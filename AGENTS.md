@@ -4,6 +4,8 @@
 
 ## 你的记忆
 
+**每次工作前，先读 [.agents/always-remember.md](.agents/always-remember.md)**——那是关于「我在为谁、为什么、朝什么而做」的备忘，提醒我记得 James 的出发点、他对 agent 能力的手感、他的理念与理想，以及我要保持的克制（别过度设计、别替人拍板、别拿分析当结论、别把 rig 缺陷当能力边界、别把复杂度当价值）。
+
 你的**决策记忆**在 [.agents/notes/](.agents/notes/)（agent 面向，跨会话持久化）：这是每个设计决策的「为什么 + 放弃了什么」，按状态轴组织（`proposed` / `in-progress` / `resolved:<fine>` / `abandoned:<fine>`）。**开始工作前先读它**（看 `resolved/` 与 `proposed/` 的树），避免重新论证或与既定方向冲突。
 
 - [.agents/notes/](.agents/notes/)：决策记忆树（no-index）——`resolved/` = 已定方向，`proposed/` = 在论证，`in-progress/` = 已接受未完成，`abandoned/` = 被否/被取代。每条 note 的 **frontmatter** 带 `status:` 字段（`proposed`/`in-progress` 平铺；`resolved:<fine>`/`abandoned:<fine>` 前缀空间）；当前立场由 `in-progress ∪ resolved:*` 从树推导，无中央「当前状态」。
