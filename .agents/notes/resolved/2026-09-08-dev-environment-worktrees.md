@@ -1,6 +1,6 @@
 # Agent Note: 开发环境自指稳定性 — bare 仓库 + worktrees（蓝绿冻结）
 
-Status: accepted
+Status: resolved:settled
 
 ## Problem
 

@@ -1,6 +1,6 @@
 # Agent Note: C1 怎么搭 + 验证结果（最小可运行 prac-on-DSH）
 
-Status: accepted
+Status: resolved:implemented
 
 Resolves the open decision in [2026-09-08-first-increment-c1.md](2026-09-08-first-increment-c1.md).
 
