@@ -33,14 +33,7 @@ docs/                       # 参考：prac 是什么、怎么运作（现在时
   abandoned/                #   被否 / 被更新取代 / 冻结
 ```
 
-## 当前状态
-
-> 权威的「当前状态」见 [.agents/notes/](.agents/notes/)（由 `in-progress ∪ resolved:*` 的并集从树推导，不在此维护）。
-
-- **阶段**：C1（最小可运行 prac-on-DSH）已搭建并验证——独立消费者能扩展 DSH。
-- **立身之本（开放问题）**：决策空间如何呈现——[.agents/notes/proposed/2026-09-08-decision-space-presentation.md](.agents/notes/proposed/2026-09-08-decision-space-presentation.md)。
-- **下一步**：C2——基于已可运行的 web surface 做「带依据的候选决策」工具。
-
 ## 相关
 
+- 决策记忆与当前方向：见 [.agents/notes/](.agents/notes/)（权威「当前状态」由 `in-progress ∪ resolved:*` 从树推导，不在 README 维护）。
 - DSH 源码与文档：`../deepseek-harness/`
