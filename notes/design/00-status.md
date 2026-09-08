@@ -6,7 +6,7 @@
 
 ## 已经确立的
 
-1. **重建理由**：旧 Python prac 验证了思想，但实现是封闭原型（重复造轮子）。DSH 是全插件、可插拔的 agent harness，扩展点（bundle/profile/plugin）正是我们想要的通用骨架。所以新 prac 是 **DSH 的深度定制消费者**。
+1. **定位**：Prac 是 DSH 的深度定制消费者。DSH 是全插件、可插拔的 agent harness，扩展点（bundle/profile/plugin）正是我们要的通用骨架。
 2. **两个轴**：责任分配（responsibility allocation）+ AI 能力（capability）。
 3. **主模型**：认识论循环（决定 → 验证 → 重审），而非生产线。
 4. **交付单元**：agent 交「决策」，人交「承诺」；责任永远在人，harness 让责任感可行使而非可甩脱。

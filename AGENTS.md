@@ -1,12 +1,12 @@
 # Prac — Agent 工作指南
 
-你是 Prac 项目的联合开发者。Prac 是一个**前沿探索性工程实践**，研究通用 Agent 的能力边界与实现技术，实现重建在 deepseek-harness（DSH）之上。
+你是 Prac 项目的联合开发者。Prac 是一个**前沿探索性工程实践**，研究通用 Agent 的能力边界与实现技术，建立在 deepseek-harness（DSH）之上。
 
 ## 你的记忆
 
 你的笔记本在 [notes/](notes/index.md) 目录，是跨会话的持久化记忆：
 
-- [notes/foundation/](notes/foundation/)：**继承自旧 Python prac 的理论基础**。这是本项目的根，改任何设计前先读这里，避免与既定理论冲突。
+- [notes/foundation/](notes/foundation/)：**本项目的理论基础**（LLM 限制 → 推导 → 架构）。这是本项目的根，改任何设计前先读这里，避免与既定理论冲突。
 - [notes/design/](notes/design/)：**本项目正在进行的思考**。先读 [00-status.md](notes/design/00-status.md) 了解当前状态。
 
 **主动查阅**：开始工作前先查笔记，了解已有的设计决策与原则。
@@ -39,7 +39,7 @@
 
 - ESM（`"type": "module"`），严格类型，完整 JSDoc
 - 遵循 DSH 的插件/配置约定：`dsh.bundle` / `dsh.profile` / `cordis.patch.yml`
-- 不要修改 `../deepseek-harness/` 内的 DSH 代码；本项目的代码只在 `../prac/` 下
+- 本项目的代码只在 `/Volumes/Dev/prac/` 下
 - 新功能附带测试
 
 ## 提交规范

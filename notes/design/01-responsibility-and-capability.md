@@ -1,6 +1,6 @@
 # 轴一：责任分配 + AI 能力
 
-> 这是新 prac 的两个根轴。绝大多数「不顺手」的手感问题，都能回溯到这两根轴上的错配，而不是某个具体开关。
+> 这是prac 的两个根轴。绝大多数「不顺手」的手感问题，都能回溯到这两根轴上的错配，而不是某个具体开关。
 
 ## 问题：现有 harness 的默认分工，让双方都接到自己最不擅长的活
 
@@ -58,5 +58,5 @@
 
 - [02-epistemic-loop-and-decision-unit.md](02-epistemic-loop-and-decision-unit.md)：把这两轴落到软件开发上
 - [03-open-questions.md](03-open-questions.md)：这三个分叉的延展
-- [foundation/agent_design_guide.md](../foundation/agent_design_guide.md)：人机协作边界、反模式（继承）
-- [foundation/agent_foundations.md](../foundation/agent_foundations.md)：LLM 固有限制（继承，能力轴的根理论）
+- [foundation/agent_design_guide.md](../foundation/agent_design_guide.md)：人机协作边界、反模式
+- [foundation/agent_foundations.md](../foundation/agent_foundations.md)：LLM 固有限制，能力轴的根理论

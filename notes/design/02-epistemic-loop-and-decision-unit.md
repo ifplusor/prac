@@ -1,6 +1,6 @@
 # 轴二：认识论循环 + 决策交付单元（落到软件开发）
 
-> 软件开发是创造性工作，没有重复的日常事务性内容。工作模式是「边做边想、不断调整」，很难在一开始把所有东西想清楚再开干。这决定了新 prac 的主模型是认识论循环，不是生产线。
+> 软件开发是创造性工作，没有重复的日常事务性内容。工作模式是「边做边想、不断调整」，很难在一开始把所有东西想清楚再开干。这决定了prac 的主模型是认识论循环，不是生产线。
 
 ## 为什么 agent 设计不好架构、爱走捷径
 
@@ -58,5 +58,5 @@
 
 - [01-responsibility-and-capability.md](01-responsibility-and-capability.md)：两轴的根源
 - [03-open-questions.md](03-open-questions.md)：决策空间的呈现、采纳判据
-- [foundation/dual_agent_architecture.md](../foundation/dual_agent_architecture.md)：Secretary/Executor 双角色（继承，认识论循环的人机界面形态）
-- [foundation/agent_design_guide.md](../foundation/agent_design_guide.md)：长流程状态管理、人机协作边界（继承）
+- [foundation/dual_agent_architecture.md](../foundation/dual_agent_architecture.md)：Secretary/Executor 双角色，认识论循环的人机界面形态
+- [foundation/agent_design_guide.md](../foundation/agent_design_guide.md)：长流程状态管理、人机协作边界

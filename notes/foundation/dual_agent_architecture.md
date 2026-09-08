@@ -896,24 +896,6 @@ Secretary 需要识别这种**渐进转化**，而不是一开始就强求用户
 - Executor 可以使用记忆系统检索相关经验
 - 两者共享同一个持久化存储
 
-## 下一步
-
-### 已完成
-
-1. [x] 实现 Task Specification 和 ExecutionReport 数据结构 (`dual_agent/types.py`)
-2. [x] 实现 Secretary 原型 (`dual_agent/secretary.py`)
-3. [x] 实现 Executor (`dual_agent/executor.py`)
-4. [x] 定义 Secretary-Executor 通信协议 (TaskQueue/ReportQueue)
-5. [x] 实现 Orchestrator 协调器 (`dual_agent/orchestrator.py`)
-
-### 待完成
-
-1. [ ] 添加更完善的意图检测和澄清策略
-2. [ ] 实现任务中断和取消机制
-3. [ ] 添加任务持久化（重启后恢复）
-4. [ ] 实现用户偏好学习
-5. [ ] 添加单元测试
-
 ---
 
 *本文档为探索性设计，将随着实践迭代更新。*
