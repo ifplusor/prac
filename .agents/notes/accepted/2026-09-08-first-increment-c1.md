@@ -22,4 +22,4 @@ Status: accepted
 
 ## Next open decision
 
-「**C1 怎么搭**」——bundle 结构、插件形态、profile 配法、用哪个 surface（web/headless）、怎么验证。这会在 prac-dev 里摊成决策空间给人类裁决后再动手。
+「**C1 怎么搭**」已裁决并落地，见 [2026-09-08-c1-build-prac-web-app.md](2026-09-08-c1-build-prac-web-app.md)。下一个开放决策是 **C2**（决策空间工具：带依据的候选决策作为模型可见输入）。

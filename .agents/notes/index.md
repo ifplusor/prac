@@ -13,9 +13,9 @@
 
 ## 当前状态
 
-- **阶段**：设计探索，尚未挂载到 DSH。
+- **阶段**：第一个增量 C1（最小可运行 prac-on-DSH）已搭建并验证——独立消费者能扩展 DSH。
 - **立身之本（开放问题）**：决策空间如何呈现——见 [proposed/2026-09-08-decision-space-presentation.md](proposed/2026-09-08-decision-space-presentation.md)。
-- **下一步**：挑一个真实 vibe coding 任务，看「决策空间呈现 / 审查主界面」哪处最痛；据此定第一个 DSH 实验切口。
+- **下一步**：C2——基于已可运行的 web surface 做「带依据的候选决策」工具。
 
 ## 决策记录
 
@@ -26,6 +26,7 @@
 | [proposed/2026-09-08-decision-space-presentation.md](proposed/2026-09-08-decision-space-presentation.md) | proposed | 决策空间如何呈现（立身之本，开放） |
 | [accepted/2026-09-08-dev-environment-worktrees.md](accepted/2026-09-08-dev-environment-worktrees.md) | accepted | 开发环境自指稳定性：bare 仓库 + worktree 蓝绿冻结 |
 | [accepted/2026-09-08-first-increment-c1.md](accepted/2026-09-08-first-increment-c1.md) | accepted | 第一个增量 = C1：最小可运行的 prac-on-DSH |
+| [accepted/2026-09-08-c1-build-prac-web-app.md](accepted/2026-09-08-c1-build-prac-web-app.md) | accepted | C1 怎么搭 + 验证结果：prac-web-app bundle + profile，独立消费者扩展 DSH 得证 |
 
 ## 参考
 
