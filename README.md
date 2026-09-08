@@ -2,7 +2,7 @@
 
 Prac（Practice）是**前沿探索性工程实践**，研究通用 Agent 的能力边界与实现技术。Prac 建立在 [deepseek-harness](https://github.com/deepseek-harness)（DSH）之上。
 
-> Prac 把「Agent 的形态」组织在两个轴——**责任分配** 与 **AI 能力**——并以**认识论循环**（决定 → 验证 → 重审）为主工作模型。**完整论述（现在时）见 [docs/philosophy.md](docs/philosophy.md)；每个「为什么 + 放弃了什么」见 [.agents/notes/](.agents/notes/index.md)。**
+> Prac 把「Agent 的形态」组织在两个轴——**责任分配** 与 **AI 能力**——并以**认识论循环**（决定 → 验证 → 重审）为主工作模型。**完整论述（现在时）见 [docs/philosophy.md](docs/philosophy.md)；每个「为什么 + 放弃了什么」见 [.agents/notes/](.agents/notes/)。**
 
 ## 为什么建立在 DSH 之上
 
@@ -26,16 +26,20 @@ docs/                       # 参考：prac 是什么、怎么运作（现在时
   philosophy.md             #   两个轴 + 认识论循环 + 决策单元
   architecture.md           #   映射到 DSH（bundle / profile / plugin）
   theory/                   #   继承的 LLM 限制理论（固有特征、记忆模型、双 Agent、设计模式）
-.agents/notes/              # 决策记忆：agent 面向，状态轴（proposed/accepted/rejected/archived）
-  index.md                  #   状态 + 导航
+.agents/notes/              # 决策记忆：agent 面向，状态轴（proposed/in-progress/resolved:<fine>/abandoned:<fine>，no-index）
+  resolved/                 #   已定方向（决策定案/结论成立/代码实现且验证）
   proposed/                 #   正在论证的决策记录（date-slug 命名，无顺序编号）
+  in-progress/              #   已接受、工作进行中
+  abandoned/                #   被否 / 被更新取代 / 冻结
 ```
 
 ## 当前状态
 
-- **阶段**：设计探索。正在把「责任分配 + 认识论循环」这套框架写清楚，尚未开始实际挂载到 DSH。
-- **立身之本（开放问题）**：决策空间如何呈现。
-- **下一步**：见 [.agents/notes/index.md](.agents/notes/index.md)。
+> 权威的「当前状态」见 [.agents/notes/](.agents/notes/)（由 `in-progress ∪ resolved:*` 的并集从树推导，不在此维护）。
+
+- **阶段**：C1（最小可运行 prac-on-DSH）已搭建并验证——独立消费者能扩展 DSH。
+- **立身之本（开放问题）**：决策空间如何呈现——[.agents/notes/proposed/2026-09-08-decision-space-presentation.md](.agents/notes/proposed/2026-09-08-decision-space-presentation.md)。
+- **下一步**：C2——基于已可运行的 web surface 做「带依据的候选决策」工具。
 
 ## 相关
 

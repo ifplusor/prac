@@ -1,6 +1,6 @@
 # Prac 在 DSH 上的落地结构
 
-> Prac 以 DSH 消费者的身份，把「认识论 harness」的六件事嫁接到它的扩展点上，而不是改它的内核。这是现在时的结构参考；「为什么这么定」见 [.agents/notes/](../.agents/notes/index.md)。
+> Prac 以 DSH 消费者的身份，把「认识论 harness」的六件事嫁接到它的扩展点上，而不是改它的内核。这是现在时的结构参考；「为什么这么定」见 [.agents/notes/](../.agents/notes/)。
 
 ## DSH 的扩展模型（已核实的结构）
 

@@ -1,6 +1,6 @@
 # Prac 哲学
 
-> Prac 如何思考「Agent 的形态」。这是稳定的现在时参考；每条决策的「为什么 + 放弃了什么」见 [.agents/notes/](../.agents/notes/index.md)。
+> Prac 如何思考「Agent 的形态」。这是稳定的现在时参考；每条决策的「为什么 + 放弃了什么」见 [.agents/notes/](../.agents/notes/)。
 
 ## 责任分配
 
