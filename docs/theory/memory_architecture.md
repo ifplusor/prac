@@ -608,4 +608,4 @@ source: local
 
 - [agent_foundations.md](agent_foundations.md) - Agent 理论基础（LLM 固有限制）
 - [agent_design_guide.md](agent_design_guide.md) - Agent 设计指南（模式与反模式）
-- [AGENTS.md](../AGENTS.md) - 本项目 Agent 实现与工具索引
+- [AGENTS.md](../../AGENTS.md) - 本项目 Agent 实现与工具索引

@@ -145,4 +145,4 @@
 
 - [agent_foundations.md](agent_foundations.md) - Agent 理论基础
 - [memory_architecture.md](memory_architecture.md) - 记忆系统详细设计
-- [AGENTS.md](../AGENTS.md) - 项目愿景与架构索引
+- [AGENTS.md](../../AGENTS.md) - 项目愿景与架构索引

@@ -1,6 +1,6 @@
-# 如何映射到 DSH 的扩展点
+# Prac 在 DSH 上的落地结构
 
-> 目标：把「认识论 harness」的六件事，以 DSH 消费者的身份嫁接到它的扩展点上，而不是改它的内核。
+> Prac 以 DSH 消费者的身份，把「认识论 harness」的六件事嫁接到它的扩展点上，而不是改它的内核。这是现在时的结构参考；「为什么这么定」见 [.agents/notes/](../.agents/notes/index.md)。
 
 ## DSH 的扩展模型（已核实的结构）
 
@@ -51,9 +51,10 @@ AGENTS.md 的规则：**「Plugins, not loop changes——新行为走文档化�
 
 1. 从最痛的一处切入：拿一个真实的 vibe coding 任务（大目标 → 拆解 → 审查 → 调整），看「决策空间呈现」和「审查主界面」这两件事哪一处最阻碍你。
 2. 做一个**最小 DSH 实验**：自定义 profile + 一个 bundle，只验证一个机制（比如「带依据的候选决策工具」），在 Web GUI 里观察。
-3. 把每次实验的观察写进 `notes/design/`，更新 03-open-questions。
+3. 把每次实验的观察写进 `.agents/notes/`（新的 proposed 记录，或更新 decision-space-presentation）。
 
 ## 相关
 
-- [01-responsibility-and-capability.md](01-responsibility-and-capability.md)、[02-epistemic-loop-and-decision-unit.md](02-epistemic-loop-and-decision-unit.md)
+- [proposed/2026-09-08-epistemic-loop-decision-unit.md](../.agents/notes/proposed/2026-09-08-epistemic-loop-decision-unit.md)
+- [philosophy.md](philosophy.md)
 - DSH：`../deepseek-harness/docs/architecture.md`（profiles & bundles）、`packages/boot/app-boot`、`packages/bundle/`

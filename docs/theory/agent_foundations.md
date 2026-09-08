@@ -109,4 +109,4 @@
 
 - [agent_design_guide.md](agent_design_guide.md) - 设计模式与操作规范
 - [memory_architecture.md](memory_architecture.md) - 记忆系统详细设计
-- [AGENTS.md](../AGENTS.md) - 项目愿景与架构索引
+- [AGENTS.md](../../AGENTS.md) - 项目愿景与架构索引

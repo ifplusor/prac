@@ -4,14 +4,14 @@
 
 ## 你的记忆
 
-你的笔记本在 [notes/](notes/index.md) 目录，是跨会话的持久化记忆：
+你的**决策记忆**在 [.agents/notes/](.agents/notes/index.md)（agent 面向，跨会话持久化）：这是每个设计决策的「为什么 + 放弃了什么」，按状态轴组织（proposed / decided / rejected / archived）。**开始工作前先读它**，避免重新论证或与既定方向冲突。
 
-- [notes/foundation/](notes/foundation/)：**本项目的理论基础**（LLM 限制 → 推导 → 架构）。这是本项目的根，改任何设计前先读这里，避免与既定理论冲突。
-- [notes/design/](notes/design/)：**本项目正在进行的思考**。先读 [00-status.md](notes/design/00-status.md) 了解当前状态。
+- [.agents/notes/index.md](.agents/notes/index.md)：状态 + 导航，先读这里了解当前立场。
+- [docs/](docs/)：**参考**（现在时、stable）。[philosophy.md](docs/philosophy.md) 是当下的哲学论述；[docs/theory/](docs/theory/) 是继承的 LLM 限制理论根。
 
-**主动查阅**：开始工作前先查笔记，了解已有的设计决策与原则。
+**主动查阅**：开始工作前先查 `.agents/notes/` 和 `docs/`。
 
-**主动记录**：发现值得保留的知识（设计决策、踩坑、有效模式）就写入 `notes/design/`，不必等人类要求。
+**主动记录**：发现值得保留的知识（设计决策、踩坑、有效模式）就写入 `.agents/notes/`（新的 proposed 记录或更新既有决策），不必等人类要求。
 
 ## 工作原则
 
