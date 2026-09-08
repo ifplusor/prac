@@ -1,0 +1,21 @@
+packages:
+  - packages/*
+
+# The bundle's DSH peer deps resolve at runtime from the DSH installation, so
+# never auto-fetch them from the registry (they are not published).
+autoInstallPeers: false
+
+catalogMode: prefer
+
+catalog:
+  "@types/node": ^24
+  typescript: ^7.0.2
+  vite: npm:@voidzero-dev/vite-plus-core@0.2.8
+  vite-plus: 0.2.8
+overrides:
+  vite: "catalog:"
+peerDependencyRules:
+  allowAny:
+    - vite
+  allowedVersions:
+    vite: "*"
