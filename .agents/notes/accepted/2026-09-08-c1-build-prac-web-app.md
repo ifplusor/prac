@@ -17,12 +17,12 @@ C1 用如下结构搭建（已在 `prac-dev` 落地并验证）：
 - **profile 配法**：profile 是 home 薄组合，不走「项目目录 symlink」。用 `dsh plugin --profile <name> add <path>` 建。按蓝绿冻结定义三个 profile：
   - `prac`（稳定 web 面）：bundles = `[dsh-base, dsh-web-app, prac-web-app]`，`patchReload: live`；**目标是装 prac-main 的 bundle**（待 C1 验收后 promote 到位）。
   - `prac-dev`（开发面）：bundles = `[dsh-base, dsh-web-app, prac-web-app]`，`patchReload: startup`（dev 副本会被频繁改，去掉 HMR 抖动）；装 **prac-dev** 的 bundle。
-  - `prac-headless`（验证回路）：bundles = `[dsh-base, dsh-headless, prac-web-app]`，`patchReload: startup`；跟随正在验证的那份。
+  - `prac-headless-dev`（验证回路）：bundles = `[dsh-base, dsh-headless, prac-web-app]`，`patchReload: startup`；跟随正在验证的那份。
   - base / web-app / headless 是 in-box bundle（从 dsh 安装解析）；`prac-web-app` 是 out-of-tree（装进 profile 的 node_modules，`link:` 链接便于开发）。
   - **promote 时序（用户裁决）**：**先验收，再 promote**。验收已在 3081 web GUI 通过（`prac_ping` 返回 `ok/name/version/time`）。已完成：提交进 `dev` → merge `main` → 更新 `prac-main` worktree → 把 `prac` 的依赖换成 `prac-main` 的 bundle。
-- **surface**：web 为主（C2 的 surface 基底 + 验收面），另有 `prac-headless` 作 agent 可自动验证的端到端回路。
+- **surface**：web 为主（C2 的 surface 基底 + 验收面），另有 `prac-headless-dev` 作 agent 可自动验证的端到端回路。
 - **验证**：bundle 单测（worktree，不写 DSH home）为主 gate；`--dump-config` / headless 跑 / web 起服 用 `danger-full-access`；web GUI 由真人验收。
-- `patchReload`: `prac` 用 `live`（稳定面无需防抖）；`prac-dev` 与 `prac-headless` 用 `startup`（会被改 / 一次性语义）。
+- `patchReload`: `prac` 用 `live`（稳定面无需防抖）；`prac-dev` 与 `prac-headless-dev` 用 `startup`（会被改 / 一次性语义）。
 
 ## Alternatives considered
 
@@ -37,8 +37,8 @@ C1 用如下结构搭建（已在 `prac-dev` 落地并验证）：
 - `vp pack` 产 `dist/index.mjs`（ESM）+ `dist/index.d.mts`；DSH 平台包保持 external（`--deps.never-bundle`）。
 - `vp check --fix`：无格式/lint/类型错误。
 - `vp test`：3/3 通过（mock 掉 DSH 缝，单测 bundle 自身贡献）。
-- `dsh --profile prac-headless --dump-config`：`prac-web-app` 行以 `insert` 排进组成树（provenance `# == prac-web-app`）。
-- `dsh --profile prac-headless "call prac_ping"`：**模型调用 `prac_ping` 成功**，返回 `{ok:true, name:'prac', version:'0.0.0', time}`。→ 独立消费者扩展 DSH 得证。
+- `dsh --profile prac-headless-dev --dump-config`：`prac-web-app` 行以 `insert` 排进组成树（provenance `# == prac-web-app`）。
+- `dsh --profile prac-headless-dev "call prac_ping"`：**模型调用 `prac_ping` 成功**，返回 `{ok:true, name:'prac', version:'0.0.0', time}`。→ 独立消费者扩展 DSH 得证。
 - `dsh --profile prac --port 3081 --no-open`：web 服务正常起服，`http://127.0.0.1:3081/?token=...`（401 未授权=需 token，符合预期）。→ 待真人开浏览器验收。
 
 ## Two friction findings (recorded, not conclusions)
