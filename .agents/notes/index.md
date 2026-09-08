@@ -24,6 +24,7 @@
 | [proposed/2026-09-08-responsibility-allocation.md](proposed/2026-09-08-responsibility-allocation.md) | proposed | 责任分配：AI 有界认知 / 人意图·判断·校验 / harness 账本 |
 | [proposed/2026-09-08-epistemic-loop-decision-unit.md](proposed/2026-09-08-epistemic-loop-decision-unit.md) | proposed | 认识论循环 + 决策交付单元 |
 | [proposed/2026-09-08-decision-space-presentation.md](proposed/2026-09-08-decision-space-presentation.md) | proposed | 决策空间如何呈现（立身之本，开放） |
+| [accepted/2026-09-08-dev-environment-worktrees.md](accepted/2026-09-08-dev-environment-worktrees.md) | accepted | 开发环境自指稳定性：bare 仓库 + worktree 蓝绿冻结 |
 
 ## 参考
 
