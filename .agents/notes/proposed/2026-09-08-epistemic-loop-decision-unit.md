@@ -1,6 +1,7 @@
+---
+status: proposed
+---
 # Agent Note: 认识论循环 + 决策交付单元
-
-Status: proposed
 
 ## Problem
 

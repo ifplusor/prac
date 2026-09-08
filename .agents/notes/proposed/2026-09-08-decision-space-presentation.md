@@ -1,6 +1,7 @@
+---
+status: proposed
+---
 # Agent Note: 决策空间如何呈现（立身之本，开放）
-
-Status: proposed
 
 ## Problem
 

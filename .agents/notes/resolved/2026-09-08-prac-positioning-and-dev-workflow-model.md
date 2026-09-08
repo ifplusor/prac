@@ -1,6 +1,7 @@
+---
+status: resolved:settled
+---
 # Agent Note: prac 的定位、`.agents/notes` 形态与开发工作流模型
-
-Status: resolved:settled
 
 ## Problem
 

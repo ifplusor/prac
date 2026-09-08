@@ -1,6 +1,7 @@
+---
+status: resolved:settled
+---
 # Agent Note: 第一个增量 = C1（最小可运行的 prac-on-DSH）
-
-Status: resolved:settled
 
 ## Problem
 
