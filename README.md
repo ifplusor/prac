@@ -26,7 +26,7 @@ docs/                       # 参考：prac 是什么、怎么运作（现在时
   philosophy.md             #   两个轴 + 认识论循环 + 决策单元
   architecture.md           #   映射到 DSH（bundle / profile / plugin）
   theory/                   #   继承的 LLM 限制理论（固有特征、记忆模型、双 Agent、设计模式）
-.agents/notes/              # 决策记忆：agent 面向，状态轴（proposed/decided/rejected/archived）
+.agents/notes/              # 决策记忆：agent 面向，状态轴（proposed/accepted/rejected/archived）
   index.md                  #   状态 + 导航
   proposed/                 #   正在论证的决策记录（date-slug 命名，无顺序编号）
 ```

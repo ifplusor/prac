@@ -5,9 +5,11 @@
 ## 生命周期
 
 - **proposed/** — 还在论证/未定案。正文用将来时，允许计划、迁移、开放问题。
-- **decided/** — 已定案。现在时陈述「prac 就是这么做的」。
+- **accepted/** — 已采纳为当前方向。现在时陈述「prac 就是这么做的」。
 - **rejected/** — 被否掉。保留仅当其理由能防止一个诱惑性错误；否则删除。
 - **archived/** — 冻结的被取代/被否决策。永不编辑，不作当前权威。
+
+> 这套生命周期借用了 RFC 文档状态的形态：`Proposed → Accepted / Rejected → Historic`。用 `accepted` 而非 DSH 的 `implemented`，是因为 prac 目前是「**采纳为方向**」，尚未在 DSH 代码里落地；等某条决策真正实现到 bundle/profile 里时，再考虑 `implemented`。
 
 ## 当前状态
 
