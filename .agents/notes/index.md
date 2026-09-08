@@ -25,6 +25,7 @@
 | [proposed/2026-09-08-epistemic-loop-decision-unit.md](proposed/2026-09-08-epistemic-loop-decision-unit.md) | proposed | 认识论循环 + 决策交付单元 |
 | [proposed/2026-09-08-decision-space-presentation.md](proposed/2026-09-08-decision-space-presentation.md) | proposed | 决策空间如何呈现（立身之本，开放） |
 | [accepted/2026-09-08-dev-environment-worktrees.md](accepted/2026-09-08-dev-environment-worktrees.md) | accepted | 开发环境自指稳定性：bare 仓库 + worktree 蓝绿冻结 |
+| [accepted/2026-09-08-first-increment-c1.md](accepted/2026-09-08-first-increment-c1.md) | accepted | 第一个增量 = C1：最小可运行的 prac-on-DSH |
 
 ## 参考
 
