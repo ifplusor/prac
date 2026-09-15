@@ -63,6 +63,11 @@ import { onUnexpectedError } from "../../base/common/errors.js";
 import { Direction, Grid, ISerializableView, IViewSize } from "../../base/browser/ui/grid/grid.js";
 import { Part } from "./part.js";
 import { ViewPane } from "./parts/views/viewPane.js";
+import { CodeEditorWidget } from "../../editor/browser/widget/codeEditor/codeEditorWidget.js";
+import { ITextModelService } from "../../editor/common/services/resolverService.js";
+import type { IResolvedTextEditorModel } from "../../editor/common/services/resolverService.js";
+import type { ICodeEditor } from "../../editor/browser/editorBrowser.js";
+import type { IReference } from "../../base/common/lifecycle.js";
 import {
   IWorkbenchLayoutService,
   IPartVisibilityChangeEvent,
@@ -235,6 +240,16 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   private readonly deferredHosts = new Map<string, HTMLElement>();
   /** Kept for runtime service access (`openWorkspaceFolder`). */
   private instantiationService: InstantiationService | undefined;
+  /**
+   * One editing surface per resource, mounted by the embedder.
+   *
+   * The reference is what keeps the workbench's text model alive while this
+   * surface shows it; releasing it lets the model go when nothing else holds it.
+   */
+  private readonly mountedFiles = new Map<
+    string,
+    { readonly editor: ICodeEditor; readonly reference: IReference<IResolvedTextEditorModel> }
+  >();
   /** One single-view grid per mounted part; the grid supplies part positioning. */
   private readonly grids = new Map<string, Grid<ISerializableView>>();
   /**
@@ -327,6 +342,9 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
             mountViewInto: (viewId: string, element: HTMLElement) =>
               this.mountViewInto(viewId, element),
             releaseView: (viewId: string) => this.releaseView(viewId),
+            mountFileInto: (resource: string, element: HTMLElement) =>
+              this.mountFileInto(resource, element),
+            releaseFile: (resource: string) => this.releaseFile(resource),
             openUntitled: (path?: string) => this.openUntitled(path),
             openWorkspaceFolder: (folderUri: string) => this.openWorkspaceFolder(folderUri),
             workspaceInfo: () => this.workspaceInfo(),
@@ -534,6 +552,83 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     this.mountedViews.delete(viewId);
     pane.setVisible(false);
     pane.dispose();
+  }
+
+  /**
+   * Mount one file's editing surface into an external host element.
+   *
+   * The unit is the **file**, because the embedder owns which files are open,
+   * their grouping and their tab strip. What the workbench contributes is the
+   * editing surface itself, built the way the workbench builds it
+   * (`TextCodeEditor.createEditorControl`): a `CodeEditorWidget` over the
+   * workbench's own text model for the resource, so language features, markers,
+   * undo/redo and saving are the real ones rather than a re-implementation.
+   *
+   * The resource may arrive as a full URI string (`vscode-remote://…`, which is
+   * what the app's own workspace folders look like) or as a bare path; the
+   * embedder cannot construct a `URI` instance, so the string is parsed here —
+   * the same reason `openWorkspaceFolder` takes a string.
+   *
+   * Model loading is asynchronous, so this registers the element first and
+   * fills it in when the model resolves; a failed load is reported and leaves
+   * the host empty rather than half-mounted.
+   */
+  mountFileInto(resource: string, element: HTMLElement): void {
+    const mounted = this.mountedFiles.get(resource);
+    if (mounted) {
+      // One surface per file: the same file asked for twice is the same editor,
+      // re-parented — a second editor would be a second view of one model.
+      element.replaceChildren(mounted.editor.getDomNode() ?? element);
+      return;
+    }
+    const instantiationService = this.instantiationService;
+    if (!instantiationService) {
+      this.logService.error(`vscode-embed: cannot mount file ${resource} before startup`);
+      return;
+    }
+    const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
+      ? URI.parse(resource)
+      : URI.file(resource);
+    void instantiationService
+      .invokeFunction(async (accessor) => {
+        const textModelService = accessor.get(ITextModelService);
+        const reference = await textModelService.createModelReference(uri);
+        // Mirrors the options `BaseTextEditor` hands its control, plus
+        // `automaticLayout`: the embedder's regions resize, and nothing here
+        // would otherwise tell the widget to lay out again.
+        const editor = instantiationService.createInstance(
+          CodeEditorWidget,
+          element,
+          {
+            automaticLayout: true,
+            fixedOverflowWidgets: true,
+            renderValidationDecorations: "on",
+          },
+          Object.create(null),
+        ) as unknown as ICodeEditor;
+        editor.setModel(reference.object.textEditorModel);
+        this.mountedFiles.set(resource, { editor, reference });
+        this._register(editor as unknown as IDisposable);
+        this._register(reference);
+      })
+      .catch((error) => {
+        this.logService.error(`vscode-embed: failed to mount file ${resource}`, error);
+      });
+  }
+
+  /**
+   * Dispose the editing surface for a file, so it can be mounted again.
+   *
+   * The text model is not the embedder's to destroy: the reference taken by
+   * {@link mountFileInto} is released, and the model goes when nothing else
+   * holds it (another surface, or a dirty buffer).
+   */
+  releaseFile(resource: string): void {
+    const mounted = this.mountedFiles.get(resource);
+    if (!mounted) return;
+    this.mountedFiles.delete(resource);
+    mounted.editor.dispose();
+    mounted.reference.dispose();
   }
 
   /**

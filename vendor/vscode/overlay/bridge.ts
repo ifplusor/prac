@@ -77,6 +77,39 @@ export interface PartHostFace {
    */
   releaseView: (viewId: string) => void;
   /**
+   * Mount **one file's editing surface** into an external host element.
+   *
+   * The unit is the file, not the editor part: the embedder decides which files
+   * are open, groups them, and draws the tab strip, so what it needs from the
+   * workbench is a single file's editing control — the workbench's own text
+   * model (so language features, undo/redo and saving are the real ones) in a
+   * `CodeEditorWidget`, which is how the workbench itself builds an editor
+   * control (`TextCodeEditor.createEditorControl`). No editor part, no editor
+   * group, no tab strip: those are the embedder's composition.
+   *
+   * The resource is the workbench's own URI as a string
+   * (`vscode-remote://<authority>/<path>`, or a bare path for a local file) —
+   * the same vocabulary {@link PartHostFace.openWorkspaceFolder} takes, because
+   * the embedder cannot construct a `URI` instance.
+   *
+   * One editing surface per resource: mounting a resource that is already
+   * mounted re-parents it (a file has one model, and a second editor for it
+   * would be a second view of the same text).
+   *
+   * @param resource - the file's URI, as a string.
+   * @param element - the host element the embedder rendered for it.
+   */
+  mountFileInto: (resource: string, element: HTMLElement) => void;
+  /**
+   * Dispose the editing surface created by {@link PartHostFace.mountFileInto},
+   * so the same file can be mounted again (elsewhere, or after its host went
+   * away). The workbench's text model survives while anything else references
+   * it.
+   *
+   * @param resource - the file's URI, as a string.
+   */
+  releaseFile: (resource: string) => void;
+  /**
    * Open an untitled editor.
    *
    * @param path - optional path the untitled buffer is named after.

@@ -123,15 +123,18 @@ pnpm --filter prac-vscode vscode:clean
 四条闸门都打真实浏览器、看 **DOM 与像素**（不是看代码），需要 DSH 页在跑。它们也正是**交互面走 bridge** 的回归测试：bridge 若失效，workbench 会退回"自己挂 part"的默认路径、把 part 挂进不可见的 boot 容器，于是四条全红。
 
 ```bash
-URL='http://127.0.0.1:3084/?token=…' node scripts/verify-layout.mjs   # 24 项
-URL='…' node scripts/verify-views.mjs                                 # 33 项
-URL='…' node scripts/verify-focus.mjs                                 # 12 项
+URL='http://127.0.0.1:3084/?token=…' node scripts/verify-layout.mjs   # 14 项
+URL='…' node scripts/verify-views.mjs                                 # 25 项
+URL='…' node scripts/verify-focus.mjs                                 # 9 项
 URL='…' node scripts/verify-regions.mjs                               # 1 项
 URL='…' node scripts/verify-view.mjs                                    # 7 项（单 view 宿主：无 part、有像素、可释放重建）
+URL='…' node scripts/verify-file.mjs                                    # 7 项（单文件编辑面：真实文本、有像素、一文件一面、可释放重建）
 URL='…' node scripts/verify-extension.mjs                               # 5 项（需已装扩展；没装则明确 SKIP）
 ```
 
-**独立页（无 bridge 的默认路径）另有一条**：`vscode:serve`（默认 `:5199`）跑着时 `vscode:smoke` 断言 7 个 part 全部挂载且编辑器有内容，`errorCount: 0`。
+数目是**决定 21 删减后**的（机制断言搬进了各包的 `*.spec.ts`，用 `pnpm test` 跑）；vendor 门只留真页面能证明的事实。
+
+**独立页（无 bridge 的默认路径）另有一条**：`vscode:serve`（默认 `:5199`）跑着时 `vscode:smoke` 断言 8 个 part 全部挂载且编辑器有内容，`errorCount: 0`。
 
 - `verify-layout`：区域树分栏、sash 拖拽、收起/展开恢复缓存尺寸，且编辑器**全程在画**并落在编排要求的位置。
 - `verify-views`：调出面（recall surface）按快捷键打开、列出实时 view 目录、隐藏/调出/移区/分栏都在像素上生效。
@@ -139,6 +142,7 @@ URL='…' node scripts/verify-extension.mjs                               # 5 �
 - `verify-regions`：VS part host 被挂载、定位、上屏。
 - 活体门里只有**需要 VS Code 侧**的那些住在这里（part host / embed face / 扩展 / 编辑器像素）；**prac 自己机制的闸门放 prac 的 `tests/gates/`**（如堆叠）。
 - `verify-view`：**单个 view** 被造成自带 pane 挂进 prac 的 region（页面里没有 sidebar part），并且跨 region 搬移时释放后重建仍然上屏。
+- `verify-file`：**一个文件的编辑面**（决定 17 的单位）——工作台自己的模型渲染出该文件的真实文本、有像素、同一文件重复挂载是同一实例换宿主、释放后能再挂载。期望值由门自己从磁盘读同一个文件算出：**app 的工作区是 DSH 的活动工作区**，不是本仓。
 - `verify-extension`：装好的第三方扩展**激活**（它的 view 描述符只有激活后才存在），且 `mountViewInto` 能把它的 view 渲染进 prac；`VIEW=…` 换视图。
 
 闸门输出的 `errorCount` 含**已知噪音**：extension host 加载 `@vscode/spdlog` / `@vscode/native-watchdog` 的 native binding 失败（我们不构建 native 产物），不影响 workbench 上屏；判定看 `checks` 全 `true` 与结尾的 `OK:` 行。
