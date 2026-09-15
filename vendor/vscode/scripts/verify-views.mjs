@@ -189,6 +189,11 @@ async function sample(page) {
             }
           : null,
         hostCount: document.querySelectorAll(editorHost).length,
+        // Where the conversation sits, from the layout probe: with the
+        // conversation a view like any other it moves, so a gate that cares
+        // about "the track stayed alive" has to read the placement, not infer it.
+        conversationRegion:
+          globalThis.__pracLayout?.getState?.().views?.["dsh:main:conversation"]?.region ?? null,
         overlay: box(document.querySelector("[data-prac-recall]")),
         strip: !!document.querySelector("[data-prac-focus-strip]"),
         rows: [...document.querySelectorAll(rowSelector)].map((element) => ({
@@ -427,7 +432,10 @@ const checks = {
   // 5. arrow keys move the cursor; Enter runs the selected row's 聚焦.
   arrowsMoveCursor: states.cursorMoved === EDITOR_VIEW,
   enterFocusedIntoConsole:
-    states.focusedByKey.host?.region === "stage" && states.focusedByKey.right === null,
+    states.focusedByKey.host?.region === "stage" &&
+    // The conversation parks in the track instead of the track emptying out:
+    // one view holds a region, and the one that yields stays on screen.
+    states.focusedByKey.conversationRegion === "right",
   enterFocusPainted: painted(states.focusedByKey.editorPaint),
 
   // 6. 移到: the view renders in the destination, and the source region's space

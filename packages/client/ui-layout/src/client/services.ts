@@ -26,8 +26,10 @@ import type { MainPanelId, PanelInfo } from "@deepseek-ai/dsh-client-ui-layout/c
 import type { HostObservable } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import { DSH_CONVERSATION_KEY, DSH_MAIN_PREFIX, catalogueViewIds } from "./catalogue.js";
 import {
+  CENTER_REGION,
   type Dir,
   type LayoutFace,
+  type LayoutState,
   type PracLayoutFace,
   type RoleBindings,
   type ViewRecord,
@@ -37,6 +39,7 @@ import {
   ensureView,
   findRegion,
   firstRegionId,
+  frontView,
   place,
   regionInfos,
   setCollapsed,
@@ -66,6 +69,13 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
   /** The arrangement's role bindings (empty until it binds them). */
   const roles: RoleBindings = {};
 
+  /** Where a view parks when it gives up the centre (unbound until the arrangement says). */
+  let trackRegion: string | undefined;
+
+  /** The region new centre views go to: the frame's centre, or the first region without one. */
+  const centreRegion = (state: LayoutState): string =>
+    findRegion(state.tree, CENTER_REGION) ? CENTER_REGION : firstRegionId(state.tree);
+
   /** Monotonic ids for regions and splits created after boot. */
   let nodeSeq = 0;
   const nextNodeId = (kind: string): string => `${kind}-${++nodeSeq}`;
@@ -87,14 +97,28 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
       navigation.abort();
       navigation = new AbortController();
       store.update((state) => {
-        // The selected panel replaces whatever `main` view is on show, in the
-        // same region it occupied — so "the centre" is derived from the
-        // arrangement's placement, never from a hard-coded region id.
-        const shown =
-          state.views[`${DSH_MAIN_PREFIX}${state.activePanelId ?? DSH_CONVERSATION_KEY}`];
-        const regionId = shown?.region ?? firstRegionId(state.tree);
         const viewId = `${DSH_MAIN_PREFIX}${panelId ?? DSH_CONVERSATION_KEY}`;
-        return place({ ...state, activePanelId: panelId }, viewId, regionId);
+        // The chosen view goes where the *arrangement* placed it, or to the
+        // centre when it has no home of its own — never to "wherever the panel
+        // on show happened to sit". A view parked in the track counts as having
+        // no home: selecting it brings it back to the centre.
+        const current = state.views[viewId]?.region;
+        const regionId =
+          current !== undefined && current !== trackRegion ? current : centreRegion(state);
+        const outgoing = frontView(state, regionId);
+        const next = place({ ...state, activePanelId: panelId }, viewId, regionId);
+        // One view holds a region. The one that gave it up parks in the track
+        // the arrangement bound, which is what lets a panel and the
+        // conversation share the screen instead of replacing each other.
+        if (
+          trackRegion === undefined ||
+          trackRegion === regionId ||
+          outgoing === undefined ||
+          outgoing === viewId
+        ) {
+          return next;
+        }
+        return place(next, outgoing, trackRegion);
       });
     },
     beginNavigation(): AbortSignal {
@@ -194,6 +218,9 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
     bindRoles(next: RoleBindings): void {
       if (next.sidebar !== undefined) roles.sidebar = next.sidebar;
       if (next.rightbar !== undefined) roles.rightbar = next.rightbar;
+    },
+    bindTrack(regionId: string): void {
+      trackRegion = regionId;
     },
   };
 

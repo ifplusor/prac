@@ -11,6 +11,7 @@
 import type { RegionInfo } from "./catalogue.js";
 import {
   CENTER_MIN,
+  CENTER_REGION,
   DEFAULT_MIN,
   SASH_SIZE,
   type Box,
@@ -56,7 +57,7 @@ export function defaultTree(): SplitNode {
     dir: "row",
     children: [
       regionNode("left", 280),
-      regionNode("stage", 0, { flex: true, min: CENTER_MIN }),
+      regionNode(CENTER_REGION, 0, { flex: true, min: CENTER_MIN }),
       regionNode("right", 420),
     ],
   };
@@ -212,6 +213,21 @@ export function place(state: LayoutState, viewId: string, regionId: string): Lay
     ...state,
     views: { ...state.views, [viewId]: { ...view, region: regionId, hidden: false, order: front } },
   };
+}
+
+/**
+ * The view a region currently renders: the front of its visible ones.
+ *
+ * A region shows exactly one view — the most recently placed visible one — which
+ * is what makes "the centre holds the focused view" a data fact rather than a
+ * rendering rule.
+ *
+ * @param state - current state.
+ * @param regionId - the region to inspect.
+ * @returns the front view id, or undefined when the region shows nothing.
+ */
+export function frontView(state: LayoutState, regionId: string): string | undefined {
+  return visibleViews(state, regionId)[0];
 }
 
 /**

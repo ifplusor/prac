@@ -58,7 +58,7 @@ DSH web 页
 
 > **编号 = 引用句柄**（对话与其它 note 直接引"决定 14"），所以**只追加、不复用、不重排**；下面的主题导航只做索引。
 > **主题导航**：与上游/补丁 `3 4 5 6` ｜ 边界与分层 `1 2 2b 7 8 9 10` ｜ 区域与布局 `14 15 16 20` ｜ 编辑器与文件 `17` ｜ 工作区与状态 `13` ｜ 生态与能力 `18 19` ｜ 工程 `11 12`
-> **当前队列（建议顺序，未裁）**：`14`（对话可放置）→ **B1**（单 view 宿主）→ `18`（server 基座 + Tier 2 扩展证明）→ frame 批次 `15 16 17 20` → 能力面（含上下文入）
+> **当前队列（建议顺序，未裁）**：~~`14`~~（已完成，见 §5）→ **B1**（单 view 宿主）→ `18`（server 基座 + Tier 2 扩展证明）→ frame 批次 `15 16 17 20` → 能力面（含上下文入）
 
 | # | 决定 | 状态 |
 | --- | --- | --- |
@@ -142,6 +142,7 @@ DSH web 页
 | 2026-09-13 | **Step B 第一部分**：发布 prac 的 client 类型 | `dist/client.d.mts`（ui-layout **8.4 kB** / vscode-host **37.9 kB**）+ `dist/client.mjs` **0 字节**空壳；13 个构建任务 |
 | 2026-09-15 | **命名收束**（`vs` 退役、`workbench` 退回 vendor、载荷去 prac 名） | 三条 `grep` 判据全 **0**；九包 `check`、五份产物、四闸门、独立页 smoke 8/8 + `errorCount: 0` |
 | 2026-09-15 | 抽出 `vendor/vscode-embed`（prac-free lib），prac 两行变薄 | 同上；staged 载荷与 `overlay/` 逐字节一致 |
+| 2026-09-15 | **决定 14 落地**：`selectPanel` 把选中视图放进**它自己的** region（无家则进中心），让出中心的视图停到编排绑定的 **track**；对话按普通 view 参与注意力（聚焦谁，谁进 stage，另一个停 right） | 八包 `check` + root `vp check .` 绿；四闸门 **24/24 · 33/33 · 12/12 · 1/1**（两条断言随决策更新：`promotedTrackClosed` → `promotedChatParksInTrack`，verify-views 改为读对话的放置而不是推断轨道消失）；独立页 smoke 8/8 + `errorCount: 0` |
 
 ## 6. 已核实事实
 

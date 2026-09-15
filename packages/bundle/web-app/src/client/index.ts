@@ -414,7 +414,7 @@ function RecallSurface({ layout }: RecallSurfaceProps): ReactElement | null {
       const row = views[active];
       if (!row) return;
       event.preventDefault();
-      layout.place(row.id, FOCUS_VIEW_REGION);
+      focusView(layout, row.id);
     }
   };
 
@@ -483,7 +483,7 @@ function RecallSurface({ layout }: RecallSurfaceProps): ReactElement | null {
         {
           type: "button",
           "data-prac-recall-focus": view.id,
-          onClick: () => layout.place(view.id, FOCUS_VIEW_REGION),
+          onClick: () => focusView(layout, view.id),
           style: RECALL_BUTTON_STYLE,
         },
         "聚焦",
@@ -592,18 +592,34 @@ function RecallSurface({ layout }: RecallSurfaceProps): ReactElement | null {
 }
 
 /**
- * Put attention's surface in a region.
+ * Put attention's surfaces in regions.
  *
- * The VS Code view is promoted to the centre when attention is on it and
- * demoted to the right track otherwise; the conversation keeps the centre when
- * the VS Code side is demoted, so demoting restores it rather than leaving the
- * centre empty.
+ * The focused surface takes the centre and the other parks in the right track,
+ * so both stay on screen. The conversation is a view like any other here: when
+ * the editor is focused the chat is still visible beside it, and vice versa.
  *
  * @param layout - the mechanism's placement face.
  * @param surface - the surface attention is on.
  */
-function placeEditor(layout: PracLayout, surface: Surface): void {
+function placeSurfaces(layout: PracLayout, surface: Surface): void {
+  layout.place(DSH_CONVERSATION_VIEW, surface === CONVERSATION ? STAGE : RIGHT);
   layout.place(VSCODE_EDITOR_VIEW, surface === VSCODE_SURFACE ? STAGE : RIGHT);
+}
+
+/**
+ * Bring one view to the centre, parking the conversation in the track unless it
+ * *is* the conversation.
+ *
+ * The recall surface's own door onto the same rule `selectPanel` applies: one
+ * view holds a region, and the one that gives it up stays on screen in the
+ * track rather than disappearing behind the new front.
+ *
+ * @param layout - the mechanism's placement face.
+ * @param viewId - the view to bring forward.
+ */
+function focusView(layout: PracLayout, viewId: string): void {
+  if (viewId !== DSH_CONVERSATION_VIEW) layout.place(DSH_CONVERSATION_VIEW, RIGHT);
+  layout.place(viewId, FOCUS_VIEW_REGION);
 }
 
 /**
@@ -613,6 +629,9 @@ function placeEditor(layout: PracLayout, surface: Surface): void {
  */
 function arrange(layout: PracLayout): void {
   layout.bindRoles(ROLES);
+  // Where a view parks when it gives up the centre: the right track, which is
+  // what the arrangement already uses for the surface attention is *not* on.
+  layout.bindTrack(RIGHT);
   for (const entry of DEFAULT_PLACEMENTS) {
     layout.place(entry.view, entry.region);
     if (entry.hidden === true) layout.hide(entry.view);
@@ -641,7 +660,7 @@ export function apply(ctx: Context): void {
   arrange(layout);
 
   // Attention moved: derive the placement.
-  focus.subscribe(() => placeEditor(layout, focus.state().current));
+  focus.subscribe(() => placeSurfaces(layout, focus.state().current));
 
   // The environment layer: additive, and the only seat a prac surface of our
   // own may float in (registering into `root` would shadow the whole frame).

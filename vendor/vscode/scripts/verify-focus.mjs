@@ -101,6 +101,10 @@ async function sample() {
       // The track is closed when nothing renders there: an empty fixed region
       // takes no space, so absence reads as width 0.
       rightRegionWidth: rightRegion ? Math.round(rightRegion.getBoundingClientRect().width) : 0,
+      // The conversation's own region, from the layout probe: decision 14 made it
+      // an ordinary view, so it moves with attention and the gates read it here.
+      conversationRegion:
+        globalThis.__pracLayout?.getState?.().views?.["dsh:main:conversation"]?.region ?? null,
       hosts,
       tabTitle:
         document
@@ -175,7 +179,10 @@ const checks = {
   promotedWiderThanBeside: states.promoted.host.box.w > states.default.host.box.w * 1.3,
   promotedPainted:
     states.promoted.paint?.distinctColours > 4 && states.promoted.paint.differsWhenHidden === true,
-  promotedTrackClosed: states.promoted.rightRegionWidth === 0,
+  // The chat stays beside the centred editor: the track holds it instead of
+  // closing (decision 14 — the conversation is a view like any other).
+  promotedChatParksInTrack:
+    states.promoted.conversationRegion === "right" && states.promoted.rightRegionWidth > 0,
   // The move must not lose the editor's content.
   contentSurvivesMove: !!states.promoted.tabTitle && !!states.back.tabTitle,
   // Back returns attention to where it was.

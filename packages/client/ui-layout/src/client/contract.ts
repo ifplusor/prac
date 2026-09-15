@@ -110,12 +110,25 @@ export const SASH_SIZE = 5;
 export const DEFAULT_MIN = 120;
 /** The centre work area stays wider than a side track can usefully be. */
 export const CENTER_MIN = 240;
-/** A box standing in for a region the resolver has not measured yet. */
+/**
+ * The frame's default centre region.
+ *
+ * Where a main panel goes when the arrangement placed it nowhere: the centre is
+ * the frame's own default, and the arrangement is free to place the same view
+ * somewhere else (see {@link PracLayoutFace.selectPanel}).
+ */
+export const CENTER_REGION = "stage";
 
 export interface LayoutFace {
   /**
-   * Select a global central panel, replacing whatever `main` view is shown in
-   * the region that currently holds it.
+   * Select a global central panel.
+   *
+   * The chosen view goes where the arrangement placed *it* (its own region), or
+   * to the centre when it has none — never to "wherever the panel on show
+   * happened to sit". Whatever held that region gives it up and parks in the
+   * track ({@link PracLayoutFace.bindTrack}) when one is bound, so a panel and
+   * the conversation can stay on screen together instead of replacing each
+   * other.
    *
    * @param panelId - a registered main key, or null for the conversation.
    * @throws when the key is not registered.
@@ -234,6 +247,16 @@ export interface PracLayoutFace {
    * @param roles - role name → view id.
    */
   bindRoles(roles: RoleBindings): void;
+  /**
+   * Bind the region a view parks in when it gives up the centre.
+   *
+   * Supplied by the arrangement, like the roles: the mechanism decides *that*
+   * one view holds a region, the arrangement decides *where* the one that yields
+   * goes. Unbound, a displaced view simply stays placed behind the new front.
+   *
+   * @param regionId - the parking ("track") region id.
+   */
+  bindTrack(regionId: string): void;
 }
 
 /**
