@@ -2,7 +2,7 @@
  * The layout model: pure functions over the region tree and the views table.
  *
  * Nothing here touches React or the DOM — placement is data, so `place`,
- * `setCollapsed` and `splitRegion` are ordinary tree rewrites that the store
+ * `setCollapsed` and `splitRegionWith` are ordinary tree rewrites that the store
  * commits and the frame renders.
  *
  * @module prac-client-ui-layout/client/model
@@ -20,6 +20,7 @@ import {
   type LayoutNode,
   type LayoutState,
   type RegionNode,
+  type Side,
   type SplitNode,
   type ViewRecord,
 } from "./contract.js";
@@ -365,33 +366,63 @@ export function setCollapsed(
   return { ...state, tree };
 }
 
+/** The split axis and child order a {@link Side} implies. */
+export interface SideGeometry {
+  /** The axis that side splits along. */
+  readonly dir: Dir;
+  /** Whether the new sibling goes before the source region. */
+  readonly before: boolean;
+}
+
 /**
- * Replace a region with a split of the original region and a new, empty one.
+ * Resolve a side into the geometry the tree needs.
  *
- * The new region is flexible: splitting a work area hands you another work
- * area, and a flexible region is present even while empty (see `isPresent`),
- * so the split is visible immediately.
+ * @param side - the side the new region goes on.
+ */
+export function sideGeometry(side: Side): SideGeometry {
+  return {
+    dir: side === "left" || side === "right" ? "row" : "column",
+    before: side === "left" || side === "up",
+  };
+}
+
+/**
+ * Replace a region with a split of the original region and a new one beside it.
+ *
+ * The new region is **flexible**, in both cases deliberately:
+ *
+ * - when the source is flexible, the two siblings then share the extent evenly
+ *   (`resolveSizes` hands every flex child an equal share), which is what
+ *   "split the work area" should look like;
+ * - when it is fixed, it keeps its size and the new sibling absorbs the
+ *   remainder of the split's own extent.
+ *
+ * The new region is *not* rendered while it is empty (see `isPresent`), so the
+ * caller is expected to move a view into it — that is why the face's door is
+ * `splitView`, not "split a region and hope".
  *
  * @param state - current state.
  * @param regionId - the region to split.
- * @param dir - the new split's axis.
+ * @param side - which side of it the new region goes on.
  * @param splitId - id for the replacement split.
- * @param newRegionId - id for the new empty region.
+ * @param newRegionId - id for the new region.
  */
-export function splitRegion(
+export function splitRegionWith(
   state: LayoutState,
   regionId: string,
-  dir: Dir,
+  side: Side,
   splitId: string,
   newRegionId: string,
 ): LayoutState {
   const node = findRegion(state.tree, regionId);
   if (!node) return state;
+  const { dir, before } = sideGeometry(side);
+  const fresh = regionNode(newRegionId, 0, { flex: true, min: DEFAULT_MIN });
   const replacement: SplitNode = {
     type: "split",
     id: splitId,
     dir,
-    children: [node, regionNode(newRegionId, 360, { flex: true, min: DEFAULT_MIN })],
+    children: before ? [fresh, node] : [node, fresh],
   };
   return { ...state, tree: replaceNode(state.tree, regionId, () => replacement) };
 }

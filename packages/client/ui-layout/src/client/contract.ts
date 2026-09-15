@@ -37,6 +37,14 @@ declare module "@deepseek-ai/cordis" {
 /** Split axis: `row` distributes width, `column` distributes height. */
 export type Dir = "row" | "column";
 
+/**
+ * Which side of a region a new sibling goes on. The axis follows from the side
+ * (`left`/`right` split a row, `up`/`down` a column), so one word carries both
+ * the direction and the ordering — there is no "split without a side" that
+ * could leave the caller to guess where the new region landed.
+ */
+export type Side = "left" | "right" | "up" | "down";
+
 /** A sized seat for one visible view. */
 export interface RegionNode {
   readonly type: "region";
@@ -263,12 +271,21 @@ export interface PracLayoutFace {
    */
   setWidth(regionId: string, width: number): void;
   /**
-   * Replace a region with a split of it and a new empty region.
+   * Split a view out into a new region on one side of the region holding it.
    *
-   * @param regionId - the region to split.
-   * @param dir - the new split's axis (defaults to `row`).
+   * The vector is **view-centric on purpose**: the mechanism creates the region
+   * *for* a view, so a split can never produce an empty region (decision 15:
+   * 分栏必带视图). The view must already be placed; an unplaced (or unknown) view
+   * is a no-op rather than an error — the caller is a user action, not a
+   * programming contract.
+   *
+   * The source region keeps its size when it is fixed and its remaining views;
+   * when it is flexible both regions share the split evenly.
+   *
+   * @param viewId - the view to move into the new region.
+   * @param side - which side of its current region the new region goes on.
    */
-  split(regionId: string, dir?: Dir): void;
+  splitView(viewId: string, side: Side): void;
   /**
    * Bind the roles DSH's borrowed vocabulary resolves through. Supplied by the
    * arrangement; the mechanism itself names no view. Later bindings win, and a

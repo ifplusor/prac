@@ -27,15 +27,49 @@ export function requireUrl(example = "http://127.0.0.1:3084/?token=…") {
 }
 
 /**
+ * Console noise the live page always carries, none of it about prac's mechanism:
+ * the code-server base's missing native bindings (`spdlog`, `native-watchdog`,
+ * `fs-copyfile`, `vsda`), the built-in extensions that cannot activate without
+ * them, two optional client modules that 404, and the gateway's plugin-inventory
+ * fetch that fails while the page settles.
+ *
+ * The last one is why this list exists: the inventory request's URL quotes every
+ * loaded bundle id, so a line that is pure noise can *contain* the name of the
+ * plugin under test. Filtering by prefix alone would read that as this feature
+ * failing — measured: `verify:split` went red on exactly that line.
+ */
+const KNOWN_NOISE = [
+  "Failed to load resource",
+  "reading the Cordis inventory failed",
+  "spdlog",
+  "native-watchdog",
+  "fs-copyfile",
+  "vsda",
+  "Activating extension",
+  "Cannot activate the",
+  "extension-telemetry",
+];
+
+/**
+ * Whether a console line is the page's known noise.
+ *
+ * @param {string} line - one console error.
+ * @returns {boolean} true when the line is noise, not a feature failure.
+ */
+export function isKnownNoise(line) {
+  return KNOWN_NOISE.some((marker) => line.includes(marker));
+}
+
+/**
  * Open the prac page: chromium, console capture, and the frame waited for.
  *
  * @param {string} url - the page URL.
  * @param {{ viewport?: { width: number, height: number } }} [options] - viewport.
  * @returns {Promise<{ browser: unknown, page: any, consoleErrors: string[], own: (prefix: string) => string[], close: () => Promise<void> }>}
  *   the page, the console lines, and `own(prefix)` to filter them to one
- *   feature's log prefix (the page carries known noise: missing native bindings
- *   and two optional client modules, so matching on "prac" would match every
- *   path in the workspace).
+ *   feature's log prefix, with the page's {@link isKnownNoise} removed first
+ *   (the page carries noise, so matching on "prac" alone would match every path
+ *   in the workspace *and* the plugin-inventory URL).
  */
 export async function openPrac(url, options = {}) {
   const browser = await chromium.launch();
@@ -54,7 +88,7 @@ export async function openPrac(url, options = {}) {
     browser,
     page,
     consoleErrors,
-    own: (prefix) => consoleErrors.filter((line) => line.includes(prefix)),
+    own: (prefix) => consoleErrors.filter((line) => line.includes(prefix) && !isKnownNoise(line)),
     close: () => browser.close(),
   };
 }

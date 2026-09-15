@@ -12,7 +12,7 @@
  * - **the attention strip** in `shell.overlay` and the focus/back stack it
  *   drives;
  * - **the recall surface** in `shell.overlay`: the mechanism's view catalogue
- *   made reachable (聚焦 / 隐藏·显示 / 移到 / 分栏 / 收起);
+ *   made reachable (聚焦 / 隐藏·显示 / 移到 / 分到上·下·左·右 / 收起);
  * - **keybindings** for the cheap moves.
  *
  * It has no region rendering and no sash mechanics: the frame, the region tree
@@ -36,7 +36,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { ILayout } from "@deepseek-ai/dsh-client-ui-layout/client";
-import type { PracLayoutFace } from "prac-client-ui-layout/client";
+import type { PracLayoutFace, Side } from "prac-client-ui-layout/client";
 
 /**
  * The view the editor seat (`prac-client-ui-vscode-editor`) declares for the
@@ -300,6 +300,24 @@ const RECALL_SELECT_STYLE = {
   cursor: "pointer",
 } as const;
 
+/**
+ * The four sides a view can be split out to, in reading order.
+ *
+ * One entry per direction rather than an axis plus a sign: the arrow and the
+ * title are what a person reads, and `Side` is the same word the mechanism
+ * takes, so nothing here translates between two geometries.
+ */
+const SPLIT_SIDES: readonly {
+  readonly side: Side;
+  readonly glyph: string;
+  readonly title: string;
+}[] = [
+  { side: "left", glyph: "←", title: "分到左侧" },
+  { side: "up", glyph: "↑", title: "分到上方" },
+  { side: "down", glyph: "↓", title: "分到下方" },
+  { side: "right", glyph: "→", title: "分到右侧" },
+];
+
 /** Props of the recall surface. */
 interface RecallSurfaceProps {
   layout: PracLayout;
@@ -313,8 +331,9 @@ interface RecallSurfaceProps {
  * do I get it back?* It lists every view the mechanism knows (including ones
  * nothing has placed), where each sits, and offers the mechanism's own moves:
  * 聚焦 (`place` into the console), 隐藏/显示 (`hide`/`show`), 移到 (`place` into
- * any region from `listRegions()`), plus 分栏 (`split`) and 收起/展开
- * (`setCollapsed`) per region.
+ * any region from `listRegions()`), 分到上/下/左/右 (`splitView`, per view — the
+ * mechanism creates the pane *for* that view, so no direction can leave an empty
+ * pane behind), and 收起/展开 (`setCollapsed`) per region.
  *
  * `Cmd/Ctrl+Alt+V` toggles it; `Escape` dismisses it; while it holds focus the
  * arrow keys move the cursor and `Enter` runs the cursor row's 聚焦. The
@@ -516,6 +535,25 @@ function RecallSurface({ layout }: RecallSurfaceProps): ReactElement | null {
           createElement("option", { key: region.id, value: region.id }, region.id),
         ),
       ),
+      // Splitting is a *view* verb (决定 15/20): the view moves into a region the
+      // mechanism creates for it, so no direction can leave an empty region
+      // behind. Disabled only while unplaced — there is no region to split then.
+      ...SPLIT_SIDES.map(({ side, glyph, title }) =>
+        createElement(
+          "button",
+          {
+            key: side,
+            type: "button",
+            "data-prac-recall-split": `${view.id}:${side}`,
+            title,
+            "aria-label": `${view.id} ${title}`,
+            disabled: view.region === null,
+            onClick: () => layout.splitView(view.id, side),
+            style: RECALL_BUTTON_STYLE,
+          },
+          glyph,
+        ),
+      ),
     ),
   );
 
@@ -550,16 +588,6 @@ function RecallSurface({ layout }: RecallSurfaceProps): ReactElement | null {
             },
           },
           region.id,
-        ),
-        createElement(
-          "button",
-          {
-            type: "button",
-            "data-prac-recall-split": region.id,
-            onClick: () => layout.split(region.id),
-            style: RECALL_BUTTON_STYLE,
-          },
-          "分栏",
         ),
         createElement(
           "button",

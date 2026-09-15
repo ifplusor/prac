@@ -15,11 +15,13 @@
  */
 
 export type {
+  Dir,
   LayoutState,
   LayoutFace,
   PracLayoutFace,
   RegionNode,
   RoleBindings,
+  Side,
   SplitNode,
   ViewRecord,
 } from "./contract.js";

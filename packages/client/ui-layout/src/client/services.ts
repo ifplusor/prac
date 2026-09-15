@@ -27,11 +27,11 @@ import type { HostObservable } from "@deepseek-ai/dsh-client-ui-renderer/client"
 import { DSH_CONVERSATION_KEY, DSH_MAIN_PREFIX, catalogueViewIds } from "./catalogue.js";
 import {
   CENTER_REGION,
-  type Dir,
   type LayoutFace,
   type LayoutState,
   type PracLayoutFace,
   type RoleBindings,
+  type Side,
   type ViewRecord,
 } from "./contract.js";
 import type { RegionInfo, ViewInfo } from "./catalogue.js";
@@ -44,7 +44,7 @@ import {
   regionInfos,
   setCollapsed,
   setRegionSize,
-  splitRegion,
+  splitRegionWith,
 } from "./model.js";
 import type { LayoutStore } from "./store.js";
 
@@ -212,13 +212,25 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
         return tree === state.tree ? state : { ...state, tree };
       });
     },
-    /** Replace a region with a split of it and a new empty region. */
-    split(regionId: string, dir: Dir = "row"): void {
+    /**
+     * Split a view out into a new region beside the one holding it.
+     *
+     * Two writes in one update, because they are one gesture: the tree gains the
+     * split, then the view is placed into the new region — through `place`, so
+     * "the moved view is the front of its region and visible" has one rule, not
+     * two spellings. A view that is placed nowhere has no region to split, and a
+     * region that no longer exists is not a split target: both are no-ops.
+     */
+    splitView(viewId: string, side: Side): void {
       const splitId = nextNodeId("split");
       const newRegionId = nextNodeId("region");
-      store.update((state) =>
-        splitRegion(state, regionId, dir === "column" ? "column" : "row", splitId, newRegionId),
-      );
+      store.update((state) => {
+        const record: ViewRecord | undefined = state.views[viewId];
+        if (record === undefined) return state;
+        const next = splitRegionWith(state, record.region, side, splitId, newRegionId);
+        if (next === state) return state;
+        return place(next, viewId, newRegionId);
+      });
     },
     /** Bind the roles DSH's borrowed vocabulary resolves through. */
     bindRoles(next: RoleBindings): void {

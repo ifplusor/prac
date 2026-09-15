@@ -28,7 +28,6 @@ import { openPrac, report, requireUrl } from "./harness.mjs";
 const RIGHT = "right";
 const LEFT = "left";
 const BOTTOM = "bottom";
-const DSH_SIDEBAR = "dsh:sidebar";
 const CONVERSATION = "dsh:main:conversation";
 const VSCODE_SIDEBAR = "vscode:sidebar";
 /** The key `prac-client-ui-layout` persists under (see its `store.ts`). */

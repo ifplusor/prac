@@ -54,6 +54,21 @@ const ARRANGED_EDITOR_REGION = "right";
 const EDITOR_VIEW = "vscode:editor";
 
 /**
+ * The arrangement's own centre occupant, used as the *view* the row split
+ * carries: `splitView` moves a view into the pane it creates, so a split needs a
+ * view to name (decision 15/20 — a split never creates an empty pane).
+ */
+const CONVERSATION_VIEW = "dsh:main:conversation";
+
+/**
+ * A second view for the `right` track, so the vertical split has something to
+ * leave behind. The editor is the view that gets split out, and a *fixed* region
+ * that empties is not rendered at all — no region, no sash, nothing to drag. One
+ * visible occupant keeps the source pane on screen.
+ */
+const VSCODE_SIDEBAR_VIEW = "vscode:sidebar";
+
+/**
  * The part the app mounts behind each view.
  *
  * The DOM marks **part** ids ({ PART_HOST_ATTR}), while the frame and this
@@ -239,7 +254,7 @@ await page.waitForTimeout(3000);
 
 const probeReady = await page.evaluate(
   () =>
-    typeof globalThis.__pracLayout?.split === "function" &&
+    typeof globalThis.__pracLayout?.splitView === "function" &&
     typeof globalThis.__pracLayout?.setCollapsed === "function" &&
     typeof globalThis.__pracLayout?.place === "function",
 );
@@ -256,8 +271,11 @@ const act = (name, ...args) =>
 const states = {};
 states.default = await sample(page);
 
-// ── split: `console` becomes a row of two flexible panes ─────────────────────
-await act("split", "stage");
+// ── split: the conversation moves into a pane beside `console` ───────────────
+// `splitView` is view-centric: it creates the pane *for* the named view, so the
+// row split that results has the conversation on one side and the (now empty)
+// `console` on the other — and the editor in `right` is untouched.
+await act("splitView", CONVERSATION_VIEW, "right");
 await page.waitForTimeout(900);
 states.split = await sample(page);
 
@@ -293,16 +311,22 @@ await page.waitForTimeout(1200);
 states.restored = await sample(page);
 
 // ── column: a `column` split resizes on dy, not just dx ──────────────────────
-// Splitting `right` (fixed, so not flex|flex) gives a vertical boundary whose
-// drag must change heights. A reload resets to the default tree — no unsplit
-// exists, and this phase is about the other axis.
+// The editor moves into a pane below `right`, which keeps the sidebar view this
+// phase places there first: a *fixed* region that empties is not rendered, so
+// without an occupant there would be no sash to drag. Splitting a fixed region
+// makes the pair fixed|flex, which is what makes a vertical drag change heights.
+// The reload is not a reset any more — decision 16 persists the tree, so this
+// phase starts from the row split and the sizes above and adds to them.
 await page.reload({ waitUntil: "load", timeout: 60_000 });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForSelector("[data-vscode-embed-part-host]", { timeout: 60_000 });
 await page.waitForTimeout(2500);
-await act("split", "right", "column");
+await act("place", VSCODE_SIDEBAR_VIEW, "right");
+await page.waitForTimeout(1200);
+await act("splitView", EDITOR_VIEW, "down");
 await page.waitForTimeout(900);
 states.columnSplit = await sample(page);
+const columnEditorPane = states.columnSplit.rightPanes[1]?.id ?? null;
 await dragSash(page, '[data-prac-sash-dir="column"]', 0, 150);
 states.columnResized = await sample(page);
 
@@ -374,14 +398,16 @@ const checks = {
   restoredRightDomWidth: states.restored.right?.box.w === preCollapseDom,
   restoredEditorPainted: painted(states.restored),
 
-  // column: the same drag on dy moves a vertical boundary.
+  // column: the same drag on dy moves a vertical boundary, and the view the
+  // split carried is in the lower pane.
   columnTwoPanes:
     states.columnSplit.rightPanes.length === 2 &&
     states.columnSplit.rightPanes.every((pane) => pane.box.h > 100),
   columnPanesStacked: stacked(states.columnSplit),
+  columnCarriedEditorBelow: states.columnSplit.editor?.region === columnEditorPane,
   columnDragChangedHeight: within(columnGrowth, 130, 170),
   columnEditorPainted:
-    painted(states.columnResized) && states.columnResized.editor?.region === "right",
+    painted(states.columnResized) && states.columnResized.editor?.region === columnEditorPane,
 };
 
 const report = {

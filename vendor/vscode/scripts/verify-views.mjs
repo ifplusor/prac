@@ -66,7 +66,7 @@ const ROW = "[data-prac-recall-row]";
 const REGION_CONTROL = "[data-prac-recall-region]";
 const toggleOf = (view) => `[data-prac-recall-toggle="${view}"]`;
 const moveOf = (view) => `[data-prac-recall-move="${view}"]`;
-const splitOf = (region) => `[data-prac-recall-split="${region}"]`;
+const splitOf = (view, side) => `[data-prac-recall-split="${view}:${side}"]`;
 const collapseOf = (region) => `[data-prac-recall-collapse="${region}"]`;
 const EDITOR_VIEW = "vscode:editor";
 const CONVERSATION_VIEW = "dsh:main:conversation";
@@ -260,7 +260,7 @@ const probeReady = await page.evaluate(
     typeof globalThis.__pracLayout?.place === "function" &&
     typeof globalThis.__pracLayout?.hide === "function" &&
     typeof globalThis.__pracLayout?.show === "function" &&
-    typeof globalThis.__pracLayout?.split === "function",
+    typeof globalThis.__pracLayout?.splitView === "function",
 );
 if (!probeReady) throw new Error("globalThis.__pracLayout is missing the catalogue/placement face");
 
@@ -333,9 +333,10 @@ await page.waitForTimeout(800);
 await toggleRecall(page);
 states.movedBySelect = await sample(page);
 
-// ── 7. 分栏 + 移到: two panes side by side, each painted ────────────────────
+// ── 7. 分栏 is a *view* verb: the editor leaves the `right` stack for a new pane
+// beside it, and the conversation it shared that region with stays behind ────
 await toggleRecall(page);
-await page.click(splitOf("stage"));
+await page.click(splitOf(EDITOR_VIEW, "right"));
 await page.waitForTimeout(800);
 const newRegion = await page.evaluate(() => {
   const ids = [...document.querySelectorAll("[data-prac-region]")].map((element) =>
@@ -344,8 +345,6 @@ const newRegion = await page.evaluate(() => {
   return ids.find((id) => !["left", "stage", "right"].includes(id)) ?? null;
 });
 if (!newRegion) throw new Error("分栏 did not create a new region");
-await page.selectOption(moveOf(EDITOR_VIEW), "stage");
-await page.selectOption(moveOf(CONVERSATION_VIEW), newRegion);
 await page.waitForTimeout(800);
 states.splitWhileOpen = await sample(page);
 await toggleRecall(page);
@@ -353,6 +352,10 @@ states.split = await sample(page);
 const newPane = states.split.regions.find((region) => region.id === newRegion) ?? null;
 states.splitNewPane = newRegion;
 states.newPanePaint = await paintAt(page, newPane, `[data-prac-region="${newRegion}"] > *`);
+// The region the editor came from: the conversation must still be rendering
+// there, which is what "分栏必带视图" means on this path (the split cannot cost
+// the source region its view).
+states.sourcePanePaint = await paintAt(page, states.split.right, '[data-prac-region="right"] > *');
 
 // ── 8. 收起 / 展开 a region from the UI ─────────────────────────────────────
 await toggleRecall(page);
@@ -361,11 +364,7 @@ await page.waitForTimeout(800);
 states.regionCollapsedOpen = await sample(page);
 await toggleRecall(page);
 states.regionCollapsed = await sample(page);
-states.regionCollapsedPaint = await paintAt(
-  page,
-  states.regionCollapsed.console,
-  '[data-prac-region="stage"] > *',
-);
+states.regionCollapsedPaint = await paintAt(page, states.regionCollapsed.host?.box, EDITOR_HOST);
 await toggleRecall(page);
 await page.click(collapseOf("left"));
 await page.waitForTimeout(800);
@@ -445,14 +444,16 @@ const checks = {
   selectMoveSourceReclaimed: states.movedBySelect.console.w === states.dragged.console.w,
   selectMovePainted: painted(states.movedBySelect.editorPaint),
 
-  // 7. 分栏: two panes side by side, both painted.
-  splitTwoPanes:
-    !!newPane &&
-    states.split.regions.length === 3 &&
-    paneIds(states.split) === `left,stage,${newRegion}`,
-  splitPanesSideBySide: sideBySide(states.split.console, newPane),
-  splitEditorPainted: painted(states.split.editorPaint) && states.split.host?.region === "stage",
-  splitConversationPanePainted: painted(states.newPanePaint),
+  // 7. 分栏: the view lands in a new pane beside the one it was in, the pane it
+  // left keeps the view it shared that region with, and both paint.
+  splitCreatedPane: !!newPane,
+  splitPaneBesideSource: sideBySide(states.split.right, newPane),
+  splitCarriedViewOut: states.split.modelViews[EDITOR_VIEW]?.region === newRegion,
+  splitSourceKeptItsView:
+    states.split.modelViews[CONVERSATION_VIEW]?.region === "right" && states.split.hostCount === 1,
+  splitEditorPaintedInNewPane:
+    painted(states.split.editorPaint) && states.split.host?.region === newRegion,
+  splitSourcePanePainted: painted(states.sourcePanePaint),
 
   // 8. 收起 / 展开 a region: the region goes to 0 (still present), the UI offers
   // 展开, the rest still paints, and expanding restores the width it had.
