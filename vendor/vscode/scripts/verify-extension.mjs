@@ -18,7 +18,7 @@
  *   VIEW=gitlens.views.repositories URL='…' node scripts/verify-extension.mjs
  */
 import { createRequire } from "node:module";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const packageDir = resolve(import.meta.dirname, "..");
@@ -26,14 +26,35 @@ const repoRoot = resolve(packageDir, "../..");
 const workDir = resolve(process.env.PRAC_WORKBENCH_DIR ?? join(repoRoot, ".build/workbench"));
 const upstreamDir = join(workDir, "upstream");
 const url = process.env.URL;
-/** A view GitLens contributes; the extension is what registers it. */
+/** The extension this gate needs, and one of the views it contributes. */
+const extension = process.env.EXTENSION ?? "eamodio.gitlens";
 const view = process.env.VIEW ?? "gitlens.views.welcome";
+/**
+ * Where the server's user extensions live. Installing one is a deliberate,
+ * reviewed act (the CLI refuses to run outside a VS Code terminal), so this gate
+ * **skips loudly** rather than failing when none is installed.
+ */
+const extensionsDir = resolve(
+  process.env.EXTENSIONS_DIR ?? join(workDir, "..", "vscode-server", "server", "extensions"),
+);
 
 if (!url) throw new Error('URL is required, e.g. URL="http://127.0.0.1:3084/?token=..."');
 if (!existsSync(join(upstreamDir, "node_modules/@playwright/test"))) {
   throw new Error(
     "@playwright/test is not installed in the upstream checkout; run vscode:build first",
   );
+}
+
+const installed =
+  existsSync(extensionsDir) &&
+  readdirSync(extensionsDir).some((entry) => entry.startsWith(`${extension}-`));
+if (!installed) {
+  console.log(
+    `SKIPPED: ${extension} is not installed in ${extensionsDir}.\n` +
+      "This gate needs a real extension on the server base; installing one is a",
+    "deliberate act (see the README's 扩展基座 section). It is a SKIP, not a pass.",
+  );
+  process.exit(0);
 }
 
 const require = createRequire(join(upstreamDir, "package.json"));

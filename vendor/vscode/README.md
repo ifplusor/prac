@@ -128,7 +128,7 @@ URL='…' node scripts/verify-views.mjs                                 # 33 项
 URL='…' node scripts/verify-focus.mjs                                 # 12 项
 URL='…' node scripts/verify-regions.mjs                               # 1 项
 URL='…' node scripts/verify-view.mjs                                    # 7 项（单 view 宿主：无 part、有像素、可释放重建）
-URL='…' node scripts/verify-extension.mjs                               # 5 项（装的扩展激活 + 它的 view 在 prac 里上屏）
+URL='…' node scripts/verify-extension.mjs                               # 5 项（需已装扩展；没装则明确 SKIP）
 ```
 
 **独立页（无 bridge 的默认路径）另有一条**：`vscode:serve`（默认 `:5199`）跑着时 `vscode:smoke` 断言 7 个 part 全部挂载且编辑器有内容，`errorCount: 0`。

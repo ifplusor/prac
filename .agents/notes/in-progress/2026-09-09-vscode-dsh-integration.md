@@ -6,7 +6,7 @@ status: in-progress
 
 > 这是这项工作的 **umbrella**：主线定义、需求约束、现在的形态、决定（含被否决的路线）、里程碑与依据、已核实事实、踩坑、开放问题。
 > 步骤 note：[2026-09-13-vs-concept-boundary.md](2026-09-13-vs-concept-boundary.md)（概念边界与命名，实现已完成，待签字）；[../proposed/2026-09-15-vscode-capabilities-into-prac.md](../proposed/2026-09-15-vscode-capabilities-into-prac.md)（把能力拆散带入 prac，方案待裁）。
-> 口径：下文所有闸门计数一律写作 **24/24 · 33/33 · 12/12 · 1/1 · 7/7 · 5/5**（layout · views · focus · regions · **view** · **extension**），所有 part 计数一律 **8/8**。旧 note 里的顺序混用与 "7 个 part" 已纠正。
+> 口径：下文所有闸门计数一律写作 **24/24 · 33/33 · 12/12 · 1/1 · 7/7**（layout · views · focus · regions · **view**），所有 part 计数一律 **8/8**。第六门 `verify-extension` 是**条件门**：装了扩展才跑（5 项），没装时明确 `SKIPPED`——SKIP 不是通过。旧 note 里的顺序混用与 "7 个 part" 已纠正。
 
 ## 1. 这个工作是什么（主线定义）
 
@@ -142,7 +142,7 @@ DSH web 页
 | 2026-09-13 | **Step B 第一部分**：发布 prac 的 client 类型 | `dist/client.d.mts`（ui-layout **8.4 kB** / vscode-host **37.9 kB**）+ `dist/client.mjs` **0 字节**空壳；13 个构建任务 |
 | 2026-09-15 | **命名收束**（`vs` 退役、`workbench` 退回 vendor、载荷去 prac 名） | 三条 `grep` 判据全 **0**；九包 `check`、五份产物、四闸门、独立页 smoke 8/8 + `errorCount: 0` |
 | 2026-09-15 | 抽出 `vendor/vscode-embed`（prac-free lib），prac 两行变薄 | 同上；staged 载荷与 `overlay/` 逐字节一致 |
-| 2026-09-15 | **决定 18 落地（扩展基座换 `server` + Tier 2 证明）**：`build.mjs` 增加 `--target server`（`out-server`，带 `--nls`），并把 **checkout 根**、`out-server`、`out-server-web` 三份 `product.json` 都盖章；服务端改用 `out-server/server-main.js`；装 **GitLens**（`eamodio.gitlens-2026.9.92030`，手工解包进 `--extensions-dir`） | 新第六门 `verify-extension` **5/5**：`gitlens.views.welcome` 挂进 prac 后有 pane、标题 `Welcome`、40 种颜色、可释放 ⇒ **扩展激活**（描述符只有激活后才注册）。`/oss-645f29cc…/version` 200 而 `oss-dev` 404（两侧 segment 一致）；原五门 **24/24 · 33/33 · 12/12 · 1/1 · 7/7** 不变；独立页 smoke 8/8 |
+| 2026-09-15 | **决定 18 落地（扩展基座换 `server` + Tier 2 证明）**：`build.mjs` 增加 `--target server`（`out-server`，带 `--nls`），并把 **checkout 根**、`out-server`、`out-server-web` 三份 `product.json` 都盖章；服务端改用 `out-server/server-main.js`；装 **GitLens**（`eamodio.gitlens-2026.9.92030`，手工解包进 `--extensions-dir`；**验收后按 James 裁决撤装**，等决定 19 给出正当安装路径） | 新第六门 `verify-extension` **5/5**：`gitlens.views.welcome` 挂进 prac 后有 pane、标题 `Welcome`、40 种颜色、可释放 ⇒ **扩展激活**（描述符只有激活后才注册）。`/oss-645f29cc…/version` 200 而 `oss-dev` 404（两侧 segment 一致）；原五门 **24/24 · 33/33 · 12/12 · 1/1 · 7/7** 不变；独立页 smoke 8/8 |
 | 2026-09-15 | **B1 落地（单 view 宿主）**：契约加 `mountViewInto`/`releaseView`，载荷用 `ViewPane.render()` 把单个 view 造成自带 pane 挂进外部元素（`getViewDescriptorById` 拿描述符，镜像 `ViewPaneContainer.createView` 的参数），lib 加 `view(viewId)` 句柄，explorer 座位改挂 `workbench.explorer.fileView` | 新第五门 `verify-view` **7/7**（自带 `.pane` + 标题 `dsh-dev` + 302 种颜色 + **页面无 sidebar part** + 跨 region 搬移时**释放后重建成功**）；原四闸门 **24/24 · 33/33 · 12/12 · 1/1** 不变；独立页 smoke 8/8 + `errorCount: 0` |
 | 2026-09-15 | **决定 14 落地**：`selectPanel` 把选中视图放进**它自己的** region（无家则进中心），让出中心的视图停到编排绑定的 **track**；对话按普通 view 参与注意力（聚焦谁，谁进 stage，另一个停 right） | 八包 `check` + root `vp check .` 绿；四闸门 **24/24 · 33/33 · 12/12 · 1/1**（两条断言随决策更新：`promotedTrackClosed` → `promotedChatParksInTrack`，verify-views 改为读对话的放置而不是推断轨道消失）；独立页 smoke 8/8 + `errorCount: 0` |
 
@@ -178,7 +178,8 @@ DSH web 页
 - `out-server/` 是**扁平**产物（`server-main.js` 直接在里面，没有 `product.json`/`package.json`/`out/`）；运行时按 `<checkout>` 解析 `node_modules`，**`product.json` 读的是 checkout 根那份** ⇒ 盖章要盖根那份（`build.mjs` 现在盖 `.`/`out-server`/`out-server-web`）。
 - 跑法（cwd = checkout）：`node out-server/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token --server-data-dir … --extensions-dir … --user-data-dir … <folder>`。
 - **装扩展**：`server-cli --install-extension` 被守卫挡住（`src/vs/server/node/server.cli.ts:94` 要求 `VSCODE_IPC_HOOK_CLI` 或 `VSCODE_CLIENT_COMMAND`）；手工装 = 解包 VSIX，把 `extension/` 移成 `<extensions-dir>/<publisher>.<name>-<version>/`，删 `extensions.json`，重启。
-- **实测**：GitLens `2026.9.92030` 装上后 `extensions.json` 只列它；`gitlens.views.welcome` / `…repositories` 都能 `mountViewInto` 挂进 prac（有 pane、有标题、有像素）⇒ 扩展**确实激活**；`spdlog` native 缺失仍是既有非致命缺口。
+- **实测（2026-09-15，验证后已撤装）**：GitLens `2026.9.92030` 装上后 `extensions.json` 只列它；`gitlens.views.welcome` / `…repositories` 都能 `mountViewInto` 挂进 prac（有 pane、有标题、有像素）⇒ 扩展**确实激活**；`spdlog` native 缺失仍是既有非致命缺口。
+- **安装的正当路径**：`server-cli --install-extension` 走的是 **CLI 管道**（`VSCODE_IPC_HOOK_CLI`），现实里由 **VS Code 的集成终端**提供；我们还没有它 ⇒ **决定 19（terminal 用 VS Code 的）会带出这条管道**。在此之前**不装用户扩展**（第六门 SKIP）；手工解包属于"绕过有意关上的门"，James 2026-09-15 裁决不做。
 
 ### Server（自建 code server）
 
@@ -285,16 +286,17 @@ DSH web 页
 6. **能力面（capabilities）**（含上下文入）：B1 已完成（§5），它是 09-15 note 里紧随其后的那块——agent 读数/动作的 settled + provenance + 分页语义见该 note。
 7. **frame 批次**：决定 `15`（底栏 / 两个侧栏堆叠）、`16`（最小集持久化）、`17`（stage 的 tab）、`20`（任意方向分栏；且 `split` 现在造的"空 region"要按决定 15 改成"带视图"）。
 8. **扩展视图的"数据"**：`mountViewInto` 能让扩展贡献的视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——`ViewPane.setVisible(true)` 不够，树数据要等视图基础设施/容器把裸 pane 认成"可见的视图"。两条候选路：把视图登记进 `IViewsService` 的可见性/容器模型，或改走"container 作为高级形态"（决定 2b/15 已允许）。
-9. **sidebar / panel / statusbar 的映射**：目前只落了 sidebar + 对话 + 编辑器 + 环境条/调出面；以及补 stub 掉的 layout 语义（显隐 / zen / centered / floating / 多窗口）。
+9. **扩展安装的正当路径**：等决定 19（VS Code terminal 提供 `VSCODE_IPC_HOOK_CLI`）落地后，用 `server-cli --install-extension` 正规安装并重跑第六门；在那之前不装用户扩展。
+10. **sidebar / panel / statusbar 的映射**：目前只落了 sidebar + 对话 + 编辑器 + 环境条/调出面；以及补 stub 掉的 layout 语义（显隐 / zen / centered / floating / 多窗口）。
 
 ### 仍然开放（工程与生态）
 
-10. **Step B 第二部分**：view id 仍是 **6 处**字面量、`/prac-vscode` 仍是 Node/浏览器**两处**；**共享常量模块的落点与依赖方向仍未定**（"契约写多遍"的根因）。
-11. **内建扩展编译**：`npm run build-fast-extensions` 被 `extensions/ipynb` 的 typecheck 挡住（现 **12/106**）。决定 18 的验收已用**市场扩展**（GitLens）走通，所以它不再是"生态是否可用"的前提；但它仍挡着**内建**扩展（git / search / emmet 等）在服务端可用。
-12. **agent 能力面**目前**没有任何实体**（排期见 6）；能力清单与 settled / provenance / 分页语义见 09-15 note。
-13. **两处 native / 可选缺口**（既有、非阻塞）：`@vscode/fs-copyfile` 抛 `Cannot find module '../build/Debug/vscode_fs.node'`（未捕获，宿主照样起）；`spdlog` 降级（server 目标上同样出现）；`vsda` 缺失；页面两个 404 是客户端可选模块（`@vscode/vscode-languagedetection`、`vscode-regexp-languagedetection`）。
-14. **机制正确的 checkout 覆盖开关**（重定向解析而非文件路径）：未做；`dsh-types --compare` 已覆盖"类型是否漂移"。
-15. **进度已提交（2026-09-15）**：分支 `feat/vscode-dsh-integration`，`wip:` 提交（含签名），tag `wip/vscode-dsh-2026-09-15`。**提交 ≠ 成果已定**——靠 James 判断的内容仍要审阅；后续进度按同样方式（feature 分支 + `wip`）提交。
+11. **Step B 第二部分**：view id 仍是 **6 处**字面量、`/prac-vscode` 仍是 Node/浏览器**两处**；**共享常量模块的落点与依赖方向仍未定**（"契约写多遍"的根因）。
+12. **内建扩展编译**：`npm run build-fast-extensions` 被 `extensions/ipynb` 的 typecheck 挡住（现 **12/106**）。决定 18 的验收已用**市场扩展**（GitLens）走通，所以它不再是"生态是否可用"的前提；但它仍挡着**内建**扩展（git / search / emmet 等）在服务端可用。
+13. **agent 能力面**目前**没有任何实体**（排期见 6）；能力清单与 settled / provenance / 分页语义见 09-15 note。
+14. **两处 native / 可选缺口**（既有、非阻塞）：`@vscode/fs-copyfile` 抛 `Cannot find module '../build/Debug/vscode_fs.node'`（未捕获，宿主照样起）；`spdlog` 降级（server 目标上同样出现）；`vsda` 缺失；页面两个 404 是客户端可选模块（`@vscode/vscode-languagedetection`、`vscode-regexp-languagedetection`）。
+15. **机制正确的 checkout 覆盖开关**（重定向解析而非文件路径）：未做；`dsh-types --compare` 已覆盖"类型是否漂移"。
+16. **进度已提交（2026-09-15）**：分支 `feat/vscode-dsh-integration`，`wip:` 提交（含签名），tag `wip/vscode-dsh-2026-09-15`。**提交 ≠ 成果已定**——靠 James 判断的内容仍要审阅；后续进度按同样方式（feature 分支 + `wip`）提交。
 
 ## Related
 
