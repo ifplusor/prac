@@ -17,13 +17,6 @@ import type { PracLayoutFace } from "prac-client-ui-layout/client";
 export type PracLayout = PracLayoutFace;
 
 /**
- * The view the editor seat (`prac-client-ui-vscode-editor`) declares for the
- * editor part host. The arrangement decides where it goes; the mechanism
- * renders it there.
- */
-export const VSCODE_EDITOR_VIEW = "vscode:editor";
-
-/**
  * The view the explorer seat (`prac-client-ui-vscode-explorer`) declares for the
  * VS Code sidebar part — the explorer (file tree, SCM) and the views hosted
  * beside it. It starts hidden: it is a tool to drop into, not part of the
@@ -72,12 +65,14 @@ export const DEFAULT_PLACEMENTS: readonly {
   { view: DSH_SIDEBAR_VIEW, region: LEFT },
   { view: DSH_CONVERSATION_VIEW, region: STAGE },
   { view: DSH_RIGHTBAR_VIEW, region: RIGHT, hidden: true },
-  { view: VSCODE_EDITOR_VIEW, region: RIGHT },
   // Placed but not shown: the VS Code sidebar (explorer/SCM) is a tool to drop
   // into — reachable from the recall surface — not part of the default
   // arrangement, where `left` already carries DSH's own workspace browser.
   { view: VSCODE_SIDEBAR_VIEW, region: LEFT, hidden: true },
 ];
+// No default for the centre's editor: since decision 17 a file is a view that
+// exists because the *app* opened it, so there is nothing to place until one is
+// open (see `trackOpenFiles`).
 
 /**
  * The roles DSH's borrowed `ctx.layout` vocabulary resolves through. The
@@ -96,9 +91,9 @@ export const ROLES = { sidebar: DSH_SIDEBAR_VIEW, rightbar: DSH_RIGHTBAR_VIEW } 
  * @param layout - the mechanism's placement face.
  * @param surface - the surface attention is on.
  */
-export function placeSurfaces(layout: PracLayout, surface: Surface): void {
+export function placeSurfaces(layout: PracLayout, surface: Surface, fileView: string | null): void {
   layout.place(DSH_CONVERSATION_VIEW, surface === CONVERSATION ? STAGE : RIGHT);
-  layout.place(VSCODE_EDITOR_VIEW, surface === VSCODE_SURFACE ? STAGE : RIGHT);
+  if (fileView !== null) layout.place(fileView, surface === VSCODE_SURFACE ? STAGE : RIGHT);
 }
 
 /**
@@ -115,6 +110,22 @@ export function placeSurfaces(layout: PracLayout, surface: Surface): void {
 export function focusView(layout: PracLayout, viewId: string): void {
   if (viewId !== DSH_CONVERSATION_VIEW) layout.place(DSH_CONVERSATION_VIEW, RIGHT);
   layout.place(viewId, FOCUS_VIEW_REGION);
+}
+
+/**
+ * Put a newly opened file in the centre, keeping the conversation on screen.
+ *
+ * The arrangement's answer to "a file opened in the app" (decision 17): the file
+ * takes the centre and the conversation parks in the track, which is the same
+ * rule attention uses — one view holds a region, the one that yields stays
+ * visible beside it.
+ *
+ * @param layout - the mechanism's placement face.
+ * @param view - the file view the app just opened.
+ */
+export function openFileInto(layout: PracLayout, view: string): void {
+  layout.place(DSH_CONVERSATION_VIEW, RIGHT);
+  layout.place(view, FOCUS_VIEW_REGION);
 }
 
 /**

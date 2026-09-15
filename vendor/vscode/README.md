@@ -126,7 +126,7 @@ pnpm --filter prac-vscode vscode:clean
 URL='http://127.0.0.1:3084/?token=…' node scripts/verify-layout.mjs   # 14 项
 URL='…' node scripts/verify-views.mjs                                 # 25 项
 URL='…' node scripts/verify-focus.mjs                                 # 9 项
-URL='…' node scripts/verify-regions.mjs                               # 1 项
+URL='…' node scripts/verify-regions.mjs                               # 6 项（frame 托管的是 view：无 part、view 有尺寸、退役的 editor part 只在屏外）
 URL='…' node scripts/verify-view.mjs                                    # 7 项（单 view 宿主：无 part、有像素、可释放重建）
 URL='…' node scripts/verify-file.mjs                                    # 9 项（单文件编辑面：真实文本、有像素、一文件一面、可释放重建；app 自己打开文件会通过事件报到）
 URL='…' node scripts/verify-extension.mjs                               # 5 项（需已装扩展；没装则明确 SKIP）
@@ -139,7 +139,7 @@ URL='…' node scripts/verify-extension.mjs                               # 5 �
 - `verify-layout`：区域树分栏、sash 拖拽、收起/展开恢复缓存尺寸，且编辑器**全程在画**并落在编排要求的位置。
 - `verify-views`：调出面（recall surface）按快捷键打开、列出实时 view 目录、隐藏/调出/移区/分栏都在像素上生效。
 - `verify-focus`：注意力把编辑器 part 在轨道与中央之间搬移且仍在上屏；含不变量「一个 part 恰好存在于一个 host」。
-- `verify-regions`：VS part host 被挂载、定位、上屏。
+- `verify-regions`：**frame 里没有 part**（决定 17 之后 prac 组合的是 view），被退役的 editor part 只以**离屏**形式存在（服务图需要它），view host 有尺寸且它自己的 pane 不超出宽度。
 - 活体门里只有**需要 VS Code 侧**的那些住在这里（part host / embed face / 扩展 / 编辑器像素）；**prac 自己机制的闸门放 prac 的 `tests/gates/`**（如堆叠）。
 - `verify-view`：**单个 view** 被造成自带 pane 挂进 prac 的 region（页面里没有 sidebar part），并且跨 region 搬移时释放后重建仍然上屏。
 - `verify-file`：**一个文件的编辑面**（决定 17 的单位）——工作台自己的模型渲染出该文件的真实文本、有像素、同一文件重复挂载是同一实例换宿主、释放后能再挂载。期望值由门自己从磁盘读同一个文件算出：**app 的工作区是 DSH 的活动工作区**，不是本仓。

@@ -1,20 +1,23 @@
 /**
- * Verify the attention mechanism: the editor part must survive being *moved*
- * between the right track and the centre.
+ * Verify the attention mechanism: the current **file view** must survive being
+ * *moved* between the right track and the centre.
  *
- * A moved part is exactly where a DOM-level check lies: the node is still in the
- * document, still error-free, and blank. So each state is judged on pixels —
+ * Since decision 17 the editor is one view per open file (`vscode:file:<resource>`),
+ * not the editor part: the file's host is `[data-vscode-embed-file]` and the
+ * conversation (`dsh:main:conversation`) is the other surface attention can rest
+ * on. A moved view is exactly where a DOM-level check lies: the node is still in
+ * the document, still error-free, and blank. So each state is judged on pixels —
  * geometry, colour spread, and whether hiding the region changes the clip.
  *
- * Two hosts can be in the document at once (the collapsed right region keeps its
- * seat), so the part's host is identified by *which one holds it*, and a state
- * that holds it twice is a failure: the part is a single instance.
+ * Only one file is open, so exactly one file host may exist: a state that holds
+ * its editor twice would mean a second editing surface (a second view of one
+ * model), which is a failure.
  *
- * Usage: URL='http://127.0.0.1:3082/?token=...' node scripts/verify-focus.mjs
+ * Usage: URL='http://127.0.0.1:3084/?token=...' node scripts/verify-focus.mjs
  */
 import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const packageDir = resolve(import.meta.dirname, "..");
@@ -32,6 +35,17 @@ const require = createRequire(join(upstreamDir, "package.json"));
 const { chromium } = require("@playwright/test");
 
 const sha = (buffer) => createHash("sha256").update(buffer).digest("hex");
+
+/**
+ * The local path behind a workbench folder URI.
+ *
+ * The app's folders are `vscode-remote://<authority>/<path>`; the authority is
+ * the page that serves the remote, so the path is what the local file system has.
+ *
+ * @param folder - the folder URI as the workbench reports it.
+ */
+const localPathOf = (folder) =>
+  decodeURIComponent(folder.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]*/i, ""));
 
 /** Decode a PNG in the page and report how much of it is not one flat colour. */
 const analyse = async (base64) => {
@@ -63,9 +77,22 @@ page.on("pageerror", (error) => errors.push(String(error.message)));
 
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
 await page.waitForSelector("[data-prac-focus-strip]", { timeout: 60_000 });
+await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
+
+// Open one file before sampling — the current model has no editor view until the
+// app opens a file. The expectation comes from the same file on disk, because the
+// app's workspace is DSH's active workspace, not this repository.
+const folder = await page.evaluate(
+  () => (globalThis.__vscodeEmbed.face.workspaceInfo().folders ?? [])[0] ?? null,
+);
+if (!folder) throw new Error("the workbench has no workspace folder");
+const manifest = JSON.parse(readFileSync(join(localPathOf(folder), "package.json"), "utf8"));
+const MARKER = `"name": "${manifest.name}"`;
+await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), `${folder}/package.json`);
+await page.waitForSelector("[data-vscode-embed-file] .monaco-editor", { timeout: 60_000 });
 await page.waitForTimeout(3000);
 
-/** Read the current state: strip, host geometry, and the part's paint. */
+/** Read the current state: strip, host geometry, and the file's paint. */
 async function sample() {
   const facts = await page.evaluate(() => {
     const box = (el) => {
@@ -78,123 +105,154 @@ async function sample() {
         h: Math.round(r.height),
       };
     };
-    // prac's own frame carries `data-prac-frame`; the fallback keeps this script
-    // working on DSH's stock `AppFrame` (whose overlay layer is the marker).
-    const frame =
-      document.querySelector("[data-prac-frame]") ??
-      document.querySelector("[data-shell-overlay]")?.parentElement;
-    const rightRegion = document.querySelector('[data-prac-region="right"]');
-    const hosts = [...document.querySelectorAll("[data-vscode-embed-part-host]")].map(
-      (el, index) => ({
-        index,
-        region: el.closest("[data-prac-region]")?.getAttribute("data-prac-region") ?? null,
-        holdsEditor: !!el.querySelector(".editor-group-container"),
-        box: box(el),
-      }),
-    );
+    const frame = document.querySelector("[data-prac-frame]");
+    const hosts = [...document.querySelectorAll("[data-vscode-embed-file]")].map((el, index) => ({
+      index,
+      region: el.closest("[data-prac-region]")?.getAttribute("data-prac-region") ?? null,
+      hasEditor: !!el.querySelector(".monaco-editor"),
+      lines: el.querySelectorAll(".view-line").length,
+      // Monaco renders text with non-breaking spaces; normalise before matching.
+      text: (el.querySelector(".view-lines")?.textContent ?? "").replace(/\u00a0/g, " ").slice(0, 4000),
+      box: box(el),
+    }));
     return {
       focus:
         document.querySelector("[data-prac-focus-strip]")?.getAttribute("data-prac-focus-strip") ??
         null,
       hasStrip: !!document.querySelector("[data-prac-focus-strip]"),
       frame: box(frame),
-      // The track is closed when nothing renders there: an empty fixed region
-      // takes no space, so absence reads as width 0.
-      rightRegionWidth: rightRegion ? Math.round(rightRegion.getBoundingClientRect().width) : 0,
-      // The conversation's own region, from the layout probe: decision 14 made it
-      // an ordinary view, so it moves with attention and the gates read it here.
+      // The conversation's own region, from the layout probe: it is a view like
+      // any other, so it moves with attention and the gate reads it here.
       conversationRegion:
         globalThis.__pracLayout?.getState?.().views?.["dsh:main:conversation"]?.region ?? null,
       hosts,
-      tabTitle:
-        document
-          .querySelector(
-            "[data-vscode-embed-part-host] .tab .label-name, [data-vscode-embed-part-host] .tabs .monaco-icon-label",
-          )
-          ?.textContent?.trim() ?? null,
     };
   });
 
-  const holders = facts.hosts.filter((host) => host.holdsEditor);
+  const holders = facts.hosts.filter((host) => host.hasEditor);
   const host = holders[0] ?? null;
   let paint = null;
   if (host && host.box.w > 2 && host.box.h > 2) {
     const clip = { x: host.box.x, y: host.box.y, width: host.box.w, height: host.box.h };
     const painted = await page.screenshot({ clip });
-    await page.evaluate((index) => {
-      const el = document.querySelectorAll("[data-vscode-embed-part-host]")[index];
-      if (el) el.style.visibility = "hidden";
-    }, host.index);
+    await page.evaluate(() => {
+      document.querySelectorAll("[data-vscode-embed-file]").forEach((el) => {
+        el.style.visibility = "hidden";
+      });
+    });
     const hidden = await page.screenshot({ clip });
-    await page.evaluate((index) => {
-      const el = document.querySelectorAll("[data-vscode-embed-part-host]")[index];
-      if (el) el.style.visibility = "";
-    }, host.index);
+    await page.evaluate(() => {
+      document.querySelectorAll("[data-vscode-embed-file]").forEach((el) => {
+        el.style.visibility = "";
+      });
+    });
     paint = {
       ...(await page.evaluate(analyse, painted.toString("base64"))),
       sha: sha(painted).slice(0, 12),
       differsWhenHidden: sha(painted) !== sha(hidden),
     };
   }
-  return { ...facts, host, holderCount: holders.length, paint };
+  return { ...facts, host, holderCount: holders.length, hostCount: facts.hosts.length, paint };
 }
 
 const states = {};
-states.default = await sample();
 
-// Promote the VS Code view with the keyboard shortcut (also exercises the binding).
+// Opening the file is the arrangement's `openFileInto`: the file takes the centre
+// and the conversation parks in the track. Attention itself still reads
+// `conversation` — opening a file does not steal the strip.
+states.opened = await sample();
+
+// Promote the file view with the keyboard shortcut (also exercises the binding).
 await page.keyboard.press("Control+Alt+2");
-await page.waitForTimeout(2500);
+await page.waitForTimeout(2000);
 states.promoted = await sample();
 
-// And back, via the keyboard's back binding.
+// Conversation has attention: the file gives up the centre for the track.
+await page.keyboard.press("Control+Alt+1");
+await page.waitForTimeout(2000);
+states.parked = await sample();
+
+// And back to the file, so `back` has a file state to return from.
+await page.keyboard.press("Control+Alt+2");
+await page.waitForTimeout(2000);
+states.repromoted = await sample();
+
+// The keyboard's back binding returns attention to where it was.
 await page.keyboard.press("Control+Alt+ArrowLeft");
-await page.waitForTimeout(2500);
+await page.waitForTimeout(2000);
 states.back = await sample();
 
 await page.screenshot({ path: resolve(repoRoot, ".build/focus.png") });
 await browser.close();
 
-/** How far the part's host centre sits from the frame centre (negative = left). */
+/** How far the file host's centre sits from the frame centre (negative = left). */
 const offset = (state) => {
   if (!state.frame || !state.host) return null;
   return state.host.box.x + state.host.box.w / 2 - (state.frame.x + state.frame.w / 2);
 };
+const painted = (state) =>
+  state.paint?.distinctColours > 4 && state.paint.differsWhenHidden === true;
+const showsTheFile = (state) =>
+  state.host !== null && state.host.lines > 0 && state.host.text.includes(MARKER);
 
 const checks = {
-  // The part is one instance: it can never be in two hosts at once.
-  partInOneHost: [states.default, states.promoted, states.back].every(
-    (state) => state.holderCount === 1,
+  // The file is one instance: exactly one host, holding exactly one editing surface.
+  fileInOneHost: [states.opened, states.promoted, states.parked, states.back].every(
+    (state) => state.hostCount === 1 && state.holderCount === 1,
   ),
   // Attention is reported by the environment layer, not by a seat we displaced.
-  stripPresent: states.default.hasStrip && states.promoted.hasStrip,
-  stripFollowsFocus: states.default.focus === "conversation" && states.promoted.focus === "vscode",
-  // Promoted: the editor holds the centre, and the track's width went to it.
+  stripPresent: states.opened.hasStrip && states.promoted.hasStrip && states.parked.hasStrip,
+  stripFollowsFocus:
+    states.opened.focus === "conversation" &&
+    states.promoted.focus === "vscode" &&
+    states.parked.focus === "conversation",
+  // Promoted: the file holds the centre, and the track's width went to it.
   // (Where attention *places* the views is the arrangement's rule and a unit
-  // test — `web-app`'s `arrangement.spec.ts`; what is live here is the part
+  // test — `web-app`'s `arrangement.spec.ts`; what is live here is the file view
   // actually moving between regions and painting in each.)
-  promotedEditorCentred:
+  promotedFileCentred:
     states.promoted.host?.region === "stage" && Math.abs(offset(states.promoted)) < 200,
-  promotedWiderThanBeside: states.promoted.host.box.w > states.default.host.box.w * 1.3,
+  promotedWiderThanBeside:
+    states.promoted.host.box.w > states.parked.host.box.w * 1.3,
   paintedThroughThePromotion:
-    states.default.paint?.distinctColours > 4 &&
-    states.default.paint.differsWhenHidden === true &&
-    states.promoted.paint?.distinctColours > 4 &&
-    states.promoted.paint.differsWhenHidden === true,
-  // The move must not lose the editor's content.
-  contentSurvivesMove: !!states.promoted.tabTitle && !!states.back.tabTitle,
-  // Back returns attention to where it was.
+    painted(states.opened) && painted(states.promoted) && painted(states.parked),
+  // The move must not lose the editor's content: the rendered lines are still the
+  // file's own text.
+  contentSurvivesMove:
+    showsTheFile(states.opened) &&
+    showsTheFile(states.promoted) &&
+    showsTheFile(states.parked) &&
+    showsTheFile(states.back),
+  // Parking the conversation in the centre sends the file back to the track.
+  parkedParksTheFileInTheTrack:
+    states.parked.host?.region === "right" &&
+    states.parked.conversationRegion === "stage" &&
+    offset(states.parked) > 200,
+  // Back returns attention to where it was: the conversation is centred again and
+  // the file is back in the track, still painting.
   backReturns:
     states.back.focus === "conversation" &&
     states.back.host?.region === "right" &&
-    offset(states.back) > 200,
-  paintedAfterBack:
-    states.back.paint?.distinctColours > 4 && states.back.paint.differsWhenHidden === true,
+    states.back.conversationRegion === "stage" &&
+    offset(states.back) > 200 &&
+    painted(states.back),
 };
 
 console.log(
   JSON.stringify(
-    { url, checks, states, errorCount: errors.length, errors: errors.slice(0, 6) },
+    {
+      url,
+      workspace: { folder, marker: MARKER },
+      checks,
+      states: Object.fromEntries(
+        Object.entries(states).map(([name, state]) => [
+          name,
+          { ...state, hosts: state.hosts.map((host) => ({ ...host, text: undefined })), paint: state.paint },
+        ]),
+      ),
+      errorCount: errors.length,
+      errors: errors.slice(0, 6),
+    },
     null,
     2,
   ),
@@ -208,5 +266,5 @@ if (failed.length) {
   process.exit(1);
 }
 console.log(
-  "\nOK: attention moves the editor part between the track and the centre, and it still paints.",
+  "\nOK: attention moves the current file view between the track and the centre, it still paints, and its text survives the move.",
 );

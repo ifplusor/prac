@@ -28,7 +28,7 @@
 import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
 import { createVscodeEmbed } from "prac-vscode-embed/client";
-import type { PracVscodeFace } from "./public.js";
+import type { PracVscodeFace, VscodeFileView } from "./public.js";
 
 /** Same-origin prefix the host half serves the app bundle under. */
 const VSCODE_ROUTE = "/prac-vscode";
@@ -133,6 +133,22 @@ export function apply(ctx: Context): void {
   // makes `inject: ["pracVscode"]` keep a seat pending until this lands. This is
   // the same seam the embed bridge crosses, one level up — seats render parts,
   // the mechanism owns the singleton boot, this row owns the view-to-part policy.
+  /**
+   * The view-id prefix for one open file.
+   *
+   * The *file* is the unit (decision 17), so the resource is the identity: a view
+   * id carries it, and the host — not the seat and not the frame — is where the
+   * two vocabularies meet.
+   */
+  const FILE_VIEW_PREFIX = "vscode:file:";
+
+  /** The view id for one app resource. */
+  const fileViewId = (resource: string): string => `${FILE_VIEW_PREFIX}${resource}`;
+
+  /** The app resource behind a file view id, or undefined for any other view. */
+  const resourceOfFileView = (view: string): string | undefined =>
+    view.startsWith(FILE_VIEW_PREFIX) ? view.slice(FILE_VIEW_PREFIX.length) : undefined;
+
   const face: PracVscodeFace = {
     partHost: (view: string): (() => ReactElement | null) => {
       const part = PART_OF_VIEW[view];
@@ -141,6 +157,13 @@ export function apply(ctx: Context): void {
     viewHost: (view: string): (() => ReactElement | null) => {
       const vscodeView = VSCODE_VIEW_OF_SEAT[view];
       return vscodeView === undefined ? () => null : embed.view(vscodeView);
+    },
+    fileViews: (): readonly VscodeFileView[] =>
+      embed.openFiles().map((resource) => ({ view: fileViewId(resource), resource })),
+    onDidChangeFileViews: (listener: () => void) => embed.onDidChangeOpenFiles(listener),
+    fileHost: (view: string): (() => ReactElement | null) => {
+      const resource = resourceOfFileView(view);
+      return resource === undefined ? () => null : embed.file(resource);
     },
   };
   ctx.effect(() => ctx.provide("pracVscode", face), `${name}: pracVscode service`);

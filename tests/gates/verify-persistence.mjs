@@ -25,16 +25,15 @@
  */
 import { openPrac, report, requireUrl } from "./harness.mjs";
 
-const RIGHT = "right";
 const LEFT = "left";
 const BOTTOM = "bottom";
 const CONVERSATION = "dsh:main:conversation";
 const VSCODE_SIDEBAR = "vscode:sidebar";
 /** The key `prac-client-ui-layout` persists under (see its `store.ts`). */
 const STATE_KEY = "prac-layout/v1";
-/** The right track's default size; a restored 320 can only be the resize. */
-const RESIZED_RIGHT = 320;
-const DEFAULT_RIGHT = 420;
+/** The sidebar's default size; a restored 320 can only be the resize. */
+const RESIZED_LEFT = 320;
+const DEFAULT_LEFT = 280;
 
 const url = requireUrl();
 const { page, own, consoleErrors, close } = await openPrac(url);
@@ -54,7 +53,7 @@ async function settle() {
  */
 async function sample() {
   return page.evaluate(
-    ({ key, right, left, bottom }) => {
+    ({ key, left, bottom }) => {
       const box = (selector) => {
         const element = document.querySelector(selector);
         if (!element) return null;
@@ -82,7 +81,6 @@ async function sample() {
         regions: [...document.querySelectorAll("[data-prac-region]")].map((element) =>
           element.getAttribute("data-prac-region"),
         ),
-        right: box(`[data-prac-region="${right}"]`),
         bottom: box(`[data-prac-region="${bottom}"]`),
         stack: [
           ...document.querySelectorAll(`[data-prac-region="${left}"] [data-prac-stack-entry]`),
@@ -90,18 +88,19 @@ async function sample() {
           view: element.getAttribute("data-prac-stack-entry"),
           collapsed: element.getAttribute("data-prac-stack-collapsed"),
         })),
+        left: box(`[data-prac-region="${left}"]`),
         persisted:
           state === null
             ? null
             : {
                 bytes: raw.length,
-                rightSize: findRegion(state.tree, right)?.size ?? null,
+                leftSize: findRegion(state.tree, left)?.size ?? null,
                 bottomCollapsed: findRegion(state.tree, bottom)?.collapsed ?? null,
                 views: Object.keys(state.views ?? {}).sort(),
               },
       };
     },
-    { key: STATE_KEY, right: RIGHT, left: LEFT, bottom: BOTTOM },
+    { key: STATE_KEY, left: LEFT, bottom: BOTTOM },
   );
 }
 
@@ -114,20 +113,20 @@ const initial = await sample();
 // 2. Move things: resize the track, show + fold a second view in the sidebar,
 //    push the conversation into the bottom bar and open it.
 await page.evaluate(
-  ({ right, bottom, conversation, vscodeSidebar, width }) => {
+  ({ left, bottom, conversation, vscodeSidebar, width }) => {
     const layout = globalThis.__pracLayout;
-    layout.setWidth(right, width);
+    layout.setWidth(left, width);
     layout.show(vscodeSidebar);
     layout.setViewCollapsed(vscodeSidebar, true);
     layout.place(conversation, bottom);
     layout.setCollapsed(bottom, false);
   },
   {
-    right: RIGHT,
+    left: LEFT,
     bottom: BOTTOM,
     conversation: CONVERSATION,
     vscodeSidebar: VSCODE_SIDEBAR,
-    width: RESIZED_RIGHT,
+    width: RESIZED_LEFT,
   },
 );
 await page.waitForTimeout(1500);
@@ -160,15 +159,15 @@ const BAR_HEIGHT = 240;
 const checks = {
   // The premise: a fresh origin really starts from the factory shape.
   startedDefault:
-    initial.regions.join(",") === "left,stage,right" &&
-    near(initial.right?.w, DEFAULT_RIGHT, 6) &&
+    initial.regions.join(",") === "left,stage" &&
+    near(initial.left?.w, DEFAULT_LEFT, 6) &&
     initial.stack.length === 0 &&
     initial.bottom === null,
   // The engine integration: the state is under the versioned key, and it is the
   // state the moves produced (not just a key that exists).
-  written: changed.persisted !== null && changed.persisted.rightSize === RESIZED_RIGHT,
+  written: changed.persisted !== null && changed.persisted.leftSize === RESIZED_LEFT,
   // …and comes back after a real reload: size, stack order with the fold, bar.
-  resizeRestored: near(reloaded.right?.w, RESIZED_RIGHT, 6),
+  resizeRestored: near(reloaded.left?.w, RESIZED_LEFT, 6),
   stackRestored:
     reloaded.stack.length === 2 &&
     stackKey(reloaded) === stackKey(changed) &&

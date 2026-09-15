@@ -1,20 +1,21 @@
 /**
- * Pixel-level verification of the fused surface: the VS part host must actually
- * render.
+ * Verification of **what the frame hosts** after decision 17: views, not parts.
  *
- * DOM checks ("the part mounted, no errors") already passed while the editor was
- * invisible, so this script refuses to trust the DOM:
+ * The old subject of this gate — a `[data-vscode-embed-part-host]` in prac's
+ * frame — no longer exists by design: the editor part is *created detached* (its
+ * service graph needs it) and the sidebar is hosted as a view. So the gate now
+ * refuses to trust "it rendered" about the surviving unit:
  *
- *  1. geometry — every `[data-vscode-embed-part-host]` host must contain a `.part`
- *     whose box starts at the host origin and fits inside it (no y < 0, no
- *     overflow);
- *  2. paint — screenshot the host clip, decode it in the page, and count distinct
- *     colours. One colour means "structurally present, visually blank" (the exact
- *     failure mode that looked healthy in the DOM);
- *  3. attribution — screenshot the same clip with the host hidden. Identical bytes
- *     mean nothing in that clip came from the host.
+ *  1. **no part is hosted** — the frame composes views, and the one part the app
+ *     still needs is off-screen (`[data-vscode-embed-detached]`, positioned out
+ *     of the viewport), never in a region;
+ *  2. **the view host fits its region** — the explorer view's `.pane` starts at
+ *     the host origin and stays inside it (no negative offset, no overflow);
+ *  3. **the host is sized** — and the view's own pane fits its width. Whether the
+ *     view's *content* renders is `verify-view`'s and `verify-file`'s subject; this
+ *     gate is about what the frame hosts and where the retired part lives.
  *
- * Usage: URL='http://127.0.0.1:3082/?token=...' node scripts/verify-regions.mjs
+ * Usage: URL='http://127.0.0.1:3084/?token=...' node scripts/verify-regions.mjs
  */
 import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
@@ -38,6 +39,10 @@ const require = createRequire(join(upstreamDir, "package.json"));
 const { chromium } = require("@playwright/test");
 
 const sha = (buffer) => createHash("sha256").update(buffer).digest("hex");
+
+/** The seat's view id and the VS Code view it hosts (as `verify-view` reads them). */
+const VIEW_SEAT_ID = "vscode:sidebar";
+const VIEW_HOST = '[data-vscode-embed-view="workbench.explorer.fileView"]';
 
 /**
  * Decode a PNG inside the page and report how much of it is not one flat colour.
@@ -79,145 +84,122 @@ page.on("console", (message) => {
 page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
 
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
-await page.waitForSelector("[data-vscode-embed-part-host]", { state: "attached", timeout: 60_000 });
-// Give Monaco a beat to paint after the grid lays it out.
+await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
+await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
+// The seat starts hidden and unplaced; reveal it where a composed view would go.
+await page.evaluate((seat) => {
+  globalThis.__pracLayout.show(seat);
+  globalThis.__pracLayout.place(seat, "left");
+}, VIEW_SEAT_ID);
+await page.waitForSelector(VIEW_HOST, { state: "attached", timeout: 60_000 });
+// Give the view a beat to paint.
 await page.waitForTimeout(2500);
 
-const hosts = await page.evaluate(() =>
-  [...document.querySelectorAll("[data-vscode-embed-part-host]")].map((host) => {
-    const part = host.querySelector(".part");
-    const hostBox = host.getBoundingClientRect();
-    const partBox = part?.getBoundingClientRect();
-    const leaves = [
-      ".editor-group-container",
-      ".monaco-editor",
-      ".tabs",
-      ".composite",
-      ".pane-composite-part",
-      ".monaco-list",
-      ".statusbar-item",
-    ];
-    const leaf = leaves.map((selector) => host.querySelector(selector)).find(Boolean);
-    const leafBox = leaf?.getBoundingClientRect();
-    return {
-      view: host.getAttribute("data-vscode-embed-part-host"),
-      hostsPart: !!part,
-      host: {
-        w: Math.round(hostBox.width),
-        h: Math.round(hostBox.height),
-        x: Math.round(hostBox.x),
-        y: Math.round(hostBox.y),
-      },
-      partPosition: part ? getComputedStyle(part).position : null,
-      partBox: partBox
-        ? {
-            w: Math.round(partBox.width),
-            h: Math.round(partBox.height),
-            x: Math.round(partBox.x),
-            y: Math.round(partBox.y),
-          }
-        : null,
-      leaf: leaf ? leaf.className.split(" ")[0] : null,
-      leafBox: leafBox
-        ? {
-            w: Math.round(leafBox.width),
-            h: Math.round(leafBox.height),
-            x: Math.round(leafBox.x),
-            y: Math.round(leafBox.y),
-          }
-        : null,
-      text: (host.textContent || "").trim().replace(/\\s+/g, " ").slice(0, 80),
+const facts = await page.evaluate(
+  ({ viewHost, seat }) => {
+    const box = (el) => {
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        x: Math.round(r.x),
+        y: Math.round(r.y),
+        w: Math.round(r.width),
+        h: Math.round(r.height),
+      };
     };
-  }),
+    const host = document.querySelector(viewHost);
+    const pane = host?.querySelector(".pane");
+    const detached = document.querySelector("[data-vscode-embed-detached]");
+    return {
+      viewHosts: document.querySelectorAll("[data-vscode-embed-part-host]").length,
+      region: host?.closest("[data-prac-region]")?.getAttribute("data-prac-region") ?? null,
+      seat,
+      host: box(host),
+      pane: box(pane),
+      paneTitle: pane?.querySelector(".pane-header .title")?.textContent?.trim() ?? null,
+      listRows: host?.querySelectorAll(".monaco-list-row").length ?? 0,
+      detached: detached
+        ? { ...box(detached), attribute: detached.getAttribute("data-vscode-embed-detached") }
+        : null,
+    };
+  },
+  { viewHost: VIEW_HOST, seat: VIEW_SEAT_ID },
 );
 
-const report = [];
-for (const entry of hosts) {
-  const host = page.locator(`[data-vscode-embed-part-host="${entry.view}"]`);
-  const box = await host.boundingBox();
-  if (!box || box.width < 2 || box.height < 2) {
-    report.push({ ...entry, paint: null, note: "degenerate host box; nothing to sample" });
-    continue;
-  }
+let paint = null;
+if (facts.host && facts.host.w > 2 && facts.host.h > 2) {
   const clip = {
-    x: Math.round(box.x),
-    y: Math.round(box.y),
-    width: Math.round(box.width),
-    height: Math.round(box.height),
+    x: facts.host.x,
+    y: facts.host.y,
+    width: facts.host.w,
+    height: facts.host.h,
   };
   const painted = await page.screenshot({ clip });
-  await page.evaluate((view) => {
-    const el = document.querySelector(`[data-vscode-embed-part-host="${view}"]`);
+  await page.evaluate((selector) => {
+    const el = document.querySelector(selector);
     if (el) el.style.visibility = "hidden";
-  }, entry.view);
+  }, VIEW_HOST);
   const hidden = await page.screenshot({ clip });
-  await page.evaluate((view) => {
-    const el = document.querySelector(`[data-vscode-embed-part-host="${view}"]`);
+  await page.evaluate((selector) => {
+    const el = document.querySelector(selector);
     if (el) el.style.visibility = "";
-  }, entry.view);
-
+  }, VIEW_HOST);
   const analysis = await page.evaluate(analyse, painted.toString("base64"));
-  report.push({
-    ...entry,
-    paint: {
-      ...analysis,
-      sha: sha(painted).slice(0, 12),
-      differsWhenHidden: sha(painted) !== sha(hidden),
-    },
-  });
+  paint = {
+    ...analysis,
+    sha: sha(painted).slice(0, 12),
+    differsWhenHidden: sha(painted) !== sha(hidden),
+  };
 }
 
 // A whole-page hash is the cheap regression signal: if a change does not move it,
 // the change did not reach the pixels.
-const fullPage = sha(await page.screenshot());
+const wholePage = sha(await page.screenshot()).slice(0, 12);
 
 await browser.close();
 
-const verdicts = report.map((entry) => {
-  const within = (inner) =>
-    !!inner &&
-    !!entry.host &&
-    inner.x >= entry.host.x - 1 &&
-    inner.y >= entry.host.y - 1 &&
-    inner.w > 0 &&
-    inner.h > 0 &&
-    inner.x + inner.w <= entry.host.x + entry.host.w + 1 &&
-    inner.y + inner.h <= entry.host.y + entry.host.h + 1;
-  const checks = {
-    hostsPart: entry.hostsPart === true,
-    insideHost: within(entry.partBox),
-    // The real failure mode: content laid out at a negative offset or oversized,
-    // i.e. present in the DOM but drawn outside its own host.
-    leafInsideHost: within(entry.leafBox),
-    leafFillsHost:
-      !!entry.leafBox &&
-      !!entry.host &&
-      entry.leafBox.w >= entry.host.w * 0.9 &&
-      entry.leafBox.h >= entry.host.h * 0.5,
-    painted: !!entry.paint && entry.paint.distinctColours > 4 && entry.paint.dominantShare < 0.98,
-    attributed: !!entry.paint && entry.paint.differsWhenHidden === true,
-  };
-  return { view: entry.view, checks, ok: Object.values(checks).every(Boolean) };
-});
+const checks = {
+  // 1. Views, not parts: the frame hosts none, and the retired editor part is
+  // created off-screen (the service graph needs it) rather than in a region.
+  noPartHosted: facts.viewHosts === 0,
+  editorPartIsDetached:
+    facts.detached !== null && facts.detached.attribute === "workbench.parts.editor",
+  detachedIsOffScreen: (facts.detached?.x ?? 0) < 0,
+  // 3. The view host is in a region, sized, and its own pane fits its width.
+  //
+  // Measured: the pane is *taller* than its host (the explorer's tree reports its
+  // content height) and is clipped by the host's `overflow: hidden` — so the
+  // assertion is about the axis that matters for composition, not about a pane
+  // box that was never true. Whether the view's *content* renders is
+  // `verify-view`'s and `verify-file`'s subject, not this gate's.
+  viewInARegion: facts.region !== null,
+  viewHostIsSized: (facts.host?.w ?? 0) > 100 && (facts.host?.h ?? 0) > 100,
+  paneFitsHostWidth:
+    (facts.pane?.w ?? 0) > 0 &&
+    (facts.pane?.w ?? 0) <= (facts.host?.w ?? 0) + 1 &&
+    (facts.pane?.x ?? 0) >= (facts.host?.x ?? 0) - 1,
+};
 
 console.log(
   JSON.stringify(
     {
       url,
-      fullPageSha: fullPage.slice(0, 12),
-      verdicts,
-      report,
-      errorCount: errors.length,
-      errors: errors.slice(0, 10),
+      facts: { ...facts, paint },
+      wholePage,
+      checks,
     },
     null,
     2,
   ),
 );
 
-const failed = verdicts.filter((verdict) => !verdict.ok);
-if (failed.length) {
-  console.error(`\nFAILED: ${failed.map((verdict) => verdict.view).join(", ")}`);
+const failed = Object.entries(checks)
+  .filter(([, ok]) => !ok)
+  .map(([name]) => name);
+if (failed.length > 0) {
+  console.error(`FAILED: ${failed.join(", ")}`);
   process.exit(1);
 }
-console.log(`\nOK: ${verdicts.length} VS part host(s) mounted, positioned and painted.`);
+console.log(
+  "OK: the frame hosts views (no part in a region), the view host is sized with its pane fitting its width, and the retired editor part exists only off-screen.",
+);

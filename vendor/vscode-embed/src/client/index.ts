@@ -58,6 +58,16 @@ export interface VscodeEmbedPage {
   readonly viewHosts: Map<string, HTMLElement>;
   /** The element hosting each open file, by resource, across all consumers. */
   readonly fileHosts: Map<string, HTMLElement>;
+  /**
+   * Open-file listeners, and the detach the face gave each one.
+   *
+   * The app boots *after* its first consumer, so a consumer can subscribe before
+   * there is a face to subscribe to; the listener is recorded here and attached
+   * when the face arrives (with one immediate call, so the consumer's first read
+   * is not lost). Without this, a subscription made during boot is silently a
+   * no-op and the consumer never hears about any file the app opens.
+   */
+  readonly openFileListeners: Map<() => void, (() => void) | undefined>;
   /** Extra classes the consumers want on the boot root (diagnostics). */
   readonly classes: Set<string>;
 }
@@ -78,6 +88,7 @@ function page(): VscodeEmbedPage {
     hosts: new Map(),
     viewHosts: new Map(),
     fileHosts: new Map(),
+    openFileListeners: new Map(),
     classes: new Set(),
   };
   globalThis.__vscodeEmbed = record;
@@ -263,6 +274,14 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
                   face.mountViewInto(viewId, element);
                 for (const [resource, element] of record.fileHosts)
                   face.mountFileInto(resource, element);
+                // Attach the listeners that arrived before the app did, then let
+                // them read the set once.
+                for (const [listener, detach] of record.openFileListeners) {
+                  if (detach === undefined) {
+                    record.openFileListeners.set(listener, face.onDidChangeOpenFiles(listener));
+                  }
+                }
+                for (const listener of record.openFileListeners.keys()) listener();
               },
             } satisfies EmbedBridge,
             // Point the app at the code server. The recipe mirrors what the
@@ -418,8 +437,14 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
     view,
     file,
     openFiles: () => record.face?.listOpenFiles() ?? [],
-    onDidChangeOpenFiles: (listener: () => void) =>
-      record.face?.onDidChangeOpenFiles(listener) ?? (() => {}),
+    onDidChangeOpenFiles: (listener: () => void): (() => void) => {
+      const detach = record.face?.onDidChangeOpenFiles(listener);
+      record.openFileListeners.set(listener, detach);
+      return () => {
+        record.openFileListeners.delete(listener);
+        detach?.();
+      };
+    },
     commands: () => record.commands,
     host: () => record.host,
     error: () => record.error,

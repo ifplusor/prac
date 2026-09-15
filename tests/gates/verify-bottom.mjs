@@ -83,7 +83,10 @@ const near = (a, b, tolerance) => Math.abs((a ?? 0) - (b ?? 0)) <= tolerance;
 // at its size, with pixels — and that collapsing it hands the room back.
 const checks = {
   // 1. Empty means absent: the default page is exactly the row.
-  absentWhileEmpty: initial.bottom === null && initial.regions.join(",") === "left,stage,right",
+  // No file is open, so the right track holds nothing and is not rendered: the
+  // factory arrangement is the sidebar plus the centre (decision 17 retired the
+  // editor part, so an empty track no longer has an occupant keeping it alive).
+  absentWhileEmpty: initial.bottom === null && initial.regions.join(",") === "left,stage",
   // 2. Filled: at the bottom, full width, at the bar's size, with pixels.
   appearsAtTheBottom:
     opened.bottom !== null &&

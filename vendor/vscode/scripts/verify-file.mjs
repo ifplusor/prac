@@ -210,16 +210,21 @@ const remounted = await sample();
 
 // The other direction: the app opens a file itself (an explorer click, a command,
 // go-to-definition), which has to reach the embedder as an event — otherwise the
-// app would be editing files nobody can see.
-await page.evaluate(() => {
+// app would be editing files nobody can see. The opener is `openFile`, the same
+// editor-service call an explorer click makes.
+await page.evaluate((uri) => {
   const face = globalThis.__vscodeEmbed.face;
   const events = [];
   globalThis.__openFileProbe = { events, before: face.listOpenFiles() };
   globalThis.__stopOpenFileProbe = face.onDidChangeOpenFiles(() => {
     events.push(face.listOpenFiles());
   });
+  face.openFile(uri);
+  // A non-file editor (an untitled buffer has a text model and no file system
+  // provider) must not be offered as a file: mounting it would try to read a
+  // path that cannot exist.
   face.openUntitled();
-});
+}, `${folder}/${FIRST.path}`);
 await page.waitForTimeout(2500);
 const opened = await page.evaluate(() => ({
   before: globalThis.__openFileProbe.before,
@@ -270,6 +275,8 @@ const checks = {
   appOpeningFiresTheEvent:
     opened.events.length >= 1 &&
     opened.events[opened.events.length - 1].some((resource) => !opened.before.includes(resource)),
+  // …and only files: the untitled buffer opened in the same breath is not one.
+  nonFilesAreNotOffered: opened.after.every((resource) => !resource.startsWith("untitled:")),
   // A failed mount is logged by the composition, not thrown at the embedder.
   noMountErrors:
     mounted.mountErrors === 0 && remounted.mountErrors === 0 && released.mountErrors === 0,

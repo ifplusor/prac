@@ -41,6 +41,40 @@ export interface PracVscodeFace {
    * @returns a component rendering the host element the view is created into.
    */
   viewHost(view: string): () => ReactElement | null;
+  /**
+   * The files the app currently has open, as view ids a seat can declare.
+   *
+   * Decision 17's unit: the app contributes one file's editing surface
+   * (`vscode:file:<resource>`), while which files are open comes from the app's
+   * own editor service — an explorer click or a command opens a file there, and
+   * the embedder has to turn it into a view.
+   *
+   * @returns one entry per open file, oldest first.
+   */
+  fileViews(): readonly VscodeFileView[];
+  /**
+   * Subscribe to changes in the open-file set.
+   *
+   * @param listener - called when the set changed; re-read {@link fileViews}.
+   * @returns a function that unsubscribes.
+   */
+  onDidChangeFileViews(listener: () => void): () => void;
+  /**
+   * The seat component for one `vscode:file:<resource>` view.
+   *
+   * @param view - the file view id from {@link fileViews}.
+   * @returns a component rendering the host element the file is mounted into,
+   * or one rendering nothing when the id is not a file view.
+   */
+  fileHost(view: string): () => ReactElement | null;
+}
+
+/** One open file, as the pair of view id and app resource. */
+export interface VscodeFileView {
+  /** The view id a seat declares for this file. */
+  readonly view: string;
+  /** The app's URI for the file. */
+  readonly resource: string;
 }
 
 declare module "@deepseek-ai/cordis" {

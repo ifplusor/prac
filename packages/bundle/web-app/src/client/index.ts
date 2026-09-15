@@ -37,11 +37,15 @@ import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { ILayout } from "@deepseek-ai/dsh-client-ui-layout/client";
 import type { Side } from "prac-client-ui-layout/client";
+// Types only, for its `Context` merge (`ctx.pracVscode`): the arrangement follows
+// the app's open-file set, and naming the face puts that service in this program.
+import type {} from "prac-client-vscode-host/client";
 import {
   CONVERSATION,
   VSCODE_SURFACE,
   arrange,
   focusView,
+  openFileInto,
   placeSurfaces,
   type PracLayout,
   type Surface,
@@ -263,6 +267,12 @@ const SPLIT_SIDES: readonly {
 /** Props of the recall surface. */
 interface RecallSurfaceProps {
   layout: PracLayout;
+  /**
+   * Bring a view forward (the surface's 聚焦). Supplied by the arrangement: with
+   * several files open, "forward" also means "this is the file attention is on",
+   * and that is arrangement state.
+   */
+  onFocus: (viewId: string) => void;
 }
 
 /**
@@ -287,7 +297,7 @@ interface RecallSurfaceProps {
  *
  * @param props - the mechanism's placement face.
  */
-function RecallSurface({ layout }: RecallSurfaceProps): ReactElement | null {
+function RecallSurface({ layout, onFocus }: RecallSurfaceProps): ReactElement | null {
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState(0);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -375,7 +385,7 @@ function RecallSurface({ layout }: RecallSurfaceProps): ReactElement | null {
       const row = views[active];
       if (!row) return;
       event.preventDefault();
-      focusView(layout, row.id);
+      onFocus(row.id);
     }
   };
 
@@ -444,7 +454,7 @@ function RecallSurface({ layout }: RecallSurfaceProps): ReactElement | null {
         {
           type: "button",
           "data-prac-recall-focus": view.id,
-          onClick: () => focusView(layout, view.id),
+          onClick: () => onFocus(view.id),
           style: RECALL_BUTTON_STYLE,
         },
         "聚焦",
@@ -582,8 +592,50 @@ export function apply(ctx: Context): void {
   const focus = createFocus();
   arrange(layout);
 
-  // Attention moved: derive the placement.
-  focus.subscribe(() => placeSurfaces(layout, focus.state().current));
+  /**
+   * The file view attention currently rests on, and every file view the app has
+   * open. The set is what makes "is this a file?" a membership question rather
+   * than a prefix test in this file: the id convention belongs to the host.
+   */
+  let currentFile: string | null = null;
+  let fileViews = new Set<string>();
+
+  // Attention moved: derive the placement. With several files open, "the editor"
+  // means the one attention last rested on.
+  focus.subscribe(() => placeSurfaces(layout, focus.state().current, currentFile));
+
+  // The app opens files itself (an explorer click, a command, a jump), so the
+  // arrangement follows the app's open-file set instead of a fixed editor view.
+  ctx.inject(["pracVscode"], (scope) => {
+    const vscode = scope.pracVscode;
+    const sync = (): void => {
+      const files = vscode.fileViews();
+      fileViews = new Set(files.map((entry) => entry.view));
+      const newest = files[files.length - 1];
+      if (newest === undefined) {
+        currentFile = null;
+        return;
+      }
+      // A file the frame has never seen takes the centre; a known one only
+      // becomes the surface attention rests on (it is already placed).
+      const known = layout.getState().views[newest.view] !== undefined;
+      currentFile = newest.view;
+      if (!known) openFileInto(layout, newest.view);
+    };
+    sync();
+    scope.effect(() => vscode.onDidChangeFileViews(sync), "prac-web-app: open files");
+  });
+
+  /**
+   * Bring a view forward, and remember it when it is a file: the strip's
+   * "editor" door should lead back to the file attention was last on.
+   *
+   * @param viewId - the view to bring forward.
+   */
+  const focusInto = (viewId: string): void => {
+    if (fileViews.has(viewId)) currentFile = viewId;
+    focusView(layout, viewId);
+  };
 
   // The environment layer: additive, and the only seat a prac surface of our
   // own may float in (registering into `root` would shadow the whole frame).
@@ -603,7 +655,7 @@ export function apply(ctx: Context): void {
   // keeps working untouched. It owns its own keybinding (`Cmd/Ctrl+Alt+V`).
   slots.inject(OVERLAY, () =>
     slots.register({ name: OVERLAY, id: "prac-recall" }, () =>
-      createElement(RecallSurface, { layout }),
+      createElement(RecallSurface, { layout, onFocus: focusInto }),
     ),
   );
 

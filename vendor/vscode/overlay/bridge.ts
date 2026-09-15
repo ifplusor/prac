@@ -110,6 +110,19 @@ export interface PartHostFace {
    */
   releaseFile: (resource: string) => void;
   /**
+   * Open a file in the workbench, by the same string vocabulary as
+   * {@link PartHostFace.mountFileInto}.
+   *
+   * The public `vscode.open` command cannot be driven from the embedder (its
+   * argument is validated against a `URI` instance the page cannot construct), so
+   * a path is opened through this instead. It goes through the editor service
+   * exactly like an explorer click does, so it also shows up in
+   * {@link PartHostFace.listOpenFiles} and becomes a view.
+   *
+   * @param resource - the file's URI, as a string.
+   */
+  openFile: (resource: string) => void;
+  /**
    * The resources the workbench currently has open, in its own order.
    *
    * The embedder owns *rendering* files (see

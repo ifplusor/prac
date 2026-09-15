@@ -1,18 +1,22 @@
 /**
  * prac-client-ui-vscode-editor — the editor seat.
  *
- * Declares exactly one `prac.view` entry, `vscode:editor`, whose component is the
- * part-host element built by the shared mechanism (`prac-client-vscode-host`).
+ * Declares **one `prac.view` entry per open file** (decision 17): the app
+ * contributes a file's editing surface, and this seat turns the app's open-file
+ * set into views. Which files are open comes from the app's own editor service
+ * (an explorer click, a command, a go-to-definition), through the shared
+ * mechanism's `onDidChangeFileViews`; the view id is `vscode:file:<resource>`, and
+ * the mapping between id and resource belongs to `prac-client-vscode-host`.
  *
  * The mechanism arrives as an injected **service** (`ctx.pracVscode`) rather than
  * as an import, because each client plugin is bundled and inlined on its own: an
  * imported module would duplicate the singleton boot guard. Injecting it is what
- * lets the two seats be separate bundles, each placeable, showable, or disabled
- * on its own.
+ * lets the seats be separate bundles, each placeable, showable, or disabled on
+ * its own.
  *
- * Placement is not decided here. The arrangement (`prac-web-app`) places
- * `vscode:editor`; the mechanism (`prac-client-ui-layout`) renders it in whatever region that
- * is, and the part is re-parented rather than recreated when it moves.
+ * Placement is not decided here. The arrangement (`prac-web-app`) puts a newly
+ * opened file in the centre; the mechanism renders it in whatever region that is
+ * and owns the tab strip over several files.
  *
  * @module prac-client-ui-vscode-editor/client
  */
@@ -22,14 +26,16 @@ import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { PracVscodeFace } from "prac-client-vscode-host/client";
 import type { ViewSeatKey } from "prac-client-ui-layout/client";
 
-/** The view id this package declares. */
-const VSCODE_EDITOR_VIEW = "vscode:editor";
-
-/** The seat it declares that view into (checked against the mechanism's key type). */
+/** The seat these views are declared into (checked against the mechanism's key). */
 const SEAT: ViewSeatKey = "prac.view";
 
 /**
- * Declare the editor seat on the frame's `prac.view` seat.
+ * Declare one seat entry per open file, and keep that set in sync with the app.
+ *
+ * The seat is declared by `prac-client-ui-layout`'s frame, so injecting waits for
+ * that declaration (either client plugin may activate first). Each entry is a
+ * registration of its own — the mechanism's view catalogue reads the registry, so
+ * a file appearing or closing is exactly a registration appearing or going away.
  *
  * @param ctx - the Cordis client context.
  */
@@ -38,20 +44,37 @@ export function apply(ctx: Context): void {
   // is what keeps this seat's use of it checked.
   const host: PracVscodeFace = ctx.pracVscode;
   const slots: SlotRegistry = ctx.slots;
-  // The seat is declared by prac-client-ui-layout's frame; injecting waits for that
-  // declaration, since either client plugin may activate first.
   ctx.effect(
     () =>
-      slots.inject(SEAT, () =>
-        slots.register(
-          { name: SEAT, id: VSCODE_EDITOR_VIEW },
-          // The mechanism is injected, so it is present before this runs; the
-          // component it returns renders an empty host until the VS Code side
-          // of the bridge has published its face, then fills it.
-          () => host.partHost(VSCODE_EDITOR_VIEW)() ?? null,
-        ),
-      ),
-    `prac-client-ui-vscode-editor: ${VSCODE_EDITOR_VIEW} view`,
+      slots.inject(SEAT, () => {
+        /** The live registration per file view, so a closed file can retract. */
+        const registered = new Map<string, () => void>();
+        const sync = (): void => {
+          const wanted = new Set(host.fileViews().map((entry) => entry.view));
+          for (const [view, dispose] of [...registered]) {
+            if (wanted.has(view)) continue;
+            dispose();
+            registered.delete(view);
+          }
+          for (const { view } of host.fileViews()) {
+            if (registered.has(view)) continue;
+            // The component renders an empty host until the app has mounted the
+            // file, then fills it — the bridge's direction, one level up.
+            registered.set(
+              view,
+              slots.register({ name: SEAT, id: view }, () => host.fileHost(view)() ?? null),
+            );
+          }
+        };
+        sync();
+        const stop = host.onDidChangeFileViews(sync);
+        return () => {
+          stop();
+          for (const dispose of registered.values()) dispose();
+          registered.clear();
+        };
+      }),
+    "prac-client-ui-vscode-editor: one view per open file",
   );
 }
 

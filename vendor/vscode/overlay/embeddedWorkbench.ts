@@ -334,6 +334,9 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
         // this face gets back to it — see `embedBridge.ts`.
         const bridge = readEmbedBridge(this.environmentService?.options);
         if (bridge?.deferParts) {
+          // The editor service needs its part to exist even though the embedder
+          // renders files itself; it is created off-screen and never hosted.
+          this.createDetachedPart("workbench.parts.editor");
           bridge.publish({
             mountPartInto: (partId: string, element: HTMLElement) =>
               this.mountPartInto(partId, element),
@@ -345,6 +348,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
             mountFileInto: (resource: string, element: HTMLElement) =>
               this.mountFileInto(resource, element),
             releaseFile: (resource: string) => this.releaseFile(resource),
+            openFile: (resource: string) => this.openFile(resource),
             listOpenFiles: () => this.listOpenFiles(),
             onDidChangeOpenFiles: (listener: () => void) => this.onDidChangeOpenFiles(listener),
             openUntitled: (path?: string) => this.openUntitled(path),
@@ -634,6 +638,41 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   }
 
   /**
+   * Open a file in the workbench, by the same string vocabulary as
+   * {@link mountFileInto}.
+   *
+   * The public `vscode.open` command cannot be driven from the embedder (its
+   * argument is validated against a `URI` instance the page cannot construct), so
+   * opening by path goes through here. The editor service opens it like any other
+   * editor — which is also how the embedder hears about it
+   * ({@link listOpenFiles}) and turns it into a view.
+   *
+   * @param resource - the file's URI, as a string.
+   */
+  openFile(resource: string): void {
+    try {
+      const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
+        ? URI.parse(resource)
+        : URI.file(resource);
+      // Activate the scheme's file system provider *before* opening: the editor
+      // service picks a `FileEditorInput` only when the scheme already has a
+      // provider, and this composition's provider (the remote one) registers
+      // asynchronously. Opening first built a `TextResourceEditorInput`, whose
+      // `resolve` rejects the model `createModelReference` returns — measured as
+      // `Unexpected model for TextResourceEditorInput: …` on a fresh page, while
+      // the same open after any read succeeded.
+      void this.fileService
+        .canHandleResource(uri)
+        .then(() => this.editorService.openEditor({ resource: uri, options: { pinned: true } }))
+        .catch((error) => {
+          this.logService.error(`vscode-embed: openFile failed for ${resource}`, error);
+        });
+    } catch (error) {
+      this.logService.error(`vscode-embed: openFile failed for ${resource}`, error);
+    }
+  }
+
+  /**
    * The resources the workbench has open.
    *
    * Read from the editor service rather than kept as a list of our own: the
@@ -648,14 +687,17 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     if (!instantiationService) return [];
     try {
       return instantiationService.invokeFunction((accessor) => {
-        // Only what the embedder can actually render as a text surface: the
-        // getting-started page is an editor input *with* a resource
-        // (`walkThrough:`) and no text model, so it is not an open file here.
-        const models = accessor.get(ITextModelService);
+        // Only what the embedder can actually render as a *file*: an editor
+        // input can carry a resource and still not be one — the getting-started
+        // page (`walkThrough:`) has no text model, and an untitled buffer
+        // (`untitled:`) has a model but no file system provider, so reading it
+        // as a file fails (`createModelReference` goes through the file
+        // service). The provider test is what both of those fail.
+        const files = accessor.get(IFileService);
         return this.editorService.editors
           .map((editor) => editor.resource)
           .filter((resource): resource is URI => resource !== undefined)
-          .filter((resource) => models.canHandleResource(resource))
+          .filter((resource) => files.hasProvider(resource))
           .map((resource) => resource.toString());
       });
     } catch (error) {
@@ -697,8 +739,42 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    * part registers. This is the seam the embedder's shell uses to place a part
    * in its own layout region.
    */
+  /**
+   * Create a part into a hidden container the frame never shows.
+   *
+   * Some services need their part to *exist* — the editor service opens editors
+   * through the editor part's groups — while the embedder renders those files
+   * itself as views (decision 17). Measured: with the editor part never created,
+   * `openEditor` throws `Cannot read properties of undefined (reading
+   * 'isLocked')` and no file ever opens, so "retire the part" has to mean
+   * "create it, never host it" rather than "never create it".
+   *
+   * The part is registered as mounted, so a later `mountPartInto` *moves* this
+   * same instance instead of creating a second one.
+   *
+   * @param partId - the workbench part id.
+   */
+  private createDetachedPart(partId: string): void {
+    const element = mainWindow.document.querySelector<HTMLElement>("[data-vscode-embed-detached]");
+    const host =
+      element ??
+      (() => {
+        const created = mainWindow.document.createElement("div");
+        created.setAttribute("data-vscode-embed-detached", partId);
+        created.style.cssText = "position:absolute;left:-100000px;top:0;width:800px;height:600px";
+        mainWindow.document.body.append(created);
+        return created;
+      })();
+    this.mountPartInto(partId, host);
+  }
+
   mountPartInto(partId: string, element: HTMLElement): void {
-    if (this.mountedParts.has(partId)) return;
+    if (this.mountedParts.has(partId)) {
+      // Already created — possibly detached (see `createDetachedPart`). The
+      // embedder asking for it means it wants it visible, so move it there.
+      this.movePartInto(partId, element);
+      return;
+    }
     const part = this.parts.get(partId);
     if (!part) {
       this.deferredHosts.set(partId, element);

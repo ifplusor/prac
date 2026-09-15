@@ -26,7 +26,6 @@ import { distinctColours, openPrac, report, requireUrl } from "./harness.mjs";
 
 const LEFT = "left";
 const STAGE = "stage";
-const RIGHT = "right";
 const CONVERSATION = "dsh:main:conversation";
 const DSH_SIDEBAR = "dsh:sidebar";
 const VSCODE_SIDEBAR = "vscode:sidebar";
@@ -190,7 +189,7 @@ await close();
 // boundary, and the shape survives a reload.
 const checks = {
   // The premise: a fresh origin really is the factory arrangement.
-  startedDefault: initial.regions.map((region) => region.id).join(",") === "left,stage,right",
+  startedDefault: initial.regions.map((region) => region.id).join(",") === "left,stage",
   // Each side's pane renders where the side says, and holds the view.
   paneOnTheRight:
     (regionBox(splitRight, rightPane)?.x ?? 0) > (regionBox(splitRight, STAGE)?.x ?? 0) &&

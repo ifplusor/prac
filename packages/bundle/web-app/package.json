@@ -34,6 +34,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "prac-client-ui-layout": "workspace:*",
+    "prac-client-vscode-host": "workspace:*",
     "react": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

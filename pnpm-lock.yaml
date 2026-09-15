@@ -196,6 +196,9 @@ importers:
       prac-client-ui-layout:
         specifier: workspace:*
         version: link:../../client/ui-layout
+      prac-client-vscode-host:
+        specifier: workspace:*
+        version: link:../../client/vscode-host
       react:
         specifier: 'catalog:'
         version: 18.3.1
