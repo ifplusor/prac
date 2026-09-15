@@ -154,7 +154,11 @@ interface Capability<T, A> {
 
 **活体判据（`verify-file` 23/23）**：能力在**不挂任何 view** 时照样回答（把文件 view `hide` 掉、座位随之释放编辑面之后，`snapshot()` 仍列出该文件——这就是"能力层真的与 UI 分开"那条硬判据）；`activate` 让 prac 的"当前 tab"与 app 的 active editor 一致；`close` 之后文件从能力与 `listOpenFiles()` 里同时消失（view 随之消失）。
 
-**仍未做（下一步）**：① tab 条消费这条能力（脏点 / 预览斜体 / × 走 `actions.close`；点 tab 走 `actions.activate`）——机制侧需要一个"view 装饰"入口（`ViewRecord` 上的 badge/flag + face 方法），因为 tab 是 frame 画的而脏是 view 的事实；② agent 面（host 侧 `/remote` + `ctx.tools.register`）。
+**UI 消费者已接上（2026-09-15）**：机制侧加两个**通用**入口——`setViewFlags(viewId, { dirty, preview })`（view 的声明者推、frame 渲染：tab 上一个点、预览斜体；`flags` 进 `ViewRecord`，因此随布局持久化）与 `activeView()`（**中心区域的前景 view**，是个通用事实、不含任何 view 名）。座位（`prac-client-ui-vscode-editor`）订阅 `editors` 能力 + 布局，把两者对上：脏/预览推给机制；当 **prac 的前景 view 与 app 的 active editor 不一致**时调用 `actions.activate`（两个状态在座位这里汇合；守卫在 app 自己的回答上，两个订阅不会乒乓）。
+
+**门里被逼出来的第三条不变式**：**一个资源只有一个编辑面**这条（决定 17）在门自己身上兑现——旧的探针 host 挂的文件恰好也是 frame 会显示的文件，于是"释放探针挂载"把编辑器从 frame 的 view 里搬走了，而那个 view 一直挂着、没人重建它。修法是给两方**各自的文件**（探针一套、app 一套），并把这条不变式写进门的注释。活体判据（`verify-file` **26/26**）：打字后 **tab 出现脏点**、撤销后消失；**点 tab 之后 app 的 active editor 跟着换**（`activeAfterTabClick` === 被点的那条 tab）；隐藏 view 之后能力照样回答；`close` 之后编辑器与 view 一起消失。
+
+**仍未做（下一步）**：① tab 的 **×**（关闭）——机制**不该**为此在持久化状态里放回调，所以关闭入口该由 **prac 自己的面**（recall 面的"关闭文件"）或 app 自己的 UI 提供，走 `actions.close`；② **预览斜体未实测**（`preview` 已接通，但门里开的都是 pinned 打开；要验得走 explorer 单击那条 preview 路径）；③ agent 面（host 侧 `/remote` + `ctx.tools.register`）。
 
 ## Alternatives
 

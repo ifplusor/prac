@@ -192,6 +192,14 @@ const TAB_STYLE: StyleObject = {
   flex: "0 0 auto",
 };
 
+/** The unsaved marker inside a tab. */
+const TAB_DIRTY_STYLE: StyleObject = {
+  fontSize: "9px",
+  marginRight: "5px",
+  verticalAlign: "middle",
+  opacity: 0.9,
+};
+
 /** The active tab, which is the view the region renders. */
 const TAB_ACTIVE_STYLE: StyleObject = {
   opacity: 1,
@@ -457,7 +465,9 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
               }),
             style: STACK_HEADER_STYLE,
           },
-          `${viewLabel(viewId)} ${collapsed ? "\u25b8" : "\u25be"}`,
+          `${state.views[viewId]?.flags?.dirty === true ? "\u25cf " : ""}${viewLabel(viewId)} ${
+            collapsed ? "\u25b8" : "\u25be"
+          }`,
         ),
         collapsed
           ? null
@@ -518,11 +528,20 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
                     views: { ...current.views, [viewId]: { ...view, order: order - 1 } },
                   };
                 }),
+              "data-prac-tab-dirty": state.views[viewId]?.flags?.dirty === true ? "true" : "false",
+              "data-prac-tab-preview":
+                state.views[viewId]?.flags?.preview === true ? "true" : "false",
               style: {
                 ...TAB_STYLE,
                 ...(viewId === active ? TAB_ACTIVE_STYLE : {}),
+                // VS Code's preview tab: the label is italic until the file is
+                // pinned. The dot is the unsaved marker.
+                ...(state.views[viewId]?.flags?.preview === true ? { fontStyle: "italic" } : {}),
               },
             },
+            ...(state.views[viewId]?.flags?.dirty === true
+              ? [createElement("span", { key: "dirty", style: TAB_DIRTY_STYLE }, "\u25cf")]
+              : []),
             viewLabel(viewId),
           ),
         ),

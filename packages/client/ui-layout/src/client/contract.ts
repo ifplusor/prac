@@ -107,6 +107,8 @@ export interface ViewRecord {
   hidden: boolean;
   /** Whether the view's body is folded away inside a stack (its header stays). */
   collapsed?: boolean;
+  /** Chrome the view's declarer set on it (tab dot, preview italic). */
+  flags?: ViewFlags;
 }
 
 /** The whole layout store state (replaced immutably on every update). */
@@ -128,6 +130,21 @@ export interface LayoutState {
   catalogueVersion: number;
   /** DSH's selected main key; null means the conversation. */
   activePanelId: string | null;
+}
+
+/**
+ * Decoration a view's **declarer** can set on it, rendered in the region's chrome.
+ *
+ * The mechanism has no way to know this: whether a view has unsaved changes or is
+ * a preview is the view's own fact, and the chrome that shows it (a tab's dot, an
+ * italic label) is the frame's. So the declarer pushes flags and the frame renders
+ * them — one direction, no second source of truth.
+ */
+export interface ViewFlags {
+  /** Unsaved changes: the chrome shows a dot. */
+  readonly dirty?: boolean;
+  /** Preview: the label is italic, the way VS Code marks a preview tab. */
+  readonly preview?: boolean;
 }
 
 /** A resolved region box for one viewport. */
@@ -305,6 +322,25 @@ export interface PracLayoutFace {
    * @param side - which side of its current region the new region goes on.
    */
   splitView(viewId: string, side: Side): void;
+  /**
+   * Set (merge) the chrome flags of a view.
+   *
+   * The declarer's channel: the mechanism renders a tab dot for `dirty` and an
+   * italic label for `preview`, and never asks where the fact came from.
+   *
+   * @param viewId - the view identity.
+   * @param flags - the flags to merge into the view's record.
+   */
+  setViewFlags(viewId: string, flags: ViewFlags): void;
+  /**
+   * The view the mechanism considers active: the front view of the centre region.
+   *
+   * A generic fact, not a view name — a UI that wants "bring the app in step with
+   * what prac shows" reads this rather than re-deriving which region is the centre.
+   *
+   * @returns the view id, or null when the centre shows nothing.
+   */
+  activeView(): string | null;
   /**
    * Bind the roles DSH's borrowed vocabulary resolves through. Supplied by the
    * arrangement; the mechanism itself names no view. Later bindings win, and a

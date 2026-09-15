@@ -16,7 +16,10 @@
  *
  * Placement is not decided here. The arrangement (`prac-web-app`) puts a newly
  * opened file in the centre; the mechanism renders it in whatever region that is
- * and owns the tab strip over several files.
+ * and owns the tab strip over several files. What the mechanism cannot know — the
+ * app's unsaved/preview state, and which file the app has active — the seat reads
+ * from the `editors` capability and pushes (chrome flags, and `activate` when
+ * prac's front view moves).
  *
  * @module prac-client-ui-vscode-editor/client
  */
@@ -24,7 +27,7 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { PracVscodeFace } from "prac-client-vscode-host/client";
-import type { ViewSeatKey } from "prac-client-ui-layout/client";
+import type { PracLayoutFace, ViewSeatKey } from "prac-client-ui-layout/client";
 
 /** The seat these views are declared into (checked against the mechanism's key). */
 const SEAT: ViewSeatKey = "prac.view";
@@ -44,6 +47,41 @@ export function apply(ctx: Context): void {
   // is what keeps this seat's use of it checked.
   const host: PracVscodeFace = ctx.pracVscode;
   const slots: SlotRegistry = ctx.slots;
+  const layout: PracLayoutFace = ctx.pracLayout;
+  // The app's own state, read through the capability: the tab's dot, its preview
+  // italic, and which file the app has active. The seat owns this because the
+  // views are its own — the mechanism renders what it is told and knows nothing
+  // about files.
+  ctx.effect(() => {
+    const editors = host.capabilities.editors;
+    /** Push one view's chrome and, for the active one, tell the app to match. */
+    const sync = (): void => {
+      const entries = new Map(editors.snapshot().map((entry) => [entry.resource, entry] as const));
+      const active = layout.activeView();
+      for (const { view, resource } of host.fileViews()) {
+        const entry = entries.get(resource);
+        layout.setViewFlags(view, {
+          dirty: entry?.dirty === true,
+          preview: entry?.preview === true,
+        });
+        // prac's active view and the app's active editor are two states; the seat
+        // is where they meet. Guarded on the app's own answer, so the two
+        // subscriptions cannot ping-pong.
+        if (view === active && entry !== undefined && !entry.active) {
+          editors.actions.activate(resource);
+        }
+      }
+    };
+    sync();
+    const stopEditors = editors.subscribe(sync);
+    // prac's own front view changes without the app knowing (a tab click), so the
+    // layout is a source too.
+    const stopLayout = layout.subscribe(sync);
+    return () => {
+      stopLayout();
+      stopEditors();
+    };
+  }, "prac-client-ui-vscode-editor: chrome + active editor");
   ctx.effect(
     () =>
       slots.inject(SEAT, () => {
@@ -81,5 +119,5 @@ export function apply(ctx: Context): void {
 /** The cordis plugin name used by loader diagnostics. */
 export const name = "prac-client-ui-vscode-editor";
 
-/** The DSH services this plugin needs: the seat, and the mechanism that renders it. */
-export const inject = ["slots", "pracVscode"];
+/** The DSH services this plugin needs: the seat, the mechanism, and the app face. */
+export const inject = ["slots", "pracVscode", "pracLayout"];

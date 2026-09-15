@@ -6,7 +6,7 @@ status: in-progress
 
 > 这是这项工作的 **umbrella**：主线定义、需求约束、现在的形态、决定（含被否决的路线）、里程碑与依据、已核实事实、踩坑、开放问题。
 > 步骤 note：[2026-09-13-vs-concept-boundary.md](2026-09-13-vs-concept-boundary.md)（概念边界与命名，实现已完成，待签字）；[../proposed/2026-09-15-vscode-capabilities-into-prac.md](../proposed/2026-09-15-vscode-capabilities-into-prac.md)（把能力拆散带入 prac，方案待裁）。
-> 口径（**决定 21 删减后**）：**vendor 侧集成门**写作 **14/14 · 28/28 · 9/9 · 6/6 · 7/7 · 17/17**（layout · views · focus · regions · view · file）；**prac 侧活体门**写作 `verify:stack 6/6 · verify:bottom 6/6 · verify:persistence 6/6 · verify:split 11/11`；所有 part 计数一律 **8/8**；**单测**写作 `pnpm test`（59 条：`ui-layout` 44 + `web-app` 15，~300ms）。活体断言总数 **142 → 103**（prac 62 → 29，vendor 80 → 74）：删掉的都是被单测覆盖的纯机制事实，几何类并成每个能力**一条漂移检查**；决定 17 退役 editor part 后，以它为主题的门把 subject 换成文件 view 又补回几条（`verify-views` 25→28、`verify-regions` 1→6 并改了主体、新增 `verify-file` 10）。第六门 `verify-extension` 是**条件门**：装了扩展才跑（5 项），没装时明确 `SKIPPED`——SKIP 不是通过。旧 note 里的顺序混用与 "7 个 part" 已纠正；上面的数字是**当下**口径，历史里程碑行里的旧数字是当时的事实，不改写。
+> 口径（**决定 21 删减后**）：**vendor 侧集成门**写作 **14/14 · 28/28 · 9/9 · 6/6 · 7/7 · 26/26**（layout · views · focus · regions · view · file）；**prac 侧活体门**写作 `verify:stack 6/6 · verify:bottom 6/6 · verify:persistence 6/6 · verify:split 11/11`；所有 part 计数一律 **8/8**；**单测**写作 `pnpm test`（59 条：`ui-layout` 44 + `web-app` 15，~300ms）。活体断言总数 **142 → 103**（prac 62 → 29，vendor 80 → 74）：删掉的都是被单测覆盖的纯机制事实，几何类并成每个能力**一条漂移检查**；决定 17 退役 editor part 后，以它为主题的门把 subject 换成文件 view 又补回几条（`verify-views` 25→28、`verify-regions` 1→6 并改了主体、新增 `verify-file` 10）。第六门 `verify-extension` 是**条件门**：装了扩展才跑（5 项），没装时明确 `SKIPPED`——SKIP 不是通过。旧 note 里的顺序混用与 "7 个 part" 已纠正；上面的数字是**当下**口径，历史里程碑行里的旧数字是当时的事实，不改写。
 
 ## 1. 这个工作是什么（主线定义）
 

@@ -77,11 +77,13 @@ function pickFiles(root) {
     if (line === undefined) continue;
     extra.push({ path: candidate, marker: line.slice(0, 30) });
   }
-  if (extra.length === 0) throw new Error(`no second file with a marker found in ${root}`);
-  // The probe hosts hold `first`/`second`; the tab phase must open files the probe
-  // does not, because a resource has exactly one editing surface (decision 17) — a
-  // file opened in the frame is *re-parented out of* a probe host.
-  return { first, second: extra[0], tabs: extra.slice(1, 3) };
+  if (extra.length < 3) throw new Error(`need three more files with marker lines in ${root}`);
+  // Two roles, and they must not overlap: the probe hosts hold one pair, the app
+  // opens the other. A resource has exactly **one** editing surface (decision 17),
+  // so mounting a file the frame also shows makes the two fight over it — measured:
+  // releasing a probe mount took the editor out of the frame's view, and nothing
+  // re-created it while that view stayed mounted.
+  return { probe: [first, extra[0]], app: [extra[1], extra[2]] };
 }
 
 const analyse = async (base64) => {
@@ -116,7 +118,11 @@ const folder = await page.evaluate(
   () => (globalThis.__vscodeEmbed.face.workspaceInfo().folders ?? [])[0] ?? null,
 );
 if (!folder) throw new Error("the workbench has no workspace folder");
-const { first: FIRST, second: SECOND, tabs: TABS } = pickFiles(localPathOf(folder));
+const { probe: PROBE, app: APP } = pickFiles(localPathOf(folder));
+/** The probe hosts' files: the app never opens these. */
+const [PROBE_A, PROBE_B] = PROBE;
+/** The app's files: the frame shows their surfaces, the probes never touch them. */
+const [APP_A, APP_B] = APP;
 
 // Two host elements the embedder renders for two files, plus a third used for
 // the same-file-twice and release/recreate phases.
@@ -138,7 +144,7 @@ await page.evaluate(
     face.mountFileInto(`${folder}/${first.path}`, host("prac-file-a"));
     face.mountFileInto(`${folder}/${second.path}`, host("prac-file-b"));
   },
-  { first: FIRST, second: SECOND },
+  { first: PROBE_A, second: PROBE_B },
 );
 await page.waitForSelector("#prac-file-a .monaco-editor", { timeout: 60_000 });
 await page.waitForSelector("#prac-file-b .monaco-editor", { timeout: 60_000 });
@@ -208,7 +214,7 @@ await page.evaluate(
     document.body.append(element);
     face.mountFileInto(`${globalThis.__pracFileProbe.folder}/${first.path}`, element);
   },
-  { first: FIRST },
+  { first: PROBE_A },
 );
 await page.waitForTimeout(1200);
 const remounted = await sample();
@@ -229,7 +235,7 @@ await page.evaluate((uri) => {
   // provider) must not be offered as a file: mounting it would try to read a
   // path that cannot exist.
   face.openUntitled();
-}, `${folder}/${FIRST.path}`);
+}, `${folder}/${APP_A.path}`);
 await page.waitForTimeout(2500);
 const opened = await page.evaluate(() => ({
   before: globalThis.__openFileProbe.before,
@@ -254,7 +260,7 @@ const oneFile = await tabsOf();
 // the event phase already opened: this brings the stage to exactly two tabs.
 await page.evaluate(
   (uri) => globalThis.__vscodeEmbed.face.openFile(uri),
-  `${folder}/${TABS[0].path}`,
+  `${folder}/${APP_B.path}`,
 );
 await page.waitForTimeout(2500);
 await page.waitForFunction(() => document.querySelectorAll("[data-prac-tab]").length === 2, null, {
@@ -268,6 +274,12 @@ if (inactive === null) throw new Error("the second file did not add an inactive 
 await page.click(`[data-prac-tab="${inactive}"]`);
 await page.waitForTimeout(2000);
 const clicked = await tabsOf();
+// The click re-fronts prac's view; the app's active editor must follow, or the two
+// disagree about which file is current (the seat reconciles through `activate`).
+const activeAfterClick = await page.evaluate(
+  () =>
+    globalThis.__vscodeEmbed.face.capabilities.editors.snapshot().find((e) => e.active)?.resource,
+);
 
 // Release the first file, then mount it again into a fresh host.
 await page.evaluate(
@@ -279,7 +291,7 @@ await page.evaluate(
     if (element) element.replaceChildren();
     face.mountFileInto(uri, element);
   },
-  { first: FIRST },
+  { first: PROBE_A },
 );
 await page.waitForSelector("#prac-file-a .monaco-editor", { timeout: 60_000 });
 await page.waitForTimeout(1500);
@@ -290,10 +302,17 @@ const released = await sample();
 const capability = () =>
   page.evaluate(() => {
     const editors = globalThis.__vscodeEmbed.face.capabilities.editors;
+    // The chrome the seat pushes from this capability: a tab's dot.
+    const tabs = [...document.querySelectorAll("[data-prac-tab]")].map((element) => ({
+      resource: element.getAttribute("data-prac-tab")?.replace(/^vscode:file:/, "") ?? null,
+      dirty: element.getAttribute("data-prac-tab-dirty") === "true",
+      preview: element.getAttribute("data-prac-tab-preview") === "true",
+    }));
     return {
       snapshot: editors.snapshot(),
       version: editors.version(),
       open: globalThis.__vscodeEmbed.face.listOpenFiles(),
+      tabs,
     };
   });
 
@@ -320,10 +339,37 @@ if (
 ) {
   throw new Error("activate did not make the file the app's active editor");
 }
-// Unsaved changes are the app's, not the surface's: type into the surface the
-// frame renders for the active file and the capability must say so.
+// Which file's surface is actually mounted? One resource has one surface, and this
+// gate has been moving editors between a prac view and its own probe hosts, so the
+// typing below targets whatever is mounted rather than assuming which host won.
+const surfaceResource = await page.evaluate(
+  () =>
+    [...document.querySelectorAll("[data-vscode-embed-file]")]
+      .find((element) => element.querySelector(".view-lines"))
+      ?.getAttribute("data-vscode-embed-file") ?? null,
+);
+if (surfaceResource === null) {
+  const dump = await page.evaluate(() => ({
+    hosts: [...document.querySelectorAll("[data-vscode-embed-file]")].map((element) => ({
+      file: element.getAttribute("data-vscode-embed-file")?.split("/").pop(),
+      inRegion: element.closest("[data-prac-region]")?.getAttribute("data-prac-region") ?? null,
+      children: element.children.length,
+      monaco: element.querySelectorAll(".monaco-editor").length,
+    })),
+    records: Object.entries(globalThis.__pracLayout.getState().views)
+      .filter(([id]) => id.startsWith("vscode:file:"))
+      .map(([id, view]) => `${id.split("/").pop()}@${view.region}${view.hidden ? "(hidden)" : ""}`),
+    open: globalThis.__vscodeEmbed.face.listOpenFiles().map((r) => r.split("/").pop()),
+    tabs: [...document.querySelectorAll("[data-prac-tab]")].map((e) =>
+      e.getAttribute("data-prac-tab")?.split("/").pop(),
+    ),
+  }));
+  throw new Error(`no mounted editor surface to type into: ${JSON.stringify(dump)}`);
+}
+// Unsaved changes are the app's, not the surface's: type into it and the
+// capability must say so — and so must the tab's dot.
 await page
-  .locator(`[data-vscode-embed-file="${activeResource}"]`)
+  .locator(`[data-vscode-embed-file="${surfaceResource}"]`)
   .filter({ has: page.locator(".view-lines") })
   .first()
   .locator(".view-lines")
@@ -334,20 +380,20 @@ const capabilityDirty = await capability();
 // Undo it. A *dirty* editor is not closed without a decision (the app asks, which
 // is correct — this action does not force it), and its hot-exit backup comes back
 // after a reload (also correct). Both would make the phases below test the wrong
-// thing, so the gate returns the file to clean — and asserts the capability saw it.
+// thing, so the gate returns the file to clean — and asserts both consumers saw it.
 await page.keyboard.press("ControlOrMeta+Z");
 await page.waitForTimeout(1500);
 const capabilityUndone = await capability();
 // The criterion the whole layer rests on: the same answer with the view hidden —
 // which also *releases* that file's surface (the seat unmounts), so the app is the
 // only thing left that knows the file is open.
-await page.evaluate((view) => globalThis.__pracLayout.hide(view), `vscode:file:${activeResource}`);
+await page.evaluate((view) => globalThis.__pracLayout.hide(view), `vscode:file:${surfaceResource}`);
 await page.waitForTimeout(1500);
 const capabilityHidden = await capability();
 // Closing the editor is an action of the capability, and the view follows.
 await page.evaluate(
   (resource) => globalThis.__vscodeEmbed.face.capabilities.editors.actions.close(resource),
-  activeResource,
+  surfaceResource,
 );
 await page.waitForTimeout(2500);
 const capabilityClosed = await capability();
@@ -375,8 +421,8 @@ const painted = (colours) => typeof colours === "number" && colours > 4;
 const checks = {
   // 1. Real editing surfaces: the workbench's model, rendered as lines of text.
   bothFilesMounted: mounted.first.editors === 1 && mounted.second.editors === 1,
-  firstShowsItsOwnText: mounted.first.lines > 3 && mounted.first.text.includes(FIRST.marker),
-  secondShowsItsOwnText: mounted.second.lines > 3 && mounted.second.text.includes(SECOND.marker),
+  firstShowsItsOwnText: mounted.first.lines > 3 && mounted.first.text.includes(PROBE_A.marker),
+  secondShowsItsOwnText: mounted.second.lines > 3 && mounted.second.text.includes(PROBE_B.marker),
   // 2. Paint, because present-but-blank is the failure mode.
   bothFilesPainted: painted(mounted.firstColours) && painted(mounted.secondColours),
   // 3. One surface per file: the third mount is the same editor, re-parented.
@@ -400,15 +446,23 @@ const checks = {
   // 6. Tabs: VS Code's default visibility, one per file, and the click switches.
   stripShownForOneFile: oneFile.length === 1 && oneFile[0].active,
   twoFilesTwoTabs: twoFiles.length === 2 && twoFiles.filter((tab) => tab.active).length === 1,
-  newestFileIsActive: twoFiles.find((tab) => tab.active)?.id.endsWith(TABS[0].path) === true,
+  newestFileIsActive: twoFiles.find((tab) => tab.active)?.id.endsWith(APP_B.path) === true,
   clickBringsItForward:
     clicked.length === 2 &&
     clicked.find((tab) => tab.active)?.id === inactive &&
     clicked.filter((tab) => tab.active).length === 1,
   // 8. The capability: one handle for both consumers, and no UI required.
   capabilityUndoesChanges: capabilityUndone.snapshot.some(
-    (entry) => entry.resource === activeResource && !entry.dirty,
+    (entry) => entry.resource === surfaceResource && !entry.dirty,
   ),
+  tabMarksUnsavedChanges:
+    capabilityDirty.tabs.some((tab) => tab.resource === surfaceResource && tab.dirty) &&
+    capabilityBefore.tabs.some((tab) => tab.resource === surfaceResource && !tab.dirty),
+  tabClearsTheMarkOnUndo: capabilityUndone.tabs.some(
+    (tab) => tab.resource === surfaceResource && !tab.dirty,
+  ),
+  clickedTabIsTheAppsActiveEditor:
+    activeAfterClick === clicked.find((tab) => tab.active)?.id.replace(/^vscode:file:/, ""),
   capabilityActivatesTheClickedFile: capabilityActivated.snapshot.some(
     (entry) => entry.resource === activeResource && entry.active,
   ),
@@ -418,13 +472,13 @@ const checks = {
     capabilityBefore.snapshot.every((entry) => entry.dirty === false),
   capabilityReportsUnsavedChanges:
     capabilityDirty.version > capabilityBefore.version &&
-    capabilityDirty.snapshot.some((entry) => entry.resource === activeResource && entry.dirty),
+    capabilityDirty.snapshot.some((entry) => entry.resource === surfaceResource && entry.dirty),
   capabilityWorksWithTheViewHidden: capabilityHidden.snapshot.some(
-    (entry) => entry.resource === activeResource,
+    (entry) => entry.resource === surfaceResource,
   ),
   capabilityCloseRemovesTheEditor:
-    capabilityClosed.snapshot.every((entry) => entry.resource !== activeResource) &&
-    capabilityClosed.open.every((resource) => resource !== activeResource) &&
+    capabilityClosed.snapshot.every((entry) => entry.resource !== surfaceResource) &&
+    capabilityClosed.open.every((resource) => resource !== surfaceResource) &&
     capabilityClosed.version > capabilityHidden.version,
   // 7. A reload takes the files with it — and takes their views with them.
   reloadForgetsTheFiles: reloaded.open.length === 0 && reloaded.fileHosts === 0,
@@ -441,9 +495,9 @@ console.log(
       url,
       workspace: {
         folder,
-        files: [FIRST.path, SECOND.path],
-        tabFiles: TABS.map((file) => file.path),
-        markers: [FIRST.marker, SECOND.marker],
+        probeFiles: PROBE.map((file) => file.path),
+        appFiles: APP.map((file) => file.path),
+        markers: PROBE.map((file) => file.marker),
       },
       mounted: {
         first: { ...mounted.first, text: undefined },

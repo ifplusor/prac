@@ -84,6 +84,8 @@ function recordingFace(views: LayoutState["views"] = {}): {
     splitView: record("splitView"),
     bindRoles: record("bindRoles"),
     bindTrack: record("bindTrack"),
+    setViewFlags: record("setViewFlags"),
+    activeView: () => null,
   } satisfies PracLayoutFace;
   return { face, calls };
 }

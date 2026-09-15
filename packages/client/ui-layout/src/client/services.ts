@@ -32,6 +32,7 @@ import {
   type PracLayoutFace,
   type RoleBindings,
   type Side,
+  type ViewFlags,
   type ViewRecord,
 } from "./contract.js";
 import type { RegionInfo, ViewInfo } from "./catalogue.js";
@@ -231,6 +232,30 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
         if (next === state) return state;
         return place(next, viewId, newRegionId);
       });
+    },
+    /**
+     * Merge chrome flags into a view's record.
+     *
+     * A no-op when nothing changes, by identity: a UI that re-syncs flags on every
+     * layout change (the editor seat does) must not wake the store in a loop.
+     */
+    setViewFlags(viewId: string, flags: ViewFlags): void {
+      store.update((state) => {
+        const view = state.views[viewId];
+        if (!view) return state;
+        const next = { ...view.flags, ...flags };
+        const same =
+          (next.dirty ?? false) === (view.flags?.dirty ?? false) &&
+          (next.preview ?? false) === (view.flags?.preview ?? false);
+        return same
+          ? state
+          : { ...state, views: { ...state.views, [viewId]: { ...view, flags: next } } };
+      });
+    },
+    /** The centre region's front view: what prac is showing as active. */
+    activeView(): string | null {
+      const state = store.get();
+      return frontView(state, centreRegion(state)) ?? null;
     },
     /** Bind the roles DSH's borrowed vocabulary resolves through. */
     bindRoles(next: RoleBindings): void {
