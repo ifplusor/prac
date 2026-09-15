@@ -2,9 +2,9 @@
  * prac-client-ui-vscode-explorer — the explorer seat.
  *
  * Declares exactly one `prac.view` entry, `vscode:sidebar`, whose component is the
- * part-host element built by the shared mechanism (`prac-client-vscode-host`). The
- * VS Code part behind it is the sidebar part, which is where the explorer (and the
- * views beside it) live.
+ * host element built by the shared mechanism (`prac-client-vscode-host`). It hosts
+ * the explorer's **file-tree view** — a single VS Code view with its own pane,
+ * not the whole sidebar part: prac groups views itself.
  *
  * The mechanism arrives as an injected **service** (`ctx.pracVscode`) rather than
  * as an import, because each client plugin is bundled and inlined on its own: an
@@ -45,8 +45,10 @@ export function apply(ctx: Context): void {
           { name: SEAT, id: VSCODE_SIDEBAR_VIEW },
           // The mechanism is injected, so it is present before this runs; the
           // component it returns renders an empty host until the VS Code side
-          // of the bridge has published its face, then fills it.
-          () => host.partHost(VSCODE_SIDEBAR_VIEW)() ?? null,
+          // of the bridge has published its face, then fills it. This seat hosts
+          // a **view** (the explorer's file tree), not the whole sidebar part:
+          // the finer unit is what lets prac group the views itself.
+          () => host.viewHost(VSCODE_SIDEBAR_VIEW)() ?? null,
         ),
       ),
     `prac-client-ui-vscode-explorer: ${VSCODE_SIDEBAR_VIEW} view`,

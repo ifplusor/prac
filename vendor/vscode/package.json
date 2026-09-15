@@ -21,6 +21,7 @@
     "vscode:verify-layout": "node scripts/verify-layout.mjs",
     "vscode:verify-focus": "node scripts/verify-focus.mjs",
     "vscode:verify-regions": "node scripts/verify-regions.mjs",
+    "vscode:verify-view": "node scripts/verify-view.mjs",
     "vscode:verify-views": "node scripts/verify-views.mjs",
     "vscode:inspect-region": "node scripts/inspect-region.mjs",
     "vscode:screenshot": "node scripts/screenshot.mjs",

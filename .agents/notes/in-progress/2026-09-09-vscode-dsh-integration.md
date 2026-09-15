@@ -6,7 +6,7 @@ status: in-progress
 
 > 这是这项工作的 **umbrella**：主线定义、需求约束、现在的形态、决定（含被否决的路线）、里程碑与依据、已核实事实、踩坑、开放问题。
 > 步骤 note：[2026-09-13-vs-concept-boundary.md](2026-09-13-vs-concept-boundary.md)（概念边界与命名，实现已完成，待签字）；[../proposed/2026-09-15-vscode-capabilities-into-prac.md](../proposed/2026-09-15-vscode-capabilities-into-prac.md)（把能力拆散带入 prac，方案待裁）。
-> 口径：下文所有闸门计数一律写作 **24/24 · 33/33 · 12/12 · 1/1**（layout · views · focus · regions），所有 part 计数一律 **8/8**。旧 note 里的顺序混用与 "7 个 part" 已纠正。
+> 口径：下文所有闸门计数一律写作 **24/24 · 33/33 · 12/12 · 1/1 · 7/7**（layout · views · focus · regions · **view**），所有 part 计数一律 **8/8**。旧 note 里的顺序混用与 "7 个 part" 已纠正。
 
 ## 1. 这个工作是什么（主线定义）
 
@@ -58,7 +58,7 @@ DSH web 页
 
 > **编号 = 引用句柄**（对话与其它 note 直接引"决定 14"），所以**只追加、不复用、不重排**；下面的主题导航只做索引。
 > **主题导航**：与上游/补丁 `3 4 5 6` ｜ 边界与分层 `1 2 2b 7 8 9 10` ｜ 区域与布局 `14 15 16 20` ｜ 编辑器与文件 `17` ｜ 工作区与状态 `13` ｜ 生态与能力 `18 19` ｜ 工程 `11 12`
-> **当前队列（建议顺序，未裁）**：~~`14`~~（已完成，见 §5）→ **B1**（单 view 宿主）→ `18`（server 基座 + Tier 2 扩展证明）→ frame 批次 `15 16 17 20` → 能力面（含上下文入）
+> **当前队列（建议顺序，未裁）**：~~`14`~~、~~**B1**~~（均已完成，见 §5）→ `18`（server 基座 + Tier 2 扩展证明）→ frame 批次 `15 16 17 20` → 能力面（含上下文入）
 
 | # | 决定 | 状态 |
 | --- | --- | --- |
@@ -142,6 +142,7 @@ DSH web 页
 | 2026-09-13 | **Step B 第一部分**：发布 prac 的 client 类型 | `dist/client.d.mts`（ui-layout **8.4 kB** / vscode-host **37.9 kB**）+ `dist/client.mjs` **0 字节**空壳；13 个构建任务 |
 | 2026-09-15 | **命名收束**（`vs` 退役、`workbench` 退回 vendor、载荷去 prac 名） | 三条 `grep` 判据全 **0**；九包 `check`、五份产物、四闸门、独立页 smoke 8/8 + `errorCount: 0` |
 | 2026-09-15 | 抽出 `vendor/vscode-embed`（prac-free lib），prac 两行变薄 | 同上；staged 载荷与 `overlay/` 逐字节一致 |
+| 2026-09-15 | **B1 落地（单 view 宿主）**：契约加 `mountViewInto`/`releaseView`，载荷用 `ViewPane.render()` 把单个 view 造成自带 pane 挂进外部元素（`getViewDescriptorById` 拿描述符，镜像 `ViewPaneContainer.createView` 的参数），lib 加 `view(viewId)` 句柄，explorer 座位改挂 `workbench.explorer.fileView` | 新第五门 `verify-view` **7/7**（自带 `.pane` + 标题 `dsh-dev` + 302 种颜色 + **页面无 sidebar part** + 跨 region 搬移时**释放后重建成功**）；原四闸门 **24/24 · 33/33 · 12/12 · 1/1** 不变；独立页 smoke 8/8 + `errorCount: 0` |
 | 2026-09-15 | **决定 14 落地**：`selectPanel` 把选中视图放进**它自己的** region（无家则进中心），让出中心的视图停到编排绑定的 **track**；对话按普通 view 参与注意力（聚焦谁，谁进 stage，另一个停 right） | 八包 `check` + root `vp check .` 绿；四闸门 **24/24 · 33/33 · 12/12 · 1/1**（两条断言随决策更新：`promotedTrackClosed` → `promotedChatParksInTrack`，verify-views 改为读对话的放置而不是推断轨道消失）；独立页 smoke 8/8 + `errorCount: 0` |
 
 ## 6. 已核实事实
@@ -241,6 +242,7 @@ DSH web 页
 | `vp pack`（host 构建）把 `dist/` 清空 ⇒ DSH 报 `client bundle not found` | 两半产物分两步出 | 同一份 `pack` 配置数组同时出两半 |
 | `exports['./client']` 路径改动后页面不对 | 客户端插件清单是**启动时**组装的 | 必须重启 DSH |
 | 根 `vp check` 报 16 个文件格式不合，全是 notes/docs | 根 check 覆盖面过宽 | 根 `check` 收窄到 `scripts vite.config.ts package.json`（临时）；**2026-09-15 已按 James 裁决改为**：根 `vite.config.ts` 的 `fmt.ignorePatterns` 只排除 `.agents/notes/`，根 `check` = `vp check .`（代码/脚本/配置/docs 全进） |
+| 改了载荷却只重建了 packages：lib 调新面方法时 React effect 抛错、host 消失，而 `check` 与四个闸门仍全绿 | 载荷在 `overlay/` 里，只有 `vscode:build` 会把它放进 checkout | 动 `vendor/vscode/overlay/**` 必须重跑 `vscode:build`；判据是**新门**（`verify-view`）而不是"没报错" |
 | 改名后 DSH 起不来 / 页面全 404 | profile 里是**绝对路径 link**；host 半边路由变了 | `pnpm install` 重链 + 重启 DSH（`patchReload: startup`）；DSH 启动要写 `~/.dsh`（沙箱外） |
 | 在 checkout 里改了却忘了重新生成补丁 ⇒ 下次构建**成功但改动丢了** | `build.mjs` 顺序：reset → `git clean -fd` → apply patch | 改 checkout 必须立刻重新生成补丁；**载荷只以 diff 文本存在的风险**见下 |
 

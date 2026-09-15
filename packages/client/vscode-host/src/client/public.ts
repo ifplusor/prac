@@ -24,12 +24,23 @@ export type { ISessions } from "@deepseek-ai/dsh-api-session-controller/client";
 /** The shared VS Code client mechanism this package publishes on the registry. */
 export interface PracVscodeFace {
   /**
-   * The seat component for one view id.
+   * The seat component for one view id, backed by a **part**.
    *
    * @param view - the view id a seat declares (`vscode:editor`, `vscode:sidebar`).
    * @returns a component rendering the host element the part is mounted into.
    */
   partHost(view: string): () => ReactElement | null;
+  /**
+   * The seat component for one view id, backed by a single VS Code **view**.
+   *
+   * The finer unit: its own pane outside any part, released when the component
+   * unmounts so it can be created again. Returns a component rendering nothing
+   * when this seat has no view behind it.
+   *
+   * @param view - the view id a seat declares (`vscode:sidebar`).
+   * @returns a component rendering the host element the view is created into.
+   */
+  viewHost(view: string): () => ReactElement | null;
 }
 
 declare module "@deepseek-ai/cordis" {

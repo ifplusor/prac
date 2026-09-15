@@ -8,10 +8,10 @@
 
 ## 两个入口
 
-| 入口                                | 平台   | 内容                                                                                                                                                                                                                                            |
-| ----------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.`（`src/host/index.ts`）          | Node   | `resolveBundleRoot()`（从消费者所在目录向上找产物）、`resolveCodeServerSegment()`（从 `product.json` / git HEAD 推 `<quality>-<commit>`）、`createAssetHandler({ root })`、`createCodeServerProxy({ host, port })`                              |
-| `./client`（`src/client/index.ts`） | 浏览器 | `createVscodeEmbed({ route, productName, … })` → `{ boot({ workspacePath }), partHost(partId), commands(), host(), error(), page }`；并再导出 `prac-vscode` 的 embed 契约（`EMBED_BRIDGE` / `PART_HOST_ATTR` / `EmbedBridge` / `PartHostFace`） |
+| 入口                                | 平台   | 内容                                                                                                                                                                                                                                                          |
+| ----------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.`（`src/host/index.ts`）          | Node   | `resolveBundleRoot()`（从消费者所在目录向上找产物）、`resolveCodeServerSegment()`（从 `product.json` / git HEAD 推 `<quality>-<commit>`）、`createAssetHandler({ root })`、`createCodeServerProxy({ host, port })`                                            |
+| `./client`（`src/client/index.ts`） | 浏览器 | `createVscodeEmbed({ route, productName, … })` → `{ boot({ workspacePath }), partHost(partId), view(viewId), commands(), host(), error(), page }`；并再导出 `prac-vscode` 的 embed 契约（`EMBED_BRIDGE` / `PART_HOST_ATTR` / `EmbedBridge` / `PartHostFace`） |
 
 导出的是**源码**（TS），与 `prac-vscode` 一样，所以消费方在构建期直接编译它，本包没有打包步骤、没有 `build` 脚本（`vp run -r build` 不会碰它）。
 
@@ -21,6 +21,11 @@
 
 - 每页一次的 boot 守卫、boot 元素、命令面、失败原因、part→元素表，全在 `globalThis.__vscodeEmbed` 这**一个**记录上（`VscodeEmbedPage`）；
 - 谁先 boot、谁后挂 host 都成立：`publish` 拿到的面会把记录里已有的 host 全部 `movePartInto` 一次，之后新挂的 host 直接进面。
+
+## 两级单位
+
+- `partHost(partId)`：workbench 的**部件**（titlebar / sidebar / editor …），页面单例，只能搬不能重建。
+- `view(viewId)`：**单个 view**（如 `workbench.explorer.fileView`）——它自带的 pane（header + body），不经过 container，也不在任何 part 里；组件卸载时 `releaseView` 释放它，因此可以再次创建。**这是 prac 组合的单位**（container / part 是可选的高级形态）。
 
 ## 它不做什么
 

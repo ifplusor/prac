@@ -62,6 +62,7 @@ import { IBrowserWorkbenchEnvironmentService } from "../services/environment/bro
 import { onUnexpectedError } from "../../base/common/errors.js";
 import { Direction, Grid, ISerializableView, IViewSize } from "../../base/browser/ui/grid/grid.js";
 import { Part } from "./part.js";
+import { ViewPane } from "./parts/views/viewPane.js";
 import {
   IWorkbenchLayoutService,
   IPartVisibilityChangeEvent,
@@ -212,6 +213,21 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   }
 
   private readonly parts = new Map<string, Part>();
+
+  /** Views the embedder mounted, by view id — one pane each, created on demand. */
+  private readonly mountedViews = new Map<string, ViewPane>();
+
+  /**
+   * View hosts whose view was not resolvable yet, by view id.
+   *
+   * A view can become resolvable *after* the composition hands its face over:
+   * the explorer's own view registers later than the frame does (measured — the
+   * same call succeeds seconds later), so a mount request is remembered and
+   * retried instead of being dropped on the floor.
+   */
+  private readonly deferredViews = new Map<string, HTMLElement>();
+  /** Retry rounds spent on {@link deferredViews} (bounded, see `scheduleViewRetry`). */
+  private viewRetryRounds = 0;
   private readonly partHosts = new Map<string, HTMLElement>();
   /** Parts already created into a host container (never mounted twice). */
   private readonly mountedParts = new Set<string>();
@@ -308,6 +324,9 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
               this.mountPartInto(partId, element),
             movePartInto: (partId: string, element: HTMLElement) =>
               this.movePartInto(partId, element),
+            mountViewInto: (viewId: string, element: HTMLElement) =>
+              this.mountViewInto(viewId, element),
+            releaseView: (viewId: string) => this.releaseView(viewId),
             openUntitled: (path?: string) => this.openUntitled(path),
             openWorkspaceFolder: (folderUri: string) => this.openWorkspaceFolder(folderUri),
             workspaceInfo: () => this.workspaceInfo(),
@@ -409,6 +428,106 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     }
 
     return toDisposable(() => this.parts.delete(id));
+  }
+
+  /**
+   * Create a registered view into an external host element (the embedder's shell).
+   *
+   * A view is created as its **own pane** — `ViewPane.render()` builds the header
+   * and the body into the pane's own element — instead of through its view
+   * container. The container is the workbench's grouping (activity bar, order,
+   * drag and drop between views); the embedder supplies its own, so the pane is
+   * what it gets. Mounting the same view again re-parents the pane it already
+   * has rather than creating a second one — a view instance holds services.
+   */
+  mountViewInto(viewId: string, element: HTMLElement): void {
+    const mounted = this.mountedViews.get(viewId);
+    if (mounted) {
+      element.replaceChildren(mounted.element);
+      return;
+    }
+    if (this.tryMountView(viewId, element)) return;
+    this.deferredViews.set(viewId, element);
+    this.scheduleViewRetry();
+  }
+
+  /**
+   * Create and mount a view, if it is resolvable.
+   *
+   * @param viewId - the view id.
+   * @param element - the host element.
+   * @returns whether the view was created.
+   */
+  private tryMountView(viewId: string, element: HTMLElement): boolean {
+    const instantiationService = this.instantiationService;
+    if (!instantiationService) {
+      this.logService.error(`vscode-embed: cannot mount view ${viewId} before startup`);
+      return false;
+    }
+    try {
+      const descriptor = this.viewDescriptorService.getViewDescriptorById(viewId);
+      // Not an error: the view may simply not have registered yet (deferred).
+      if (!descriptor) return false;
+      // Mirrors `ViewPaneContainer.createView`: the descriptor's ctor plus the
+      // options its own container would pass it.
+      const pane = instantiationService.createInstance(
+        descriptor.ctorDescriptor.ctor as new (...args: unknown[]) => ViewPane,
+        ...((descriptor.ctorDescriptor.staticArguments ?? []) as unknown[]),
+        {
+          id: descriptor.id,
+          title: descriptor.name.value,
+          expanded: true,
+          singleViewPaneContainerTitle: descriptor.singleViewPaneContainerTitle,
+        },
+      );
+      pane.render();
+      this.mountedViews.set(viewId, pane);
+      this._register(pane);
+      element.replaceChildren(pane.element);
+      return true;
+    } catch (error) {
+      this.logService.error(`vscode-embed: failed to mount view ${viewId}`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Retry the deferred view hosts, a bounded number of rounds.
+   *
+   * Bounded on purpose: an genuinely unknown view id must end up in the log
+   * rather than in a timer that runs for the life of the page.
+   */
+  private scheduleViewRetry(): void {
+    if (this.viewRetryRounds >= 20) {
+      this.logService.error(
+        `vscode-embed: gave up mounting ${[...this.deferredViews.keys()].join(", ")}`,
+      );
+      this.deferredViews.clear();
+      return;
+    }
+    this.viewRetryRounds += 1;
+    const timer = setTimeout(() => {
+      for (const [viewId, element] of [...this.deferredViews]) {
+        if (this.tryMountView(viewId, element)) this.deferredViews.delete(viewId);
+      }
+      if (this.deferredViews.size === 0) this.viewRetryRounds = 0;
+      else this.scheduleViewRetry();
+    }, 250);
+    this._register(toDisposable(() => clearTimeout(timer)));
+  }
+
+  /**
+   * Dispose a view this composition mounted, so it can be created again.
+   *
+   * The pane is disposed (its registrations go with it); nothing else in the
+   * view graph is torn down, so a second `mountViewInto` builds a fresh one.
+   */
+  releaseView(viewId: string): void {
+    this.deferredViews.delete(viewId);
+    const pane = this.mountedViews.get(viewId);
+    if (!pane) return;
+    this.mountedViews.delete(viewId);
+    pane.dispose();
   }
 
   /**

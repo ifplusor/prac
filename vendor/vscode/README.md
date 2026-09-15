@@ -112,6 +112,7 @@ URL='http://127.0.0.1:3084/?token=…' node scripts/verify-layout.mjs   # 24 项
 URL='…' node scripts/verify-views.mjs                                 # 33 项
 URL='…' node scripts/verify-focus.mjs                                 # 12 项
 URL='…' node scripts/verify-regions.mjs                               # 1 项
+URL='…' node scripts/verify-view.mjs                                    # 7 项（单 view 宿主：无 part、有像素、可释放重建）
 ```
 
 **独立页（无 bridge 的默认路径）另有一条**：`vscode:serve`（默认 `:5199`）跑着时 `vscode:smoke` 断言 7 个 part 全部挂载且编辑器有内容，`errorCount: 0`。
@@ -120,6 +121,7 @@ URL='…' node scripts/verify-regions.mjs                               # 1 项
 - `verify-views`：调出面（recall surface）按快捷键打开、列出实时 view 目录、隐藏/调出/移区/分栏都在像素上生效。
 - `verify-focus`：注意力把编辑器 part 在轨道与中央之间搬移且仍在上屏；含不变量「一个 part 恰好存在于一个 host」。
 - `verify-regions`：VS part host 被挂载、定位、上屏。
+- `verify-view`：**单个 view** 被造成自带 pane 挂进 prac 的 region（页面里没有 sidebar part），并且跨 region 搬移时释放后重建仍然上屏。
 
 闸门输出的 `errorCount` 含**已知噪音**：extension host 加载 `@vscode/spdlog` / `@vscode/native-watchdog` 的 native binding 失败（我们不构建 native 产物），不影响 workbench 上屏；判定看 `checks` 全 `true` 与结尾的 `OK:` 行。
 

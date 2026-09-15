@@ -50,6 +50,17 @@ export const PART_OF_VIEW: Readonly<Record<string, string>> = {
 };
 
 /**
+ * The VS Code **view** behind each seat that hosts one.
+ *
+ * A view is the finer unit (decision 2b): its own pane, outside any part, so a
+ * seat can be rebuilt without the rest of the workbench composition coming with
+ * it. Parts remain the coarser option ({@link PART_OF_VIEW}).
+ */
+export const VSCODE_VIEW_OF_SEAT: Readonly<Record<string, string>> = {
+  [VSCODE_SIDEBAR_VIEW]: "workbench.explorer.fileView",
+};
+
+/**
  * The workspace the app is started for.
  *
  * It comes from DSH, which owns the workspace registry and binds sessions to
@@ -126,6 +137,10 @@ export function apply(ctx: Context): void {
     partHost: (view: string): (() => ReactElement | null) => {
       const part = PART_OF_VIEW[view];
       return part === undefined ? () => null : embed.partHost(part);
+    },
+    viewHost: (view: string): (() => ReactElement | null) => {
+      const vscodeView = VSCODE_VIEW_OF_SEAT[view];
+      return vscodeView === undefined ? () => null : embed.view(vscodeView);
     },
   };
   ctx.effect(() => ctx.provide("pracVscode", face), `${name}: pracVscode service`);

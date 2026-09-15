@@ -57,6 +57,26 @@ export interface PartHostFace {
    */
   movePartInto: (partId: string, element: HTMLElement) => void;
   /**
+   * Create a registered view into an external host element.
+   *
+   * The view is created as **its own pane** — header and body into its own
+   * element — rather than through its view container: grouping (activity bar,
+   * ordering, drag and drop between views) is the embedder's business, and a
+   * view can therefore live outside any part. The same view mounted twice
+   * re-uses the pane it already has.
+   *
+   * @param viewId - the view id (`workbench.explorer.fileView`).
+   * @param element - the host element the embedder rendered for it.
+   */
+  mountViewInto: (viewId: string, element: HTMLElement) => void;
+  /**
+   * Dispose a view created by {@link PartHostFace.mountViewInto}, so the same
+   * view can be created again (elsewhere, or after its host went away).
+   *
+   * @param viewId - the view id.
+   */
+  releaseView: (viewId: string) => void;
+  /**
    * Open an untitled editor.
    *
    * @param path - optional path the untitled buffer is named after.
