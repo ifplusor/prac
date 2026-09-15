@@ -10,6 +10,7 @@
 
 import type { RegionInfo } from "./catalogue.js";
 import {
+  BOTTOM_REGION,
   CENTER_MIN,
   CENTER_REGION,
   DEFAULT_MIN,
@@ -54,11 +55,21 @@ export function defaultTree(): SplitNode {
   return {
     type: "split",
     id: "root",
-    dir: "row",
+    dir: "column",
     children: [
-      regionNode("left", 280, { stack: true }),
-      regionNode(CENTER_REGION, 0, { flex: true, min: CENTER_MIN }),
-      regionNode("right", 420, { stack: true }),
+      {
+        type: "split",
+        id: "top",
+        dir: "row",
+        children: [
+          regionNode("left", 280, { stack: true }),
+          regionNode(CENTER_REGION, 0, { flex: true, min: CENTER_MIN }),
+          regionNode("right", 420, { stack: true }),
+        ],
+      },
+      // Empty at boot: an empty region is not rendered, so this costs the default
+      // layout nothing and appears (at its size) as soon as something lands in it.
+      regionNode(BOTTOM_REGION, 240, { stack: true }),
     ],
   };
 }

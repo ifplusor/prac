@@ -129,6 +129,15 @@ export const CENTER_MIN = 240;
  * somewhere else (see {@link PracLayoutFace.selectPanel}).
  */
 export const CENTER_REGION = "stage";
+/**
+ * The frame's bottom bar.
+ *
+ * It sits under the whole row of side regions — the home of a terminal, output,
+ * problems: things that are about the workspace rather than about one region.
+ * It is empty at boot, and an empty region is not rendered at all, so the
+ * default layout is exactly the row; the arrangement (or the user) fills it.
+ */
+export const BOTTOM_REGION = "bottom";
 
 export interface LayoutFace {
   /**
