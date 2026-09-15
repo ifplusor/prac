@@ -119,7 +119,85 @@ export interface PracVscodeFace {
         close(resource: string): void;
       };
     };
+    /**
+     * The problems the app knows about.
+     *
+     * Read-only, paginated, and the first capability whose data arrives **late**:
+     * `settled()` is what a consumer must await before treating the set as the
+     * truth.
+     */
+    readonly diagnostics: {
+      /** A summary plus the most severe page. */
+      snapshot(): VscodeDiagnosticsSnapshot;
+      /**
+       * A page of diagnostics, optionally for one file.
+       *
+       * @param query - the filter and page.
+       */
+      query(query: VscodeDiagnosticsQuery): VscodeDiagnosticsPage;
+      /**
+       * Subscribe to changes.
+       *
+       * @param listener - called after a change; re-read {@link snapshot}.
+       * @returns a function that unsubscribes.
+       */
+      subscribe(listener: () => void): () => void;
+      /** Resolves when the markers have stopped arriving (bounded). */
+      settled(): Promise<void>;
+      /** A monotonic revision of the set, for provenance. */
+      version(): number;
+    };
   };
+}
+
+/** One diagnostic, as this face reports it. */
+export interface VscodeDiagnosticEntry {
+  /** The file the marker belongs to, as the app's URI string. */
+  readonly resource: string;
+  readonly severity: "error" | "warning" | "info" | "hint";
+  readonly message: string;
+  readonly source?: string;
+  readonly code?: string;
+  /** 1-based positions, as the app reports them. */
+  readonly range: {
+    readonly startLine: number;
+    readonly startColumn: number;
+    readonly endLine: number;
+    readonly endColumn: number;
+  };
+}
+
+/** Counts, so a consumer can decide whether the detail is worth asking for. */
+export interface VscodeDiagnosticsSummary {
+  readonly error: number;
+  readonly warning: number;
+  readonly info: number;
+  readonly hint: number;
+  /** How many files carry at least one diagnostic. */
+  readonly resources: number;
+}
+
+/** A bounded slice of the diagnostics. */
+export interface VscodeDiagnosticsPage {
+  readonly entries: readonly VscodeDiagnosticEntry[];
+  /** How many matched the query, before paging. */
+  readonly total: number;
+  readonly offset: number;
+  readonly truncated: boolean;
+}
+
+/** The default view: a summary plus the most severe page. */
+export interface VscodeDiagnosticsSnapshot {
+  readonly summary: VscodeDiagnosticsSummary;
+  readonly page: VscodeDiagnosticsPage;
+}
+
+/** A query for one file or one page. */
+export interface VscodeDiagnosticsQuery {
+  /** Restrict to one file (the app's URI string). Absent means everything. */
+  readonly resource?: string;
+  readonly limit?: number;
+  readonly offset?: number;
 }
 
 /** One open editor, as this face reports it. */

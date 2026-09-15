@@ -25,10 +25,26 @@
 import { createElement, useEffect, useRef } from "react";
 import type { ReactElement } from "react";
 import { EMBED_BRIDGE, PART_HOST_ATTR } from "prac-vscode";
-import type { EditorEntry, EmbedBridge, PartHostFace } from "prac-vscode";
+import type {
+  DiagnosticEntry,
+  DiagnosticsPage,
+  DiagnosticsQuery,
+  DiagnosticsSnapshot,
+  EditorEntry,
+  EmbedBridge,
+  PartHostFace,
+} from "prac-vscode";
 
 export { EMBED_BRIDGE, PART_HOST_ATTR };
-export type { EditorEntry, EmbedBridge, PartHostFace };
+export type {
+  DiagnosticEntry,
+  DiagnosticsPage,
+  DiagnosticsQuery,
+  DiagnosticsSnapshot,
+  EditorEntry,
+  EmbedBridge,
+  PartHostFace,
+};
 
 /** The command namespace the app module publishes. */
 export interface CommandNamespace {
@@ -70,6 +86,8 @@ export interface VscodeEmbedPage {
   readonly openFileListeners: Map<() => void, (() => void) | undefined>;
   /** Subscribers to the `editors` capability, recorded until the face arrives. */
   readonly editorsListeners: Map<() => void, (() => void) | undefined>;
+  /** Subscribers to the `diagnostics` capability, recorded until the face arrives. */
+  readonly diagnosticsListeners: Map<() => void, (() => void) | undefined>;
   /** Extra classes the consumers want on the boot root (diagnostics). */
   readonly classes: Set<string>;
 }
@@ -92,6 +110,7 @@ function page(): VscodeEmbedPage {
     fileHosts: new Map(),
     openFileListeners: new Map(),
     editorsListeners: new Map(),
+    diagnosticsListeners: new Map(),
     classes: new Set(),
   };
   globalThis.__vscodeEmbed = record;
@@ -213,6 +232,20 @@ export interface VscodeEmbedHandle {
         close(resource: string): void;
       };
     };
+    /**
+     * The problems the app knows about.
+     *
+     * The first capability whose data arrives *late* (a language server answers
+     * after the file opens), so `settled()` is the member that matters: a consumer
+     * that skips it reads an incomplete set as if it were the truth.
+     */
+    readonly diagnostics: {
+      snapshot(): DiagnosticsSnapshot;
+      query(query: DiagnosticsQuery): DiagnosticsPage;
+      subscribe(listener: () => void): () => void;
+      settled(): Promise<void>;
+      version(): number;
+    };
   };
   /** The app's command namespace, once its module has loaded. */
   commands(): CommandNamespace | undefined;
@@ -316,6 +349,15 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
                   }
                 }
                 for (const listener of record.editorsListeners.keys()) listener();
+                for (const [listener, detach] of record.diagnosticsListeners) {
+                  if (detach === undefined) {
+                    record.diagnosticsListeners.set(
+                      listener,
+                      face.capabilities.diagnostics.subscribe(listener),
+                    );
+                  }
+                }
+                for (const listener of record.diagnosticsListeners.keys()) listener();
               },
             } satisfies EmbedBridge,
             // Point the app at the code server. The recipe mirrors what the
@@ -487,12 +529,38 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
     },
   };
 
+  const diagnostics = {
+    snapshot: (): DiagnosticsSnapshot =>
+      record.face?.capabilities.diagnostics.snapshot() ?? {
+        summary: { error: 0, warning: 0, info: 0, hint: 0, resources: 0 },
+        page: { entries: [], total: 0, offset: 0, truncated: false },
+      },
+    query: (query: DiagnosticsQuery): DiagnosticsPage =>
+      record.face?.capabilities.diagnostics.query(query) ?? {
+        entries: [],
+        total: 0,
+        offset: query.offset ?? 0,
+        truncated: false,
+      },
+    subscribe: (listener: () => void): (() => void) => {
+      const detach = record.face?.capabilities.diagnostics.subscribe(listener);
+      record.diagnosticsListeners.set(listener, detach);
+      return () => {
+        record.diagnosticsListeners.delete(listener);
+        detach?.();
+      };
+    },
+    settled: (): Promise<void> =>
+      record.face?.capabilities.diagnostics.settled() ?? Promise.resolve(),
+    version: (): number => record.face?.capabilities.diagnostics.version() ?? 0,
+  };
+
   return {
     boot,
     partHost,
     view,
     file,
-    capabilities: { editors },
+    capabilities: { editors, diagnostics },
     openFiles: () => record.face?.listOpenFiles() ?? [],
     onDidChangeOpenFiles: (listener: () => void): (() => void) => {
       const detach = record.face?.onDidChangeOpenFiles(listener);

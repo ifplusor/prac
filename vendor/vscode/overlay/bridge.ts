@@ -173,6 +173,8 @@ export interface PartHostFace {
   readonly capabilities: {
     /** The open editor set (decision 21's first capability). */
     readonly editors: EditorsCapability;
+    /** The problems the app knows about (the first capability with async data). */
+    readonly diagnostics: DiagnosticsCapability;
   };
 }
 
@@ -259,6 +261,86 @@ export interface Capability<T, A> {
 
 /** The editor set: what is open, what is active, what is unsaved. */
 export type EditorsCapability = Capability<readonly EditorEntry[], EditorsActions>;
+
+/** One diagnostic, flattened for a consumer that is not a VS Code editor. */
+export interface DiagnosticEntry {
+  /** The file the marker belongs to, as a URI string. */
+  readonly resource: string;
+  readonly severity: "error" | "warning" | "info" | "hint";
+  readonly message: string;
+  /** Who produced it (an extension id, a language server, …). */
+  readonly source?: string;
+  readonly code?: string;
+  /** 1-based, the way the app reports positions. */
+  readonly range: {
+    readonly startLine: number;
+    readonly startColumn: number;
+    readonly endLine: number;
+    readonly endColumn: number;
+  };
+}
+
+/** Counts, so a consumer can decide whether the detail is worth asking for. */
+export interface DiagnosticsSummary {
+  readonly error: number;
+  readonly warning: number;
+  readonly info: number;
+  readonly hint: number;
+  /** How many files carry at least one diagnostic. */
+  readonly resources: number;
+}
+
+/** A bounded slice of the diagnostics, with what it was taken from. */
+export interface DiagnosticsPage {
+  readonly entries: readonly DiagnosticEntry[];
+  /** How many diagnostics matched the query (before paging). */
+  readonly total: number;
+  readonly offset: number;
+  /** Whether the page is short because of a limit rather than because the data ended. */
+  readonly truncated: boolean;
+}
+
+/** The default view of the diagnostics: a summary plus the most severe page. */
+export interface DiagnosticsSnapshot {
+  readonly summary: DiagnosticsSummary;
+  readonly page: DiagnosticsPage;
+}
+
+/** A query for a consumer that wants a specific file or page. */
+export interface DiagnosticsQuery {
+  /** Restrict to one file (a URI string). Absent means the whole workspace. */
+  readonly resource?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+/**
+ * Diagnostics are read-only, and the capability says so instead of inventing
+ * actions: what a consumer may *do* about a problem is not the marker service's
+ * business.
+ */
+export type DiagnosticsActions = Record<string, never>;
+
+/**
+ * The problems the app knows about.
+ *
+ * This is the capability the whole layer exists for: an IDE knows what an agent
+ * cannot see, and it knows it **late** — a language server answers after the file
+ * opens, so a snapshot taken too early is not wrong, it is incomplete. Hence
+ * `settled()`.
+ */
+export interface DiagnosticsCapability extends Capability<DiagnosticsSnapshot, DiagnosticsActions> {
+  /**
+   * A page of diagnostics, optionally for one file.
+   *
+   * Paging and a summary are part of the contract on purpose: the raw set can be
+   * large, and a consumer (an agent, above all) should be able to ask "how bad is
+   * it" before asking "show me everything".
+   *
+   * @param query - the filter and page.
+   */
+  query(query: DiagnosticsQuery): DiagnosticsPage;
+}
 
 /** What an embedder hands the workbench at boot. */
 export interface EmbedBridge {

@@ -66,6 +66,8 @@ import { Part } from "./part.js";
 import { ViewPane } from "./parts/views/viewPane.js";
 import { CodeEditorWidget } from "../../editor/browser/widget/codeEditor/codeEditorWidget.js";
 import { ITextModelService } from "../../editor/common/services/resolverService.js";
+import { IMarkerService, MarkerSeverity } from "../../platform/markers/common/markers.js";
+import type { IMarker } from "../../platform/markers/common/markers.js";
 import type { IResolvedTextEditorModel } from "../../editor/common/services/resolverService.js";
 import type { ICodeEditor } from "../../editor/browser/editorBrowser.js";
 import type { IReference } from "../../base/common/lifecycle.js";
@@ -350,7 +352,10 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
               this.mountFileInto(resource, element),
             releaseFile: (resource: string) => this.releaseFile(resource),
             openFile: (resource: string) => this.openFile(resource),
-            capabilities: { editors: this.createEditorsCapability() },
+            capabilities: {
+              editors: this.createEditorsCapability(),
+              diagnostics: this.createDiagnosticsCapability(),
+            },
             listOpenFiles: () => this.listOpenFiles(),
             onDidChangeOpenFiles: (listener: () => void) => this.onDidChangeOpenFiles(listener),
             openUntitled: (path?: string) => this.openUntitled(path),
@@ -404,6 +409,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
 
     // Parts live in these services.
     this.editorService = accessor.get(IEditorService);
+    this.markerService = accessor.get(IMarkerService);
     this.untitledTextEditorService = accessor.get(IUntitledTextEditorService);
     this.editorGroupService = accessor.get(IEditorGroupsService);
     this.paneCompositeService = accessor.get(IPaneCompositePartService);
@@ -429,6 +435,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   private telemetryService!: ITelemetryService;
   private fileService!: IFileService;
   private editorService!: IEditorService;
+  private markerService!: IMarkerService;
   private untitledTextEditorService!: IUntitledTextEditorService;
   private editorGroupService!: IEditorGroupsService;
   private paneCompositeService!: IPaneCompositePartService;
@@ -791,6 +798,123 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
           if (identifiers.length > 0) void this.editorService.closeEditors(identifiers);
         },
       },
+    };
+  }
+
+  /**
+   * The diagnostics capability: the marker service, paginated and with a real
+   * `settled()`.
+   *
+   * Markers arrive from language servers and extensions *after* a file is opened,
+   * so this is the first capability whose data is genuinely asynchronous — the
+   * envelope's `settled` is the point here, not decoration. Its definition is
+   * "no marker change for a quiet period", bounded so a consumer can never hang:
+   * whatever has arrived has stopped arriving.
+   *
+   * @returns the capability.
+   */
+  private createDiagnosticsCapability(): {
+    snapshot: () => { summary: DiagnosticsSnapshot["summary"]; page: DiagnosticsPage };
+    query: (query: DiagnosticsQuery) => DiagnosticsPage;
+    subscribe: (listener: () => void) => () => void;
+    settled: () => Promise<void>;
+    version: () => number;
+    actions: Record<string, never>;
+  } {
+    const QUIET_MS = 400;
+    const MAX_WAIT_MS = 3000;
+    const DEFAULT_LIMIT = 100;
+    const MAX_SCAN = 5000;
+    let revision = 0;
+    const listeners = new Set<() => void>();
+    this._register(
+      this.markerService.onMarkerChanged(() => {
+        revision += 1;
+        for (const listener of [...listeners]) listener();
+      }),
+    );
+    const severityName = (severity: MarkerSeverity): DiagnosticEntry["severity"] => {
+      if (severity === MarkerSeverity.Error) return "error";
+      if (severity === MarkerSeverity.Warning) return "warning";
+      if (severity === MarkerSeverity.Info) return "info";
+      return "hint";
+    };
+    const rank = { error: 0, warning: 1, info: 2, hint: 3 } as const;
+    const entryOf = (marker: IMarker): DiagnosticEntry => ({
+      resource: marker.resource.toString(),
+      severity: severityName(marker.severity),
+      message: marker.message,
+      ...(marker.source === undefined ? {} : { source: marker.source }),
+      ...(typeof marker.code === "string"
+        ? { code: marker.code }
+        : marker.code === undefined
+          ? {}
+          : { code: marker.code.value }),
+      range: {
+        startLine: marker.startLineNumber,
+        startColumn: marker.startColumn,
+        endLine: marker.endLineNumber,
+        endColumn: marker.endColumn,
+      },
+    });
+    const readAll = (resource: string | undefined): IMarker[] => {
+      const uri =
+        resource === undefined
+          ? undefined
+          : /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
+            ? URI.parse(resource)
+            : URI.file(resource);
+      return this.markerService.read(uri === undefined ? undefined : { resource: uri });
+    };
+    const page = (query: DiagnosticsQuery): DiagnosticsPage => {
+      const limit = Math.max(1, query.limit ?? DEFAULT_LIMIT);
+      const offset = Math.max(0, query.offset ?? 0);
+      const all = readAll(query.resource);
+      const total = all.length;
+      const entries = all
+        .slice(0, MAX_SCAN)
+        .map(entryOf)
+        .sort((a, b) => rank[a.severity] - rank[b.severity] || a.resource.localeCompare(b.resource))
+        .slice(offset, offset + limit);
+      return {
+        entries,
+        total,
+        offset,
+        truncated: offset + entries.length < Math.min(total, MAX_SCAN) || total > MAX_SCAN,
+      };
+    };
+    return {
+      snapshot: () => {
+        const all = readAll(undefined).map(entryOf);
+        const summary = { error: 0, warning: 0, info: 0, hint: 0, resources: 0 };
+        for (const entry of all) summary[entry.severity] += 1;
+        summary.resources = new Set(all.map((entry) => entry.resource)).size;
+        return { summary, page: page({}) };
+      },
+      query: (query: DiagnosticsQuery) => page(query),
+      subscribe: (listener: () => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      settled: () =>
+        new Promise<void>((resolve) => {
+          let quiet: ReturnType<typeof setTimeout> | undefined;
+          let cap: ReturnType<typeof setTimeout> | undefined;
+          const finish = (): void => {
+            if (quiet !== undefined) clearTimeout(quiet);
+            if (cap !== undefined) clearTimeout(cap);
+            subscription.dispose();
+            resolve();
+          };
+          const subscription = this.markerService.onMarkerChanged(() => {
+            if (quiet !== undefined) clearTimeout(quiet);
+            quiet = setTimeout(finish, QUIET_MS);
+          });
+          quiet = setTimeout(finish, QUIET_MS);
+          cap = setTimeout(finish, MAX_WAIT_MS);
+        }),
+      version: () => revision,
+      actions: {},
     };
   }
 

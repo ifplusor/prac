@@ -177,6 +177,13 @@ export function apply(ctx: Context): void {
           close: (resource: string) => embed.capabilities.editors.actions.close(resource),
         },
       },
+      diagnostics: {
+        snapshot: () => embed.capabilities.diagnostics.snapshot(),
+        query: (query) => embed.capabilities.diagnostics.query(query),
+        subscribe: (listener: () => void) => embed.capabilities.diagnostics.subscribe(listener),
+        settled: () => embed.capabilities.diagnostics.settled(),
+        version: () => embed.capabilities.diagnostics.version(),
+      },
     },
   };
   ctx.effect(() => ctx.provide("pracVscode", face), `${name}: pracVscode service`);

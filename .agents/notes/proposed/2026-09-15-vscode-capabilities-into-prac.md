@@ -158,6 +158,12 @@ interface Capability<T, A> {
 
 **门里被逼出来的第三条不变式**：**一个资源只有一个编辑面**这条（决定 17）在门自己身上兑现——旧的探针 host 挂的文件恰好也是 frame 会显示的文件，于是"释放探针挂载"把编辑器从 frame 的 view 里搬走了，而那个 view 一直挂着、没人重建它。修法是给两方**各自的文件**（探针一套、app 一套），并把这条不变式写进门的注释。活体判据（`verify-file` **26/26**）：打字后 **tab 出现脏点**、撤销后消失；**点 tab 之后 app 的 active editor 跟着换**（`activeAfterTabClick` === 被点的那条 tab）；隐藏 view 之后能力照样回答；`close` 之后编辑器与 view 一起消失。
 
+**第二条能力：`diagnostics`（2026-09-15 落地）**。数据直接来自工作台的 `IMarkerService`（`read({resource})` + `onMarkerChanged`），形状是**摘要 + 分页**（`summary {error,warning,info,hint,resources}` + `page {entries,total,offset,truncated}`，最严重的先出；另有 `query({resource,limit,offset})`）——不是把原始数组塞给消费者。动作是**空的**（`Record<string, never>`）：诊断只读，"拿它怎么办"不是 marker service 的事，能力表里宁可空着也不编动作。
+
+**`settled()` 在这条能力上第一次是真的**：markers 由语言服务器/扩展在文件打开**之后**才到，所以定义为"**一段时间内没有新的 marker 变化**"（quiet 400ms，上限 3000ms 兜底，消费者永远不会挂住）——"已经到的都到齐了"。这是这层存在的理由：跳过它的消费者会把**半成品当真值**。
+
+**这一轮实测到的限制（记在案，不是漏做）**：本 rig **没有 marker 源**——`vscode.json-language-features` 本身激活失败（`Cannot find module .../extensions/json-language-features/...`，和 npm/git-base/emmet 那批一样），所以"markers 到达 → version 自增 → quiet 后 settled"这条**变化路径没有被活体验证**。门（`verify-file` **31/31**）因此只锚在契约上：空答案形状正确、分页如实回报（`total`/`offset`/`truncated`）、按资源过滤、**`settled()` 真的等 quiet**（实测 ~400ms；一个 `Promise.resolve()` 会骗过其它每一条断言）、`version()` 可读且不倒退。要验数据路径，要么修内建扩展的构建（12/106 那条），要么走决定 18 的"装一个真扩展"（**需要你授权**）。
+
 **仍未做（下一步）**：① tab 的 **×**（关闭）——机制**不该**为此在持久化状态里放回调，所以关闭入口该由 **prac 自己的面**（recall 面的"关闭文件"）或 app 自己的 UI 提供，走 `actions.close`；② **预览斜体未实测**（`preview` 已接通，但门里开的都是 pinned 打开；要验得走 explorer 单击那条 preview 路径）；③ agent 面（host 侧 `/remote` + `ctx.tools.register`）。
 
 ## Alternatives

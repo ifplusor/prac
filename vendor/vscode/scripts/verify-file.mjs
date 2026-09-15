@@ -398,6 +398,28 @@ await page.evaluate(
 await page.waitForTimeout(2500);
 const capabilityClosed = await capability();
 
+// `diagnostics` — the first capability whose data arrives *late*. There is no
+// marker source in this rig (measured: the built-in `json-language-features`
+// extension fails to activate, and installing a real one is the pending
+// decision-18 path), so what the gate can hold it to is the contract itself:
+// a well-formed empty answer, paging that reports what it read, and a `settled()`
+// that waits for quiet instead of claiming to be done immediately.
+const diagnosticsProbe = await page.evaluate(async () => {
+  const diagnostics = globalThis.__vscodeEmbed.face.capabilities.diagnostics;
+  const before = diagnostics.version();
+  const started = performance.now();
+  await diagnostics.settled();
+  const settledMs = Math.round(performance.now() - started);
+  return {
+    snapshot: diagnostics.snapshot(),
+    page: diagnostics.query({ limit: 2, offset: 1 }),
+    scoped: diagnostics.query({ resource: "vscode-remote://127.0.0.1:3084/nope" }),
+    settledMs,
+    versionBefore: before,
+    versionAfter: diagnostics.version(),
+  };
+});
+
 // A reload forgets the app's editors, and the frame must forget the views with
 // them: a persisted placement record outlives the file, and left alone it renders
 // a tab for a file nobody has open and holds the centre with an empty view.
@@ -484,6 +506,27 @@ const checks = {
   reloadForgetsTheFiles: reloaded.open.length === 0 && reloaded.fileHosts === 0,
   noTabForAClosedFile: reloaded.fileTabs.length === 0,
   conversationTakesTheCentreBack: reloaded.conversationRegion === "stage",
+  // 9. The diagnostics capability's contract, with no marker source in this rig.
+  diagnosticsShape: (() => {
+    const { summary, page } = diagnosticsProbe.snapshot;
+    return (
+      summary.error === 0 &&
+      summary.warning === 0 &&
+      summary.info === 0 &&
+      summary.hint === 0 &&
+      summary.resources === 0 &&
+      page.entries.length === 0 &&
+      page.total === 0 &&
+      page.truncated === false
+    );
+  })(),
+  diagnosticsPagingEchoes: diagnosticsProbe.page.offset === 1 && diagnosticsProbe.page.total === 0,
+  diagnosticsScopeFilters: diagnosticsProbe.scoped.entries.length === 0,
+  // The point of `settled`: a resolved-immediately promise would pass every other
+  // check here and still hand a consumer a half-arrived set as the truth.
+  diagnosticsSettledWaitsForQuiet:
+    diagnosticsProbe.settledMs >= 300 && diagnosticsProbe.settledMs < 2500,
+  diagnosticsVersionIsReadable: diagnosticsProbe.versionAfter >= diagnosticsProbe.versionBefore,
   // A failed mount is logged by the composition, not thrown at the embedder.
   noMountErrors:
     mounted.mountErrors === 0 && remounted.mountErrors === 0 && released.mountErrors === 0,
@@ -517,6 +560,7 @@ console.log(
       },
       opened: { before: opened.before, after: opened.after, eventCount: opened.events.length },
       reloaded,
+      diagnostics: diagnosticsProbe,
       capability: {
         before: capabilityBefore.snapshot.length,
         dirty: capabilityDirty.snapshot,
