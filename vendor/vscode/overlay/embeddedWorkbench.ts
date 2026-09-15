@@ -481,6 +481,11 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
         },
       );
       pane.render();
+      // Tell the pane it is on screen: a tree view's *data* is provided by the
+      // extension only once the view reports itself visible (this is how
+      // `ViewPaneContainer` drives it too), so a view mounted outside a
+      // container has to say so itself.
+      pane.setVisible(true);
       this.mountedViews.set(viewId, pane);
       this._register(pane);
       element.replaceChildren(pane.element);
@@ -527,6 +532,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     const pane = this.mountedViews.get(viewId);
     if (!pane) return;
     this.mountedViews.delete(viewId);
+    pane.setVisible(false);
     pane.dispose();
   }
 

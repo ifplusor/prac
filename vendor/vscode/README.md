@@ -103,6 +103,21 @@ pnpm --filter prac-vscode vscode:clean
   cache/                                # npm / node-gyp / xdg / ms-playwright 缓存
 ```
 
+## 扩展基座（`--target server`）
+
+除 web bundle 外，构建还产出 **标准 `server` 目标**（`out-server/`），浏览器连的就是它（WebSocket management + 扩展宿主），也是"哪些扩展算可安装"的判据来源。
+
+- **产物是扁平的**：`out-server/` 直接放 `server-main.js` 等（没有 `product.json`/`package.json`/`out/`），运行时按 `<checkout>` 解析 `node_modules` 与 `product.json`。
+- **跑法**（cwd = checkout）：
+  ```bash
+  cd .build/workbench/upstream
+  node out-server/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token \
+    --server-data-dir …/server/data --extensions-dir …/server/extensions --user-data-dir …/server/user <folder>
+  ```
+- **`product.json` 要盖章的是 checkout 根那份**（扁平产物自己那份不存在），否则服务端算 `oss-dev` 而客户端按 build 注入的 commit 要 `/oss-<commit>`。`build.mjs` 现在给 `.` / `out-server` / `out-server-web` 都盖。
+- **装扩展**：`server-cli --install-extension` 被守卫挡住（`server.cli.ts:94` 要求 `VSCODE_IPC_HOOK_CLI` 或 `VSCODE_CLIENT_COMMAND`，即"在 VS Code 终端里"）。手工装即可：VSIX 是 zip，解包后把 `extension/` 移成 `<extensions-dir>/<publisher>.<name>-<version>/`，删掉 `extensions.json`，重启服务端。
+- **已知边界**：扩展贡献的 **tree view** 能挂上、有标题、有像素，但 body 是 "no data provider registered"——树数据要等视图基础设施/容器把它认成"可见的视图"，裸 pane 还不够（下一步）。
+
 ## 验证（活体闸门）
 
 四条闸门都打真实浏览器、看 **DOM 与像素**（不是看代码），需要 DSH 页在跑。它们也正是**交互面走 bridge** 的回归测试：bridge 若失效，workbench 会退回"自己挂 part"的默认路径、把 part 挂进不可见的 boot 容器，于是四条全红。
@@ -113,6 +128,7 @@ URL='…' node scripts/verify-views.mjs                                 # 33 项
 URL='…' node scripts/verify-focus.mjs                                 # 12 项
 URL='…' node scripts/verify-regions.mjs                               # 1 项
 URL='…' node scripts/verify-view.mjs                                    # 7 项（单 view 宿主：无 part、有像素、可释放重建）
+URL='…' node scripts/verify-extension.mjs                               # 5 项（装的扩展激活 + 它的 view 在 prac 里上屏）
 ```
 
 **独立页（无 bridge 的默认路径）另有一条**：`vscode:serve`（默认 `:5199`）跑着时 `vscode:smoke` 断言 7 个 part 全部挂载且编辑器有内容，`errorCount: 0`。
@@ -122,6 +138,7 @@ URL='…' node scripts/verify-view.mjs                                    # 7 �
 - `verify-focus`：注意力把编辑器 part 在轨道与中央之间搬移且仍在上屏；含不变量「一个 part 恰好存在于一个 host」。
 - `verify-regions`：VS part host 被挂载、定位、上屏。
 - `verify-view`：**单个 view** 被造成自带 pane 挂进 prac 的 region（页面里没有 sidebar part），并且跨 region 搬移时释放后重建仍然上屏。
+- `verify-extension`：装好的第三方扩展**激活**（它的 view 描述符只有激活后才存在），且 `mountViewInto` 能把它的 view 渲染进 prac；`VIEW=…` 换视图。
 
 闸门输出的 `errorCount` 含**已知噪音**：extension host 加载 `@vscode/spdlog` / `@vscode/native-watchdog` 的 native binding 失败（我们不构建 native 产物），不影响 workbench 上屏；判定看 `checks` 全 `true` 与结尾的 `OK:` 行。
 

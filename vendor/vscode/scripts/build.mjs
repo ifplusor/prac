@@ -233,6 +233,19 @@ function buildBundle() {
     "web",
     "--nls",
   ]);
+  // The extension base: the standard `server` target, not `server-web`. It is
+  // what the browser talks to (WebSocket management + extension host) and what
+  // decides which extensions count as installable. `--nls` is required — without
+  // it the build fails on the missing `nls.messages.json`.
+  run("node", [
+    "build/next/index.ts",
+    "bundle",
+    "--out",
+    "out-server",
+    "--target",
+    "server",
+    "--nls",
+  ]);
 }
 
 function stage() {
@@ -259,22 +272,30 @@ function stage() {
  * `codeServerPath()` derives the one segment both channels actually use.
  */
 function stampServerCommit() {
-  const distro = join(upstreamDir, "out-server-web");
-  const productPath = join(distro, "product.json");
-  if (!existsSync(productPath)) {
-    log("server", "no out-server-web/product.json to stamp (server distro not built)");
-    return;
-  }
-  const product = JSON.parse(readFileSync(productPath, "utf8"));
   const commit = checkoutCommit();
   if (commit === undefined) throw new Error("cannot resolve the upstream checkout commit to stamp");
-  if (product.commit === commit) {
-    log("server", `product.json already stamped (${commit.slice(0, 10)})`);
-    return;
+  let stamped = 0;
+  // The flat `server` build reads the **checkout root's** product.json at runtime
+  // (its script dir has none), while the web bundle bakes the commit in from
+  // `.git/HEAD` at build time — so both copies have to agree, which is what
+  // stamping the root does.
+  for (const distro of [".", "out-server", "out-server-web"]) {
+    const productPath = join(upstreamDir, distro, "product.json");
+    if (!existsSync(productPath)) {
+      log("server", `${distro}: no product.json to stamp (not built)`);
+      continue;
+    }
+    const product = JSON.parse(readFileSync(productPath, "utf8"));
+    if (product.commit === commit) {
+      log("server", `${distro}: already stamped (${commit.slice(0, 10)})`);
+      continue;
+    }
+    product.commit = commit;
+    writeFileSync(productPath, `${JSON.stringify(product, null, "\t")}\n`);
+    log("server", `${distro}: stamped commit=${commit.slice(0, 10)}`);
+    stamped += 1;
   }
-  product.commit = commit;
-  writeFileSync(productPath, `${JSON.stringify(product, null, "\t")}\n`);
-  log("server", `stamped product.json commit=${commit.slice(0, 10)}`);
+  if (stamped === 0) log("server", "nothing to stamp");
 }
 
 /**
