@@ -56,9 +56,9 @@ export function defaultTree(): SplitNode {
     id: "root",
     dir: "row",
     children: [
-      regionNode("left", 280),
+      regionNode("left", 280, { stack: true }),
       regionNode(CENTER_REGION, 0, { flex: true, min: CENTER_MIN }),
-      regionNode("right", 420),
+      regionNode("right", 420, { stack: true }),
     ],
   };
 }

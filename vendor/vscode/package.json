@@ -24,6 +24,7 @@
     "vscode:verify-view": "node scripts/verify-view.mjs",
     "vscode:verify-extension": "node scripts/verify-extension.mjs",
     "vscode:verify-views": "node scripts/verify-views.mjs",
+    "vscode:verify-stack": "node scripts/verify-stack.mjs",
     "vscode:inspect-region": "node scripts/inspect-region.mjs",
     "vscode:screenshot": "node scripts/screenshot.mjs",
     "vscode:clean": "node scripts/clean.mjs",

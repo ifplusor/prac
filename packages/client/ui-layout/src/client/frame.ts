@@ -137,6 +137,29 @@ function View({ viewId, renderSlot, box, viewportWidth }: ViewProps): ReactNode 
   return null;
 }
 
+/** A view's display label: the tail of its id (`dsh:sidebar` → `sidebar`). */
+function viewLabel(viewId: string): string {
+  return (viewId.split(":").pop() ?? viewId).replace(/[-_]/g, " ");
+}
+
+/** The header a stacked view carries: its label plus a fold toggle. */
+const STACK_HEADER_STYLE: StyleObject = {
+  display: "block",
+  width: "100%",
+  textAlign: "left",
+  padding: "2px 6px",
+  font: "inherit",
+  fontSize: "11px",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  cursor: "pointer",
+  border: "none",
+  borderTop: "1px solid rgba(128, 128, 128, 0.25)",
+  background: "transparent",
+  color: "inherit",
+  opacity: 0.8,
+};
+
 /** One in-flight sash drag. */
 interface DragState {
   pointerId: number;
@@ -318,8 +341,10 @@ function regionStyle(node: RegionNode, dir: Dir): StyleObject {
     minWidth: dir === "row" ? node.min : 0,
     minHeight: dir === "column" ? node.min : 0,
   };
-  if (node.flex) return { flex: "1 1 0", ...minimum, overflow: "hidden" };
-  return { flex: `0 0 ${node.size}px`, ...minimum, overflow: "hidden" };
+  const stack: StyleObject =
+    node.stack === true ? { display: "flex", flexDirection: "column" } : {};
+  if (node.flex) return { flex: "1 1 0", ...minimum, overflow: "hidden", ...stack };
+  return { flex: `0 0 ${node.size}px`, ...minimum, overflow: "hidden", ...stack };
 }
 
 /**
@@ -395,26 +420,104 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
      * @param node - the region to render.
      * @param dir - the parent split's axis.
      */
-    const renderRegion = (node: RegionNode, dir: Dir): ReactElement =>
-      createElement(
+    /**
+     * One entry of a stack: a header (label + fold toggle) and, unless folded,
+     * the view's body.
+     *
+     * @param viewId - the view this entry shows.
+     * @param box - the box of the region holding the stack.
+     */
+    const stackEntry = (viewId: string, box: Box): ReactElement => {
+      const collapsed = state.views[viewId]?.collapsed === true;
+      return createElement(
+        "div",
+        {
+          key: viewId,
+          "data-prac-stack-entry": viewId,
+          "data-prac-stack-collapsed": collapsed ? "true" : "false",
+          style: {
+            flex: collapsed ? "0 0 auto" : "1 1 0",
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          },
+        },
+        createElement(
+          "button",
+          {
+            key: "header",
+            type: "button",
+            "data-prac-stack-toggle": viewId,
+            "aria-expanded": collapsed ? "false" : "true",
+            onClick: () =>
+              store.update((current) => {
+                const view = current.views[viewId];
+                if (!view) return current;
+                return {
+                  ...current,
+                  views: {
+                    ...current.views,
+                    [viewId]: { ...view, collapsed: view.collapsed !== true },
+                  },
+                };
+              }),
+            style: STACK_HEADER_STYLE,
+          },
+          `${viewLabel(viewId)} ${collapsed ? "\u25b8" : "\u25be"}`,
+        ),
+        collapsed
+          ? null
+          : createElement(
+              "div",
+              {
+                key: "body",
+                "data-prac-stack-body": viewId,
+                style: { flex: "1 1 auto", minHeight: 0, position: "relative", overflow: "hidden" },
+              },
+              createElement(View, {
+                viewId,
+                renderSlot,
+                box,
+                viewportWidth: state.viewportWidth,
+              }),
+            ),
+      );
+    };
+
+    /**
+     * A region renders its front-most visible view — or, when it is a **stack**
+     * and holds more than one, every visible view with a header of its own. A
+     * stack of one renders bare, so a single-view region looks and measures
+     * exactly as it did before stacking existed.
+     *
+     * @param node - the region to render.
+     * @param dir - the parent split's axis.
+     */
+    const renderRegion = (node: RegionNode, dir: Dir): ReactElement => {
+      const box = sizes.get(node.id) ?? ZERO_BOX;
+      const views = visibleViews(state, node.id);
+      const stacked = node.stack === true && views.length > 1;
+      return createElement(
         "div",
         {
           key: node.id,
           "data-prac-region": node.id,
           style: regionStyle(node, dir),
         },
-        visibleViews(state, node.id)
-          .slice(0, 1)
-          .map((viewId) =>
-            createElement(View, {
-              key: viewId,
-              viewId,
-              renderSlot,
-              box: sizes.get(node.id) ?? ZERO_BOX,
-              viewportWidth: state.viewportWidth,
-            }),
-          ),
+        stacked
+          ? views.map((viewId) => stackEntry(viewId, box))
+          : views.slice(0, 1).map((viewId) =>
+              createElement(View, {
+                key: viewId,
+                viewId,
+                renderSlot,
+                box,
+                viewportWidth: state.viewportWidth,
+              }),
+            ),
       );
+    };
 
     /**
      * Recursive: a split interleaves its present children with sashes.

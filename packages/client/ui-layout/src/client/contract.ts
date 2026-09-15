@@ -51,6 +51,15 @@ export interface RegionNode {
   cachedSize: number;
   /** Smallest size this region may be squeezed to, in px. */
   min: number;
+  /**
+   * Whether the region **stacks** all its visible views instead of showing only
+   * the front one.
+   *
+   * A stack shows a header per view (with a fold toggle) once it holds more than
+   * one visible view; with exactly one it renders it bare, so a single-view
+   * region looks and measures the same either way.
+   */
+  readonly stack?: boolean;
 }
 
 /** A flex container of children along one axis. */
@@ -69,6 +78,8 @@ export interface ViewRecord {
   region: string;
   order: number;
   hidden: boolean;
+  /** Whether the view's body is folded away inside a stack (its header stays). */
+  collapsed?: boolean;
 }
 
 /** The whole layout store state (replaced immutably on every update). */
@@ -218,6 +229,16 @@ export interface PracLayoutFace {
    * @param viewId - the view identity.
    */
   hide(viewId: string): void;
+  /**
+   * Fold a view's body away inside a stack, keeping its header.
+   *
+   * Only stacked regions render the state; elsewhere it is remembered for when
+   * the view lands in one.
+   *
+   * @param viewId - the view identity.
+   * @param collapsed - the requested state.
+   */
+  setViewCollapsed(viewId: string, collapsed: boolean): void;
   /**
    * Collapse a region to nothing (remembering its size) or restore it.
    *

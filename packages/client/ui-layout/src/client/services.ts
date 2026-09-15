@@ -195,6 +195,12 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
         return { ...state, views: { ...state.views, [viewId]: { ...view, hidden: true } } };
       });
     },
+    setViewCollapsed(viewId: string, collapsed: boolean): void {
+      store.update((state) => {
+        const view = ensureView(state, viewId);
+        return { ...state, views: { ...state.views, [viewId]: { ...view, collapsed } } };
+      });
+    },
     /** Collapse a region to nothing (remembering its size) or restore it. */
     setCollapsed(regionId: string, collapsed: boolean): void {
       store.update((state) => setCollapsed(state, regionId, collapsed));
