@@ -162,7 +162,103 @@ export interface PartHostFace {
   openWorkspaceFolder: (folderUri: string) => void;
   /** The current workspace identity, for diagnostics. */
   workspaceInfo: () => unknown;
+  /**
+   * The app's **capabilities**: its knowledge, addressed by name rather than by
+   * which UI happens to be mounted.
+   *
+   * The hard criterion is that a capability works with **no view mounted at all**
+   * — if it only answers while some part is on screen, the capability layer was
+   * not actually separated from the UI.
+   */
+  readonly capabilities: {
+    /** The open editor set (decision 21's first capability). */
+    readonly editors: EditorsCapability;
+  };
 }
+
+/**
+ * One open editor, as both consumers see it.
+ *
+ * `resource` is the app's URI as a string (the embedder cannot construct a `URI`);
+ * the rest is state the app owns. This is the shape the **UI** renders (a tab's
+ * dirty dot, its preview italic) and the **agent** reads (what the user has open
+ * and what is unsaved) — one snapshot, two consumers.
+ */
+export interface EditorEntry {
+  /** The file's URI, as a string. */
+  readonly resource: string;
+  /** Whether this is the app's active editor. */
+  readonly active: boolean;
+  /** Whether the editor has unsaved changes. */
+  readonly dirty: boolean;
+  /** Whether the editor is in preview mode (replaced by the next preview open). */
+  readonly preview: boolean;
+}
+
+/** What a consumer may do to the editor set. */
+export interface EditorsActions {
+  /**
+   * Close an open file's editor.
+   *
+   * The action lives on the capability, not on the hosting face: closing is
+   * something *done to the editor set*, and the embedder's views follow it (the
+   * open-file event takes the view away with the editor).
+   *
+   * @param resource - the file's URI, as a string.
+   */
+  close(resource: string): void;
+  /**
+   * Make a file's editor the app's active one.
+   *
+   * The UI needs this because *its* notion of "current" is the front view in a
+   * region: clicking a prac tab re-fronts a view, and unless the app's active
+   * editor follows, the two disagree — the capability would report the wrong file
+   * as active, and the tab the user just clicked would not be the one the app
+   * considers current. Measured: without it, a tab click left the app on the
+   * previously active editor while prac showed the clicked one.
+   *
+   * @param resource - the file's URI, as a string.
+   */
+  activate(resource: string): void;
+}
+
+/**
+ * A capability: a named piece of the app's knowledge with **one handle for every
+ * consumer**.
+ *
+ * The envelope is deliberately uniform, because the two consumers need different
+ * things from the same data: the UI wants `snapshot` + `subscribe` (render now,
+ * re-render on change), the agent wants `settled` + `version` + provenance (do not
+ * act on half-settled state, and say which revision the answer is about). A
+ * capability without those two is not one — it would hand a model a moment as if
+ * it were a fact.
+ */
+export interface Capability<T, A> {
+  /** The current value. */
+  snapshot(): T;
+  /**
+   * Subscribe to changes.
+   *
+   * @param listener - called after a change; re-read `snapshot`.
+   * @returns a function that unsubscribes.
+   */
+  subscribe(listener: () => void): () => void;
+  /**
+   * Resolve when the async sources behind this capability have caught up.
+   *
+   * `editors` is synchronous workbench state, so this resolves at once — the
+   * envelope is uniform on purpose, and a capability whose data *is* async (a
+   * language server's diagnostics) is where this earns its keep.
+   */
+  settled(): Promise<void>;
+  /** A monotonic revision of the snapshot, for provenance. */
+  version(): number;
+  /** The actions this capability allows. */
+  readonly actions: A;
+}
+
+/** The editor set: what is open, what is active, what is unsaved. */
+export type EditorsCapability = Capability<readonly EditorEntry[], EditorsActions>;
 
 /** What an embedder hands the workbench at boot. */
 export interface EmbedBridge {

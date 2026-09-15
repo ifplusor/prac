@@ -78,6 +78,60 @@ export interface PracVscodeFace {
    * @param view - any view id.
    */
   fileResource(view: string): string | undefined;
+  /**
+   * The app's capabilities, addressed by name — the same handle the UI renders
+   * and an agent consumer reads.
+   *
+   * @see the `Capability` envelope in `prac-vscode`'s bridge: `snapshot` +
+   * `subscribe` for rendering, `settled` + `version` for anyone acting on the
+   * data, and the actions the capability allows.
+   */
+  readonly capabilities: {
+    /** The open editor set: what is open, what is active, what is unsaved. */
+    readonly editors: {
+      /** One entry per open file. */
+      snapshot(): readonly VscodeEditorEntry[];
+      /**
+       * Subscribe to changes.
+       *
+       * @param listener - called after a change; re-read {@link snapshot}.
+       * @returns a function that unsubscribes.
+       */
+      subscribe(listener: () => void): () => void;
+      /** Resolves when the async sources behind the capability have caught up. */
+      settled(): Promise<void>;
+      /** A monotonic revision of the snapshot, for provenance. */
+      version(): number;
+      /** What may be done to the editor set. */
+      readonly actions: {
+        /**
+         * Make a file's editor the app's active one — the UI calls this when its
+         * own "current" changes (a tab click), so the two cannot disagree.
+         *
+         * @param resource - the app's URI for the file.
+         */
+        activate(resource: string): void;
+        /**
+         * Close a file's editor.
+         *
+         * @param resource - the app's URI for the file.
+         */
+        close(resource: string): void;
+      };
+    };
+  };
+}
+
+/** One open editor, as this face reports it. */
+export interface VscodeEditorEntry {
+  /** The app's URI for the file. */
+  readonly resource: string;
+  /** Whether this is the app's active editor. */
+  readonly active: boolean;
+  /** Whether the editor has unsaved changes. */
+  readonly dirty: boolean;
+  /** Whether the editor is in preview mode. */
+  readonly preview: boolean;
 }
 
 /** One open file, as the pair of view id and app resource. */

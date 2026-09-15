@@ -25,10 +25,10 @@
 import { createElement, useEffect, useRef } from "react";
 import type { ReactElement } from "react";
 import { EMBED_BRIDGE, PART_HOST_ATTR } from "prac-vscode";
-import type { EmbedBridge, PartHostFace } from "prac-vscode";
+import type { EditorEntry, EmbedBridge, PartHostFace } from "prac-vscode";
 
 export { EMBED_BRIDGE, PART_HOST_ATTR };
-export type { EmbedBridge, PartHostFace };
+export type { EditorEntry, EmbedBridge, PartHostFace };
 
 /** The command namespace the app module publishes. */
 export interface CommandNamespace {
@@ -68,6 +68,8 @@ export interface VscodeEmbedPage {
    * no-op and the consumer never hears about any file the app opens.
    */
   readonly openFileListeners: Map<() => void, (() => void) | undefined>;
+  /** Subscribers to the `editors` capability, recorded until the face arrives. */
+  readonly editorsListeners: Map<() => void, (() => void) | undefined>;
   /** Extra classes the consumers want on the boot root (diagnostics). */
   readonly classes: Set<string>;
 }
@@ -89,6 +91,7 @@ function page(): VscodeEmbedPage {
     viewHosts: new Map(),
     fileHosts: new Map(),
     openFileListeners: new Map(),
+    editorsListeners: new Map(),
     classes: new Set(),
   };
   globalThis.__vscodeEmbed = record;
@@ -189,6 +192,28 @@ export interface VscodeEmbedHandle {
    * @returns a function that unsubscribes.
    */
   onDidChangeOpenFiles(listener: () => void): () => void;
+  /**
+   * The app's capabilities, addressed by name.
+   *
+   * Each member reads the app's face when called, so a consumer may hold the
+   * handle before the app has booted; subscriptions made that early are attached
+   * when the face arrives (and called once, so the first read is not lost).
+   */
+  readonly capabilities: {
+    /** The open editor set — the UI's tab state and the agent's context. */
+    readonly editors: {
+      snapshot(): readonly EditorEntry[];
+      subscribe(listener: () => void): () => void;
+      settled(): Promise<void>;
+      version(): number;
+      readonly actions: {
+        /** Make a file's editor the app's active one. */
+        activate(resource: string): void;
+        /** Close a file's editor. */
+        close(resource: string): void;
+      };
+    };
+  };
   /** The app's command namespace, once its module has loaded. */
   commands(): CommandNamespace | undefined;
   /** The element the app was mounted into, once booted. */
@@ -282,6 +307,15 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
                   }
                 }
                 for (const listener of record.openFileListeners.keys()) listener();
+                for (const [listener, detach] of record.editorsListeners) {
+                  if (detach === undefined) {
+                    record.editorsListeners.set(
+                      listener,
+                      face.capabilities.editors.subscribe(listener),
+                    );
+                  }
+                }
+                for (const listener of record.editorsListeners.keys()) listener();
               },
             } satisfies EmbedBridge,
             // Point the app at the code server. The recipe mirrors what the
@@ -431,11 +465,34 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
     };
   };
 
+  const editors = {
+    snapshot: (): readonly EditorEntry[] => record.face?.capabilities.editors.snapshot() ?? [],
+    subscribe: (listener: () => void): (() => void) => {
+      const detach = record.face?.capabilities.editors.subscribe(listener);
+      record.editorsListeners.set(listener, detach);
+      return () => {
+        record.editorsListeners.delete(listener);
+        detach?.();
+      };
+    },
+    settled: (): Promise<void> => record.face?.capabilities.editors.settled() ?? Promise.resolve(),
+    version: (): number => record.face?.capabilities.editors.version() ?? 0,
+    actions: {
+      activate: (resource: string): void => {
+        record.face?.capabilities.editors.actions.activate(resource);
+      },
+      close: (resource: string): void => {
+        record.face?.capabilities.editors.actions.close(resource);
+      },
+    },
+  };
+
   return {
     boot,
     partHost,
     view,
     file,
+    capabilities: { editors },
     openFiles: () => record.face?.listOpenFiles() ?? [],
     onDidChangeOpenFiles: (listener: () => void): (() => void) => {
       const detach = record.face?.onDidChangeOpenFiles(listener);

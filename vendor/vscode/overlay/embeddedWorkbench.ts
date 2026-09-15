@@ -45,6 +45,7 @@ import { IEditorService } from "../services/editor/common/editorService.js";
 import { IUntitledTextEditorService } from "../services/untitled/common/untitledTextEditorService.js";
 import { URI } from "../../base/common/uri.js";
 import { IEditorGroupsService } from "../services/editor/common/editorGroupsService.js";
+import type { EditorInput } from "../common/editor/editorInput.js";
 import { IPaneCompositePartService } from "../services/panecomposite/browser/panecomposite.js";
 import { IViewDescriptorService } from "../common/views.js";
 import { ITitleService } from "../services/title/browser/titleService.js";
@@ -349,6 +350,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
               this.mountFileInto(resource, element),
             releaseFile: (resource: string) => this.releaseFile(resource),
             openFile: (resource: string) => this.openFile(resource),
+            capabilities: { editors: this.createEditorsCapability() },
             listOpenFiles: () => this.listOpenFiles(),
             onDidChangeOpenFiles: (listener: () => void) => this.onDidChangeOpenFiles(listener),
             openUntitled: (path?: string) => this.openUntitled(path),
@@ -703,6 +705,100 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     } catch (error) {
       this.logService.error("vscode-embed: failed to list open files", error);
       return [];
+    }
+  }
+
+  /**
+   * The editor set as a capability: the same handle the UI renders and the agent
+   * reads.
+   *
+   * Data is the editor service's own (open editors, the active one, each input's
+   * dirty state) plus the groups' preview editors — nothing is derived or
+   * cached, so there is no second truth to drift.
+   *
+   * @returns the capability.
+   */
+  private createEditorsCapability(): {
+    snapshot: () => {
+      resource: string;
+      active: boolean;
+      dirty: boolean;
+      preview: boolean;
+    }[];
+    subscribe: (listener: () => void) => () => void;
+    settled: () => Promise<void>;
+    version: () => number;
+    actions: { activate: (resource: string) => void; close: (resource: string) => void };
+  } {
+    let revision = 0;
+    const listeners = new Set<() => void>();
+    const dirtyListeners = new DisposableStore();
+    const notify = (): void => {
+      revision += 1;
+      // Rebinding per-input dirty listeners here keeps one subscription path: a
+      // dirty change is an editors change, and the set of inputs to watch is the
+      // set the last notification was about.
+      this.watchDirty(dirtyListeners, notify);
+      for (const listener of [...listeners]) listener();
+    };
+    const entryOf = (editor: EditorInput, previews: ReadonlySet<EditorInput>) => ({
+      resource: editor.resource?.toString() ?? "",
+      active: editor === this.editorService.activeEditor,
+      dirty: editor.isDirty(),
+      preview: previews.has(editor),
+    });
+    const visibleEditors = (): EditorInput[] => {
+      return this.editorService.editors.filter(
+        (editor) => editor.resource !== undefined && this.fileService.hasProvider(editor.resource),
+      );
+    };
+    const previewsOf = (): Set<EditorInput> => {
+      const previews = new Set<EditorInput>();
+      for (const group of this.editorGroupService.groups) {
+        if (group.previewEditor) previews.add(group.previewEditor);
+      }
+      return previews;
+    };
+    this._register(this.editorService.onDidEditorsChange(() => notify()));
+    this.watchDirty(dirtyListeners, notify);
+    return {
+      snapshot: () => {
+        const previews = previewsOf();
+        return visibleEditors().map((editor) => entryOf(editor, previews));
+      },
+      subscribe: (listener: () => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      // Nothing in this capability is asynchronous: the open set, the active
+      // editor, dirty and preview are all synchronous workbench state. The
+      // envelope is uniform, so this resolves at once and the version is what a
+      // consumer compares.
+      settled: () => Promise.resolve(),
+      version: () => revision,
+      actions: {
+        activate: (resource: string) => {
+          const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
+            ? URI.parse(resource)
+            : URI.file(resource);
+          void this.editorService.openEditor({ resource: uri });
+        },
+        close: (resource: string) => {
+          const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
+            ? URI.parse(resource)
+            : URI.file(resource);
+          const identifiers = this.editorService.findEditors(uri);
+          if (identifiers.length > 0) void this.editorService.closeEditors(identifiers);
+        },
+      },
+    };
+  }
+
+  /** Watch each open input's dirty state, replacing the previous watch set. */
+  private watchDirty(store: DisposableStore, notify: () => void): void {
+    store.clear();
+    for (const editor of this.editorService.editors) {
+      store.add(editor.onDidChangeDirty(() => notify()));
     }
   }
 

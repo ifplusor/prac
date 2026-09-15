@@ -143,6 +143,19 @@ interface Capability<T, A> {
 
 **与当前实现的接口（都是加法）**：`pracVscode` 现有 `partHost` / `viewHost` / `fileViews` / `onDidChangeFileViews` / `fileHost` / `fileResource`；B2 加 `capabilities.*`。键（uri / view id）的翻译仍归 host——和 `fileResource` 同一条理由。
 
+## B2 第一步已落地（`editors`，2026-09-15）
+
+**能力外壳**（`vendor/vscode/overlay/bridge.ts`）：`Capability<T, A> = { snapshot, subscribe, settled, version, actions }`；`editors` 的数据是 `EditorEntry { resource, active, dirty, preview }`，动作是 `activate(resource)` / `close(resource)`。**实的部分**：工作台自己的 `IEditorService`（打开集合 / active）+ 每个 `EditorInput.isDirty()` + 各 group 的 `previewEditor`；`settled()` 对这条能力是立即 resolve（它的数据全是同步状态，信封统一是刻意的），`version()` 每次变化自增。跨层透传：`vendor/vscode-embed` 的句柄 → `PracVscodeFace.capabilities.editors`，订阅在 face 到达前先记录（与 `fileState` 同一条理由）。
+
+**门里被逼出来的两条真实语义**（都不是 bug，是 VS Code 的正确行为，记在案）：
+
+1. **脏编辑器不会被静默关掉**：`close(resource)` 对脏文件会走"要不要保存"的决策路径（所以这个动作**不带 force**）；门要关就得先撤销（`Control+Z`），并顺手断言能力跟着看到 `dirty: false`。
+2. **reload 会带回脏缓冲区**（hot exit 备份），所以"reload 后 app 没有文件"只对**干净**文件成立——门的 reload 阶段必须先把文件恢复干净，否则测的是热退出而不是"文件 view 跟着消失"。
+
+**活体判据（`verify-file` 23/23）**：能力在**不挂任何 view** 时照样回答（把文件 view `hide` 掉、座位随之释放编辑面之后，`snapshot()` 仍列出该文件——这就是"能力层真的与 UI 分开"那条硬判据）；`activate` 让 prac 的"当前 tab"与 app 的 active editor 一致；`close` 之后文件从能力与 `listOpenFiles()` 里同时消失（view 随之消失）。
+
+**仍未做（下一步）**：① tab 条消费这条能力（脏点 / 预览斜体 / × 走 `actions.close`；点 tab 走 `actions.activate`）——机制侧需要一个"view 装饰"入口（`ViewRecord` 上的 badge/flag + face 方法），因为 tab 是 frame 画的而脏是 view 的事实；② agent 面（host 侧 `/remote` + `ctx.tools.register`）。
+
 ## Alternatives
 
 **A：服务图 handover（补丁加"我只要服务图，不要 composition"的路径，把 `serviceCollection` / `InstantiationService` / lifecycle 交给 embedder）**
@@ -177,4 +190,4 @@ interface Capability<T, A> {
 7. **与 umbrella §8 的能力/生态开放项互相引用**（扩展宿主 web → server、terminal PTY 放在 DSH host、DSH ↔ workbench 状态桥、内建扩展编译 12/106）——它们与"agent 能力面"是同一条决策链的前后段，但目前两条 note 互不链接细分。
 
 8. **已闭合（2026-09-15，决定 17 落地）**：路径是 `CodeEditorWidget` + `ITextModelService.createModelReference(uri)`（镜像工作台的 `TextCodeEditor.createEditorControl`）。**实测带走的**：工作台自己的文本模型（语言特性 / markers / undo / save）。**实测没有的**：挂在 `EditorInput`+`EditorPane` 上的贡献——面包屑 / peek / diff 与自定义编辑器 / 热退出。⇒ `editor(file) → view` 成立；上面那份"没有的"清单就是能力面（尤其 `diagnostics`）要补的洞，也是"tab 的脏点/预览/关闭要 `editors` 能力"这条结论的证据。
-9. **B2 是否按上面的提案开工**：先做 `editors`（把 tab 的脏点/预览/关闭补齐）还是先做 `diagnostics`（旗舰 agent 用例）？我建议 `editors` 先行——它同时是**第一个 UI 消费者与第一个 agent 消费者**，能把"两个消费者、同一真相"这条判据一次验掉。
+9. **已定（2026-09-15）**：先做 `editors`（见上一节"B2 第一步已落地"）；`diagnostics` 紧随其后。

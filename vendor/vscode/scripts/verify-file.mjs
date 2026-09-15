@@ -285,6 +285,73 @@ await page.waitForSelector("#prac-file-a .monaco-editor", { timeout: 60_000 });
 await page.waitForTimeout(1500);
 const released = await sample();
 
+// Decision 21's first capability: the open editor set, addressed by name rather
+// than by whichever view happens to be mounted.
+const capability = () =>
+  page.evaluate(() => {
+    const editors = globalThis.__vscodeEmbed.face.capabilities.editors;
+    return {
+      snapshot: editors.snapshot(),
+      version: editors.version(),
+      open: globalThis.__vscodeEmbed.face.listOpenFiles(),
+    };
+  });
+
+const capabilityBefore = await capability();
+const activeResource = capabilityBefore.snapshot.find((entry) => entry.active)?.resource ?? null;
+if (activeResource === null) throw new Error("no active editor to exercise the capability with");
+// Bring that file's view to the front (what clicking its prac tab does), which
+// mounts its surface — then tell the app the same thing through the capability's
+// `activate`. Both halves matter: prac's front view and the app's active editor are
+// two states, and the UI keeps them in step through this action.
+await page.evaluate(
+  (view) => globalThis.__pracLayout.place(view, "stage"),
+  `vscode:file:${activeResource}`,
+);
+await page.waitForTimeout(1500);
+await page.evaluate(
+  (resource) => globalThis.__vscodeEmbed.face.capabilities.editors.actions.activate(resource),
+  activeResource,
+);
+await page.waitForTimeout(1200);
+const capabilityActivated = await capability();
+if (
+  !capabilityActivated.snapshot.some((entry) => entry.resource === activeResource && entry.active)
+) {
+  throw new Error("activate did not make the file the app's active editor");
+}
+// Unsaved changes are the app's, not the surface's: type into the surface the
+// frame renders for the active file and the capability must say so.
+await page
+  .locator(`[data-vscode-embed-file="${activeResource}"]`)
+  .filter({ has: page.locator(".view-lines") })
+  .first()
+  .locator(".view-lines")
+  .click();
+await page.keyboard.type("x");
+await page.waitForTimeout(1800);
+const capabilityDirty = await capability();
+// Undo it. A *dirty* editor is not closed without a decision (the app asks, which
+// is correct — this action does not force it), and its hot-exit backup comes back
+// after a reload (also correct). Both would make the phases below test the wrong
+// thing, so the gate returns the file to clean — and asserts the capability saw it.
+await page.keyboard.press("ControlOrMeta+Z");
+await page.waitForTimeout(1500);
+const capabilityUndone = await capability();
+// The criterion the whole layer rests on: the same answer with the view hidden —
+// which also *releases* that file's surface (the seat unmounts), so the app is the
+// only thing left that knows the file is open.
+await page.evaluate((view) => globalThis.__pracLayout.hide(view), `vscode:file:${activeResource}`);
+await page.waitForTimeout(1500);
+const capabilityHidden = await capability();
+// Closing the editor is an action of the capability, and the view follows.
+await page.evaluate(
+  (resource) => globalThis.__vscodeEmbed.face.capabilities.editors.actions.close(resource),
+  activeResource,
+);
+await page.waitForTimeout(2500);
+const capabilityClosed = await capability();
+
 // A reload forgets the app's editors, and the frame must forget the views with
 // them: a persisted placement record outlives the file, and left alone it renders
 // a tab for a file nobody has open and holds the centre with an empty view.
@@ -338,6 +405,27 @@ const checks = {
     clicked.length === 2 &&
     clicked.find((tab) => tab.active)?.id === inactive &&
     clicked.filter((tab) => tab.active).length === 1,
+  // 8. The capability: one handle for both consumers, and no UI required.
+  capabilityUndoesChanges: capabilityUndone.snapshot.some(
+    (entry) => entry.resource === activeResource && !entry.dirty,
+  ),
+  capabilityActivatesTheClickedFile: capabilityActivated.snapshot.some(
+    (entry) => entry.resource === activeResource && entry.active,
+  ),
+  capabilityListsTheOpenFiles:
+    capabilityBefore.snapshot.length >= 1 &&
+    capabilityBefore.snapshot.filter((entry) => entry.active).length === 1 &&
+    capabilityBefore.snapshot.every((entry) => entry.dirty === false),
+  capabilityReportsUnsavedChanges:
+    capabilityDirty.version > capabilityBefore.version &&
+    capabilityDirty.snapshot.some((entry) => entry.resource === activeResource && entry.dirty),
+  capabilityWorksWithTheViewHidden: capabilityHidden.snapshot.some(
+    (entry) => entry.resource === activeResource,
+  ),
+  capabilityCloseRemovesTheEditor:
+    capabilityClosed.snapshot.every((entry) => entry.resource !== activeResource) &&
+    capabilityClosed.open.every((resource) => resource !== activeResource) &&
+    capabilityClosed.version > capabilityHidden.version,
   // 7. A reload takes the files with it — and takes their views with them.
   reloadForgetsTheFiles: reloaded.open.length === 0 && reloaded.fileHosts === 0,
   noTabForAClosedFile: reloaded.fileTabs.length === 0,
@@ -375,6 +463,19 @@ console.log(
       },
       opened: { before: opened.before, after: opened.after, eventCount: opened.events.length },
       reloaded,
+      capability: {
+        before: capabilityBefore.snapshot.length,
+        dirty: capabilityDirty.snapshot,
+        hidden: capabilityHidden.snapshot.length,
+        closed: capabilityClosed.snapshot.length,
+        versions: [
+          capabilityBefore.version,
+          capabilityDirty.version,
+          capabilityUndone.version,
+          capabilityHidden.version,
+          capabilityClosed.version,
+        ],
+      },
       tabs: {
         oneFile: oneFile.map((tab) => (tab.active ? `${tab.id} (active)` : tab.id)),
         twoFiles: twoFiles.map((tab) => (tab.active ? `${tab.id} (active)` : tab.id)),

@@ -166,6 +166,18 @@ export function apply(ctx: Context): void {
       return resource === undefined ? () => null : embed.file(resource);
     },
     fileResource: (view: string): string | undefined => resourceOfFileView(view),
+    capabilities: {
+      editors: {
+        snapshot: () => embed.capabilities.editors.snapshot(),
+        subscribe: (listener: () => void) => embed.capabilities.editors.subscribe(listener),
+        settled: () => embed.capabilities.editors.settled(),
+        version: () => embed.capabilities.editors.version(),
+        actions: {
+          activate: (resource: string) => embed.capabilities.editors.actions.activate(resource),
+          close: (resource: string) => embed.capabilities.editors.actions.close(resource),
+        },
+      },
+    },
   };
   ctx.effect(() => ctx.provide("pracVscode", face), `${name}: pracVscode service`);
 
