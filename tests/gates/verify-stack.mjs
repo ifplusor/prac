@@ -87,27 +87,29 @@ await close();
 const entryOf = (facts, view) => facts.entries.find((entry) => entry.view === view) ?? null;
 const bodyHeight = (facts, view) => entryOf(facts, view)?.body?.h ?? 0;
 
+// Decision 21: whether a region *is* a stack (`isStacked`: a stack region with
+// two visible views, and not one with one) is a unit test. What stays here is the
+// rendering of that decision — headers appear, bodies have height, folding keeps
+// the header and hands the space over, and a click on the header toggles.
 const checks = {
   // 1. The default layout is untouched: one visible view, no headers.
   defaultIsBare: initial.entries.length === 0,
   // 2. Two visible views stack, in distinct bands, each with a header and a body.
-  stackedHasBoth:
+  stackedRendersBoth:
     stacked.entries.length === 2 &&
     entryOf(stacked, BASE_VIEW) !== null &&
-    entryOf(stacked, ADDED_VIEW) !== null,
-  stackedDistinctBands:
+    entryOf(stacked, ADDED_VIEW) !== null &&
     (entryOf(stacked, BASE_VIEW)?.entry?.y ?? 0) !==
       (entryOf(stacked, ADDED_VIEW)?.entry?.y ?? 0) &&
-    (entryOf(stacked, BASE_VIEW)?.entry?.h ?? 0) > 0 &&
-    (entryOf(stacked, ADDED_VIEW)?.entry?.h ?? 0) > 0,
-  stackedBodies: bodyHeight(stacked, BASE_VIEW) > 40 && bodyHeight(stacked, ADDED_VIEW) > 40,
+    bodyHeight(stacked, BASE_VIEW) > 40 &&
+    bodyHeight(stacked, ADDED_VIEW) > 40,
   stackedPainted: stacked.distinctColours > 4,
   // 3. Folding keeps the header, drops the body, and gives the space away.
-  foldKeepsHeader:
+  foldKeepsHeaderDropsBody:
     entryOf(folded, ADDED_VIEW)?.collapsed === true &&
-    (entryOf(folded, ADDED_VIEW)?.header?.h ?? 0) > 0,
-  foldDropsBody: bodyHeight(folded, ADDED_VIEW) <= 2,
-  foldGrowsNeighbour: bodyHeight(folded, BASE_VIEW) > bodyHeight(stacked, BASE_VIEW),
+    (entryOf(folded, ADDED_VIEW)?.header?.h ?? 0) > 0 &&
+    bodyHeight(folded, ADDED_VIEW) <= 2 &&
+    bodyHeight(folded, BASE_VIEW) > bodyHeight(stacked, BASE_VIEW),
   // 4. The header itself toggles (the UI path, not just the face).
   clickToggles:
     entryOf(clicked, BASE_VIEW)?.collapsed === true && bodyHeight(clicked, BASE_VIEW) <= 2,

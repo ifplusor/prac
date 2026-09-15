@@ -169,20 +169,18 @@ const checks = {
   // Attention is reported by the environment layer, not by a seat we displaced.
   stripPresent: states.default.hasStrip && states.promoted.hasStrip,
   stripFollowsFocus: states.default.focus === "conversation" && states.promoted.focus === "vscode",
-  // Default: the editor sits beside the conversation, to the right of centre.
-  defaultEditorBeside: states.default.host?.region === "right" && offset(states.default) > 200,
-  defaultPainted:
-    states.default.paint?.distinctColours > 4 && states.default.paint.differsWhenHidden === true,
   // Promoted: the editor holds the centre, and the track's width went to it.
+  // (Where attention *places* the views is the arrangement's rule and a unit
+  // test — `web-app`'s `arrangement.spec.ts`; what is live here is the part
+  // actually moving between regions and painting in each.)
   promotedEditorCentred:
     states.promoted.host?.region === "stage" && Math.abs(offset(states.promoted)) < 200,
   promotedWiderThanBeside: states.promoted.host.box.w > states.default.host.box.w * 1.3,
-  promotedPainted:
-    states.promoted.paint?.distinctColours > 4 && states.promoted.paint.differsWhenHidden === true,
-  // The chat stays beside the centred editor: the track holds it instead of
-  // closing (decision 14 — the conversation is a view like any other).
-  promotedChatParksInTrack:
-    states.promoted.conversationRegion === "right" && states.promoted.rightRegionWidth > 0,
+  paintedThroughThePromotion:
+    states.default.paint?.distinctColours > 4 &&
+    states.default.paint.differsWhenHidden === true &&
+    states.promoted.paint?.distinctColours > 4 &&
+    states.promoted.paint.differsWhenHidden === true,
   // The move must not lose the editor's content.
   contentSurvivesMove: !!states.promoted.tabTitle && !!states.back.tabTitle,
   // Back returns attention to where it was.
@@ -190,7 +188,7 @@ const checks = {
     states.back.focus === "conversation" &&
     states.back.host?.region === "right" &&
     offset(states.back) > 200,
-  backPainted:
+  paintedAfterBack:
     states.back.paint?.distinctColours > 4 && states.back.paint.differsWhenHidden === true,
 };
 

@@ -393,6 +393,11 @@ const regionInfoIds = (state) => state.regionInfos.map((region) => region.id);
 
 const gutter = 5; // the sash between two regions, in px (prac-client-ui-layout's SASH_SIZE)
 
+// Decision 21: this gate is the recall surface's **UI contract**, so it stays
+// mostly as it is — what it drops is the model half of rules that are unit tests
+// (`catalogue.spec.ts` for the id join, `upload`'s own specs for placement), and
+// what it merges is the per-state pixel evidence, which is worth one assertion
+// per phase rather than one per state.
 const checks = {
   // 1. the keybinding toggles, the surface is painted, Escape dismisses it.
   keyOpens: !states.default.overlay && !!states.opened.overlay,
@@ -402,13 +407,16 @@ const checks = {
   // The attention strip the recall surface sits beside is untouched.
   stripStillPresent: states.default.strip && states.opened.strip && states.split.strip,
 
-  // 2. the offered catalogue is the mechanism's union, re-read live.
-  catalogueListsDshSlots:
+  // 2. the offered catalogue is the real registries joined — DSH's own slots and
+  // the seat — and the DOM renders exactly it.
+  catalogueJoinsTheRealRegistries:
     catalogueIds(states.opened).includes("dsh:sidebar") &&
     catalogueIds(states.opened).includes("dsh:main:conversation") &&
-    catalogueIds(states.opened).includes("dsh:rightbar"),
-  catalogueListsSeatView: catalogueIds(states.opened).includes(EDITOR_VIEW),
-  catalogueVersionMoves: states.opened.catalogueVersion > 0,
+    catalogueIds(states.opened).includes("dsh:rightbar") &&
+    catalogueIds(states.opened).includes(EDITOR_VIEW) &&
+    // The version is what told a subscribed UI to re-read; with the real plugins
+    // registered it must have moved off zero.
+    states.opened.catalogueVersion > 0,
   rowsMatchCatalogue: rowIds(states.opened).join(",") === catalogueIds(states.opened).join(","),
   regionsMatchCatalogue:
     regionControlIds(states.opened).join(",") === regionInfoIds(states.opened).join(","),
@@ -416,17 +424,17 @@ const checks = {
 
   // 3. hide: `right` collapses to nothing and its space is taken by `console`.
   hideCollapsedRight: states.hidden.right === null && states.hidden.hostCount === 0,
-  hideGaveSpaceToConsole: states.hidden.console.w === states.dragged.console.w + dragWidth + gutter,
   hideOffersShow:
     states.hiddenWhileOpen.rows.find((row) => row.id === EDITOR_VIEW)?.hidden === "true",
-  remainingViewPainted: painted(states.hiddenConsolePaint),
 
   // 4. recall: back in `right`, at the dragged width, and painting.
   recallReturnedToRight: states.recalled.host?.region === "right",
-  recallRestoredWidth:
-    states.recalled.right?.w === dragWidth && states.recalled.modelSizes.right?.size === dragWidth,
-  recallConsoleShrankBack: states.recalled.console.w === states.dragged.console.w,
-  recallPainted: painted(states.recalled.editorPaint),
+  spaceAndWidthComeBack:
+    states.hidden.console.w === states.dragged.console.w + dragWidth + gutter &&
+    states.recalled.right?.w === dragWidth &&
+    states.recalled.console.w === states.dragged.console.w,
+  paintedAfterHideAndRecall:
+    painted(states.hiddenConsolePaint) && painted(states.recalled.editorPaint),
 
   // 5. arrow keys move the cursor; Enter runs the selected row's 聚焦.
   arrowsMoveCursor: states.cursorMoved === EDITOR_VIEW,
@@ -435,36 +443,33 @@ const checks = {
     // The conversation parks in the track instead of the track emptying out:
     // one view holds a region, and the one that yields stays on screen.
     states.focusedByKey.conversationRegion === "right",
-  enterFocusPainted: painted(states.focusedByKey.editorPaint),
 
   // 6. 移到: the view renders in the destination, and the source region's space
   // is reclaimed (console returns to the width it had before the move out).
-  selectMoveLanded: states.movedBySelect.host?.region === "right",
-  selectMoveRestoredWidth: states.movedBySelect.right?.w === dragWidth,
-  selectMoveSourceReclaimed: states.movedBySelect.console.w === states.dragged.console.w,
-  selectMovePainted: painted(states.movedBySelect.editorPaint),
+  selectMoveLandedAndReclaimed:
+    states.movedBySelect.host?.region === "right" &&
+    states.movedBySelect.right?.w === dragWidth &&
+    states.movedBySelect.console.w === states.dragged.console.w,
+  paintedAfterFocusAndMove:
+    painted(states.focusedByKey.editorPaint) && painted(states.movedBySelect.editorPaint),
 
   // 7. 分栏: the view lands in a new pane beside the one it was in, the pane it
   // left keeps the view it shared that region with, and both paint.
   splitCreatedPane: !!newPane,
   splitPaneBesideSource: sideBySide(states.split.right, newPane),
-  splitCarriedViewOut: states.split.modelViews[EDITOR_VIEW]?.region === newRegion,
   splitSourceKeptItsView:
     states.split.modelViews[CONVERSATION_VIEW]?.region === "right" && states.split.hostCount === 1,
   splitEditorPaintedInNewPane:
     painted(states.split.editorPaint) && states.split.host?.region === newRegion,
   splitSourcePanePainted: painted(states.sourcePanePaint),
 
-  // 8. 收起 / 展开 a region: the region goes to 0 (still present), the UI offers
-  // 展开, the rest still paints, and expanding restores the width it had.
-  regionCollapseFromUi:
+  // 8. 收起 / 展开 a region: the region goes to 0 (still present) and the UI
+  // offers 展开; expanding restores the width it had.
+  collapseThenExpandFromTheUi:
     states.regionCollapsed.left?.w === 0 &&
-    states.regionCollapsed.modelSizes.left?.collapsed === true &&
-    states.regionCollapsedOpen.regionCollapseStates.left === "true",
+    states.regionCollapsedOpen.regionCollapseStates.left === "true" &&
+    states.regionExpanded.left?.w === 280,
   regionCollapseStillPaints: painted(states.regionCollapsedPaint),
-  regionExpandFromUi:
-    states.regionExpanded.left?.w === 280 &&
-    states.regionExpanded.modelSizes.left?.collapsed === false,
 };
 
 const report = {

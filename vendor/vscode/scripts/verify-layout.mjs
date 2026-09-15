@@ -326,7 +326,6 @@ await page.waitForTimeout(1200);
 await act("splitView", EDITOR_VIEW, "down");
 await page.waitForTimeout(900);
 states.columnSplit = await sample(page);
-const columnEditorPane = states.columnSplit.rightPanes[1]?.id ?? null;
 await dragSash(page, '[data-prac-sash-dir="column"]', 0, 150);
 states.columnResized = await sample(page);
 
@@ -352,62 +351,54 @@ const dragGrowth = states.resized.consoleExtent - states.split.consoleExtent;
 const collapseGrowth = states.collapsed.consoleExtent - states.resized.consoleExtent;
 const columnGrowth = states.columnResized.right.box.h - states.columnSplit.right.box.h;
 
+// Decision 21: the mechanism's arithmetic (region geometry, `sashSizes`' clamps,
+// `cachedSize` round-trip, where the placement table puts the editor) is a unit
+// test. This gate keeps the VS Code side of the arrangement: the editor part is
+// in the region the arrangement names and paints, a real mouse drag moves the
+// rendered boundary — on both axes — and the part survives being moved,
+// collapsed and expanded. Pixel assertions are merged per phase rather than
+// repeated per state.
 const checks = {
-  // default: the tree reproduces today's row, with the right occupants.
+  // default: the tree reproduces today's row, with the editor as its occupant.
   defaultRegions:
     states.default.regions.map((region) => region.id).join(",") === "left,stage,right",
   defaultConversationInConsole: states.default.conversationInConsole === true,
-  defaultEditorInRight: states.default.editor?.region === "right",
-  defaultRightPainted: painted(states.default),
-  // The arrangement's ask vs what actually rendered: the editor view is placed
-  // in the region the arrangement names (DEFAULT_PLACEMENTS → `right`), the
-  // mechanism's placement table agrees, and the DOM region is that region.
-  defaultEditorPlacedAsArranged:
+  defaultEditorInTheArrangedRegion:
     states.default.modelEditorRegion === ARRANGED_EDITOR_REGION &&
     states.default.editor?.region === states.default.modelEditorRegion &&
     states.default.editor?.view === EDITOR_VIEW,
+  paintedInTheDefault: painted(states.default),
 
-  // split: two panes in `console`, the editor untouched and still painting.
-  splitTwoPanes:
+  // split: two panes in `console`, the editor untouched in `right`.
+  splitTwoPanesSideBySide:
     states.split.consolePanes.length === 2 &&
-    states.split.consolePanes.every((pane) => pane.box.w > 100),
-  splitPanesSideBySide: sideBySide(states.split),
-  splitEditorPainted: painted(states.split) && states.split.editor?.region === "right",
+    states.split.consolePanes.every((pane) => pane.box.w > 100) &&
+    sideBySide(states.split),
+  splitEditorUntouched: painted(states.split) && states.split.editor?.region === "right",
 
   // drag: the boundary actually moved both neighbours — a stale size would not.
-  dragShrankRight: within(dragShrink, 100, 140),
-  dragGaveSpaceToConsole: within(dragGrowth, 100, 140),
-  dragEditorPainted: painted(states.resized) && states.resized.editor?.region === "right",
+  dragMovedBothNeighbours: within(dragShrink, 100, 140) && within(dragGrowth, 100, 140),
+  paintedAfterTheMoves: painted(states.resized) && painted(states.restored),
 
   // collapse: `right` goes to zero, `console` takes exactly that space.
-  collapsedEditorMovedToConsole: states.moved.editor?.region === "stage",
-  collapsedEditorPainted: painted(states.collapsed) && states.collapsed.editor?.region === "stage",
-  collapsedRightZero:
+  collapseZeroesAndGivesRoom:
     states.collapsed.right?.box.w === 0 &&
     states.collapsed.modelRightSize === 0 &&
-    states.collapsed.modelRightCollapsed === true,
-  collapsedConsoleGrew: within(collapseGrowth, preCollapseDom - 20, preCollapseDom + 20),
+    states.collapsed.modelRightCollapsed === true &&
+    within(collapseGrowth, preCollapseDom - 20, preCollapseDom + 20),
+  paintedWhileCollapsed: painted(states.collapsed),
 
-  // expand: the cached width comes back — in the model and, once the part is
-  // back in `right`, as a real painted region of the same width.
-  expandRestoredModelSize:
-    states.expanded.modelRightSize === preCollapseModel &&
-    states.expanded.modelRightCollapsed === false,
-  expandEditorPainted: painted(states.expanded),
-  restoredEditorInRight: states.restored.editor?.region === "right",
-  restoredRightDomWidth: states.restored.right?.box.w === preCollapseDom,
-  restoredEditorPainted: painted(states.restored),
+  // expand: the part is back in `right`, painted, at the width it had.
+  restoreBringsBackThePart:
+    states.restored.editor?.region === "right" && states.restored.right?.box.w === preCollapseDom,
 
-  // column: the same drag on dy moves a vertical boundary, and the view the
-  // split carried is in the lower pane.
-  columnTwoPanes:
+  // column: the same drag on dy moves a vertical boundary.
+  columnPanesStacked:
     states.columnSplit.rightPanes.length === 2 &&
-    states.columnSplit.rightPanes.every((pane) => pane.box.h > 100),
-  columnPanesStacked: stacked(states.columnSplit),
-  columnCarriedEditorBelow: states.columnSplit.editor?.region === columnEditorPane,
+    states.columnSplit.rightPanes.every((pane) => pane.box.h > 100) &&
+    stacked(states.columnSplit),
   columnDragChangedHeight: within(columnGrowth, 130, 170),
-  columnEditorPainted:
-    painted(states.columnResized) && states.columnResized.editor?.region === columnEditorPane,
+  paintedAfterTheColumnSplit: painted(states.columnResized),
 };
 
 const report = {

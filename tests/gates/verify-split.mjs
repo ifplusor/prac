@@ -1,26 +1,24 @@
 /**
- * Verification of **splitting** (decision 20, and decision 15's "分栏必带视图").
+ * Verification of **splitting** (decision 20, and decision 15's "分栏必带视图")
+ * — the half of it a live page owns.
  *
  * The verb is view-centric: `splitView(viewId, side)` moves a view into a region
- * the mechanism creates for it on that side. So this gate asserts the two halves
- * of that sentence:
+ * the mechanism creates for it on that side. The *tree* that produces — axes,
+ * child order, flexibility, nesting, one new region per call — is a unit test
+ * (`ui-layout`'s `model.spec.ts`), so this gate spends its browser on:
  *
- *  1. **the pane appears where the side says** — a new region beside the source,
- *     on the right for `right`, on the left for `left`, below for `down`; a `row`
- *     split or a `column` split accordingly, nesting freely;
- *  2. **the split carries a view and is not a rearrangement** — the split view
- *     renders in the new pane (painted), the region it came from keeps the view
- *     it was sharing that region with, and each split adds exactly one pane (the
- *     one holding the view), so no direction leaves empty chrome behind;
- *  3. **both axes are draggable** — a real mouse drag on the vertical sash
- *     resizes the pair, not just the horizontal one;
- *  4. **the shape survives a reload** — including the dragged size, which is the
- *     tree shape decision 16 persists.
+ *  1. **the pane lands where the side says** — right of the source for `right`,
+ *     left for `left`, below for `down`, sharing the band or the width (the
+ *     arithmetic mirror and real CSS agreeing);
+ *  2. **the split carries a view** — the moved view is in the new pane and paints
+ *     there, while the region it left keeps the view it shared with;
+ *  3. **both axes drag** — a real mouse drag on the vertical sash resizes the
+ *     pair, not just the horizontal one;
+ *  4. **the shape survives a reload** — placements and the dragged size.
  *
- * Both opposing sides are exercised on purpose (`right` *and* `left`): the side
- * decides the child order inside the new split, so testing one direction only
- * would leave the other branch unverified — the same trap as the sash gate that
- * only ever dragged one way.
+ * Both opposing sides (`right` *and* `left`) are exercised on purpose: the two
+ * orderings reach different DOM layouts, and verifying one direction only is the
+ * same trap as a sash gate that only ever drags one way.
  *
  * Usage: URL='http://127.0.0.1:3084/?token=...' pnpm verify:split
  */
@@ -32,8 +30,6 @@ const RIGHT = "right";
 const CONVERSATION = "dsh:main:conversation";
 const DSH_SIDEBAR = "dsh:sidebar";
 const VSCODE_SIDEBAR = "vscode:sidebar";
-/** The three regions the frame ships with; anything else is one this gate made. */
-const SHIPPED = [LEFT, STAGE, RIGHT];
 /** The key `prac-client-ui-layout` persists under (see its `store.ts`). */
 const STATE_KEY = "prac-layout/v1";
 /** How far the vertical sash is dragged, in px. */
@@ -123,9 +119,6 @@ async function dragSash(selector, { dx = 0, dy = 0 }) {
 
 /** The region box for `id`, or null when the region is not rendered. */
 const regionBox = (facts, id) => facts.regions.find((region) => region.id === id)?.box ?? null;
-/** The split whose children include `regionId`. */
-const splitOf = (facts, regionId) =>
-  facts.splits.find((split) => split.children.includes(regionId)) ?? null;
 /** Every region id `after` has that `before` did not. */
 const freshIds = (before, after) => {
   const known = new Set(before.regions.map((region) => region.id));
@@ -186,60 +179,51 @@ const restored = await sample();
 
 await close();
 
+// ── the assertions ───────────────────────────────────────────────────────────
+//
+// Decision 21 draws the line here: **what the tree should look like** is a unit
+// test (`ui-layout`'s `model.spec.ts` covers `sideGeometry`, `splitRegionWith`'s
+// child order and flexibility, nesting, one-new-region-per-call, and the sash
+// arithmetic). What is left for a live page is what only a live page can show:
+// the panes land on the side they were asked for in real CSS, the view lands in
+// the pane that was made for it and paints, a real mouse drag moves the vertical
+// boundary, and the shape survives a reload.
 const checks = {
-  // 1. The pane appears where the side says, and the view is in it.
+  // The premise: a fresh origin really is the factory arrangement.
   startedDefault: initial.regions.map((region) => region.id).join(",") === "left,stage,right",
-  rightSplitIsARow: splitOf(splitRight, rightPane)?.dir === "row",
-  rightSplitPutsPaneAfter:
-    splitOf(splitRight, rightPane)?.children.join(",") === `${STAGE},${rightPane}` &&
-    (regionBox(splitRight, rightPane)?.x ?? 0) > (regionBox(splitRight, STAGE)?.x ?? 0),
-  rightPaneSpansTheRow:
+  // Each side's pane renders where the side says, and holds the view.
+  paneOnTheRight:
+    (regionBox(splitRight, rightPane)?.x ?? 0) > (regionBox(splitRight, STAGE)?.x ?? 0) &&
     near(regionBox(splitRight, rightPane)?.y, regionBox(splitRight, STAGE)?.y, 2) &&
     near(regionBox(splitRight, rightPane)?.h, regionBox(splitRight, STAGE)?.h, 2),
-  viewMovedIntoPane: paneOf(splitRight, CONVERSATION) === rightPane,
-  panePainted: splitRight.panePaint > 4,
-  stageKeptAsEmptyWorkArea:
-    regionBox(splitRight, STAGE) !== null &&
-    (splitRight.regions.find((region) => region.id === STAGE)?.children ?? 1) === 0,
-  // 2. The opposite side: the new region is inserted *before* the source.
-  leftSplitPutsPaneFirst:
-    splitOf(splitLeft, leftPane)?.children.join(",") === `${leftPane},${rightPane}` &&
-    (regionBox(splitLeft, leftPane)?.x ?? 0) < (regionBox(splitLeft, rightPane)?.x ?? 0),
-  leftPaneAlignedWithSource:
-    near(regionBox(splitLeft, leftPane)?.y, regionBox(splitLeft, rightPane)?.y, 2) &&
-    near(regionBox(splitLeft, leftPane)?.h, regionBox(splitLeft, rightPane)?.h, 2),
-  leftPanePainted: splitLeft.panePaint > 4,
-  // 3. A column split nested in the row: below, same width, stack's other view put.
-  downSplitIsAColumn: splitOf(nested, belowPane)?.dir === "column",
-  downSplitPutsPaneBelow:
-    (regionBox(nested, belowPane)?.y ?? 0) > (regionBox(nested, LEFT)?.y ?? 0),
-  paneAlignedWithSource:
+  paneOnTheLeft:
+    (regionBox(splitLeft, leftPane)?.x ?? 0) < (regionBox(splitLeft, rightPane)?.x ?? 0) &&
+    near(regionBox(splitLeft, leftPane)?.y, regionBox(splitLeft, rightPane)?.y, 2),
+  paneBelow:
+    (regionBox(nested, belowPane)?.y ?? 0) > (regionBox(nested, LEFT)?.y ?? 0) &&
     near(regionBox(nested, belowPane)?.x, regionBox(nested, LEFT)?.x, 2) &&
     near(regionBox(nested, belowPane)?.w, regionBox(nested, LEFT)?.w, 2),
-  nestedViewMoved: paneOf(nested, VSCODE_SIDEBAR) === belowPane,
+  viewInThePane:
+    paneOf(splitRight, CONVERSATION) === rightPane &&
+    paneOf(splitLeft, CONVERSATION) === leftPane &&
+    paneOf(nested, VSCODE_SIDEBAR) === belowPane,
+  // The renderer follows the model: the moved view actually paints there.
+  panesPainted: splitRight.panePaint > 4 && splitLeft.panePaint > 4 && nested.panePaint > 4,
+  // The pane the view left keeps the view it was sharing the region with.
   sourceKeptItsView: paneOf(nested, DSH_SIDEBAR) === LEFT,
-  columnSashRendered: nested.sashDirs.includes("column") && nested.splitDirs.includes("column"),
-  // Each split made exactly one new region, and it is the one holding the view
-  // (checked above) — so a split never leaves an extra empty pane behind.
-  oneNewPanePerSplit:
-    freshIds(initial, splitRight).length === 1 &&
-    freshIds(splitRight, splitLeft).length === 1 &&
-    freshIds(splitLeft, nested).length === 1,
-  // 4. A real drag on the vertical sash resizes the pair.
-  dragGrewUpper: near(dragged.sizes[LEFT]?.size, beforeDrag + DRAG, 8),
-  dragShrankLower:
-    (regionBox(dragged, belowPane)?.h ?? 0) < (regionBox(nested, belowPane)?.h ?? 0) - DRAG / 2,
-  dragKeptWidth: near(regionBox(dragged, belowPane)?.w, regionBox(nested, belowPane)?.w, 2),
-  // 5. The whole shape survives a reload, dragged size included.
-  regionsRestored:
-    restored.regions.map((region) => region.id).join(",") ===
-    dragged.regions.map((region) => region.id).join(","),
+  // The other axis: a vertical boundary exists and a real drag resizes the pair.
+  columnSashDrags:
+    nested.sashDirs.includes("column") &&
+    near(dragged.sizes[LEFT]?.size, beforeDrag + DRAG, 8) &&
+    (regionBox(dragged, belowPane)?.h ?? 0) < (regionBox(nested, belowPane)?.h ?? 0) - DRAG / 2 &&
+    near(regionBox(dragged, belowPane)?.w, regionBox(nested, belowPane)?.w, 2),
+  // The whole shape — placements and the dragged size — survives a reload.
   placementsRestored:
     paneOf(restored, CONVERSATION) === paneOf(dragged, CONVERSATION) &&
     paneOf(restored, VSCODE_SIDEBAR) === paneOf(dragged, VSCODE_SIDEBAR) &&
     paneOf(restored, DSH_SIDEBAR) === paneOf(dragged, DSH_SIDEBAR),
-  sizeRestored: near(restored.sizes[LEFT]?.size, dragged.sizes[LEFT]?.size, 2),
   geometryRestored:
+    near(restored.sizes[LEFT]?.size, dragged.sizes[LEFT]?.size, 2) &&
     near(regionBox(restored, belowPane)?.h, regionBox(dragged, belowPane)?.h, 6) &&
     near(
       regionBox(restored, paneOf(dragged, CONVERSATION))?.w,

@@ -141,33 +141,40 @@ const reloaded = await sample();
 await close();
 
 const near = (a, b, tolerance) => Math.abs((a ?? 0) - (b ?? 0)) <= tolerance;
-/** The left region's stack as `<view>:<folded>` in render order. */
+/**
+ * The left region's stack as `<view>:<folded>` in render order.
+ *
+ * @param entry - a sample.
+ */
 const stackKey = (entry) => entry.stack.map((item) => `${item.view}:${item.collapsed}`).join(",");
+/** The bar's own size, from the frame's tree. */
+const BAR_HEIGHT = 240;
 
+// Decision 21: the *semantics* this feature rests on are unit tests now — that
+// `arrange` fills gaps instead of re-asserting its defaults, and that a state
+// change is what the store is asked to keep. What a live page owns is the
+// integration itself: DSH's store engine writing under the versioned key, and the
+// next boot rehydrating it. So every surviving assertion is **absolute** (it
+// states what must be true after the reload), never "the same as before" — a
+// relative check passes vacuously when the change never happened.
 const checks = {
-  // 1. The starting point is the factory shape, not leftovers.
-  startedDefault: initial.regions.join(",") === "left,stage,right",
-  startedUnresized: near(initial.right?.w, DEFAULT_RIGHT, 6),
-  startedUnstacked: initial.stack.length === 0,
-  startedBottomAbsent: initial.bottom === null,
-  // 2. The moves landed — otherwise step 3 could pass vacuously.
-  resizeLanded: near(changed.right?.w, RESIZED_RIGHT, 6),
-  stackLanded: changed.stack.length === 2,
-  foldLanded: changed.stack.some(
-    (entry) => entry.view === VSCODE_SIDEBAR && entry.collapsed === "true",
-  ),
-  bottomLanded: changed.bottom !== null,
+  // The premise: a fresh origin really starts from the factory shape.
+  startedDefault:
+    initial.regions.join(",") === "left,stage,right" &&
+    near(initial.right?.w, DEFAULT_RIGHT, 6) &&
+    initial.stack.length === 0 &&
+    initial.bottom === null,
+  // The engine integration: the state is under the versioned key, and it is the
+  // state the moves produced (not just a key that exists).
   written: changed.persisted !== null && changed.persisted.rightSize === RESIZED_RIGHT,
-  // 3. …and came back.
-  regionsRestored: reloaded.regions.join(",") === changed.regions.join(","),
+  // …and comes back after a real reload: size, stack order with the fold, bar.
   resizeRestored: near(reloaded.right?.w, RESIZED_RIGHT, 6),
-  stackRestored: stackKey(reloaded) === stackKey(changed),
-  foldRestored: reloaded.stack.some(
-    (entry) => entry.view === VSCODE_SIDEBAR && entry.collapsed === "true",
-  ),
-  bottomRestored: reloaded.bottom !== null && near(reloaded.bottom?.h, changed.bottom?.h, 6),
-  bottomNotCollapsed: reloaded.persisted?.bottomCollapsed !== true,
-  // 4. No rehydration or persistence complaint from the engine.
+  stackRestored:
+    reloaded.stack.length === 2 &&
+    stackKey(reloaded) === stackKey(changed) &&
+    reloaded.stack.some((entry) => entry.view === VSCODE_SIDEBAR && entry.collapsed === "true"),
+  bottomRestored: reloaded.bottom !== null && near(reloaded.bottom?.h, BAR_HEIGHT, 6),
+  // No rehydration or persistence complaint from the engine.
   noErrors:
     own("__pracLayout").length === 0 &&
     own("prac-client-ui-layout").length === 0 &&

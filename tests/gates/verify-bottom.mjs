@@ -77,20 +77,25 @@ await close();
 
 const near = (a, b, tolerance) => Math.abs((a ?? 0) - (b ?? 0)) <= tolerance;
 
+// Decision 21: the arithmetic (an empty fixed region is absent; the row's extent
+// minus the bar's; `cachedSize` round-trip) is a unit test. What stays here is
+// that real CSS agrees with it — the bar is at the bottom, as wide as the frame,
+// at its size, with pixels — and that collapsing it hands the room back.
 const checks = {
   // 1. Empty means absent: the default page is exactly the row.
-  absentWhileEmpty: initial.bottom === null,
-  defaultRegionsIntact: initial.regions.join(",") === "left,stage,right",
+  absentWhileEmpty: initial.bottom === null && initial.regions.join(",") === "left,stage,right",
   // 2. Filled: at the bottom, full width, at the bar's size, with pixels.
-  appearsWhenFilled: opened.bottom !== null,
-  bottomSpansWidth: near(opened.bottom?.w, opened.frame?.w, 2),
-  bottomAtBottom: near((opened.bottom?.y ?? 0) + (opened.bottom?.h ?? 0), opened.frame?.h, 2),
-  bottomSized: (opened.bottom?.h ?? 0) >= 200 && (opened.bottom?.h ?? 0) <= 260,
+  appearsAtTheBottom:
+    opened.bottom !== null &&
+    near(opened.bottom?.w, opened.frame?.w, 2) &&
+    near((opened.bottom?.y ?? 0) + (opened.bottom?.h ?? 0), opened.frame?.h, 2) &&
+    (opened.bottom?.h ?? 0) >= 200 &&
+    (opened.bottom?.h ?? 0) <= 260,
   bottomPainted: opened.distinctColours > 4,
   // 3. The row above gives the room, and gets it back on collapse.
   rowGivesRoom: (opened.stage?.h ?? 0) < (initial.stage?.h ?? 0) - 100,
-  collapseZeroes: (collapsed.bottom?.h ?? 0) <= 2,
-  collapseReturnsRoom: near(collapsed.stage?.h, initial.stage?.h, 8),
+  collapseReturnsRoom:
+    (collapsed.bottom?.h ?? 0) <= 2 && near(collapsed.stage?.h, initial.stage?.h, 8),
   // Only this feature's own failures; the page's known noise is not ours.
   noErrors:
     own("__pracLayout").length === 0 &&
