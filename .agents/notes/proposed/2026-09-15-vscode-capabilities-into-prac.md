@@ -73,7 +73,7 @@ James（2026-09-15）：**"我们想要的不是自定义 workbench，而是把�
 
 **次序（James 2026-09-15）**：先把 **B1（单 view 宿主）** 做完验完，**再**做 agent 能力面（capabilities）。所以本 note 的 B1/B2 是 UI 侧；能力面是紧随其后的下一块（形状已在「理想形态」里定，实现押后）。
 
-### B1：**单 view** 先行（零补丁变化）
+### B1：**单 view** 先行（已完成，2026-09-15）
 
 目标：把 **explorer 的文件树 view** 挂进 prac 的一个 region；prac 侧**不认识 container，也不认识 part**。
 
@@ -85,9 +85,63 @@ James（2026-09-15）：**"我们想要的不是自定义 workbench，而是把�
 
 判据：文件树出现在 prac 指定 region；`[data-vscode-embed-part-host]` 里**没有** sidebar part；四闸门仍绿；**能否 `dispose` 后重新创建**（能 ⇒ view 真的可以多实例，这是它优于 part 的硬判据；不能 ⇒ 记录它其实仍带 container 级单例）。
 
-### B2：把"挂哪一级"做成能力表（B1 成功后）
+### B2：把"挂哪一级"做成能力表（B1 成功后的那一半；**能力面的具体提案见下面新增的 B2 一节**）
 
 `pracVscode` 从"part 宿主"变成**能力句柄表**：`view(id)` 为主，`editor(file) → view`（单文件编辑面，**L1 现在挂的 `workbench.parts.editor` 是过渡形态**），`viewContainer(id)` / `part(id)` 作为**高级形态**可选（后续再加 service 句柄）；座位与编排按能力名取。lib 的目标形状随之从 `boot/partHost` 走向 `kernel / views / capabilities`（**agent 面是新增的一块，目前一个字都没写**）。
+
+## B2 提案（2026-09-15，待 James 裁）：能力面
+
+**一条能力的形状（统一外壳，先定这个再谈内容）**——UI 与 agent 消费同一个句柄：
+
+```ts
+interface Capability<T, A> {
+  snapshot(): T;                                // 当前值
+  subscribe(listener: () => void): () => void;  // 变化通知（UI 也用它）
+  settled(): Promise<void>;                     // 异步源收敛（LSP / git 进程 / 扩展宿主）
+  readonly version: number;                     // 单调版本：provenance 的一部分
+  readonly actions: A;                          // 具名动作（关闭 / 保存 / 打开 …）
+}
+```
+
+每条回复都带 **provenance**：`{ workspace, remoteAuthority, at, versions }`。**没有 `settled` 与 version 的能力不算能力**——agent 会拿半成品当真值（这是"理想里最看重"那条的落地）。
+
+**第一批（按价值/不确定性排序）**
+
+| 能力 | 内容 | 为什么它第一个 |
+| --- | --- | --- |
+| `editors` | 打开的文件、active、**dirty**、**preview**；`actions.close(resource)` | 决定 17 的 tab 条**缺的就是这一半**（脏点 / 预览斜体 / ×），也是"用户正在看什么"的上下文来源；tab 的 × 走 `actions.close`，**不新增 face 方法** |
+| `diagnostics` | 按 URI 的 markers + `settled()` + version；**分页 + 摘要**（不把原始数组塞给模型） | 旗舰：IDE 知道而 agent 不知道的东西，且异步收敛语义最典型 |
+| `documents` | 当前文件内容 / 选区 / 版本 | 决定 12/13 已定"上下文入并入能力面"，这是它的载体 |
+| 之后 | `search` / `scm` / `tasks` / `symbols`+`references` / `terminal` | 每个都要单独定"数据结构 + 收敛判据 + 成本" |
+
+**三层落点（每层形状不同，别混）**
+
+| 层 | 谁 | 形状 |
+| --- | --- | --- |
+| 内核侧（浏览器、prac-free） | `vendor/vscode-embed` | `capabilities: { editors, diagnostics, … }`，直接用内核服务实现（`IEditorService` / `ILanguageDiagnosticsService` / …） |
+| prac 客户端 | `prac-client-vscode-host`（或新包） | `pracVscode.capabilities.*`；UI 直接订阅（tab 的脏点就是一个订阅者） |
+| prac **host** 侧（DSH 工具） | 新包 `prac-host-vscode-capabilities` | **声明 `/remote` 能力** + `ctx.tools.register(defineTool({ name, description, parameters, execute }))`：`vscode_diagnostics` / `vscode_editors` / `vscode_open_file` / `vscode_command`；host 通过 `ctx.remote` 调到页面侧的实现 |
+
+**这条通道是 DSH 原生的**：`@deepseek-ai/dsh-api-remotes` 是"Host Remote 能力的两面 BFF"——**host 声明能力、client 用生成的 `/remote` 制品挂载实现**（`ctx.remote.$mount()` / `$on`），工具在 host 侧注册（`packages/fs/tool-present` 是最小的形状样本）。所以"把 vscode 能力交给 agent"不是我们自造协议，而是：**能力句柄在页面、实现在 remote、工具在 host**。
+
+**不可让步的判据（否则"拆开"没发生）**
+
+1. **无 UI 也可用**：不挂任何 view / part 的页面上，`diagnostics` / `editors` 照样可读。用一张**只开能力、不挂 view** 的页面测——这是"能力层与 UI 层真的分开了"最硬的证据。
+2. **两个消费者、同一真相**：tab 的脏点与 agent 读的 `editors` 是同一个句柄、同一个服务，没有第二份。
+3. **settled + provenance + 分页**：如上一节。
+
+**不做什么（防跑偏）**
+
+- 不做 `executeCommand(id, args)` 当万能出口——那正是"拆散"的反面（再包一层 API）；命令要么作为**具名动作**出现在相关能力上，要么在 `vscode_command` 里限定白名单。
+- 不把 VS Code 的 UI 状态镜像进 DSH 的 store：各管一半，边界处显式 scope（与「不可让步的约束 4」一致）。
+
+**第一步的验收（可执行的样子）**
+
+- vendor 门（新 `verify-capability.mjs`，或并入 `verify-file`）：**不挂任何 view** 的页面上——`editors.snapshot()` 有打开的文件；`diagnostics.snapshot(uri)` 有该文件的条目；`settled()` 在 LSP 收敛后 resolve（构造一个"先返回空、后到位"的场景，断言它**不**提前 resolve）；`version` 单调；`actions.close(uri)` 之后文件从 `editors` 与 tab 同时消失。
+- prac 侧：键入后 tab 出现脏点（`editors` 的第一个 UI 消费者）。
+- DSH 侧：`vscode_diagnostics` 工具在无 UI 页面返回结构化诊断（host 侧工具测试）。
+
+**与当前实现的接口（都是加法）**：`pracVscode` 现有 `partHost` / `viewHost` / `fileViews` / `onDidChangeFileViews` / `fileHost` / `fileResource`；B2 加 `capabilities.*`。键（uri / view id）的翻译仍归 host——和 `fileResource` 同一条理由。
 
 ## Alternatives
 
@@ -110,7 +164,7 @@ James（2026-09-15）：**"我们想要的不是自定义 workbench，而是把�
 
 ## Verification
 
-四闸门（`24/24 · 33/33 · 12/12 · 1/1`）＋独立页 `vscode:smoke`；新增一条断言：explorer 的**文件树 view** 在 prac 的 region 内、且页面里没有 sidebar part host。
+**B1 已验收**（当时的数字：四闸门 24/24 · 33/33 · 12/12 · 1/1 ＋独立页 smoke）；决定 17 之后口径变为 vendor `14/14 · 28/28 · 9/9 · 6/6 · 7/7 · 17/17`（layout · views · focus · regions · view · file）＋ prac 四门 `6/6 · 6/6 · 6/6 · 11/11` ＋ smoke `8/8`。B2 的验收见上面「第一步的验收」。
 
 ## Open questions
 
@@ -122,4 +176,5 @@ James（2026-09-15）：**"我们想要的不是自定义 workbench，而是把�
 6. **已闭合（2026-09-15）**：容纳单位定为 `view`（umbrella 决定 2b），原"决定 2/3 与 09-15 方向相冲"的张力消解；container / part 退为可选的高级形态（"何时真的需要"列在 umbrella §8）。
 7. **与 umbrella §8 的能力/生态开放项互相引用**（扩展宿主 web → server、terminal PTY 放在 DSH host、DSH ↔ workbench 状态桥、内建扩展编译 12/106）——它们与"agent 能力面"是同一条决策链的前后段，但目前两条 note 互不链接细分。
 
-8. **从 VS Code 拿“单个 file view”的路径（决定 17 的后果）**：`IEditorService` 造出来的是“组里带 tab 的 editor”；要一个**不带 part/tab、但仍带完整 IDE 能力**（model / 语言特性 / undo / diff）的单文件编辑面，需要先确定正确构造路径（`IEditorPane` 工厂 / `EditorPane` / `CodeEditorWidget` 各自带走什么）。这是 B1 之后的 L2 工作，也是 lib 的 `editor(file)` 句柄能否成立的前提。
+8. **已闭合（2026-09-15，决定 17 落地）**：路径是 `CodeEditorWidget` + `ITextModelService.createModelReference(uri)`（镜像工作台的 `TextCodeEditor.createEditorControl`）。**实测带走的**：工作台自己的文本模型（语言特性 / markers / undo / save）。**实测没有的**：挂在 `EditorInput`+`EditorPane` 上的贡献——面包屑 / peek / diff 与自定义编辑器 / 热退出。⇒ `editor(file) → view` 成立；上面那份"没有的"清单就是能力面（尤其 `diagnostics`）要补的洞，也是"tab 的脏点/预览/关闭要 `editors` 能力"这条结论的证据。
+9. **B2 是否按上面的提案开工**：先做 `editors`（把 tab 的脏点/预览/关闭补齐）还是先做 `diagnostics`（旗舰 agent 用例）？我建议 `editors` 先行——它同时是**第一个 UI 消费者与第一个 agent 消费者**，能把"两个消费者、同一真相"这条判据一次验掉。
