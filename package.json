@@ -7,9 +7,11 @@
     "build": "vp run -r build",
     "test": "vp run -r test",
     "check": "vp check .",
-    "dsh-types": "node scripts/dsh-types.mjs"
+    "dsh-types": "node scripts/dsh-types.mjs",
+    "verify:stack": "node tests/gates/verify-stack.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

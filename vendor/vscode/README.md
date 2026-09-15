@@ -137,6 +137,7 @@ URL='…' node scripts/verify-extension.mjs                               # 5 �
 - `verify-views`：调出面（recall surface）按快捷键打开、列出实时 view 目录、隐藏/调出/移区/分栏都在像素上生效。
 - `verify-focus`：注意力把编辑器 part 在轨道与中央之间搬移且仍在上屏；含不变量「一个 part 恰好存在于一个 host」。
 - `verify-regions`：VS part host 被挂载、定位、上屏。
+- 活体门里只有**需要 VS Code 侧**的那些住在这里（part host / embed face / 扩展 / 编辑器像素）；**prac 自己机制的闸门放 prac 的 `tests/gates/`**（如堆叠）。
 - `verify-view`：**单个 view** 被造成自带 pane 挂进 prac 的 region（页面里没有 sidebar part），并且跨 region 搬移时释放后重建仍然上屏。
 - `verify-extension`：装好的第三方扩展**激活**（它的 view 描述符只有激活后才存在），且 `mountViewInto` 能把它的 view 渲染进 prac；`VIEW=…` 换视图。
 

@@ -11,6 +11,9 @@ autoInstallPeers: false
 catalogMode: prefer
 
 catalog:
+  # 活体门的浏览器工具链（prac 侧自己的 tests/gates/）。与上游 checkout 同版本，
+  # 这样两边复用同一个浏览器缓存。
+  "@playwright/test": 1.61.1
   # DSH's own packages, pinned to the version this repo runs against. Types only:
   # every import of them is `import type`, erased from the bundles.
   "@deepseek-ai/cordis": 4.0.2
