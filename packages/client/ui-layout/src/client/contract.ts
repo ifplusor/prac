@@ -68,7 +68,26 @@ export interface RegionNode {
    * region looks and measures the same either way.
    */
   readonly stack?: boolean;
+  /**
+   * Whether the region shows an **editor-group-style tab strip**, borrowed from
+   * VS Code's `workbench.editor.showTabs`:
+   *
+   * - `"multiple"` (VS Code's default): the strip is shown even for a single
+   *   view, so the region always reads as "these are the things open here";
+   * - `"single"`: only once the region holds more than one, which is what a
+   *   prac *stack* does with its headers;
+   * - `"none"`: never.
+   *
+   * Absent means no tab strip: the region renders bare (one view) or as a stack
+   * (several), which is what the side tracks and the bottom bar do. A tab strip
+   * is the group's chrome, so a region has at most one of the two: tabs replace
+   * the fold headers, whose per-view fold is a stack idea.
+   */
+  readonly tabs?: TabMode;
 }
+
+/** How many visible views a region needs before it shows a tab strip. */
+export type TabMode = "multiple" | "single" | "none";
 
 /** A flex container of children along one axis. */
 export interface SplitNode {

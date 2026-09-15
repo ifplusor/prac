@@ -21,6 +21,7 @@ import {
   regionNode,
   resolveSizes,
   sashSizes,
+  showsTabStrip,
   setCollapsed,
   setRegionSize,
   sideGeometry,
@@ -78,6 +79,15 @@ describe("defaultTree", () => {
     expect(findRegion(tree, "right")?.stack).toBe(true);
     expect(findRegion(tree, CENTER_REGION)?.stack).toBeUndefined();
   });
+
+  it("gives the centre the tab strip, at VS Code's default tab visibility", () => {
+    const tree = defaultTree();
+    // Borrowed: `workbench.editor.showTabs` defaults to `"multiple"`, so the
+    // strip is there for a single view too.
+    expect(findRegion(tree, CENTER_REGION)?.tabs).toBe("multiple");
+    expect(findRegion(tree, "left")?.tabs).toBeUndefined();
+    expect(findRegion(tree, BOTTOM_REGION)?.tabs).toBeUndefined();
+  });
 });
 
 describe("placement", () => {
@@ -131,6 +141,36 @@ describe("placement", () => {
   it("never calls a non-stack region stacked, even with two views", () => {
     const two = place(place(state(), "a", CENTER_REGION), "b", CENTER_REGION);
     expect(isStacked(two, findRegion(two.tree, CENTER_REGION)!)).toBe(false);
+  });
+});
+
+describe("showsTabStrip", () => {
+  const region = (extra: Partial<RegionNode> = {}) => regionNode("r", 300, extra);
+
+  it("shows for a single view when the mode is VS Code's default", () => {
+    const one = place(state(), "a", "r");
+    expect(showsTabStrip(one, findRegion(one.tree, "r") ?? region({ tabs: "multiple" }))).toBe(
+      true,
+    );
+    const node = region({ tabs: "multiple" });
+    expect(showsTabStrip({ ...one, tree: node }, node)).toBe(true);
+  });
+
+  it("waits for a second view in `single`, and never shows in `none`", () => {
+    const single = region({ tabs: "single" });
+    const one = place({ ...state(), tree: single }, "a", "r");
+    expect(showsTabStrip(one, single)).toBe(false);
+    const two = place(one, "b", "r");
+    expect(showsTabStrip(two, single)).toBe(true);
+    expect(showsTabStrip(two, region({ tabs: "none" }))).toBe(false);
+  });
+
+  it("never shows for a region without a tab mode, however many views it holds", () => {
+    const plain = region();
+    const two = place(place({ ...state(), tree: plain }, "a", "r"), "b", "r");
+    expect(showsTabStrip(two, plain)).toBe(false);
+    // …and a split node is never a strip: it has no views of its own.
+    expect(showsTabStrip(two, defaultTree())).toBe(false);
   });
 });
 

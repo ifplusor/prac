@@ -64,7 +64,10 @@ export function defaultTree(): SplitNode {
         dir: "row",
         children: [
           regionNode("left", 280, { stack: true }),
-          regionNode(CENTER_REGION, 0, { flex: true, min: CENTER_MIN }),
+          // The centre is the editor group of this layout: it gets the tab strip
+          // (VS Code's default `showTabs: "multiple"`), and it stays flexible so an
+          // empty work area is still present.
+          regionNode(CENTER_REGION, 0, { flex: true, min: CENTER_MIN, tabs: "multiple" }),
           regionNode("right", 420, { stack: true }),
         ],
       },
@@ -288,6 +291,24 @@ export function isPresent(state: LayoutState, node: LayoutNode): boolean {
  */
 export function isStacked(state: LayoutState, node: LayoutNode): boolean {
   return node.type === "region" && node.stack === true && visibleViews(state, node.id).length > 1;
+}
+
+/**
+ * Whether a region renders a **tab strip** rather than bare or stacked views.
+ *
+ * The mode is VS Code's `showTabs` vocabulary (`contract.ts`), and the count it
+ * is compared against is the region's visible views — the same list the stack
+ * and the bare rendering use.
+ *
+ * @param state - current state.
+ * @param node - the region to test.
+ */
+export function showsTabStrip(state: LayoutState, node: LayoutNode): boolean {
+  if (node.type !== "region") return false;
+  const count = visibleViews(state, node.id).length;
+  if (node.tabs === "multiple") return count >= 1;
+  if (node.tabs === "single") return count > 1;
+  return false;
 }
 
 /**

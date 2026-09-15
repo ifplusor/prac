@@ -45,6 +45,7 @@ import {
   resolveSizes,
   sashSizes,
   setRegionSize,
+  showsTabStrip,
   subtreeMin,
   visibleViews,
 } from "./model.js";
@@ -161,6 +162,41 @@ const STACK_HEADER_STYLE: StyleObject = {
   background: "transparent",
   color: "inherit",
   opacity: 0.8,
+};
+
+/** The tab strip: one row above the active view's body (an editor group's chrome). */
+const TAB_STRIP_STYLE: StyleObject = {
+  display: "flex",
+  alignItems: "stretch",
+  flex: "0 0 auto",
+  overflow: "hidden",
+  background: "rgba(127,127,127,0.10)",
+};
+
+/** One tab. */
+const TAB_STYLE: StyleObject = {
+  font: "inherit",
+  fontSize: "11px",
+  lineHeight: "1",
+  padding: "5px 10px",
+  border: "none",
+  borderRight: "1px solid rgba(127,127,127,0.22)",
+  background: "transparent",
+  color: "inherit",
+  opacity: 0.7,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+  maxWidth: "220px",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  flex: "0 0 auto",
+};
+
+/** The active tab, which is the view the region renders. */
+const TAB_ACTIVE_STYLE: StyleObject = {
+  opacity: 1,
+  background: "rgba(127,127,127,0.22)",
+  boxShadow: "inset 0 -1px 0 rgba(127,127,127,0.9)",
 };
 
 /** One in-flight sash drag. */
@@ -443,6 +479,73 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
     };
 
     /**
+     * One region's tab strip: the visible views in order, the front one active.
+     *
+     * Borrowed from VS Code's editor group, including its `showTabs` default:
+     * with `"multiple"` the strip is there for a single view too. Clicking a tab
+     * brings that view to the front — the same ordering a `place` writes — so the
+     * strip is a view of the region's order, not a second source of truth.
+     *
+     * @param views - the region's visible views, in order.
+     */
+    const tabStrip = (views: readonly string[]): ReactElement => {
+      const active = views[0];
+      return createElement(
+        "div",
+        {
+          key: "tabs",
+          "data-prac-tab-strip": "",
+          style: TAB_STRIP_STYLE,
+        },
+        views.map((viewId) =>
+          createElement(
+            "button",
+            {
+              key: viewId,
+              type: "button",
+              "data-prac-tab": viewId,
+              "data-prac-tab-active": viewId === active ? "true" : "false",
+              onClick: () =>
+                store.update((current) => {
+                  const order = Math.min(
+                    0,
+                    ...Object.values(current.views).map((entry) => entry.order),
+                  );
+                  const view = current.views[viewId];
+                  if (!view || view.order === order) return current;
+                  return {
+                    ...current,
+                    views: { ...current.views, [viewId]: { ...view, order: order - 1 } },
+                  };
+                }),
+              style: {
+                ...TAB_STYLE,
+                ...(viewId === active ? TAB_ACTIVE_STYLE : {}),
+              },
+            },
+            viewLabel(viewId),
+          ),
+        ),
+        createElement("span", { key: "filler", style: { flex: "1 1 auto" } }),
+      );
+    };
+
+    /**
+     * One view's body, sized to the region's box.
+     *
+     * @param viewId - the view to render.
+     * @param box - the box of the region holding it.
+     */
+    const viewBody = (viewId: string, box: Box): ReactElement =>
+      createElement(View, {
+        key: viewId,
+        viewId,
+        renderSlot,
+        box,
+        viewportWidth: state.viewportWidth,
+      });
+
+    /**
      * A region renders its front-most visible view — or, when it is a **stack**
      * and holds more than one, every visible view with a header of its own. A
      * stack of one renders bare, so a single-view region looks and measures
@@ -462,17 +565,11 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
           "data-prac-region": node.id,
           style: regionStyle(node, dir),
         },
-        stacked
-          ? views.map((viewId) => stackEntry(viewId, box))
-          : views.slice(0, 1).map((viewId) =>
-              createElement(View, {
-                key: viewId,
-                viewId,
-                renderSlot,
-                box,
-                viewportWidth: state.viewportWidth,
-              }),
-            ),
+        showsTabStrip(state, node)
+          ? [tabStrip(views), viewBody(views[0] ?? "", box)]
+          : stacked
+            ? views.map((viewId) => stackEntry(viewId, box))
+            : views.slice(0, 1).map((viewId) => viewBody(viewId, box)),
       );
     };
 

@@ -66,6 +66,7 @@ function pickFiles(root) {
   const manifest = join(root, "package.json");
   const name = JSON.parse(readFileSync(manifest, "utf8")).name;
   const first = { path: "package.json", marker: `"name": "${name}"` };
+  const extra = [];
   for (const candidate of ["README.md", "AGENTS.md", "tsconfig.json"]) {
     const full = join(root, candidate);
     if (!existsSync(full)) continue;
@@ -74,9 +75,13 @@ function pickFiles(root) {
       .map((text) => text.trim())
       .find((text) => text.length >= 16);
     if (line === undefined) continue;
-    return { first, second: { path: candidate, marker: line.slice(0, 30) } };
+    extra.push({ path: candidate, marker: line.slice(0, 30) });
   }
-  throw new Error(`no second file with a marker found in ${root}`);
+  if (extra.length === 0) throw new Error(`no second file with a marker found in ${root}`);
+  // The probe hosts hold `first`/`second`; the tab phase must open files the probe
+  // does not, because a resource has exactly one editing surface (decision 17) — a
+  // file opened in the frame is *re-parented out of* a probe host.
+  return { first, second: extra[0], tabs: extra.slice(1, 3) };
 }
 
 const analyse = async (base64) => {
@@ -111,7 +116,7 @@ const folder = await page.evaluate(
   () => (globalThis.__vscodeEmbed.face.workspaceInfo().folders ?? [])[0] ?? null,
 );
 if (!folder) throw new Error("the workbench has no workspace folder");
-const { first: FIRST, second: SECOND } = pickFiles(localPathOf(folder));
+const { first: FIRST, second: SECOND, tabs: TABS } = pickFiles(localPathOf(folder));
 
 // Two host elements the embedder renders for two files, plus a third used for
 // the same-file-twice and release/recreate phases.
@@ -233,6 +238,37 @@ const opened = await page.evaluate(() => ({
 }));
 await page.evaluate(() => globalThis.__stopOpenFileProbe?.());
 
+// Tabs (decision 17's stage chrome, borrowed from VS Code's editor group): the
+// strip shows for a single file (`showTabs: "multiple"` is VS Code's default),
+// a second file gets its own tab, and clicking a tab brings that view forward.
+const tabsOf = () =>
+  page.evaluate(() =>
+    [...document.querySelectorAll("[data-prac-tab]")].map((element) => ({
+      id: element.getAttribute("data-prac-tab"),
+      active: element.getAttribute("data-prac-tab-active") === "true",
+    })),
+  );
+
+const oneFile = await tabsOf();
+// A file the probe hosts do not hold (one surface per resource), and not the one
+// the event phase already opened: this brings the stage to exactly two tabs.
+await page.evaluate(
+  (uri) => globalThis.__vscodeEmbed.face.openFile(uri),
+  `${folder}/${TABS[0].path}`,
+);
+await page.waitForTimeout(2500);
+await page.waitForFunction(() => document.querySelectorAll("[data-prac-tab]").length === 2, null, {
+  timeout: 60_000,
+});
+await page.waitForTimeout(2500);
+const twoFiles = await tabsOf();
+// Click whichever tab is not active: the region must follow the click.
+const inactive = twoFiles.find((tab) => !tab.active)?.id ?? null;
+if (inactive === null) throw new Error("the second file did not add an inactive tab");
+await page.click(`[data-prac-tab="${inactive}"]`);
+await page.waitForTimeout(2000);
+const clicked = await tabsOf();
+
 // Release the first file, then mount it again into a fresh host.
 await page.evaluate(
   ({ first }) => {
@@ -277,6 +313,14 @@ const checks = {
     opened.events[opened.events.length - 1].some((resource) => !opened.before.includes(resource)),
   // …and only files: the untitled buffer opened in the same breath is not one.
   nonFilesAreNotOffered: opened.after.every((resource) => !resource.startsWith("untitled:")),
+  // 6. Tabs: VS Code's default visibility, one per file, and the click switches.
+  stripShownForOneFile: oneFile.length === 1 && oneFile[0].active,
+  twoFilesTwoTabs: twoFiles.length === 2 && twoFiles.filter((tab) => tab.active).length === 1,
+  newestFileIsActive: twoFiles.find((tab) => tab.active)?.id.endsWith(TABS[0].path) === true,
+  clickBringsItForward:
+    clicked.length === 2 &&
+    clicked.find((tab) => tab.active)?.id === inactive &&
+    clicked.filter((tab) => tab.active).length === 1,
   // A failed mount is logged by the composition, not thrown at the embedder.
   noMountErrors:
     mounted.mountErrors === 0 && remounted.mountErrors === 0 && released.mountErrors === 0,
@@ -289,6 +333,7 @@ console.log(
       workspace: {
         folder,
         files: [FIRST.path, SECOND.path],
+        tabFiles: TABS.map((file) => file.path),
         markers: [FIRST.marker, SECOND.marker],
       },
       mounted: {
@@ -308,6 +353,11 @@ console.log(
         mountMessages: released.mountMessages,
       },
       opened: { before: opened.before, after: opened.after, eventCount: opened.events.length },
+      tabs: {
+        oneFile: oneFile.map((tab) => (tab.active ? `${tab.id} (active)` : tab.id)),
+        twoFiles: twoFiles.map((tab) => (tab.active ? `${tab.id} (active)` : tab.id)),
+        clicked: clicked.map((tab) => (tab.active ? `${tab.id} (active)` : tab.id)),
+      },
       checks,
     },
     null,
