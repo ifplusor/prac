@@ -1,0 +1,43 @@
+{
+  "name": "prac-vscode",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The pinned, patch-vendored Code - OSS the web bundle is built from: the upstream pin, the patch set that is our only change to it, the overlay this build places into it, and the recipe that produces `.build/workbench`. It is not a DSH plugin — it carries no loader entry; what serves its output is `prac-host-vscode`, and what boots it in the DSH page is `prac-client-vscode-host`, which imports the embed bridge contract from here.",
+  "license": "MIT",
+  "files": [
+    "overlay",
+    "patches",
+    "scripts"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./overlay/bridge.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "vscode:build": "node scripts/build.mjs",
+    "vscode:serve": "node scripts/serve.mjs",
+    "vscode:smoke": "node scripts/smoke.mjs",
+    "vscode:verify-layout": "node scripts/verify-layout.mjs",
+    "vscode:verify-focus": "node scripts/verify-focus.mjs",
+    "vscode:verify-regions": "node scripts/verify-regions.mjs",
+    "vscode:verify-views": "node scripts/verify-views.mjs",
+    "vscode:inspect-region": "node scripts/inspect-region.mjs",
+    "vscode:screenshot": "node scripts/screenshot.mjs",
+    "vscode:clean": "node scripts/clean.mjs",
+    "vscode:check": "vp check",
+    "check": "vp check"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "prac": {
+    "vscode": {
+      "repository": "https://github.com/microsoft/vscode.git",
+      "tag": "1.137.0"
+    }
+  }
+}

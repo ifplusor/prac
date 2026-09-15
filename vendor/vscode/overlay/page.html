@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>prac</title>
+    <link rel="stylesheet" href="./out/vs/workbench/workbench.web.main.internal.css" />
+    <style>
+      /* prac's own shell: the composition is ours; VS Code only provides parts/services. */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+      }
+      #prac-shell {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      #prac-middle {
+        display: flex;
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+      [data-vscode-embed-part-host="workbench.parts.titlebar"] {
+        flex: 0 0 30px;
+      }
+      [data-vscode-embed-part-host="workbench.parts.activitybar"] {
+        flex: 0 0 48px;
+      }
+      [data-vscode-embed-part-host="workbench.parts.sidebar"] {
+        flex: 0 0 260px;
+        min-width: 0;
+      }
+      [data-vscode-embed-part-host="workbench.parts.editor"] {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      [data-vscode-embed-part-host="workbench.parts.auxiliarybar"] {
+        flex: 0 0 0;
+        min-width: 0;
+        overflow: hidden;
+      }
+      [data-vscode-embed-part-host="workbench.parts.panel"] {
+        flex: 0 0 180px;
+      }
+      [data-vscode-embed-part-host="workbench.parts.banner"] {
+        flex: 0 0 0;
+        overflow: hidden;
+      }
+      [data-vscode-embed-part-host="workbench.parts.statusbar"] {
+        flex: 0 0 22px;
+      }
+      [data-vscode-embed-part-host] {
+        position: relative;
+        overflow: hidden;
+      }
+      [data-vscode-embed-part-host] > .part {
+        position: absolute;
+        inset: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Every part gets an external host: the shell below IS the workbench composition. -->
+    <div id="prac-shell">
+      <div data-vscode-embed-part-host="workbench.parts.titlebar"></div>
+      <div data-vscode-embed-part-host="workbench.parts.banner"></div>
+      <div id="prac-middle">
+        <div data-vscode-embed-part-host="workbench.parts.activitybar"></div>
+        <div data-vscode-embed-part-host="workbench.parts.sidebar"></div>
+        <div data-vscode-embed-part-host="workbench.parts.editor"></div>
+        <div data-vscode-embed-part-host="workbench.parts.auxiliarybar"></div>
+      </div>
+      <div data-vscode-embed-part-host="workbench.parts.panel"></div>
+      <div data-vscode-embed-part-host="workbench.parts.statusbar"></div>
+    </div>
+  </body>
+  <script>
+    globalThis._VSCODE_FILE_ROOT = new URL("./out/", window.location.href).toString();
+  </script>
+  <script type="module" src="./out/nls.messages.js"></script>
+  <script type="module">
+    // prac's own entry point: boot the Code - OSS workbench through the web-embedder API,
+    // but composed by prac's shell (the [data-vscode-embed-part-host] hosts above).
+    import { create } from "./out/vs/workbench/workbench.web.main.internal.js";
+    window.__pracVscode = create(document.body, {
+      productConfiguration: {
+        nameShort: "prac",
+        nameLong: "prac",
+        applicationName: "prac",
+      },
+    });
+    window.__pracEntryLoaded = true;
+  </script>
+</html>

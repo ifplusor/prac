@@ -1,3 +1,11 @@
+.cache/
+.corepack/
+.data/
+.npm-cache/
+
+# Vendored upstream checkout for the workbench build (fetched at build time, not committed)
+.build/
+
 # Dependencies
 node_modules/
 .pnpm-store/

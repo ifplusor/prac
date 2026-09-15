@@ -1,0 +1,25 @@
+{
+  "name": "prac-vscode-embed",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The embeddable wrapper over the Code - OSS build `prac-vscode` produces: a host half (same-origin asset serving + code-server HTTP/WS proxy) and a browser half (boot the app once per page, host its parts in containers the embedder owns, carry its theme classes and command namespace). It knows nothing about prac or DSH — routes, ports, workspace paths and which part backs which view stay in the consumer.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/host/index.ts",
+    "./client": "./src/client/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "check": "vp check"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "prac-vscode": "workspace:*",
+    "react": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

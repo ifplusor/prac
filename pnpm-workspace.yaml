@@ -1,14 +1,31 @@
 packages:
-  - packages/*
+  - packages/*/*
+  - vendor/*
 
-# The bundle's DSH peer deps resolve at runtime from the DSH installation, so
-# never auto-fetch them from the registry (they are not published).
+# The DSH *runtime* still comes from the installation (`ctx`, the loader's
+# module table, the served bundles) — these entries are for TYPES only. They are
+# published on npm (verified 2026-09-13), pinned exactly: the `latest` dist-tag
+# points at an old release, so a range would resolve the wrong thing.
 autoInstallPeers: false
 
 catalogMode: prefer
 
 catalog:
+  # DSH's own packages, pinned to the version this repo runs against. Types only:
+  # every import of them is `import type`, erased from the bundles.
+  "@deepseek-ai/cordis": 4.0.2
+  "@deepseek-ai/dsh-api-session-controller": 0.1.5-rc.1
+  "@deepseek-ai/dsh-api-workspace-controller": 0.1.5-rc.1
+  "@deepseek-ai/dsh-client-ui-layout": 0.1.5-rc.1
+  "@deepseek-ai/dsh-client-ui-renderer": 0.1.5-rc.1
+  "@deepseek-ai/dsh-client-ui-session": 0.1.5-rc.1
+  "@deepseek-ai/dsh-client-store": 0.1.5-rc.1
+  "@deepseek-ai/dsh-client-ui-slots": 0.1.5-rc.1
+  "@deepseek-ai/dsh-client-ui-theme": 0.1.5-rc.1
+  "@deepseek-ai/dsh-host-webserver": 0.1.5-rc.1
   "@types/node": ^24
+  "@types/react": ~18.3.1
+  react: ^18.2.0
   typescript: ^7.0.2
   vite: npm:@voidzero-dev/vite-plus-core@0.2.8
   vite-plus: 0.2.8
@@ -19,3 +36,9 @@ peerDependencyRules:
     - vite
   allowedVersions:
     vite: "*"
+# Optional native accelerators of `ws`, reached only through the toolchain's
+# dependency graph. Their build scripts are not needed here, so `pnpm install`
+# must not stop on the approval prompt for them.
+allowBuilds:
+  bufferutil: false
+  utf-8-validate: false

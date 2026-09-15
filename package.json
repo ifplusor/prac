@@ -6,7 +6,8 @@
   "scripts": {
     "build": "vp run -r build",
     "test": "vp run -r test",
-    "check": "vp check"
+    "check": "vp check .",
+    "dsh-types": "node scripts/dsh-types.mjs"
   },
   "devDependencies": {
     "vite": "catalog:",

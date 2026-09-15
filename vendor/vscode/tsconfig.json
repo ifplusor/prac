@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    // Only the bridge contract is ours to type-check: it is compiled by two
+    // toolchains (upstream's build, and ours through the client half's import).
+    // The other overlay files (`embeddedWorkbench.ts`, `embeddedWebMain.ts`) are
+    // upstream-tree code — they import `vs/...` internals by relative path and are
+    // only compiled by upstream's build, inside the checkout, so they are not part
+    // of this program.
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "moduleDetection": "force",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true
+  },
+  "include": ["overlay/bridge.ts"]
+}

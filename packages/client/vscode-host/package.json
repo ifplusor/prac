@@ -1,0 +1,45 @@
+{
+  "name": "prac-client-vscode-host",
+  "version": "0.0.0",
+  "private": true,
+  "description": "prac's row onto the embedded VS Code app: when it may boot (only once DSH reports a workspace), which part backs which view, and the `pracVscode` service the seats render through. The mechanism itself — the once-per-page boot, the part-host elements, the theme classes and the command namespace — belongs to `prac-vscode-embed`.",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./client": {
+      "types": "./dist/client.d.mts",
+      "default": "./dist/client.js"
+    },
+    "./package.json": "./package.json",
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "check": "vp check"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "catalog:",
+    "@deepseek-ai/dsh-api-session-controller": "catalog:",
+    "@deepseek-ai/dsh-api-workspace-controller": "catalog:",
+    "@deepseek-ai/dsh-client-store": "catalog:",
+    "@types/react": "catalog:",
+    "prac-vscode-embed": "workspace:*",
+    "react": "catalog:"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web"
+    }
+  }
+}

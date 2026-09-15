@@ -1,0 +1,44 @@
+# @prac/web-app bundle patch layer: prac's composition.
+#
+# Applied after dsh-web-app's insert, so the shipped rows are addressable by id.
+# DSH composes every client plugin as a row, and a patch can disable or insert
+# rows — replacing the frame is therefore DSH's own extension point, not a fork.
+#
+# `ui-layout` stays installed (its types are what other packages augment SlotMap
+# with); only its row is taken out of the composition.
+- id: ui-layout
+  disabled: true
+
+- insert:
+    # The frame mechanism: region tree, sashes, collapse, the view catalogue,
+    # the `prac.view` seat, `ctx.layout` (compat shim) and `ctx.pracLayout`.
+    - id: prac-client-ui-layout
+      name: "prac-client-ui-layout"
+
+    # The shared VS Code client mechanism: the single VS Code boot (the
+    # app may be created only once per page) and the part-host element
+    # factory. It declares no seat, so it composes with either seat alone — a
+    # deployment that keeps only one seat still gets its app.
+    - id: prac-client-vscode-host
+      name: "prac-client-vscode-host"
+
+    # The seats. Each is independent: dropping either row leaves a working
+    # window, because the boot above does not belong to a seat.
+    - id: prac-client-ui-vscode-editor
+      name: "prac-client-ui-vscode-editor"
+    - id: prac-client-ui-vscode-explorer
+      name: "prac-client-ui-vscode-explorer"
+
+    # The VS Code side's host half: the `/prac-vscode` route that serves the
+    # built VS Code bundle, and the same-origin proxy to the code server. `prac-vscode`
+    # itself is vendor-only — it pins, patches and builds what this row serves,
+    # so it has no loader entry and cannot appear here.
+    - id: prac-host-vscode
+      name: "prac-host-vscode"
+
+    # The arrangement. DSH scans client halves from *loader rows*, so the
+    # arrangement needs a row even though its host half does nothing: without
+    # it, `exports["./client"]` is never served and nothing places a view.
+    # `id` stays `prac-web-app` so the profile can address the row.
+    - id: prac-web-app
+      name: "prac-web-app"

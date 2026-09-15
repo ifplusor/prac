@@ -1,0 +1,306 @@
+#!/usr/bin/env node
+/**
+ * Reproducible build for the patch-vendored VS Code this repo owns.
+ *
+ * VS Code is vendored here as a **pin + patch set + build recipe**, not as
+ * source: upstream (Code - OSS) is fetched at the tag pinned in `package.json`
+ * (`prac.vscode`) into a gitignored work directory, reset to that pristine tag,
+ * and patched with `patches/*.patch` — that patch set is prac's only change to
+ * it. The build then produces the web workbench bundle and stages it together
+ * with prac's own entry point (`src/index.html`), which boots the workbench
+ * through the public web-embedder API `create()` from
+ * `workbench.web.main.internal`.
+ *
+ * Steps:
+ *   1. ensure the upstream checkout at the pinned tag
+ *   2. install dependencies (root + the `build/` toolchain)
+ *   3. copy the codicon font the web bundle references
+ *   4. transpile `src/` -> `out-build`
+ *   5. bundle -> `out-vscode-web` (target `web`, with NLS)
+ *   6. stage `<work>/web` = our `index.html` + an `out/` link to the bundle
+ *
+ * Everything (checkout, caches, output) lives under `PRAC_WORKBENCH_DIR`
+ * (default `<repo>/.build/workbench`, gitignored), so the build writes nothing
+ * outside the repository and needs no elevated sandbox.
+ *
+ * Usage:
+ *   node scripts/build.mjs [--force] [--skip-install] [--skip-build]
+ *     --force         wipe the work directory and rebuild from scratch
+ *     --skip-install  reuse an existing dependency install
+ *     --skip-build    only ensure checkout/install, do not transpile/bundle
+ */
+import { spawnSync } from "node:child_process";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join, resolve } from "node:path";
+
+const scriptDir = import.meta.dirname;
+const packageDir = resolve(scriptDir, "..");
+const repoRoot = resolve(packageDir, "../..");
+
+const pkg = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8"));
+const pin = pkg.prac?.vscode;
+if (!pin?.repository || !pin?.tag) {
+  throw new Error("package.json is missing prac.vscode { repository, tag }");
+}
+
+const flags = new Set(process.argv.slice(2));
+const workDir = resolve(process.env.PRAC_WORKBENCH_DIR ?? join(repoRoot, ".build/workbench"));
+const upstreamDir = join(workDir, "upstream");
+const webDir = join(workDir, "web");
+const cacheDir = join(workDir, "cache");
+
+/** Keep every cache the toolchain touches inside the repository. */
+const env = {
+  ...process.env,
+  npm_config_cache: join(cacheDir, "npm"),
+  npm_config_devdir: join(cacheDir, "node-gyp"),
+  XDG_CACHE_HOME: join(cacheDir, "xdg"),
+  PLAYWRIGHT_BROWSERS_PATH: join(cacheDir, "ms-playwright"),
+};
+
+/** @param {string} step @param {string} message */
+function log(step, message) {
+  console.log(`[prac-vscode] ${step}: ${message}`);
+}
+
+/**
+ * @param {string} command @param {string[]} args
+ * @param {string} [cwd] @param {{ tolerant?: boolean }} [options]
+ */
+function run(command, args, cwd = upstreamDir, options = {}) {
+  log("run", `${command} ${args.join(" ")}`);
+  const result = spawnSync(command, args, { cwd, env, stdio: "inherit" });
+  if (result.status !== 0 && !options.tolerant) {
+    throw new Error(`${command} ${args.join(" ")} exited with ${result.status}`);
+  }
+  return result.status;
+}
+
+/** The exact tag currently checked out in the upstream work tree, if any. */
+function currentTag() {
+  const result = spawnSync("git", ["-C", upstreamDir, "describe", "--tags", "--exact-match"], {
+    encoding: "utf8",
+  });
+  return result.status === 0 ? result.stdout.trim() : undefined;
+}
+
+function ensureCheckout() {
+  if (flags.has("--force")) rmSync(workDir, { recursive: true, force: true });
+  if (!existsSync(join(upstreamDir, ".git"))) {
+    rmSync(upstreamDir, { recursive: true, force: true });
+    mkdirSync(dirname(upstreamDir), { recursive: true });
+    log("upstream", `cloning ${pin.repository}#${pin.tag}`);
+    run(
+      "git",
+      ["clone", "--depth", "1", "--branch", pin.tag, pin.repository, upstreamDir],
+      workDir,
+    );
+  } else {
+    const tag = currentTag();
+    if (tag !== pin.tag) {
+      log("upstream", `checking out ${pin.tag} (was ${tag ?? "unknown"})`);
+      run(
+        "git",
+        ["fetch", "--depth", "1", "origin", `refs/tags/${pin.tag}:refs/tags/${pin.tag}`],
+        upstreamDir,
+        { tolerant: true },
+      );
+    }
+    // Always start from a pristine tree so the patch set below is the single source of
+    // truth. `git clean -fd` (no -x) keeps ignored dirs, so node_modules and build output
+    // survive; only tracked edits and our previously applied files are removed.
+    log("upstream", `resetting to pristine ${pin.tag}`);
+    run("git", ["checkout", "--force", pin.tag]);
+    run("git", ["clean", "-fd"]);
+  }
+  applyPatches();
+  stageOverlay();
+}
+
+/**
+ * Files this package places into the checkout.
+ *
+ * `patches/` carries only the *delta* to upstream files (two small edits). Our own
+ * files — the payload the edits import, and the bridge contract both sides compile
+ * against — live here and are placed at the paths upstream's build expects.
+ *
+ * `to` is checkout-relative.
+ */
+const OVERLAY = [
+  { from: "overlay/bridge.ts", to: "src/vs/workbench/browser/embedBridge.ts" },
+  { from: "overlay/embeddedWorkbench.ts", to: "src/vs/workbench/browser/embeddedWorkbench.ts" },
+  { from: "overlay/embeddedWebMain.ts", to: "src/vs/workbench/browser/embeddedWebMain.ts" },
+];
+
+/**
+ * Place {@link OVERLAY} into the checkout.
+ *
+ * The copy is the point of the reset: `git clean -fd` removes everything here on
+ * every build, so the checkout can never become a second source of truth for files
+ * this repository owns.
+ */
+function stageOverlay() {
+  for (const { from, to } of OVERLAY) {
+    const source = join(packageDir, from);
+    const dest = join(upstreamDir, to);
+    if (!existsSync(source)) throw new Error(`missing overlay file: ${source}`);
+    cpSync(source, dest);
+    log("overlay", `${from} → ${to}`);
+  }
+}
+
+/** Apply every `patches/*.patch` (name order) onto the pristine checkout. */
+function applyPatches() {
+  const patchesDir = join(packageDir, "patches");
+  if (!existsSync(patchesDir)) return;
+  for (const patch of readdirSync(patchesDir)
+    .filter((file) => file.endsWith(".patch"))
+    .sort()) {
+    run("git", ["apply", "--whitespace=nowarn", join(patchesDir, patch)]);
+    log("patch", `applied ${patch}`);
+  }
+}
+
+function ensureInstall() {
+  if (flags.has("--skip-install")) {
+    log("install", "skipped (--skip-install)");
+    return;
+  }
+  const marker = join(cacheDir, "install.marker");
+  if (existsSync(marker) && readFileSync(marker, "utf8") === pin.tag && !flags.has("--force")) {
+    log("install", "already installed");
+    return;
+  }
+  // Root: JS deps + devDeps only. Lifecycle scripts are skipped on purpose — the
+  // ones a consumer environment cannot run (node-gyp native builds, the playwright
+  // browser download, the copilot extension postinstall) are not needed to build the
+  // web workbench, and skipping them keeps the build inside the repository. The few
+  // files other postinstall steps would generate (extension API proposals, extension
+  // points) are committed upstream, so a checkout already has them.
+  run("npm", [
+    "install",
+    "--ignore-scripts",
+    "--no-audit",
+    "--no-fund",
+    "--legacy-peer-deps",
+    "--loglevel=error",
+  ]);
+  // The build toolchain is a separate package with its own lockfile; esbuild needs its
+  // postinstall to verify the platform binary, and it writes nothing outside the repo.
+  run(
+    "npm",
+    ["install", "--no-audit", "--no-fund", "--legacy-peer-deps", "--loglevel=error"],
+    join(upstreamDir, "build"),
+  );
+  mkdirSync(cacheDir, { recursive: true });
+  writeFileSync(marker, pin.tag);
+}
+
+function copyCodicons() {
+  const dest = join(upstreamDir, "src/vs/base/browser/ui/codicons/codicon/codicon.ttf");
+  if (existsSync(dest)) {
+    log("codicons", "already present");
+    return;
+  }
+  const source = join(upstreamDir, "node_modules/@vscode/codicons/dist/codicon.ttf");
+  if (!existsSync(source)) throw new Error(`codicon.ttf not found at ${source}`);
+  mkdirSync(dirname(dest), { recursive: true });
+  cpSync(source, dest);
+  log("codicons", "copied codicon.ttf into the source tree");
+}
+
+function buildBundle() {
+  if (flags.has("--skip-build")) {
+    log("build", "skipped (--skip-build)");
+    return;
+  }
+  run("node", ["build/next/index.ts", "transpile", "--out", "out-build"]);
+  run("node", [
+    "build/next/index.ts",
+    "bundle",
+    "--out",
+    "out-vscode-web",
+    "--target",
+    "web",
+    "--nls",
+  ]);
+}
+
+function stage() {
+  rmSync(webDir, { recursive: true, force: true });
+  mkdirSync(webDir, { recursive: true });
+  cpSync(join(packageDir, "overlay/page.html"), join(webDir, "index.html"));
+  symlinkSync(join(upstreamDir, "out-vscode-web"), join(webDir, "out"), "dir");
+  log("stage", `web surface staged at ${webDir}`);
+}
+
+/**
+ * Stamp the checked-out commit into the server distro's `product.json`.
+ *
+ * Both sides derive their product segment with VS Code's own
+ * `getServerProductSegment(product) = \`${quality ?? 'oss'}-${commit ?? 'dev'}\``,
+ * and they read **different copies** of `product.json`: the web client's is
+ * injected at bundle time (so it carries the real commit), while the server
+ * distro's is read at runtime. Left unstamped, the server computes `oss-dev`
+ * while the client asks for `/oss-<commit>` — every remote-resource request 404s
+ * and the extension-host upgrade never lands, which presents as "the editor
+ * cannot open files" rather than as a path mismatch.
+ *
+ * Stamping makes the two copies agree by construction, so the host's
+ * `codeServerPath()` derives the one segment both channels actually use.
+ */
+function stampServerCommit() {
+  const distro = join(upstreamDir, "out-server-web");
+  const productPath = join(distro, "product.json");
+  if (!existsSync(productPath)) {
+    log("server", "no out-server-web/product.json to stamp (server distro not built)");
+    return;
+  }
+  const product = JSON.parse(readFileSync(productPath, "utf8"));
+  const commit = checkoutCommit();
+  if (commit === undefined) throw new Error("cannot resolve the upstream checkout commit to stamp");
+  if (product.commit === commit) {
+    log("server", `product.json already stamped (${commit.slice(0, 10)})`);
+    return;
+  }
+  product.commit = commit;
+  writeFileSync(productPath, `${JSON.stringify(product, null, "\t")}\n`);
+  log("server", `stamped product.json commit=${commit.slice(0, 10)}`);
+}
+
+/**
+ * The commit the upstream checkout has checked out, read the way VS Code's own
+ * `build/lib/git.ts` does (`.git/HEAD` is a detached commit or a `ref:`).
+ *
+ * @returns the 40-hex commit, or `undefined` when it cannot be read.
+ */
+function checkoutCommit() {
+  try {
+    const head = readFileSync(join(upstreamDir, ".git/HEAD"), "utf8").trim();
+    if (/^[0-9a-f]{40}$/i.test(head)) return head;
+    const ref = /^ref:\s*(.+)$/.exec(head);
+    if (!ref) return undefined;
+    const value = readFileSync(join(upstreamDir, ".git", ref[1]), "utf8").trim();
+    return /^[0-9a-f]{40}$/i.test(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+mkdirSync(cacheDir, { recursive: true });
+ensureCheckout();
+ensureInstall();
+copyCodicons();
+buildBundle();
+stampServerCommit();
+stage();
+console.log("[prac-vscode] done. serve it with: pnpm --filter prac-vscode vscode:serve");

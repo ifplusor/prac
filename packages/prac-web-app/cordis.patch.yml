@@ -1,4 +1,0 @@
-# @prac/web-app bundle patch layer: mount the prac plugin beside the platform.
-- insert:
-    - id: prac-web-app
-      name: "prac-web-app"

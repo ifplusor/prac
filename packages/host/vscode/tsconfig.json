@@ -1,20 +1,22 @@
 {
   "compilerOptions": {
     "target": "esnext",
+    // The Node plane: this package owns routes and sockets, never a document.
     "lib": ["es2023"],
     "moduleDetection": "force",
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "resolveJsonModule": true,
+    // Node globals for the routes and the stream proxy; the DSH boundary is
+    // declared locally in src/dsh.d.ts.
     "types": ["node"],
     "strict": true,
     "noUnusedLocals": true,
-    "declaration": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
-  }
+  },
+  "include": ["src"]
 }

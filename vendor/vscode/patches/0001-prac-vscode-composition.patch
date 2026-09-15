@@ -1,0 +1,74 @@
+diff --git a/src/vs/workbench/browser/web.factory.ts b/src/vs/workbench/browser/web.factory.ts
+index e342f838..dd88e57d 100644
+--- a/src/vs/workbench/browser/web.factory.ts
++++ b/src/vs/workbench/browser/web.factory.ts
+@@ -4,7 +4,7 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import { ITunnel, ITunnelOptions, IWorkbench, IWorkbenchConstructionOptions, Menu } from './web.api.js';
+-import { BrowserMain } from './web.main.js';
++import { EmbeddedBrowserMain } from './embeddedWebMain.js';
+ import { URI, UriComponents } from '../../base/common/uri.js';
+ import { IDisposable, toDisposable } from '../../base/common/lifecycle.js';
+ import { CommandsRegistry } from '../../platform/commands/common/commands.js';
+@@ -59,7 +59,7 @@ export function create(domElement: HTMLElement, options: IWorkbenchConstructionO
+ 
+ 	// Startup workbench and resolve waiters
+ 	let instantiatedWorkbench: IWorkbench | undefined = undefined;
+-	new BrowserMain(domElement, options).open().then(workbench => {
++	new EmbeddedBrowserMain(domElement, options).open().then(workbench => {
+ 		instantiatedWorkbench = workbench;
+ 		workbenchPromise.complete(workbench);
+ 	});
+diff --git a/src/vs/workbench/browser/web.main.ts b/src/vs/workbench/browser/web.main.ts
+index a2f09581..e4dfffb6 100644
+--- a/src/vs/workbench/browser/web.main.ts
++++ b/src/vs/workbench/browser/web.main.ts
+@@ -113,7 +113,17 @@ export class BrowserMain extends Disposable {
+ 
+ 	constructor(
+ 		private readonly domElement: HTMLElement,
+-		private readonly configuration: IWorkbenchConstructionOptions
++		/**
++		 * The embedder's construction options.
++		 *
++		 * `protected` so a composition that replaces the workbench (rather than the
++		 * service bootstrap) can hand them on: the options carry things the parts
++		 * cannot otherwise reach — most importantly `workspaceProvider`, which is
++		 * what tells the workspace service *which* workspace this window is.
++		 * The `IWorkbenchOptions` parameter of `createWorkbench` is a different,
++		 * much smaller bag (`extraClasses`/`resetLayout`) and never carried these.
++		 */
++		protected readonly configuration: IWorkbenchConstructionOptions
+ 	) {
+ 		super();
+ 
+@@ -666,14 +676,26 @@ export class BrowserMain extends Disposable {
+ 			workspace = this.configuration.workspaceProvider.workspace;
+ 		}
+ 
++		// The provider's URIs arrive as JSON (`UriComponents`), not as `URI`
++		// instances: an embedder supplying `{ scheme, authority, path }` is
++		// following the documented `IWorkspace` shape. `getWorkspaceIdentifier`
++		// and `getSingleFolderWorkspaceIdentifier` take real `URI`s, and
++		// `isSingleFolderWorkspaceIdentifier` checks `URI.isUri` — so an
++		// unrevived component fails that guard and the workbench silently falls
++		// back to *empty window*, which then scopes storage, configuration,
++		// profile and trust to nothing. Revive both shapes before use.
++		// (The standalone bootstrap revives for the same reason; this path did not.)
++
+ 		// Multi-root workspace
+ 		if (workspace && isWorkspaceToOpen(workspace)) {
+-			return getWorkspaceIdentifier(workspace.workspaceUri);
++			const workspaceUri = URI.revive(workspace.workspaceUri);
++			if (workspaceUri) return getWorkspaceIdentifier(workspaceUri);
+ 		}
+ 
+ 		// Single-folder workspace
+ 		if (workspace && isFolderToOpen(workspace)) {
+-			return getSingleFolderWorkspaceIdentifier(workspace.folderUri);
++			const folderUri = URI.revive(workspace.folderUri);
++			if (folderUri) return getSingleFolderWorkspaceIdentifier(folderUri);
+ 		}
+ 
+ 		// Empty window workspace
