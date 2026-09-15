@@ -110,6 +110,28 @@ export interface PartHostFace {
    */
   releaseFile: (resource: string) => void;
   /**
+   * The resources the workbench currently has open, in its own order.
+   *
+   * The embedder owns *rendering* files (see
+   * {@link PartHostFace.mountFileInto}), so it needs to know which files the
+   * app considers open — opening one from the app's own UI (an explorer click, a
+   * command, a jump) has to become a view, or the app would be editing files
+   * nobody can see.
+   *
+   * @returns one URI string per open file.
+   */
+  listOpenFiles: () => string[];
+  /**
+   * Subscribe to changes in the open-file set.
+   *
+   * Fires after the set actually changed (not on every editor activation), so a
+   * listener can re-read {@link PartHostFace.listOpenFiles} and reconcile.
+   *
+   * @param listener - called when the open-file set changed.
+   * @returns a function that unsubscribes.
+   */
+  onDidChangeOpenFiles: (listener: () => void) => () => void;
+  /**
    * Open an untitled editor.
    *
    * @param path - optional path the untitled buffer is named after.

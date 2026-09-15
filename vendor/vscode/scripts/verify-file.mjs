@@ -208,6 +208,26 @@ await page.evaluate(
 await page.waitForTimeout(1200);
 const remounted = await sample();
 
+// The other direction: the app opens a file itself (an explorer click, a command,
+// go-to-definition), which has to reach the embedder as an event — otherwise the
+// app would be editing files nobody can see.
+await page.evaluate(() => {
+  const face = globalThis.__vscodeEmbed.face;
+  const events = [];
+  globalThis.__openFileProbe = { events, before: face.listOpenFiles() };
+  globalThis.__stopOpenFileProbe = face.onDidChangeOpenFiles(() => {
+    events.push(face.listOpenFiles());
+  });
+  face.openUntitled();
+});
+await page.waitForTimeout(2500);
+const opened = await page.evaluate(() => ({
+  before: globalThis.__openFileProbe.before,
+  events: globalThis.__openFileProbe.events,
+  after: globalThis.__vscodeEmbed.face.listOpenFiles(),
+}));
+await page.evaluate(() => globalThis.__stopOpenFileProbe?.());
+
 // Release the first file, then mount it again into a fresh host.
 await page.evaluate(
   ({ first }) => {
@@ -242,6 +262,14 @@ const checks = {
   // 4. Release disposes, and the same file can be mounted again.
   releaseThenRemount:
     released.first.editors === 1 && released.first.lines > 3 && released.second.editors === 1,
+  // 5. The app's own openings reach the embedder: a new resource in the list and
+  // an event carrying it.
+  appOpeningIsReported:
+    opened.after.length === opened.before.length + 1 &&
+    opened.after.some((resource) => !opened.before.includes(resource)),
+  appOpeningFiresTheEvent:
+    opened.events.length >= 1 &&
+    opened.events[opened.events.length - 1].some((resource) => !opened.before.includes(resource)),
   // A failed mount is logged by the composition, not thrown at the embedder.
   noMountErrors:
     mounted.mountErrors === 0 && remounted.mountErrors === 0 && released.mountErrors === 0,
@@ -272,6 +300,7 @@ console.log(
         first: { ...released.first, text: undefined },
         mountMessages: released.mountMessages,
       },
+      opened: { before: opened.before, after: opened.after, eventCount: opened.events.length },
       checks,
     },
     null,

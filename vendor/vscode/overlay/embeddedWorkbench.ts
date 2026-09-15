@@ -345,6 +345,8 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
             mountFileInto: (resource: string, element: HTMLElement) =>
               this.mountFileInto(resource, element),
             releaseFile: (resource: string) => this.releaseFile(resource),
+            listOpenFiles: () => this.listOpenFiles(),
+            onDidChangeOpenFiles: (listener: () => void) => this.onDidChangeOpenFiles(listener),
             openUntitled: (path?: string) => this.openUntitled(path),
             openWorkspaceFolder: (folderUri: string) => this.openWorkspaceFolder(folderUri),
             workspaceInfo: () => this.workspaceInfo(),
@@ -629,6 +631,63 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     this.mountedFiles.delete(resource);
     mounted.editor.dispose();
     mounted.reference.dispose();
+  }
+
+  /**
+   * The resources the workbench has open.
+   *
+   * Read from the editor service rather than kept as a list of our own: the
+   * app's own UI (explorer clicks, commands, go-to-definition) opens editors
+   * through it. An editor input without a resource is not a file the embedder
+   * can render as one, so it is left out.
+   *
+   * @returns one URI string per open file, in the workbench's order.
+   */
+  listOpenFiles(): string[] {
+    const instantiationService = this.instantiationService;
+    if (!instantiationService) return [];
+    try {
+      return instantiationService.invokeFunction((accessor) => {
+        // Only what the embedder can actually render as a text surface: the
+        // getting-started page is an editor input *with* a resource
+        // (`walkThrough:`) and no text model, so it is not an open file here.
+        const models = accessor.get(ITextModelService);
+        return this.editorService.editors
+          .map((editor) => editor.resource)
+          .filter((resource): resource is URI => resource !== undefined)
+          .filter((resource) => models.canHandleResource(resource))
+          .map((resource) => resource.toString());
+      });
+    } catch (error) {
+      this.logService.error("vscode-embed: failed to list open files", error);
+      return [];
+    }
+  }
+
+  /**
+   * Subscribe to changes in the open-file set.
+   *
+   * Two of the editor service's events can mean "the set changed" (activate,
+   * close) and neither *is* the set, so the set is compared here: the listener
+   * hears exactly when the list it would read differs from the one it last saw.
+   * `onDidVisibleEditorsChange` is deliberately not used — the editor part may
+   * never be mounted in this composition, so "visible" is not ours to rely on.
+   *
+   * @param listener - called when the open-file set changed.
+   * @returns a function that unsubscribes.
+   */
+  onDidChangeOpenFiles(listener: () => void): () => void {
+    let last = this.listOpenFiles().join("\n");
+    const notify = (): void => {
+      const next = this.listOpenFiles().join("\n");
+      if (next === last) return;
+      last = next;
+      listener();
+    };
+    const store = new DisposableStore();
+    store.add(this.editorService.onDidActiveEditorChange(notify));
+    store.add(this.editorService.onDidCloseEditor(notify));
+    return () => store.dispose();
   }
 
   /**

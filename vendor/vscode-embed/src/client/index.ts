@@ -56,6 +56,8 @@ export interface VscodeEmbedPage {
   readonly hosts: Map<string, HTMLElement>;
   /** The element hosting each view, by view id, across all consumers. */
   readonly viewHosts: Map<string, HTMLElement>;
+  /** The element hosting each open file, by resource, across all consumers. */
+  readonly fileHosts: Map<string, HTMLElement>;
   /** Extra classes the consumers want on the boot root (diagnostics). */
   readonly classes: Set<string>;
 }
@@ -75,6 +77,7 @@ function page(): VscodeEmbedPage {
     started: false,
     hosts: new Map(),
     viewHosts: new Map(),
+    fileHosts: new Map(),
     classes: new Set(),
   };
   globalThis.__vscodeEmbed = record;
@@ -91,6 +94,12 @@ function mountPart(record: VscodeEmbedPage, partId: string, element: HTMLElement
 function mountView(record: VscodeEmbedPage, viewId: string, element: HTMLElement): void {
   record.viewHosts.set(viewId, element);
   record.face?.mountViewInto(viewId, element);
+}
+
+/** Enter one file into the record and, if the face is up, have it mounted here. */
+function mountFile(record: VscodeEmbedPage, resource: string, element: HTMLElement): void {
+  record.fileHosts.set(resource, element);
+  record.face?.mountFileInto(resource, element);
 }
 
 /** The theme classes (`vs` / `vs-dark` / `hc-*`) the app put on its boot root. */
@@ -148,6 +157,27 @@ export interface VscodeEmbedHandle {
    * @returns a component rendering the host element the view is created into.
    */
   view(viewId: string): () => ReactElement;
+  /**
+   * The seat component for **one open file**.
+   *
+   * The unit is the file (decision 17): the app contributes one file's editing
+   * surface, while which files are open, how they are grouped and what the tab
+   * strip looks like stay the consumer's business. Unmounting releases the
+   * surface, so the same file can be shown again elsewhere.
+   *
+   * @param resource - the file's URI as the app reports it (`listOpenFiles`).
+   * @returns a component rendering the host element the file is mounted into.
+   */
+  file(resource: string): () => ReactElement;
+  /** The files the app currently has open, as URI strings. */
+  openFiles(): string[];
+  /**
+   * Subscribe to changes in the open-file set.
+   *
+   * @param listener - called when the set changed; re-read {@link openFiles}.
+   * @returns a function that unsubscribes.
+   */
+  onDidChangeOpenFiles(listener: () => void): () => void;
   /** The app's command namespace, once its module has loaded. */
   commands(): CommandNamespace | undefined;
   /** The element the app was mounted into, once booted. */
@@ -231,6 +261,8 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
                 for (const [partId, element] of record.hosts) face.movePartInto(partId, element);
                 for (const [viewId, element] of record.viewHosts)
                   face.mountViewInto(viewId, element);
+                for (const [resource, element] of record.fileHosts)
+                  face.mountFileInto(resource, element);
               },
             } satisfies EmbedBridge,
             // Point the app at the code server. The recipe mirrors what the
@@ -350,10 +382,44 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
     };
   };
 
+  const file = (resource: string): (() => ReactElement) => {
+    return function VscodeFileHost(): ReactElement {
+      const ref = useRef<HTMLDivElement | null>(null);
+      useEffect(() => {
+        const element = ref.current;
+        if (!element) return undefined;
+        mountFile(record, resource, element);
+        return () => {
+          if (record.fileHosts.get(resource) !== element) return;
+          record.fileHosts.delete(resource);
+          record.face?.releaseFile(resource);
+        };
+      }, []);
+      return createElement("div", {
+        ref,
+        // An editor widget carries its own theme classes from the app's global
+        // styles; the host only has to size it.
+        "data-vscode-embed-file": resource,
+        style: {
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          minWidth: 0,
+          minHeight: 0,
+          overflow: "hidden",
+        },
+      });
+    };
+  };
+
   return {
     boot,
     partHost,
     view,
+    file,
+    openFiles: () => record.face?.listOpenFiles() ?? [],
+    onDidChangeOpenFiles: (listener: () => void) =>
+      record.face?.onDidChangeOpenFiles(listener) ?? (() => {}),
     commands: () => record.commands,
     host: () => record.host,
     error: () => record.error,

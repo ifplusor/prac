@@ -128,7 +128,7 @@ URL='…' node scripts/verify-views.mjs                                 # 25 项
 URL='…' node scripts/verify-focus.mjs                                 # 9 项
 URL='…' node scripts/verify-regions.mjs                               # 1 项
 URL='…' node scripts/verify-view.mjs                                    # 7 项（单 view 宿主：无 part、有像素、可释放重建）
-URL='…' node scripts/verify-file.mjs                                    # 7 项（单文件编辑面：真实文本、有像素、一文件一面、可释放重建）
+URL='…' node scripts/verify-file.mjs                                    # 9 项（单文件编辑面：真实文本、有像素、一文件一面、可释放重建；app 自己打开文件会通过事件报到）
 URL='…' node scripts/verify-extension.mjs                               # 5 项（需已装扩展；没装则明确 SKIP）
 ```
 
