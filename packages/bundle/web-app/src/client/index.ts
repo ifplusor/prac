@@ -36,22 +36,16 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { ILayout } from "@deepseek-ai/dsh-client-ui-layout/client";
-import type { PracLayoutFace, Side } from "prac-client-ui-layout/client";
-
-/**
- * The view the editor seat (`prac-client-ui-vscode-editor`) declares for the
- * editor part host. The arrangement decides where it goes; the mechanism
- * renders it there.
- */
-const VSCODE_EDITOR_VIEW = "vscode:editor";
-
-/**
- * The view the explorer seat (`prac-client-ui-vscode-explorer`) declares for the
- * VS Code sidebar part — the explorer (file tree, SCM) and the views hosted
- * beside it. It starts hidden: it is a tool to drop into, not part of the
- * default arrangement.
- */
-const VSCODE_SIDEBAR_VIEW = "vscode:sidebar";
+import type { Side } from "prac-client-ui-layout/client";
+import {
+  CONVERSATION,
+  VSCODE_SURFACE,
+  arrange,
+  focusView,
+  placeSurfaces,
+  type PracLayout,
+  type Surface,
+} from "./arrangement.js";
 
 /**
  * The overlay seat this arrangement puts its own two surfaces into.
@@ -61,60 +55,11 @@ const VSCODE_SIDEBAR_VIEW = "vscode:sidebar";
  */
 const OVERLAY = "shell.overlay" satisfies keyof SlotMap;
 
-/** DSH's sidebar slot as a view id (see `prac-client-ui-layout`'s catalogue). */
-const DSH_SIDEBAR_VIEW = "dsh:sidebar";
-/** DSH's rightbar slot as a view id. */
-const DSH_RIGHTBAR_VIEW = "dsh:rightbar";
-/** DSH's keyed `main` slot: the conversation is its default key. */
-const DSH_CONVERSATION_VIEW = "dsh:main:conversation";
-
-/** The mechanism's default regions (`prac-client-ui-layout`'s default region tree). */
-const LEFT = "left";
-const STAGE = "stage";
-const RIGHT = "right";
-
-/** The surfaces attention can rest on. */
-const CONVERSATION = "conversation";
-const VSCODE_SURFACE = "vscode";
-
-/**
- * The arrangement's default placement table — the single place that says what
- * prac starts with.
- *
- * `place` is "put it here and show it"; `hidden` entries are placed but not
- * shown (DSH's right panel is a view like any other and starts out of the way,
- * so the `right` region belongs to the editor).
- */
-const DEFAULT_PLACEMENTS: readonly {
-  readonly view: string;
-  readonly region: string;
-  readonly hidden?: boolean;
-}[] = [
-  { view: DSH_SIDEBAR_VIEW, region: LEFT },
-  { view: DSH_CONVERSATION_VIEW, region: STAGE },
-  { view: DSH_RIGHTBAR_VIEW, region: RIGHT, hidden: true },
-  { view: VSCODE_EDITOR_VIEW, region: RIGHT },
-  // Placed but not shown: the VS Code sidebar (explorer/SCM) is a tool to drop
-  // into — reachable from the recall surface — not part of the default
-  // arrangement, where `left` already carries DSH's own workspace browser.
-  { view: VSCODE_SIDEBAR_VIEW, region: LEFT, hidden: true },
-];
-
-/**
- * The roles DSH's borrowed `ctx.layout` vocabulary resolves through. The
- * mechanism names no view; this table is what makes `toggleSidebar()` mean
- * "collapse the region holding `dsh:sidebar`".
- */
-const ROLES = { sidebar: DSH_SIDEBAR_VIEW, rightbar: DSH_RIGHTBAR_VIEW } as const;
-
 /** The attention state the strip renders. */
 interface FocusState {
   readonly current: Surface;
   readonly canGoBack: boolean;
 }
-
-/** A surface attention can rest on. */
-type Surface = typeof CONVERSATION | typeof VSCODE_SURFACE;
 
 /** The focus store: a stack, not a mode. */
 interface FocusStore {
@@ -243,10 +188,7 @@ function FocusStrip({ focus, actions }: FocusStripProps): ReactElement {
 }
 
 /** The placement face this half uses, as `prac-client-ui-layout` provides it. */
-type PracLayout = PracLayoutFace;
-
 /** Where the recall surface's 聚焦 puts a view: the main work area. */
-const FOCUS_VIEW_REGION = STAGE;
 
 /**
  * The recall surface's restrained chrome, shared so every control matches the
@@ -617,62 +559,6 @@ function RecallSurface({ layout }: RecallSurfaceProps): ReactElement | null {
     ...rows,
     regionBar,
   );
-}
-
-/**
- * Put attention's surfaces in regions.
- *
- * The focused surface takes the centre and the other parks in the right track,
- * so both stay on screen. The conversation is a view like any other here: when
- * the editor is focused the chat is still visible beside it, and vice versa.
- *
- * @param layout - the mechanism's placement face.
- * @param surface - the surface attention is on.
- */
-function placeSurfaces(layout: PracLayout, surface: Surface): void {
-  layout.place(DSH_CONVERSATION_VIEW, surface === CONVERSATION ? STAGE : RIGHT);
-  layout.place(VSCODE_EDITOR_VIEW, surface === VSCODE_SURFACE ? STAGE : RIGHT);
-}
-
-/**
- * Bring one view to the centre, parking the conversation in the track unless it
- * *is* the conversation.
- *
- * The recall surface's own door onto the same rule `selectPanel` applies: one
- * view holds a region, and the one that gives it up stays on screen in the
- * track rather than disappearing behind the new front.
- *
- * @param layout - the mechanism's placement face.
- * @param viewId - the view to bring forward.
- */
-function focusView(layout: PracLayout, viewId: string): void {
-  if (viewId !== DSH_CONVERSATION_VIEW) layout.place(DSH_CONVERSATION_VIEW, RIGHT);
-  layout.place(viewId, FOCUS_VIEW_REGION);
-}
-
-/**
- * Lay out prac's default arrangement and bind the roles the compat shim uses.
- *
- * The defaults **fill gaps instead of re-asserting themselves**: the frame's
- * state is persisted per origin, so on the next load most of these views already
- * have a placement, and re-placing them would silently drag the arrangement back
- * to its factory shape — `place(conversation, 'bottom')` would survive until the
- * next reload and then undo itself. A view with no record (a fresh window, or a
- * view this table just gained) still gets its default.
- *
- * @param layout - the mechanism's placement face.
- */
-function arrange(layout: PracLayout): void {
-  layout.bindRoles(ROLES);
-  // Where a view parks when it gives up the centre: the right track, which is
-  // what the arrangement already uses for the surface attention is *not* on.
-  layout.bindTrack(RIGHT);
-  const known = layout.getState().views;
-  for (const entry of DEFAULT_PLACEMENTS) {
-    if (known[entry.view] !== undefined) continue;
-    layout.place(entry.view, entry.region);
-    if (entry.hidden === true) layout.hide(entry.view);
-  }
 }
 
 /**
