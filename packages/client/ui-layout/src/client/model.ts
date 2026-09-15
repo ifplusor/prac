@@ -274,6 +274,85 @@ export function isPresent(state: LayoutState, node: LayoutNode): boolean {
 }
 
 /**
+ * Whether a region renders its views as a stack of headers rather than bare.
+ *
+ * A stack region of one renders bare on purpose: a single-view region must look
+ * and measure exactly as it did before stacking existed, so the header is a cost
+ * paid only when a second visible view arrives.
+ *
+ * This is the render *decision*, kept here (not in the frame) so it can be
+ * tested without a DOM: the frame only carries out what this returns.
+ *
+ * @param state - current state.
+ * @param node - the region to test.
+ */
+export function isStacked(state: LayoutState, node: LayoutNode): boolean {
+  return node.type === "region" && node.stack === true && visibleViews(state, node.id).length > 1;
+}
+
+/**
+ * The two sizes a sash drag produces; only the regions that change are present.
+ */
+export interface SashSizes {
+  /** The new size of the region before the sash, when it changes. */
+  a?: number;
+  /** The new size of the region after the sash, when it changes. */
+  b?: number;
+}
+
+/**
+ * The two sizes a drag produces. `null` means "this boundary does not move"
+ * (flex|flex): two flexible siblings share the remainder, so there is no size to
+ * write. Only the region/regions that actually change are returned.
+ *
+ * `delta` is the pointer movement along the split axis (right/down positive).
+ * `budget` is the extent this *pair* may share: the split's content extent, net
+ * of its sashes and of every other child's minimum.
+ *
+ * Both neighbours are clamped at their `min`, and the shrinking one keeps at
+ * least its own: without the shared budget a growing fixed region can starve its
+ * flex siblings to zero (the sash then has a lower bound but no upper one).
+ *
+ * @param a - the region before the sash.
+ * @param b - the region after the sash.
+ * @param delta - pointer movement along the split axis, in px.
+ * @param budget - the extent the pair may share, in px.
+ */
+export function sashSizes(
+  a: RegionNode,
+  b: RegionNode,
+  delta: number,
+  budget: number,
+): SashSizes | null {
+  if (a.flex && b.flex) return null;
+  if (!a.flex && !b.flex) {
+    const total = a.size + b.size;
+    const upper = Math.max(a.min, budget - b.min);
+    const grew = Math.min(Math.max(a.size + delta, a.min), upper);
+    const shrunk = Math.max(b.min, total - grew);
+    return { a: total - shrunk, b: shrunk };
+  }
+  if (!a.flex) {
+    const upper = Math.max(a.min, budget - b.min);
+    return { a: Math.min(Math.max(a.size + delta, a.min), upper) };
+  }
+  const upper = Math.max(b.min, budget - a.min);
+  return { b: Math.min(Math.max(b.size - delta, b.min), upper) };
+}
+
+/**
+ * The smallest extent a subtree can occupy along its split axis: the sum of its
+ * regions' minima, so a split's budget can reserve room for children the drag is
+ * not touching.
+ *
+ * @param node - the subtree to measure.
+ */
+export function subtreeMin(node: LayoutNode): number {
+  if (node.type === "region") return node.min;
+  return node.children.reduce((total, child) => total + subtreeMin(child), 0);
+}
+
+/**
  * The nearest present region on one `side` of a subtree.
  *
  * @param state - current state.

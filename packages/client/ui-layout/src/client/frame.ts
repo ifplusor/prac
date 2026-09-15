@@ -41,8 +41,11 @@ import {
   findRegion,
   findSplit,
   isPresent,
+  isStacked,
   resolveSizes,
+  sashSizes,
   setRegionSize,
+  subtreeMin,
   visibleViews,
 } from "./model.js";
 import { type LayoutStore, useLayout } from "./store.js";
@@ -261,52 +264,6 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
   });
 }
 
-/** The two sizes a drag produces; only the regions that change are present. */
-interface SashSizes {
-  a?: number;
-  b?: number;
-}
-
-/**
- * The two sizes a drag produces. `null` means "this boundary does not
- * move" (flex|flex). Only the region/regions that actually change are returned.
- *
- * `delta` is the pointer movement along the split axis (right/down
- * positive). `budget` is the extent this *pair* may share: the split's
- * content extent, net of its sashes and of every other child's minimum.
- *
- * @param a - the region before the sash.
- * @param b - the region after the sash.
- * @param delta - pointer movement along the split axis, in px.
- * @param budget - the extent the pair may share, in px.
- */
-function sashSizes(a: RegionNode, b: RegionNode, delta: number, budget: number): SashSizes | null {
-  if (a.flex && b.flex) return null;
-  if (!a.flex && !b.flex) {
-    const total = a.size + b.size;
-    const upper = Math.max(a.min, budget - b.min);
-    const grew = Math.min(Math.max(a.size + delta, a.min), upper);
-    const shrunk = Math.max(b.min, total - grew);
-    return { a: total - shrunk, b: shrunk };
-  }
-  if (!a.flex) {
-    const upper = Math.max(a.min, budget - b.min);
-    return { a: Math.min(Math.max(a.size + delta, a.min), upper) };
-  }
-  const upper = Math.max(b.min, budget - a.min);
-  return { b: Math.min(Math.max(b.size - delta, b.min), upper) };
-}
-
-/**
- * The smallest extent a subtree can occupy along its split axis.
- *
- * @param node - the subtree to measure.
- */
-function subtreeMin(node: LayoutNode): number {
-  if (node.type === "region") return node.min;
-  return node.children.reduce((total, child) => total + subtreeMin(child), 0);
-}
-
 /** Frame-wide rules that cannot be expressed as inline styles on rendered entries. */
 const FRAME_STYLES = `
 [data-prac-overlay-layer] > * { pointer-events: auto; }
@@ -497,7 +454,7 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
     const renderRegion = (node: RegionNode, dir: Dir): ReactElement => {
       const box = sizes.get(node.id) ?? ZERO_BOX;
       const views = visibleViews(state, node.id);
-      const stacked = node.stack === true && views.length > 1;
+      const stacked = isStacked(state, node);
       return createElement(
         "div",
         {

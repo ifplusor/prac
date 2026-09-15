@@ -22,7 +22,8 @@
   },
   "scripts": {
     "build": "vp pack",
-    "check": "vp check"
+    "check": "vp check",
+    "test": "vp test run"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
