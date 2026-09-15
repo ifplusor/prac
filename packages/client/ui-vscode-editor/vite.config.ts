@@ -1,6 +1,6 @@
 import { defineConfig } from "vite-plus";
 
-import { CLIENT_EXTERNALS, clientPack } from "../../../scripts/pack-client.ts";
+import { PLATFORM_MODULES, clientPack } from "../../../scripts/pack-client.ts";
 
 /**
  * `pack` emits both halves, each as its own config because they are different
@@ -9,10 +9,10 @@ import { CLIENT_EXTERNALS, clientPack } from "../../../scripts/pack-client.ts";
  * - the **host half** (`src/index.ts` → `dist/index.mjs`) is intentionally
  *   empty — the mechanism is browser-only — but every bundle row is imported on
  *   both planes, so the entry has to exist.
- * - the **client half** (`src/client.ts` → `dist/client.js`) is the mechanism:
- *   the frame, the region tree, the sashes, the view catalogue and both
- *   services. Its wrapping is DSH's loader contract, so it comes from
- *   `scripts/pack-client.ts` rather than being restated here.
+ * - the **client half** (`src/client.ts` → `dist/client.js`) is the seat that
+ *   hosts the VS Code editor part as a prac view. Its wrapping is DSH's loader
+ *   contract, so it comes from `scripts/pack-client.ts` rather than being
+ *   restated here.
  *
  * `vite.config.ts` is also where the artifact is *verified*: the `check:client`
  * task asserts the emitted bytes (loader closure, answerable requires, no
@@ -33,7 +33,7 @@ export default defineConfig({
       "check:client": {
         command:
           "node ../../../scripts/bundle-client.mjs --artifact dist/client.js --id prac-client-ui-vscode-editor" +
-          ` --allow ${CLIENT_EXTERNALS.join(" --allow ")} --exports apply,name,inject`,
+          ` --allow ${PLATFORM_MODULES.join(" --allow ")} --exports apply,name,inject`,
         dependsOn: ["build"],
       },
     },

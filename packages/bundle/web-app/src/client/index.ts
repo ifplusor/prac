@@ -625,6 +625,13 @@ function focusView(layout: PracLayout, viewId: string): void {
 /**
  * Lay out prac's default arrangement and bind the roles the compat shim uses.
  *
+ * The defaults **fill gaps instead of re-asserting themselves**: the frame's
+ * state is persisted per origin, so on the next load most of these views already
+ * have a placement, and re-placing them would silently drag the arrangement back
+ * to its factory shape — `place(conversation, 'bottom')` would survive until the
+ * next reload and then undo itself. A view with no record (a fresh window, or a
+ * view this table just gained) still gets its default.
+ *
  * @param layout - the mechanism's placement face.
  */
 function arrange(layout: PracLayout): void {
@@ -632,7 +639,9 @@ function arrange(layout: PracLayout): void {
   // Where a view parks when it gives up the centre: the right track, which is
   // what the arrangement already uses for the surface attention is *not* on.
   layout.bindTrack(RIGHT);
+  const known = layout.getState().views;
   for (const entry of DEFAULT_PLACEMENTS) {
+    if (known[entry.view] !== undefined) continue;
     layout.place(entry.view, entry.region);
     if (entry.hidden === true) layout.hide(entry.view);
   }

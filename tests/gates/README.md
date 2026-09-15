@@ -5,8 +5,11 @@
 
 ```bash
 # 需要一页活着的 DSH（profile prac-dev）；URL 带 token，和其它门一样
-URL='http://127.0.0.1:3084/?token=…' pnpm verify:stack    # 堆叠：单视图裸渲染、两个叠放、折叠
-URL='http://127.0.0.1:3084/?token=…' pnpm verify:bottom   # 底栏：空则不在、填了上屏、折叠还回空间
+URL='http://127.0.0.1:3084/?token=…' pnpm verify:stack        # 堆叠：单视图裸渲染、两个叠放、折叠
+URL='http://127.0.0.1:3084/?token=…' pnpm verify:bottom       # 底栏：空则不在、填了上屏、折叠还回空间
+URL='http://127.0.0.1:3084/?token=…' pnpm verify:persistence  # 持久化：改尺寸/堆叠/折叠/底栏，reload 后复原
 ```
+
+`verify:persistence` 同时守住排布的一条语义：`arrange()` 的默认放置**只填空缺**，不覆盖已恢复的状态——否则每次 reload 都会把视图拖回出厂位置，「持久化」自我撤销（去掉那条 `continue` 后该门立刻变红，是它真的在断言这件事）。
 
 `harness.mjs` 提供启动 chromium、等 frame、控制台噪声过滤与像素质计数；`@playwright/test` 是**根 devDep**（pin 与上游同版本，两边共用浏览器缓存）。

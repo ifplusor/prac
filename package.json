@@ -9,7 +9,8 @@
     "check": "vp check .",
     "dsh-types": "node scripts/dsh-types.mjs",
     "verify:stack": "node tests/gates/verify-stack.mjs",
-    "verify:bottom": "node tests/gates/verify-bottom.mjs"
+    "verify:bottom": "node tests/gates/verify-bottom.mjs",
+    "verify:persistence": "node tests/gates/verify-persistence.mjs"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

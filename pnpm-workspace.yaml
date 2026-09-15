@@ -3,9 +3,10 @@ packages:
   - vendor/*
 
 # The DSH *runtime* still comes from the installation (`ctx`, the loader's
-# module table, the served bundles) — these entries are for TYPES only. They are
-# published on npm (verified 2026-09-13), pinned exactly: the `latest` dist-tag
-# points at an old release, so a range would resolve the wrong thing.
+# module table, the served bundles) — these entries are for TYPES and for the
+# build-time resolution of the platform words. They are published on npm
+# (verified 2026-09-13), pinned exactly: the `latest` dist-tag points at an old
+# release, so a range would resolve the wrong thing.
 autoInstallPeers: false
 
 catalogMode: prefer
@@ -14,8 +15,12 @@ catalog:
   # 活体门的浏览器工具链（prac 侧自己的 tests/gates/）。与上游 checkout 同版本，
   # 这样两边复用同一个浏览器缓存。
   "@playwright/test": 1.61.1
-  # DSH's own packages, pinned to the version this repo runs against. Types only:
-  # every import of them is `import type`, erased from the bundles.
+  # DSH's own packages, pinned to the version this repo runs against. Almost all
+  # of them are TYPES only (`import type`, erased from the bundles); the one
+  # *value* import is `@deepseek-ai/dsh-client-store` in ui-layout's client half,
+  # which stays external and is answered at runtime by the shell's module table
+  # (see `scripts/pack-client.ts`'s PLATFORM_MODULES) — so no implementation of
+  # it is inlined here either.
   "@deepseek-ai/cordis": 4.0.2
   "@deepseek-ai/dsh-api-session-controller": 0.1.5-rc.1
   "@deepseek-ai/dsh-api-workspace-controller": 0.1.5-rc.1

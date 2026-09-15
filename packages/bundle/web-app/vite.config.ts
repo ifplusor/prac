@@ -1,6 +1,6 @@
 import { defineConfig } from "vite-plus";
 
-import { CLIENT_EXTERNALS, clientPack } from "../../../scripts/pack-client.ts";
+import { PLATFORM_MODULES, clientPack } from "../../../scripts/pack-client.ts";
 
 /**
  * `pack` emits both halves of this package, each as its own config because they
@@ -33,7 +33,7 @@ export default defineConfig({
       "check:client": {
         command:
           "node ../../../scripts/bundle-client.mjs --artifact dist/client.js --id prac-web-app" +
-          ` --allow ${CLIENT_EXTERNALS.join(" --allow ")} --exports apply,name,inject`,
+          ` --allow ${PLATFORM_MODULES.join(" --allow ")} --exports apply,name,inject`,
         dependsOn: ["build"],
       },
     },

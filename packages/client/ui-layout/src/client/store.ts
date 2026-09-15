@@ -2,15 +2,35 @@
  * The layout store: one immutable state cell, subscribed to with
  * `useSyncExternalStore`.
  *
+ * The cell is DSH's own snapshot store engine (`dsh-client-store`), used with
+ * its opt-in persistence: the frame's state — the region tree (sizes, collapse,
+ * stack order) and the view table (where each view sits, whether it is hidden,
+ * whether it is folded) — survives a reload. Attention (`activePanelId`) and the
+ * measured viewport survive too; they are simply overwritten on the next measure
+ * or click.
+ *
+ * The store engine is a **platform word**: DSH's shell seeds it into the
+ * loader's module table as a singleton, so the client artifact requires it
+ * rather than inlining a second zustand/immer behind its own state (see
+ * `clientPack`'s `external` in `vite.config.ts`).
+ *
+ * The **key is versioned**: the engine rehydrates whatever is under it without
+ * validating the shape, so a state shape that changes must move to a new key
+ * rather than read a stale one.
+ *
  * It knows nothing about placement rules (those are pure functions in `model`)
  * — it only commits their results and wakes subscribers.
  *
  * @module prac-client-ui-layout/client/store
  */
 
+import { createSnapshotStore } from "@deepseek-ai/dsh-client-store";
 import { useSyncExternalStore } from "react";
 import { type LayoutState } from "./contract.js";
 import { defaultTree } from "./model.js";
+
+/** The persisted state's key. Bump the version when the shape changes. */
+export const STATE_KEY = "prac-layout/v1";
 
 // ── store ─────────────────────────────────────────────────────────────
 
@@ -47,7 +67,7 @@ export interface LayoutStore {
  * regions.
  */
 export function createStore(): LayoutStore {
-  let state: LayoutState = {
+  const initial: LayoutState = {
     viewportWidth: 0,
     viewportHeight: 0,
     tree: defaultTree(),
@@ -55,26 +75,23 @@ export function createStore(): LayoutStore {
     catalogueVersion: 0,
     activePanelId: null,
   };
-  const listeners = new Set<() => void>();
-  const emit = (): void => {
-    // Iterate a snapshot: a listener may unsubscribe while we emit, and live
-    // Set iteration would then skip the next listener.
-    for (const listener of Array.from(listeners)) listener();
-  };
+  // `flush: "raf"` batches a burst of updates into one frame; persistence writes
+  // on every committed state, under one key this origin shares (see `STATE_KEY`:
+  // localStorage is per origin, so two DSH tabs on the same origin are not
+  // separated yet — the per-workspace scope is deferred).
+  const snapshot = createSnapshotStore<LayoutState>(initial, {
+    flush: "raf",
+    persist: { name: STATE_KEY },
+  });
   return {
-    get: () => state,
-    subscribe: (listener: () => void): (() => void) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
+    get: () => snapshot.getSnapshot(),
+    subscribe: (listener: () => void): (() => void) => snapshot.subscribe(listener),
     /** Replace the state through a pure updater. */
     update: (updater: (current: LayoutState) => LayoutState): void => {
-      const next = updater(state);
-      if (next === state) return;
-      state = next;
-      emit();
+      const current = snapshot.getSnapshot();
+      const next = updater(current);
+      if (next === current) return;
+      snapshot.set(next);
     },
   };
 }

@@ -1,6 +1,6 @@
 import { defineConfig } from "vite-plus";
 
-import { CLIENT_EXTERNALS, clientPack } from "../../../scripts/pack-client.ts";
+import { PLATFORM_MODULES, clientPack } from "../../../scripts/pack-client.ts";
 
 /**
  * `pack` emits both halves, each as its own config because they are different
@@ -26,7 +26,14 @@ export default defineConfig({
       platform: "node",
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
     },
-    clientPack("prac-client-ui-layout", { entry: "src/client/index.ts" }),
+    // The store engine is a *runtime* platform word: DSH's shell seeds
+    // `@deepseek-ai/dsh-client-store` into the loader's module table as a
+    // singleton, so the bundle requires it instead of inlining a second copy of
+    // zustand/immer behind its own state.
+    clientPack("prac-client-ui-layout", {
+      entry: "src/client/index.ts",
+      external: ["@deepseek-ai/dsh-client-store"],
+    }),
     // The client half's published types, emitted from a type-only entry so the
     // `.d.mts` carries them (and DSH's merges) without a second runtime copy.
     {
@@ -41,7 +48,7 @@ export default defineConfig({
       "check:client": {
         command:
           "node ../../../scripts/bundle-client.mjs --artifact dist/client.js --id prac-client-ui-layout" +
-          ` --allow ${CLIENT_EXTERNALS.join(" --allow ")} --exports apply,name,inject`,
+          ` --allow ${PLATFORM_MODULES.join(" --allow ")} --exports apply,name,inject`,
         dependsOn: ["build"],
       },
     },

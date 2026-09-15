@@ -1,0 +1,185 @@
+/**
+ * Verification of **persistence** (decision 16): the frame's state survives a
+ * reload, and the arrangement's defaults fill gaps instead of overwriting it.
+ *
+ *  1. **a fresh origin starts from the factory shape** — clear the key, reload,
+ *     and the frame is the default tree with the default placements (so what
+ *     follows is the frame's doing, not the page's);
+ *  2. **state is written** — after resizing the right track, showing + folding a
+ *     second view in the left sidebar, moving the conversation into the bottom
+ *     bar and opening it, the versioned key holds the state;
+ *  3. **state is restored** — after `page.reload()` the same facts hold in the
+ *     DOM: the resized track, both stack entries with the second still folded,
+ *     the bottom bar still filled and open, the same region list;
+ *  4. **no rehydration failure** — the engine rehydrates whatever is under the
+ *     key without validating it, so a shape change that forgets to bump the key
+ *     surfaces here rather than as a half-broken frame.
+ *
+ * (3) is what the gate is really about: with the arrangement re-asserting
+ * `DEFAULT_PLACEMENTS` on every activation, the conversation would jump back to
+ * the stage and the sidebar's second view would be hidden again on reload —
+ * "persistence" that undoes itself. `arrange()` therefore skips views the state
+ * already knows.
+ *
+ * Usage: URL='http://127.0.0.1:3084/?token=...' pnpm verify:persistence
+ */
+import { openPrac, report, requireUrl } from "./harness.mjs";
+
+const RIGHT = "right";
+const LEFT = "left";
+const BOTTOM = "bottom";
+const DSH_SIDEBAR = "dsh:sidebar";
+const CONVERSATION = "dsh:main:conversation";
+const VSCODE_SIDEBAR = "vscode:sidebar";
+/** The key `prac-client-ui-layout` persists under (see its `store.ts`). */
+const STATE_KEY = "prac-layout/v1";
+/** The right track's default size; a restored 320 can only be the resize. */
+const RESIZED_RIGHT = 320;
+const DEFAULT_RIGHT = 420;
+
+const url = requireUrl();
+const { page, own, consoleErrors, close } = await openPrac(url);
+
+/** Wait for the frame to be rendered after a navigation. */
+async function settle() {
+  await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
+  await page.waitForFunction(() => !!globalThis.__pracLayout, null, { timeout: 60_000 });
+  await page.waitForTimeout(1200);
+}
+
+/**
+ * Read the frame's state from the DOM and from the persisted key.
+ *
+ * @returns {Promise<object>} the sample: region list and boxes, the left
+ * region's stack entries with their fold flags, and what the key holds.
+ */
+async function sample() {
+  return page.evaluate(
+    ({ key, right, left, bottom }) => {
+      const box = (selector) => {
+        const element = document.querySelector(selector);
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        return {
+          x: Math.round(rect.x),
+          y: Math.round(rect.y),
+          w: Math.round(rect.width),
+          h: Math.round(rect.height),
+        };
+      };
+      /** Depth-first region lookup in the persisted tree. */
+      const findRegion = (node, id) => {
+        if (node === null || typeof node !== "object") return null;
+        if (node.id === id) return node;
+        for (const child of node.children ?? []) {
+          const hit = findRegion(child, id);
+          if (hit !== null) return hit;
+        }
+        return null;
+      };
+      const raw = localStorage.getItem(key);
+      const state = raw === null ? null : JSON.parse(raw);
+      return {
+        regions: [...document.querySelectorAll("[data-prac-region]")].map((element) =>
+          element.getAttribute("data-prac-region"),
+        ),
+        right: box(`[data-prac-region="${right}"]`),
+        bottom: box(`[data-prac-region="${bottom}"]`),
+        stack: [
+          ...document.querySelectorAll(`[data-prac-region="${left}"] [data-prac-stack-entry]`),
+        ].map((element) => ({
+          view: element.getAttribute("data-prac-stack-entry"),
+          collapsed: element.getAttribute("data-prac-stack-collapsed"),
+        })),
+        persisted:
+          state === null
+            ? null
+            : {
+                bytes: raw.length,
+                rightSize: findRegion(state.tree, right)?.size ?? null,
+                bottomCollapsed: findRegion(state.tree, bottom)?.collapsed ?? null,
+                views: Object.keys(state.views ?? {}).sort(),
+              },
+      };
+    },
+    { key: STATE_KEY, right: RIGHT, left: LEFT, bottom: BOTTOM },
+  );
+}
+
+// 1. A fresh origin: clear the key, reload, and start from the factory shape.
+await page.evaluate((key) => localStorage.removeItem(key), STATE_KEY);
+await page.reload({ waitUntil: "load" });
+await settle();
+const initial = await sample();
+
+// 2. Move things: resize the track, show + fold a second view in the sidebar,
+//    push the conversation into the bottom bar and open it.
+await page.evaluate(
+  ({ right, bottom, conversation, vscodeSidebar, width }) => {
+    const layout = globalThis.__pracLayout;
+    layout.setWidth(right, width);
+    layout.show(vscodeSidebar);
+    layout.setViewCollapsed(vscodeSidebar, true);
+    layout.place(conversation, bottom);
+    layout.setCollapsed(bottom, false);
+  },
+  {
+    right: RIGHT,
+    bottom: BOTTOM,
+    conversation: CONVERSATION,
+    vscodeSidebar: VSCODE_SIDEBAR,
+    width: RESIZED_RIGHT,
+  },
+);
+await page.waitForTimeout(1500);
+const changed = await sample();
+
+// 3. Reload: everything above has to come back.
+await page.reload({ waitUntil: "load" });
+await settle();
+const reloaded = await sample();
+
+await close();
+
+const near = (a, b, tolerance) => Math.abs((a ?? 0) - (b ?? 0)) <= tolerance;
+/** The left region's stack as `<view>:<folded>` in render order. */
+const stackKey = (entry) => entry.stack.map((item) => `${item.view}:${item.collapsed}`).join(",");
+
+const checks = {
+  // 1. The starting point is the factory shape, not leftovers.
+  startedDefault: initial.regions.join(",") === "left,stage,right",
+  startedUnresized: near(initial.right?.w, DEFAULT_RIGHT, 6),
+  startedUnstacked: initial.stack.length === 0,
+  startedBottomAbsent: initial.bottom === null,
+  // 2. The moves landed — otherwise step 3 could pass vacuously.
+  resizeLanded: near(changed.right?.w, RESIZED_RIGHT, 6),
+  stackLanded: changed.stack.length === 2,
+  foldLanded: changed.stack.some(
+    (entry) => entry.view === VSCODE_SIDEBAR && entry.collapsed === "true",
+  ),
+  bottomLanded: changed.bottom !== null,
+  written: changed.persisted !== null && changed.persisted.rightSize === RESIZED_RIGHT,
+  // 3. …and came back.
+  regionsRestored: reloaded.regions.join(",") === changed.regions.join(","),
+  resizeRestored: near(reloaded.right?.w, RESIZED_RIGHT, 6),
+  stackRestored: stackKey(reloaded) === stackKey(changed),
+  foldRestored: reloaded.stack.some(
+    (entry) => entry.view === VSCODE_SIDEBAR && entry.collapsed === "true",
+  ),
+  bottomRestored: reloaded.bottom !== null && near(reloaded.bottom?.h, changed.bottom?.h, 6),
+  bottomNotCollapsed: reloaded.persisted?.bottomCollapsed !== true,
+  // 4. No rehydration or persistence complaint from the engine.
+  noErrors:
+    own("__pracLayout").length === 0 &&
+    own("prac-client-ui-layout").length === 0 &&
+    own("vscode-embed:").length === 0 &&
+    own("rehydration").length === 0 &&
+    own("persistence failed").length === 0,
+};
+
+report({
+  url,
+  facts: { initial, changed, reloaded, consoleErrors },
+  checks,
+  ok: "OK: the frame's state (track size, stack order, fold, bottom bar) is written under the versioned key and comes back after a reload, with the arrangement's defaults only filling gaps.",
+});
