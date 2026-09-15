@@ -398,20 +398,28 @@ await page.evaluate(
 await page.waitForTimeout(2500);
 const capabilityClosed = await capability();
 
-// `diagnostics` — the first capability whose data arrives *late*. There is no
-// marker source in this rig (measured: the built-in `json-language-features`
-// extension fails to activate, and installing a real one is the pending
-// decision-18 path), so what the gate can hold it to is the contract itself:
-// a well-formed empty answer, paging that reports what it read, and a `settled()`
-// that waits for quiet instead of claiming to be done immediately.
+// `diagnostics` — the first capability whose data arrives *late*. The rig now has
+// a marker source (cSpell, installed through the extension gate), so the gate holds
+// it to the **contract**, which must hold whether or not anything is wrong in the
+// workspace: the summary is the same set the query returns, a page reports what it
+// was taken from, a scoped query filters, and `settled()` waits for quiet instead
+// of answering while markers are still arriving.
 const diagnosticsProbe = await page.evaluate(async () => {
   const diagnostics = globalThis.__vscodeEmbed.face.capabilities.diagnostics;
   const before = diagnostics.version();
   const started = performance.now();
   await diagnostics.settled();
   const settledMs = Math.round(performance.now() - started);
+  // The whole set, to check the summary against: the summary may not be a second
+  // count of its own.
+  const all = diagnostics.query({ limit: 100000 });
+  const counts = { error: 0, warning: 0, info: 0, hint: 0 };
+  for (const entry of all.entries) counts[entry.severity] += 1;
   return {
     snapshot: diagnostics.snapshot(),
+    all,
+    counts,
+    resources: new Set(all.entries.map((entry) => entry.resource)).size,
     page: diagnostics.query({ limit: 2, offset: 1 }),
     scoped: diagnostics.query({ resource: "vscode-remote://127.0.0.1:3084/nope" }),
     settledMs,
@@ -506,22 +514,31 @@ const checks = {
   reloadForgetsTheFiles: reloaded.open.length === 0 && reloaded.fileHosts === 0,
   noTabForAClosedFile: reloaded.fileTabs.length === 0,
   conversationTakesTheCentreBack: reloaded.conversationRegion === "stage",
-  // 9. The diagnostics capability's contract, with no marker source in this rig.
-  diagnosticsShape: (() => {
-    const { summary, page } = diagnosticsProbe.snapshot;
+  // 9. The diagnostics capability's contract.
+  diagnosticsSummaryIsTheSameSet: (() => {
+    const { summary } = diagnosticsProbe.snapshot;
+    const derived = diagnosticsProbe.counts;
     return (
-      summary.error === 0 &&
-      summary.warning === 0 &&
-      summary.info === 0 &&
-      summary.hint === 0 &&
-      summary.resources === 0 &&
-      page.entries.length === 0 &&
-      page.total === 0 &&
-      page.truncated === false
+      summary.error === derived.error &&
+      summary.warning === derived.warning &&
+      summary.info === derived.info &&
+      summary.hint === derived.hint &&
+      summary.resources === diagnosticsProbe.resources
     );
   })(),
-  diagnosticsPagingEchoes: diagnosticsProbe.page.offset === 1 && diagnosticsProbe.page.total === 0,
+  diagnosticsPageIsBounded:
+    diagnosticsProbe.snapshot.page.total === diagnosticsProbe.all.total &&
+    diagnosticsProbe.snapshot.page.entries.length <= 100 &&
+    diagnosticsProbe.snapshot.page.entries.length === Math.min(100, diagnosticsProbe.all.total),
+  diagnosticsPagingEchoes:
+    diagnosticsProbe.page.offset === 1 &&
+    diagnosticsProbe.page.total === diagnosticsProbe.all.total &&
+    diagnosticsProbe.page.entries.length <= 2,
   diagnosticsScopeFilters: diagnosticsProbe.scoped.entries.length === 0,
+  // With a source present, arrival must have moved the version — the fact `settled`
+  // is about.
+  diagnosticsVersionMovesWithMarkers:
+    diagnosticsProbe.all.total === 0 ? true : diagnosticsProbe.versionBefore > 0,
   // The point of `settled`: a resolved-immediately promise would pass every other
   // check here and still hand a consumer a half-arrived set as the truth.
   diagnosticsSettledWaitsForQuiet:

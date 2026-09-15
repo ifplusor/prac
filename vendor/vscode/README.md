@@ -128,8 +128,8 @@ URL='…' node scripts/verify-views.mjs                                 # 28 项
 URL='…' node scripts/verify-focus.mjs                                 # 9 项
 URL='…' node scripts/verify-regions.mjs                               # 6 项（frame 托管的是 view：无 part、view 有尺寸、退役的 editor part 只在屏外）
 URL='…' node scripts/verify-view.mjs                                    # 7 项（单 view 宿主：无 part、有像素、可释放重建）
-URL='…' node scripts/verify-file.mjs                                    # 31 项（单文件编辑面：真实文本、有像素、一文件一面、可释放重建；app 打开文件通过事件报到；stage 的 tab 条：一条文件也有、两条最新 active、点 tab 换 view；reload 后文件 view 跟着消失；`editors` 能力：不挂 view 也回答、activate/dirty/close；tab 脏点、点 tab 与 app 的 active editor 对上；`diagnostics` 契约：形状/分页/settled 等 quiet）
-URL='…' node scripts/verify-extension.mjs                               # 5 项（需已装扩展；没装则明确 SKIP）
+URL='…' node scripts/verify-file.mjs                                    # 33 项（单文件编辑面：真实文本、有像素、一文件一面、可释放重建；app 打开文件通过事件报到；stage 的 tab 条：一条文件也有、两条最新 active、点 tab 换 view；reload 后文件 view 跟着消失；`editors` 能力：不挂 view 也回答、activate/dirty/close；tab 脏点、点 tab 与 app 的 active editor 对上；`diagnostics` 契约：形状/分页/settled 等 quiet）
+URL='…' node scripts/verify-extension.mjs                               # 5 项（需已装扩展；没装则明确 SKIP。`VIEW=none` 用于没有 view 的扩展：改用它产生的诊断来证明激活）
 ```
 
 数目是**决定 21 删减后**的（机制断言搬进了各包的 `*.spec.ts`，用 `pnpm test` 跑）；vendor 门只留真页面能证明的事实。

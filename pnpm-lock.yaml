@@ -307,6 +307,9 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 18.3.31
+      prac-vscode:
+        specifier: workspace:*
+        version: link:../../../vendor/vscode
       prac-vscode-embed:
         specifier: workspace:*
         version: link:../../../vendor/vscode-embed

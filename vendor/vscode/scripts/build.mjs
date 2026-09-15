@@ -271,10 +271,21 @@ function stage() {
  * Stamping makes the two copies agree by construction, so the host's
  * `codeServerPath()` derives the one segment both channels actually use.
  */
+/** The extension gallery both planes are configured from (the vendor's own module). */
+const { EXTENSIONS_GALLERY: gallery } = await import("../overlay/gallery.ts");
+
 function stampServerCommit() {
   const commit = checkoutCommit();
   if (commit === undefined) throw new Error("cannot resolve the upstream checkout commit to stamp");
   let stamped = 0;
+  // The OSS `product.json` ships **no** extension gallery, so the product's own
+  // install path (`workbench.extensions.installExtension`) has nothing to talk to:
+  // the Extensions view is empty and installing by id fails. The ecosystem is the
+  // point of embedding VS Code at all (decision 18's criterion is "a real
+  // extension activates"), so the gallery is stamped in here — read from the same
+  // `overlay/gallery.json` the client passes to the workbench, so the two planes
+  // cannot drift.
+
   // The flat `server` build reads the **checkout root's** product.json at runtime
   // (its script dir has none), while the web bundle bakes the commit in from
   // `.git/HEAD` at build time — so both copies have to agree, which is what
@@ -286,13 +297,14 @@ function stampServerCommit() {
       continue;
     }
     const product = JSON.parse(readFileSync(productPath, "utf8"));
-    if (product.commit === commit) {
+    if (product.commit === commit && product.extensionsGallery !== undefined) {
       log("server", `${distro}: already stamped (${commit.slice(0, 10)})`);
       continue;
     }
     product.commit = commit;
+    product.extensionsGallery = gallery;
     writeFileSync(productPath, `${JSON.stringify(product, null, "\t")}\n`);
-    log("server", `${distro}: stamped commit=${commit.slice(0, 10)}`);
+    log("server", `${distro}: stamped commit=${commit.slice(0, 10)} + extensionsGallery`);
     stamped += 1;
   }
   if (stamped === 0) log("server", "nothing to stamp");

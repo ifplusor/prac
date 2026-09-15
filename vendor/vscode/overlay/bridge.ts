@@ -18,6 +18,8 @@
  * @module embed-bridge
  */
 
+export { EXTENSIONS_GALLERY } from "./gallery.js";
+
 /** The construction-options field an embedder hands the workbench its bridge on. */
 export const EMBED_BRIDGE = "vscodeEmbed";
 

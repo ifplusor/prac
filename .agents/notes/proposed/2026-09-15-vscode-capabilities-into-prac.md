@@ -162,7 +162,13 @@ interface Capability<T, A> {
 
 **`settled()` 在这条能力上第一次是真的**：markers 由语言服务器/扩展在文件打开**之后**才到，所以定义为"**一段时间内没有新的 marker 变化**"（quiet 400ms，上限 3000ms 兜底，消费者永远不会挂住）——"已经到的都到齐了"。这是这层存在的理由：跳过它的消费者会把**半成品当真值**。
 
-**这一轮实测到的限制（记在案，不是漏做）**：本 rig **没有 marker 源**——`vscode.json-language-features` 本身激活失败（`Cannot find module .../extensions/json-language-features/...`，和 npm/git-base/emmet 那批一样），所以"markers 到达 → version 自增 → quiet 后 settled"这条**变化路径没有被活体验证**。门（`verify-file` **31/31**）因此只锚在契约上：空答案形状正确、分页如实回报（`total`/`offset`/`truncated`）、按资源过滤、**`settled()` 真的等 quiet**（实测 ~400ms；一个 `Promise.resolve()` 会骗过其它每一条断言）、`version()` 可读且不倒退。要验数据路径，要么修内建扩展的构建（12/106 那条），要么走决定 18 的"装一个真扩展"（**需要你授权**）。
+**数据路径已实测（2026-09-15，James 授权装扩展后）**：装 **cSpell 4.9.3** 后，能力返回了**真实 marker**——`source: "cSpell"`、severity `info`、`resource` 是打开的那个文件、`version` 自增、`settled()` 等了 402ms 才 resolve（即"等到了到达的 markers"，而不是立刻说完成）。`verify-extension` 因此扩成两半：**有 view 的扩展**仍验"view 挂进 prac 并上屏"，**没有 view 的扩展（linter / spell checker）**改用它**知道什么**来证明激活——诊断的 `source` 就是它的 UI。判据 `verify-extension` **5/5**（`EXTENSION=streetsidesoftware.code-spell-checker VIEW=none`）。`verify-file` 的契约断言同时改成**相对形状**（summary 必须等于 query 返回的同一集合、page 有界、`offset` 如实回报），这样**有没有 marker 都成立**（实测 51 条 / 4 个文件时一样绿）。
+
+**装扩展这条路上的三件坑（都实测，记在案）**：
+1. **OSS 的 `product.json` 没有 gallery** ⇒ 产品自己的安装路径（`workbench.extensions.installExtension`）答"No extension gallery service configured"；而**客户端**的 product configuration 与**服务端**的 product.json 是两份 ⇒ 两边都要喂。现在 gallery 由 `overlay/gallery.ts` **单一来源**给出：build 脚本 import 它去盖服务端三份 product.json，prac 的 host 把它放进 embed 的构造选项（客户端那份）。
+2. **产品自己的两条安装路径在我们这套组合里会挂住**：`workbench.extensions.installExtension` 与 `server-cli --install-extension` 都**永远不返回**（实测 25s / 120s 超时），因为它们要弹"确认/重载"对话框，而**我们不托管任何对话框/通知的面**——prac 的 frame 里没有 part，通知/弹窗没有 DOM。这是一条**真实的缺口**（也解释了编辑器"脏文件关闭要确认"那条路为什么在 prac 里没法走）：prac 需要给对话框/通知一个座位（`shell.overlay` 或某个 region），否则任何"问用户一句"的产品流程都会挂住。
+3. **`--extensions-dir` 里的 `extensions.json` 是缓存**：手工放进去一个扩展目录后不删它，扫描器不会发现新扩展（实测：不删 → 一个 marker 都没有；删掉 → cSpell 立刻产出 23 条）。`
+
 
 **仍未做（下一步）**：① tab 的 **×**（关闭）——机制**不该**为此在持久化状态里放回调，所以关闭入口该由 **prac 自己的面**（recall 面的"关闭文件"）或 app 自己的 UI 提供，走 `actions.close`；② **预览斜体未实测**（`preview` 已接通，但门里开的都是 pinned 打开；要验得走 explorer 单击那条 preview 路径）；③ agent 面（host 侧 `/remote` + `ctx.tools.register`）。
 

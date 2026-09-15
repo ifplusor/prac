@@ -89,82 +89,147 @@ await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 // The embed face arrives with the composition's bridge; the page loads it lazily.
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
 
-const mounted = await page.evaluate((viewId) => {
-  const host = document.createElement("div");
-  host.id = "prac-extension-probe";
-  Object.assign(host.style, {
-    position: "fixed",
-    left: "0",
-    top: "0",
-    width: "640px",
-    height: "520px",
-    zIndex: "2147483647",
-    background: "#1e1e1e",
-    overflow: "hidden",
-  });
-  document.body.appendChild(host);
-  globalThis.__vscodeEmbed.face.mountViewInto(viewId, host);
-  return { viewId };
-}, view);
+/**
+ * Whether to mount the view this extension contributes. An extension with **no**
+ * views (a linter, a spell checker) proves itself through the capability instead:
+ * its diagnostics are its UI, and reading them is a stronger activation proof than
+ * a panel would be.
+ */
+const expectsView = view !== "none";
+let mounted = {};
+let facts = { panes: 0, headerTitle: null, distinctColours: 0, host: null };
+let released = false;
+if (expectsView) {
+  const mountedView = await page.evaluate((viewId) => {
+    const host = document.createElement("div");
+    host.id = "prac-extension-probe";
+    Object.assign(host.style, {
+      position: "fixed",
+      left: "0",
+      top: "0",
+      width: "640px",
+      height: "520px",
+      zIndex: "2147483647",
+      background: "#1e1e1e",
+      overflow: "hidden",
+    });
+    document.body.appendChild(host);
+    globalThis.__vscodeEmbed.face.mountViewInto(viewId, host);
+    return { viewId };
+  }, view);
 
-// First mount activates the extension (view contributions imply `onView:`), which
-// takes as long as loading an extension's bundle does.
-await page.waitForSelector("#prac-extension-probe .pane", { timeout: 120_000 }).catch(() => {});
-await page.waitForTimeout(3000);
+  // First mount activates the extension (view contributions imply `onView:`), which
+  // takes as long as loading an extension's bundle does.
+  await page.waitForSelector("#prac-extension-probe .pane", { timeout: 120_000 }).catch(() => {});
+  await page.waitForTimeout(3000);
 
-const facts = await page.evaluate(() => {
-  const host = document.querySelector("#prac-extension-probe");
-  const box = (element) => {
-    if (!element) return null;
-    const rect = element.getBoundingClientRect();
-    return {
-      x: Math.round(rect.x),
-      y: Math.round(rect.y),
-      w: Math.round(rect.width),
-      h: Math.round(rect.height),
+  facts = await page.evaluate(() => {
+    const host = document.querySelector("#prac-extension-probe");
+    const box = (element) => {
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return {
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        w: Math.round(rect.width),
+        h: Math.round(rect.height),
+      };
     };
-  };
-  return {
-    host: box(host),
-    panes: host?.querySelectorAll(".pane").length ?? 0,
-    headerTitle:
-      host?.querySelector(".pane-header .title")?.textContent?.trim() ??
-      host?.querySelector(".pane-header")?.textContent?.trim() ??
-      null,
-    bodyText: (host?.querySelector(".pane-body")?.textContent ?? "").trim().slice(0, 120),
-  };
-});
-
-if (facts.host && facts.host.w > 2 && facts.host.h > 2) {
-  const shot = await page.screenshot({
-    clip: { x: facts.host.x, y: facts.host.y, width: facts.host.w, height: facts.host.h },
+    return {
+      host: box(host),
+      panes: host?.querySelectorAll(".pane").length ?? 0,
+      headerTitle:
+        host?.querySelector(".pane-header .title")?.textContent?.trim() ??
+        host?.querySelector(".pane-header")?.textContent?.trim() ??
+        null,
+      bodyText: (host?.querySelector(".pane-body")?.textContent ?? "").trim().slice(0, 120),
+    };
   });
-  facts.distinctColours = await page.evaluate(analyse, shot.toString("base64"));
-} else {
-  facts.distinctColours = 0;
+
+  if (facts.host && facts.host.w > 2 && facts.host.h > 2) {
+    const shot = await page.screenshot({
+      clip: { x: facts.host.x, y: facts.host.y, width: facts.host.w, height: facts.host.h },
+    });
+    facts.distinctColours = await page.evaluate(analyse, shot.toString("base64"));
+  } else {
+    facts.distinctColours = 0;
+  }
+
+  // Release it again: an extension view has to be creatable twice, like any view.
+  released = await page.evaluate((viewId) => {
+    globalThis.__vscodeEmbed.face.releaseView(viewId);
+    const host = document.querySelector("#prac-extension-probe");
+    document.body.removeChild(host);
+    return true;
+  }, view);
+  mounted = mountedView;
 }
 
-// Release it again: an extension view has to be creatable twice, like any view.
-const released = await page.evaluate((viewId) => {
-  globalThis.__vscodeEmbed.face.releaseView(viewId);
-  const host = document.querySelector("#prac-extension-probe");
-  document.body.removeChild(host);
-  return true;
-}, view);
+// The capability phase, for any extension: what it *knows*, read through the same
+// handle an agent would use. This is the acceptance criterion for the whole
+// capability layer — "an installed extension activates and its knowledge is
+// reachable" — without asking a view for permission.
+const capabilityFacts = await page.evaluate(async () => {
+  const folder = (globalThis.__vscodeEmbed.face.workspaceInfo().folders ?? [])[0] ?? null;
+  if (folder === null) throw new Error("the workbench has no workspace folder");
+  // A file has to be open (and its model loaded) for an extension to have anything
+  // to say about it: diagnostics are per resource.
+  globalThis.__vscodeEmbed.face.openFile(`${folder}/AGENTS.md`);
+  await new Promise((resolve) => setTimeout(resolve, 4000));
+  const started = performance.now();
+  await globalThis.__vscodeEmbed.face.capabilities.diagnostics.settled();
+  const settledMs = Math.round(performance.now() - started);
+  const diagnostics = globalThis.__vscodeEmbed.face.capabilities.diagnostics;
+  return {
+    folder,
+    settledMs,
+    summary: diagnostics.snapshot().summary,
+    version: diagnostics.version(),
+    entries: diagnostics.query({ limit: 5 }).entries.map((entry) => ({
+      resource: entry.resource,
+      source: entry.source ?? null,
+      severity: entry.severity,
+      message: entry.message.slice(0, 60),
+    })),
+  };
+});
 
 await browser.close();
 
 const mountErrors = consoleErrors.filter((line) => line.includes("vscode-embed"));
 const checks = {
-  // The extension's view descriptor existed — it activates on first view use.
-  viewMounted: facts.panes >= 1,
-  viewTitled: facts.headerTitle !== null && facts.headerTitle.length > 0,
-  viewPainted: facts.distinctColours > 4,
-  viewReleased: released === true,
+  // The extension's knowledge reaches the capability layer: markers that name a
+  // source arrived, and `settled()` waited for them instead of answering early.
+  capabilitySeesTheExtension:
+    capabilityFacts.entries.length > 0 &&
+    capabilityFacts.entries.every((entry) => entry.source !== null),
+  capabilitySettledOnArrival: capabilityFacts.settledMs >= 300,
+  capabilityVersionMoved: capabilityFacts.version > 0,
+  capabilitySummaryCounts:
+    capabilityFacts.summary.error +
+      capabilityFacts.summary.warning +
+      capabilityFacts.summary.info +
+      capabilityFacts.summary.hint >
+    0,
+  // A view-contributing extension also has to mount, title itself and paint.
+  ...(expectsView
+    ? {
+        viewMounted: facts.panes >= 1,
+        viewTitled: facts.headerTitle !== null && facts.headerTitle.length > 0,
+        viewPainted: facts.distinctColours > 4,
+        viewReleased: released === true,
+      }
+    : {}),
   noMountErrors: mountErrors.length === 0,
 };
 
-console.log(JSON.stringify({ url, view, ...mounted, facts, checks, mountErrors }, null, 2));
+console.log(
+  JSON.stringify(
+    { url, extension, view, ...mounted, facts, capabilityFacts, checks, mountErrors },
+    null,
+    2,
+  ),
+);
 
 const failed = Object.entries(checks)
   .filter(([, ok]) => !ok)
@@ -174,5 +239,7 @@ if (failed.length > 0) {
   process.exit(1);
 }
 console.log(
-  `OK: ${view} — contributed by an installed extension — renders inside prac, so the extension is active on the server base.`,
+  expectsView
+    ? `OK: ${view} — contributed by ${extension} — renders inside prac, and the extension's diagnostics reach the capability layer.`
+    : `OK: ${extension} is active on the server base: its diagnostics reach the capability layer with a source, and settled() waited for them.`,
 );

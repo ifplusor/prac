@@ -28,6 +28,7 @@
 import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
 import { createVscodeEmbed } from "prac-vscode-embed/client";
+import { EXTENSIONS_GALLERY } from "prac-vscode";
 import type { PracVscodeFace, VscodeFileView } from "./public.js";
 
 /** Same-origin prefix the host half serves the app bundle under. */
@@ -118,7 +119,13 @@ function activeWorkspace(ctx: Context): WorkspaceLaunch | undefined {
  * @param ctx - the Cordis client context.
  */
 export function apply(ctx: Context): void {
-  const embed = createVscodeEmbed({ route: VSCODE_ROUTE, productName: "prac" });
+  const embed = createVscodeEmbed({
+    route: VSCODE_ROUTE,
+    productName: "prac",
+    // The extension gallery, from the vendor's single data file: the OSS product
+    // has none, and without it the product's own install path cannot work.
+    extensionsGallery: { ...EXTENSIONS_GALLERY },
+  });
 
   /** Boot the app for the active workspace; true once it is running. */
   const boot = (): boolean => {

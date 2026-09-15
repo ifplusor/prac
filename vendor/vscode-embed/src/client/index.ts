@@ -153,6 +153,16 @@ export interface VscodeEmbedOptions {
   readonly serverBasePath?: string;
   /** Route the code server redirects its callback to. Defaults to `"/callback"`. */
   readonly callbackRoute?: string;
+  /**
+   * The extension gallery the **client** should use.
+   *
+   * The OSS product ships none, and the client's product configuration is separate
+   * from the server's `product.json`: the server can have a gallery stamped while
+   * the client still reports "No extension gallery service configured". The
+   * consumer supplies it (`prac-vscode`'s `gallery.json`) so both planes read one
+   * source.
+   */
+  readonly extensionsGallery?: Record<string, string>;
 }
 
 export interface VscodeEmbedLaunch {
@@ -318,6 +328,9 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
               nameShort: productName,
               nameLong: productName,
               applicationName: productName,
+              ...(options.extensionsGallery === undefined
+                ? {}
+                : { extensionsGallery: options.extensionsGallery }),
             },
             // The embed bridge: the app mounts no parts on its own, and hands its
             // part-hosting face back through `publish`. The field name and the

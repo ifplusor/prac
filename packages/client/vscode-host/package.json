@@ -31,6 +31,7 @@
     "@deepseek-ai/dsh-api-workspace-controller": "catalog:",
     "@deepseek-ai/dsh-client-store": "catalog:",
     "@types/react": "catalog:",
+    "prac-vscode": "workspace:*",
     "prac-vscode-embed": "workspace:*",
     "react": "catalog:"
   },
