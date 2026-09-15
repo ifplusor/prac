@@ -67,6 +67,17 @@ export interface PracVscodeFace {
    * or one rendering nothing when the id is not a file view.
    */
   fileHost(view: string): () => ReactElement | null;
+  /**
+   * The app resource behind a view id, or `undefined` when the id is not a file
+   * view.
+   *
+   * The id convention (`vscode:file:<resource>`) belongs to this package, so a
+   * consumer that needs to recognise a file view asks here rather than matching a
+   * prefix itself.
+   *
+   * @param view - any view id.
+   */
+  fileResource(view: string): string | undefined;
 }
 
 /** One open file, as the pair of view id and app resource. */

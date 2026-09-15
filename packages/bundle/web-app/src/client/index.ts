@@ -47,6 +47,8 @@ import {
   focusView,
   openFileInto,
   placeSurfaces,
+  restoreCentre,
+  staleFileViews,
   type PracLayout,
   type Surface,
 } from "./arrangement.js";
@@ -611,9 +613,29 @@ export function apply(ctx: Context): void {
     const sync = (): void => {
       const files = vscode.fileViews();
       fileViews = new Set(files.map((entry) => entry.view));
+      // Files the app no longer has open stop being shown: their records outlive
+      // them (the frame persists), and a stale record renders a tab for a file
+      // nobody has open and holds a region with an empty view.
+      const records = layout.getState().views;
+      let hidAFileView = false;
+      for (const view of staleFileViews(records, fileViews, (id) => vscode.fileResource(id))) {
+        if (records[view]?.hidden === true) continue;
+        layout.hide(view);
+        hidAFileView = true;
+      }
       const newest = files[files.length - 1];
       if (newest === undefined) {
         currentFile = null;
+        if (hidAFileView) {
+          // The editor surface just *left*: attention returns to the conversation
+          // and the centre is the conversation's again. Gated on that event
+          // deliberately — a frame that merely boots with no file open must not
+          // overrule an arrangement the user persisted (the chat parked in the
+          // bottom bar, a split of its own), which is what a bare "no files ⇒
+          // centre the chat" rule did.
+          focus.focus(CONVERSATION);
+          restoreCentre(layout);
+        }
         return;
       }
       // A file the app opened comes forward, and **attention follows it**: the

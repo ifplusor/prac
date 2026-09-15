@@ -165,6 +165,7 @@ export function apply(ctx: Context): void {
       const resource = resourceOfFileView(view);
       return resource === undefined ? () => null : embed.file(resource);
     },
+    fileResource: (view: string): string | undefined => resourceOfFileView(view),
   };
   ctx.effect(() => ctx.provide("pracVscode", face), `${name}: pracVscode service`);
 

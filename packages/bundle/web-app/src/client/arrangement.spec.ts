@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { LayoutState, PracLayoutFace, RoleBindings } from "prac-client-ui-layout/client";
+import type {
+  LayoutState,
+  PracLayoutFace,
+  RoleBindings,
+  ViewRecord,
+} from "prac-client-ui-layout/client";
 import {
   CONVERSATION,
   DEFAULT_PLACEMENTS,
@@ -14,6 +19,8 @@ import {
   focusView,
   openFileInto,
   placeSurfaces,
+  restoreCentre,
+  staleFileViews,
 } from "./arrangement.js";
 
 /**
@@ -124,6 +131,58 @@ describe("focusView", () => {
     const { face, calls } = recordingFace();
     focusView(face, DSH_CONVERSATION_VIEW);
     expect(shapes(calls)).toEqual([["place", DSH_CONVERSATION_VIEW, STAGE]]);
+  });
+});
+
+describe("staleFileViews", () => {
+  const records = {
+    [FILE_VIEW]: { region: STAGE, order: 0, hidden: false },
+    "vscode:file:vscode-remote://127.0.0.1:3084/workspace/closed.ts": {
+      region: STAGE,
+      order: 1,
+      hidden: false,
+    },
+    [DSH_CONVERSATION_VIEW]: { region: STAGE, order: 2, hidden: false },
+    [VSCODE_SIDEBAR_VIEW]: { region: LEFT, order: 3, hidden: true },
+  } satisfies Record<string, ViewRecord>;
+  const resourceOf = (view: string): string | undefined =>
+    view.startsWith("vscode:file:") ? view.slice("vscode:file:".length) : undefined;
+
+  it("names the file views the app no longer has open", () => {
+    expect(staleFileViews(records, new Set([FILE_VIEW]), resourceOf)).toEqual([
+      "vscode:file:vscode-remote://127.0.0.1:3084/workspace/closed.ts",
+    ]);
+  });
+
+  it("names every file view when nothing is open (a reload)", () => {
+    expect(staleFileViews(records, new Set(), resourceOf).sort()).toEqual(
+      [FILE_VIEW, "vscode:file:vscode-remote://127.0.0.1:3084/workspace/closed.ts"].sort(),
+    );
+  });
+
+  it("never touches a view that is not a file view", () => {
+    // The host's answer decides, not a name this module could invent: a view whose
+    // id merely looks like a file is left alone.
+    const ids = staleFileViews(records, new Set(), () => undefined);
+    expect(ids).toEqual([]);
+  });
+});
+
+describe("restoreCentre", () => {
+  it("moves the conversation back when the centre holds something else", () => {
+    const { face, calls } = recordingFace({
+      [DSH_CONVERSATION_VIEW]: { region: RIGHT, order: 0, hidden: false },
+    });
+    expect(restoreCentre(face)).toBe(true);
+    expect(shapes(calls)).toEqual([["place", DSH_CONVERSATION_VIEW, STAGE]]);
+  });
+
+  it("leaves it where it is when the centre is already its", () => {
+    const { face, calls } = recordingFace({
+      [DSH_CONVERSATION_VIEW]: { region: STAGE, order: 0, hidden: false },
+    });
+    expect(restoreCentre(face)).toBe(false);
+    expect(shapes(calls)).toEqual([]);
   });
 });
 

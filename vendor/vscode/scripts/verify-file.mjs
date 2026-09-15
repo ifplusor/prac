@@ -285,6 +285,23 @@ await page.waitForSelector("#prac-file-a .monaco-editor", { timeout: 60_000 });
 await page.waitForTimeout(1500);
 const released = await sample();
 
+// A reload forgets the app's editors, and the frame must forget the views with
+// them: a persisted placement record outlives the file, and left alone it renders
+// a tab for a file nobody has open and holds the centre with an empty view.
+await page.reload({ waitUntil: "load" });
+await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
+await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
+await page.waitForTimeout(6000);
+const reloaded = await page.evaluate(() => ({
+  open: globalThis.__vscodeEmbed.face.listOpenFiles(),
+  fileHosts: document.querySelectorAll("[data-vscode-embed-file]").length,
+  fileTabs: [...document.querySelectorAll("[data-prac-tab]")]
+    .map((element) => element.getAttribute("data-prac-tab"))
+    .filter((id) => id !== null && id.startsWith("vscode:file:")),
+  conversationRegion:
+    globalThis.__pracLayout.getState().views["dsh:main:conversation"]?.region ?? null,
+}));
+
 await browser.close();
 
 const painted = (colours) => typeof colours === "number" && colours > 4;
@@ -321,6 +338,10 @@ const checks = {
     clicked.length === 2 &&
     clicked.find((tab) => tab.active)?.id === inactive &&
     clicked.filter((tab) => tab.active).length === 1,
+  // 7. A reload takes the files with it — and takes their views with them.
+  reloadForgetsTheFiles: reloaded.open.length === 0 && reloaded.fileHosts === 0,
+  noTabForAClosedFile: reloaded.fileTabs.length === 0,
+  conversationTakesTheCentreBack: reloaded.conversationRegion === "stage",
   // A failed mount is logged by the composition, not thrown at the embedder.
   noMountErrors:
     mounted.mountErrors === 0 && remounted.mountErrors === 0 && released.mountErrors === 0,
@@ -353,6 +374,7 @@ console.log(
         mountMessages: released.mountMessages,
       },
       opened: { before: opened.before, after: opened.after, eventCount: opened.events.length },
+      reloaded,
       tabs: {
         oneFile: oneFile.map((tab) => (tab.active ? `${tab.id} (active)` : tab.id)),
         twoFiles: twoFiles.map((tab) => (tab.active ? `${tab.id} (active)` : tab.id)),

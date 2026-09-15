@@ -128,7 +128,7 @@ URL='…' node scripts/verify-views.mjs                                 # 28 项
 URL='…' node scripts/verify-focus.mjs                                 # 9 项
 URL='…' node scripts/verify-regions.mjs                               # 6 项（frame 托管的是 view：无 part、view 有尺寸、退役的 editor part 只在屏外）
 URL='…' node scripts/verify-view.mjs                                    # 7 项（单 view 宿主：无 part、有像素、可释放重建）
-URL='…' node scripts/verify-file.mjs                                    # 14 项（单文件编辑面：真实文本、有像素、一文件一面、可释放重建；app 打开文件通过事件报到；stage 的 tab 条：一条文件也有、两条最新 active、点 tab 换 view）
+URL='…' node scripts/verify-file.mjs                                    # 17 项（单文件编辑面：真实文本、有像素、一文件一面、可释放重建；app 打开文件通过事件报到；stage 的 tab 条：一条文件也有、两条最新 active、点 tab 换 view；reload 后文件 view 跟着消失）
 URL='…' node scripts/verify-extension.mjs                               # 5 项（需已装扩展；没装则明确 SKIP）
 ```
 

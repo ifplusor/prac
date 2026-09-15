@@ -11,7 +11,7 @@
  * @module prac-web-app/client/arrangement
  */
 
-import type { PracLayoutFace } from "prac-client-ui-layout/client";
+import type { PracLayoutFace, ViewRecord } from "prac-client-ui-layout/client";
 
 /** The mechanism's placement face, named once for this module's signatures. */
 export type PracLayout = PracLayoutFace;
@@ -126,6 +126,49 @@ export function focusView(layout: PracLayout, viewId: string): void {
 export function openFileInto(layout: PracLayout, view: string): void {
   layout.place(DSH_CONVERSATION_VIEW, RIGHT);
   layout.place(view, FOCUS_VIEW_REGION);
+}
+
+/**
+ * The file views the frame should stop showing.
+ *
+ * A file view exists because the **app** has that file open. When it no longer
+ * does — a closed editor, or a page reload whose app state is gone — the view has
+ * no subject, but its placement record outlives it (decision 16 persists the
+ * frame). Left alone it renders a tab for a file nobody has open and holds a
+ * region with an empty view, which is exactly what a reload used to look like.
+ *
+ * They are *hidden* rather than removed: the record keeps the placement for when
+ * the same file is opened again (`place` shows it there).
+ *
+ * @param records - the frame's view table.
+ * @param openFiles - the file views the app currently reports.
+ * @param resourceOf - the host's file-view test (`undefined` for anything else).
+ * @returns the file views to hide.
+ */
+export function staleFileViews(
+  records: Readonly<Record<string, ViewRecord>>,
+  openFiles: ReadonlySet<string>,
+  resourceOf: (view: string) => string | undefined,
+): string[] {
+  return Object.keys(records).filter(
+    (view) => resourceOf(view) !== undefined && !openFiles.has(view),
+  );
+}
+
+/**
+ * Give the centre back to the conversation when nothing else holds it.
+ *
+ * The arrangement's own default says the conversation lives in the centre; this
+ * is that default re-applied to a *gap* rather than to a fresh frame — which is
+ * what happens when the last file closes and takes the editor surface with it.
+ *
+ * @param layout - the mechanism's placement face.
+ * @returns whether the conversation had to be moved.
+ */
+export function restoreCentre(layout: PracLayout): boolean {
+  if (layout.getState().views[DSH_CONVERSATION_VIEW]?.region === FOCUS_VIEW_REGION) return false;
+  layout.place(DSH_CONVERSATION_VIEW, FOCUS_VIEW_REGION);
+  return true;
 }
 
 /**
