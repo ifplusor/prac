@@ -616,11 +616,18 @@ export function apply(ctx: Context): void {
         currentFile = null;
         return;
       }
-      // A file the frame has never seen takes the centre; a known one only
-      // becomes the surface attention rests on (it is already placed).
-      const known = layout.getState().views[newest.view] !== undefined;
+      // A file the app opened comes forward, and **attention follows it**: the
+      // strip must not read "conversation" while a file holds the centre (and
+      // with attention already claimed to be on the conversation, pressing that
+      // very key would do nothing, since `focus` ignores a no-op change).
       currentFile = newest.view;
-      if (!known) openFileInto(layout, newest.view);
+      const surface = focus.state().current;
+      focus.focus(VSCODE_SURFACE);
+      if (focus.state().current === surface) {
+        // Attention was already on the editor, so no subscription ran: placing
+        // the *new* file is this call's job.
+        openFileInto(layout, currentFile);
+      }
     };
     sync();
     scope.effect(() => vscode.onDidChangeFileViews(sync), "prac-web-app: open files");

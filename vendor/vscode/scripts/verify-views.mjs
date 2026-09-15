@@ -16,25 +16,28 @@
  *     `Escape` dismisses it;
  *  2. the catalogue the overlay lists is the mechanism's `listViews()` — the
  *     union of DSH slots (`dsh:sidebar`, every registered `main` key,
- *     `dsh:rightbar`) and the `prac.view` seat (`vscode:editor`), including views
- *     that are hidden;
- *  3. **hide** a view → its region collapses to 0 and the space goes to the
- *     regions that remain, which still paint;
- *  4. **recall** it → it returns to the region it was in, at the width it had
+ *     `dsh:rightbar`) and the `prac.view` seat (one `vscode:file:<resource>` per
+ *     open file), including views that are hidden;
+ *  3. **移到** frees the track: the conversation leaves `right` for `left`, and
+ *     the current file view then moves into `right` as its only occupant;
+ *  4. **hide** a view → its fixed region collapses to 0 and the space goes to the
+ *     flexible regions that remain, which still paint;
+ *  5. **recall** it → it returns to the region it was in, at the width it had
  *     (deliberately a dragged width, not the default), and it paints — the check
- *     that catches a stale size or a lost VS part;
- *  5. the keyboard path: arrow keys move the row cursor and `Enter` runs that
- *     row's 聚焦;
- *  6. **move** via 移到 → the view renders in the destination and paints while
- *     the source region's space is reclaimed;
- *  7. **分栏** → two regions side by side, both painted;
- *  8. **收起/展开** → a region goes to 0 (still present), the UI offers the
+ *     that catches a stale size or a lost editing surface;
+ *  6. the keyboard path: arrow keys move the row cursor and `Enter` runs that
+ *     row's 聚焦, which centres the file and parks the conversation in the track;
+ *  7. **移到** again → the file renders in the destination and the source
+ *     region's space is reclaimed;
+ *  8. **分栏** → two regions side by side, the source keeps the view it shared,
+ *     and both paint;
+ *  9. **收起/展开** → a region goes to 0 (still present), the UI offers the
  *     inverse, the rest still paints, and expanding restores the width.
  *
  * Every action after the opening is taken through the overlay's own controls, so
  * what passes is the UI entry point, not the mechanism behind it.
  *
- * Usage: URL='http://127.0.0.1:3082/?token=...' node scripts/verify-views.mjs
+ * Usage: URL='http://127.0.0.1:3084/?token=...' node scripts/verify-views.mjs
  */
 import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
@@ -48,7 +51,7 @@ const upstreamDir = join(
   "upstream",
 );
 const url = process.env.URL;
-if (!url) throw new Error('URL is required, e.g. URL="http://127.0.0.1:3082/?token=..."');
+if (!url) throw new Error('URL is required, e.g. URL="http://127.0.0.1:3084/?token=..."');
 if (!existsSync(join(upstreamDir, "node_modules/@playwright/test"))) {
   throw new Error(
     "@playwright/test is not installed in the upstream checkout; run vscode:build first",
@@ -68,12 +71,12 @@ const toggleOf = (view) => `[data-prac-recall-toggle="${view}"]`;
 const moveOf = (view) => `[data-prac-recall-move="${view}"]`;
 const splitOf = (view, side) => `[data-prac-recall-split="${view}:${side}"]`;
 const collapseOf = (region) => `[data-prac-recall-collapse="${region}"]`;
-const EDITOR_VIEW = "vscode:editor";
+/** The view id a file view carries by convention (`prac-client-vscode-host`). */
+const FILE_VIEW_PREFIX = "vscode:file:";
 const CONVERSATION_VIEW = "dsh:main:conversation";
-// The DOM marks **part** ids, not view ids (see `PART_HOST_ATTR`) — the editor
-// view is mounted as the editor part.
-const EDITOR_PART = "workbench.parts.editor";
-const EDITOR_HOST = `[data-vscode-embed-part-host="${EDITOR_PART}"]`;
+// Since decision 17 the editor is one view per open file: the host is the file
+// host, and which resource it holds is discovered live.
+const EDITOR_HOST = "[data-vscode-embed-file]";
 const FRAME = "[data-prac-frame]";
 
 /**
@@ -152,6 +155,14 @@ async function dragSash(page, selector, dx) {
 async function toggleRecall(page) {
   await page.keyboard.press("Control+Alt+KeyV");
   await page.waitForTimeout(500);
+}
+
+/** Move a view to a region through the overlay's own 移到 select. */
+async function moveViaOverlay(page, view, region) {
+  await toggleRecall(page);
+  await page.selectOption(moveOf(view), region);
+  await page.waitForTimeout(800);
+  await toggleRecall(page);
 }
 
 /** Read the frame's DOM, the placement model, and the catalogue the overlay offers. */
@@ -233,7 +244,7 @@ async function sample(page) {
   const regionOf = (id) => facts.regions.find((region) => region.id === id) ?? null;
   facts.left = regionOf("left");
   facts.right = regionOf("right");
-  facts.console = regionOf("stage");
+  facts.stage = regionOf("stage");
   facts.editorPaint = await paintAt(page, facts.host?.box, EDITOR_HOST);
   facts.overlayPaint = facts.overlay ? await paintAt(page, facts.overlay, RECALL) : null;
   return facts;
@@ -249,7 +260,15 @@ page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
 
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
 await page.waitForSelector(FRAME, { timeout: 60_000 });
-await page.waitForSelector(EDITOR_HOST, { timeout: 60_000 });
+await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
+
+// Open one file: without one there is no editor view to list or drive.
+const folder = await page.evaluate(
+  () => (globalThis.__vscodeEmbed.face.workspaceInfo().folders ?? [])[0] ?? null,
+);
+if (!folder) throw new Error("the workbench has no workspace folder");
+await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), `${folder}/package.json`);
+await page.waitForSelector(`${EDITOR_HOST} .monaco-editor`, { timeout: 60_000 });
 // Give Monaco a beat to paint after the grid lays it out.
 await page.waitForTimeout(3000);
 
@@ -263,6 +282,16 @@ const probeReady = await page.evaluate(
     typeof globalThis.__pracLayout?.splitView === "function",
 );
 if (!probeReady) throw new Error("globalThis.__pracLayout is missing the catalogue/placement face");
+
+const FILE_VIEW = await page.evaluate(
+  (prefix) =>
+    globalThis.__pracLayout
+      .listViews()
+      .map((view) => view.id)
+      .find((id) => id.startsWith(prefix)) ?? null,
+  FILE_VIEW_PREFIX,
+);
+if (!FILE_VIEW) throw new Error("no file view was declared after opening a file");
 
 const states = {};
 states.default = await sample(page);
@@ -281,39 +310,52 @@ await page.keyboard.press("Escape");
 await page.waitForTimeout(500);
 states.dismissed = await sample(page);
 
-// ── 2. give `right` a distinctive width, so a recall must restore *this* ────
+// ── 2. 移到 frees the track: the conversation leaves `right` for `left` ──────
+// The file view is the only editor surface, and the track must hold it alone for
+// hiding it to collapse the region. The conversation is what fills `right` by
+// default, so moving it out is the move the UI already offers.
+await moveViaOverlay(page, CONVERSATION_VIEW, "left");
+states.conversationMoved = await sample(page);
+
+// …and the file takes the track it just freed.
+await moveViaOverlay(page, FILE_VIEW, "right");
+states.fileInTrack = await sample(page);
+
+// ── 3. give `right` a distinctive width, so a recall must restore *this* ────
 await dragSash(page, '[data-prac-sash-right="right"]', 100);
 states.dragged = await sample(page);
 const dragWidth = states.dragged.right?.w ?? 0;
 
-// ── 3. hide via the overlay's own button ─────────────────────────────────────
+// ── 4. hide via the overlay's own button ─────────────────────────────────────
 await toggleRecall(page);
-await page.click(toggleOf(EDITOR_VIEW));
+await page.click(toggleOf(FILE_VIEW));
 await page.waitForTimeout(800);
 states.hiddenWhileOpen = await sample(page);
 await toggleRecall(page);
 states.hidden = await sample(page);
-states.hiddenConsolePaint = await paintAt(
-  page,
-  states.hidden.console,
-  '[data-prac-region="stage"] > *',
-);
+states.hiddenRestPaint = await paintAt(page, states.hidden.left, '[data-prac-region="left"] > *');
 
-// ── 4. recall via the same button ────────────────────────────────────────────
+// ── 5. recall via the same button ────────────────────────────────────────────
 await toggleRecall(page);
-await page.click(toggleOf(EDITOR_VIEW));
+await page.click(toggleOf(FILE_VIEW));
 await page.waitForTimeout(800);
 states.recalledWhileOpen = await sample(page);
 await toggleRecall(page);
 states.recalled = await sample(page);
 
-// ── 5. the keyboard path: arrow keys move the cursor, Enter runs 聚焦 ────────
+// ── 6. the keyboard path: arrow keys move the cursor, Enter runs 聚焦 ────────
 // The cursor is read with a DOM-only probe: sampling (which hides the overlay to
 // attribute its pixels) would blur the focused panel before `Enter` is pressed.
 await toggleRecall(page);
-await page.keyboard.press("ArrowDown");
-await page.keyboard.press("ArrowDown");
-await page.keyboard.press("ArrowDown");
+const fileRowIndex = await page.evaluate(
+  ({ view, rowSelector }) =>
+    [...document.querySelectorAll(rowSelector)].findIndex(
+      (row) => row.getAttribute("data-prac-recall-row") === view,
+    ),
+  { view: FILE_VIEW, rowSelector: ROW },
+);
+if (fileRowIndex < 0) throw new Error("the file view is not a row in the recall catalogue");
+for (let step = 0; step < fileRowIndex; step += 1) await page.keyboard.press("ArrowDown");
 await page.waitForTimeout(200);
 const selectedRow = await page.evaluate(
   () =>
@@ -326,17 +368,14 @@ await toggleRecall(page);
 states.cursorMoved = selectedRow;
 states.focusedByKey = await sample(page);
 
-// ── 6. move via 移到 (the select) ────────────────────────────────────────────
-await toggleRecall(page);
-await page.selectOption(moveOf(EDITOR_VIEW), "right");
-await page.waitForTimeout(800);
-await toggleRecall(page);
+// ── 7. move via 移到 (the select): the file lands in the track it left ───────
+await moveViaOverlay(page, FILE_VIEW, "right");
 states.movedBySelect = await sample(page);
 
-// ── 7. 分栏 is a *view* verb: the editor leaves the `right` stack for a new pane
+// ── 8. 分栏 is a *view* verb: the editor leaves the `right` stack for a new pane
 // beside it, and the conversation it shared that region with stays behind ────
 await toggleRecall(page);
-await page.click(splitOf(EDITOR_VIEW, "right"));
+await page.click(splitOf(FILE_VIEW, "right"));
 await page.waitForTimeout(800);
 const newRegion = await page.evaluate(() => {
   const ids = [...document.querySelectorAll("[data-prac-region]")].map((element) =>
@@ -352,12 +391,12 @@ states.split = await sample(page);
 const newPane = states.split.regions.find((region) => region.id === newRegion) ?? null;
 states.splitNewPane = newRegion;
 states.newPanePaint = await paintAt(page, newPane, `[data-prac-region="${newRegion}"] > *`);
-// The region the editor came from: the conversation must still be rendering
+// The region the file came from: the conversation must still be rendering
 // there, which is what "分栏必带视图" means on this path (the split cannot cost
 // the source region its view).
 states.sourcePanePaint = await paintAt(page, states.split.right, '[data-prac-region="right"] > *');
 
-// ── 8. 收起 / 展开 a region from the UI ─────────────────────────────────────
+// ── 9. 收起 / 展开 a region from the UI ─────────────────────────────────────
 await toggleRecall(page);
 await page.click(collapseOf("left"));
 await page.waitForTimeout(800);
@@ -408,12 +447,12 @@ const checks = {
   stripStillPresent: states.default.strip && states.opened.strip && states.split.strip,
 
   // 2. the offered catalogue is the real registries joined — DSH's own slots and
-  // the seat — and the DOM renders exactly it.
+  // the file seat — and the DOM renders exactly it.
   catalogueJoinsTheRealRegistries:
     catalogueIds(states.opened).includes("dsh:sidebar") &&
     catalogueIds(states.opened).includes("dsh:main:conversation") &&
     catalogueIds(states.opened).includes("dsh:rightbar") &&
-    catalogueIds(states.opened).includes(EDITOR_VIEW) &&
+    catalogueIds(states.opened).includes(FILE_VIEW) &&
     // The version is what told a subscribed UI to re-read; with the real plugins
     // registered it must have moved off zero.
     states.opened.catalogueVersion > 0,
@@ -422,38 +461,47 @@ const checks = {
     regionControlIds(states.opened).join(",") === regionInfoIds(states.opened).join(","),
   hiddenViewOffered: states.opened.rows.find((row) => row.id === "dsh:rightbar")?.hidden === "true",
 
-  // 3. hide: `right` collapses to nothing and its space is taken by `console`.
-  hideCollapsedRight: states.hidden.right === null && states.hidden.hostCount === 0,
-  hideOffersShow:
-    states.hiddenWhileOpen.rows.find((row) => row.id === EDITOR_VIEW)?.hidden === "true",
+  // 3. 移到: the conversation leaves the track and the file takes it over.
+  conversationMovedOutOfTheTrack:
+    states.conversationMoved.modelViews[CONVERSATION_VIEW]?.region === "left" &&
+    states.conversationMoved.right === null,
+  fileMovedIntoTheTrack:
+    states.fileInTrack.host?.region === "right" && painted(states.fileInTrack.editorPaint),
 
-  // 4. recall: back in `right`, at the dragged width, and painting.
+  // 4. hide: `right` collapses to nothing, and the regions that remain paint.
+  hideCollapsedTheTrack:
+    states.hidden.right === null &&
+    states.hidden.hostCount === 0 &&
+    painted(states.hiddenRestPaint),
+  hideOffersShow:
+    states.hiddenWhileOpen.rows.find((row) => row.id === FILE_VIEW)?.hidden === "true",
+
+  // 5. recall: back in `right`, at the dragged width, and painting.
   recallReturnedToRight: states.recalled.host?.region === "right",
   spaceAndWidthComeBack:
-    states.hidden.console.w === states.dragged.console.w + dragWidth + gutter &&
+    states.hidden.stage.w === states.dragged.stage.w + dragWidth + gutter &&
     states.recalled.right?.w === dragWidth &&
-    states.recalled.console.w === states.dragged.console.w,
-  paintedAfterHideAndRecall:
-    painted(states.hiddenConsolePaint) && painted(states.recalled.editorPaint),
+    states.recalled.stage.w === states.dragged.stage.w,
+  paintedAfterHideAndRecall: painted(states.recalled.editorPaint),
 
-  // 5. arrow keys move the cursor; Enter runs the selected row's 聚焦.
-  arrowsMoveCursor: states.cursorMoved === EDITOR_VIEW,
-  enterFocusedIntoConsole:
+  // 6. arrow keys move the cursor; Enter runs the selected row's 聚焦.
+  arrowsMoveCursor: states.cursorMoved === FILE_VIEW,
+  enterFocusedIntoTheCentre:
     states.focusedByKey.host?.region === "stage" &&
     // The conversation parks in the track instead of the track emptying out:
     // one view holds a region, and the one that yields stays on screen.
     states.focusedByKey.conversationRegion === "right",
+  paintedAfterFocus: painted(states.focusedByKey.editorPaint),
 
-  // 6. 移到: the view renders in the destination, and the source region's space
-  // is reclaimed (console returns to the width it had before the move out).
+  // 7. 移到: the view renders in the destination, and the source region's space
+  // is reclaimed (the centre returns to the width it had before the move out).
   selectMoveLandedAndReclaimed:
     states.movedBySelect.host?.region === "right" &&
     states.movedBySelect.right?.w === dragWidth &&
-    states.movedBySelect.console.w === states.dragged.console.w,
-  paintedAfterFocusAndMove:
-    painted(states.focusedByKey.editorPaint) && painted(states.movedBySelect.editorPaint),
+    states.movedBySelect.stage.w === states.dragged.stage.w,
+  paintedAfterMove: painted(states.movedBySelect.editorPaint),
 
-  // 7. 分栏: the view lands in a new pane beside the one it was in, the pane it
+  // 8. 分栏: the view lands in a new pane beside the one it was in, the pane it
   // left keeps the view it shared that region with, and both paint.
   splitCreatedPane: !!newPane,
   splitPaneBesideSource: sideBySide(states.split.right, newPane),
@@ -463,7 +511,7 @@ const checks = {
     painted(states.split.editorPaint) && states.split.host?.region === newRegion,
   splitSourcePanePainted: painted(states.sourcePanePaint),
 
-  // 8. 收起 / 展开 a region: the region goes to 0 (still present) and the UI
+  // 9. 收起 / 展开 a region: the region goes to 0 (still present) and the UI
   // offers 展开; expanding restores the width it had.
   collapseThenExpandFromTheUi:
     states.regionCollapsed.left?.w === 0 &&
@@ -476,18 +524,18 @@ const report = {
   url,
   checks,
   evidence: {
-    editorView: EDITOR_VIEW,
+    editorView: FILE_VIEW,
     dragWidth,
     hidden: {
       regions: paneIds(states.hidden),
-      console: states.hidden.console?.w,
-      draggedConsole: states.dragged.console?.w,
+      stage: states.hidden.stage?.w,
+      draggedStage: states.dragged.stage?.w,
     },
     recall: {
       region: states.recalled.host?.region,
       width: states.recalled.right?.w,
       modelSize: states.recalled.modelSizes.right?.size,
-      console: states.recalled.console?.w,
+      stage: states.recalled.stage?.w,
     },
     keyboard: { selected: states.cursorMoved },
     catalogue: {

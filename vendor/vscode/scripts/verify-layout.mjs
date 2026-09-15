@@ -1,13 +1,17 @@
 /**
  * Verify prac's nested region tree: default shape, split, sash drag, and
- * collapse-that-remembers-width.
+ * collapse-that-remembers-width — with the current **file view** as the subject
+ * that must keep painting.
  *
- * A layout bug is exactly where DOM checks lie: the regions are present, the
- * part is mounted, the tree is right — and the editor is blank (the
- * "structurally present, visually empty" failure this repo hit twice). So every
- * state is judged on pixels: screenshot the VS part host's clip, decode it in
- * the page, count distinct colours, and compare against the same clip with the
- * host hidden.
+ * Since decision 17 the editor is one view per open file
+ * (`vscode:file:<resource>`, host `[data-vscode-embed-file]`), and opening a file
+ * is what the arrangement answers with `openFileInto`: the file takes the centre
+ * and the conversation parks in the right track. A layout bug is exactly where
+ * DOM checks lie: the regions are present, the view is mounted, the tree is right
+ * — and the editor is blank (the "structurally present, visually empty" failure
+ * this repo hit twice). So every state is judged on pixels: screenshot the file
+ * host's clip, decode it in the page, count distinct colours, and compare against
+ * the same clip with the host hidden.
  *
  * The layout mechanism is driven from the page through `globalThis.__pracLayout`
  * (see the comment in `prac-client-ui-layout/src/client.ts`): a DSH client bundle's
@@ -15,7 +19,7 @@
  * the Cordis context any other way. `split`/`setCollapsed` are the mechanism's
  * own face; no internals are poked.
  *
- * Usage: URL='http://127.0.0.1:3082/?token=...' node scripts/verify-layout.mjs
+ * Usage: URL='http://127.0.0.1:3084/?token=...' node scripts/verify-layout.mjs
  */
 import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
@@ -29,7 +33,7 @@ const upstreamDir = join(
   "upstream",
 );
 const url = process.env.URL;
-if (!url) throw new Error('URL is required, e.g. URL="http://127.0.0.1:3082/?token=..."');
+if (!url) throw new Error('URL is required, e.g. URL="http://127.0.0.1:3084/?token=..."');
 if (!existsSync(join(upstreamDir, "node_modules/@playwright/test"))) {
   throw new Error(
     "@playwright/test is not installed in the upstream checkout; run vscode:build first",
@@ -42,16 +46,16 @@ const { chromium } = require("@playwright/test");
 const sha = (buffer) => createHash("sha256").update(buffer).digest("hex");
 
 /**
- * The region the arrangement (`prac-web-app`'s client half, DEFAULT_PLACEMENTS)
- * asks for the `vscode:editor` view. The DOM must agree with the placement table.
+ * The region the arrangement (`prac-web-app`'s client half, `openFileInto`) asks
+ * for a newly opened file. The DOM must agree with the placement policy.
  */
-const ARRANGED_EDITOR_REGION = "right";
+const ARRANGED_FILE_REGION = "stage";
 
 /**
- * The view id the editor seat (`prac-client-ui-vscode-editor`) declares and the
- * arrangement places.
+ * The view id a file view carries by convention (`prac-client-vscode-host`); the
+ * exact resource is discovered live, because the workspace is a session fact.
  */
-const EDITOR_VIEW = "vscode:editor";
+const FILE_VIEW_PREFIX = "vscode:file:";
 
 /**
  * The arrangement's own centre occupant, used as the *view* the row split
@@ -61,27 +65,15 @@ const EDITOR_VIEW = "vscode:editor";
 const CONVERSATION_VIEW = "dsh:main:conversation";
 
 /**
- * A second view for the `right` track, so the vertical split has something to
- * leave behind. The editor is the view that gets split out, and a *fixed* region
- * that empties is not rendered at all — no region, no sash, nothing to drag. One
- * visible occupant keeps the source pane on screen.
+ * A fixed-region occupant, so a split has a region that stays on screen. A
+ * *fixed* region that empties is not rendered at all — no region, no sash,
+ * nothing to drag — so the file view is split out of a region the sidebar keeps
+ * occupied.
  */
 const VSCODE_SIDEBAR_VIEW = "vscode:sidebar";
 
-/**
- * The part the app mounts behind each view.
- *
- * The DOM marks **part** ids ({ PART_HOST_ATTR}), while the frame and this
- * script speak **view** ids (`ctx.pracLayout`), so the two have to be related
- * here rather than assumed equal.
- */
-const PART_OF_VIEW = {
-  "vscode:editor": "workbench.parts.editor",
-  "vscode:sidebar": "workbench.parts.sidebar",
-};
-const VIEW_OF_PART = Object.fromEntries(
-  Object.entries(PART_OF_VIEW).map(([view, part]) => [part, view]),
-);
+/** The track the conversation parks in when a file takes the centre. */
+const TRACK_REGION = "right";
 
 /**
  * Decode a PNG inside the page and report how much of it is not one flat colour.
@@ -126,10 +118,10 @@ async function dragSash(page, selector, dx, dy = 0) {
   await page.waitForTimeout(700);
 }
 
-/** Read the region tree, the rendered geometry, and the part's paint. */
-async function sample(page) {
+/** Read the region tree, the rendered geometry, and the file view's paint. */
+async function sample(page, fileView) {
   const facts = await page.evaluate(
-    ({ editorView, viewOfPart }) => {
+    ({ fileView, trackRegion }) => {
       const box = (element) => {
         if (!element) return null;
         const rect = element.getBoundingClientRect();
@@ -146,7 +138,8 @@ async function sample(page) {
       }));
       const byId = (id) => regions.find((region) => region.id === id) ?? null;
 
-      // The panes of the split that holds the `console` region.
+      // The direct region siblings of the split that directly holds `regionId`:
+      // the two panes a sash between them moves.
       const panesOf = (regionId) => {
         const region = document.querySelector(`[data-prac-region="${regionId}"]`);
         const split = region?.parentElement?.closest("[data-prac-split]") ?? null;
@@ -156,20 +149,8 @@ async function sample(page) {
               .map((child) => ({ id: child.getAttribute("data-prac-region"), box: box(child) }))
           : [];
       };
-      const consolePanes = panesOf("stage");
-      const rightPanes = panesOf("right");
 
-      const hosts = [...document.querySelectorAll("[data-vscode-embed-part-host]")].map(
-        (element) => ({
-          view: viewOfPart[element.getAttribute("data-vscode-embed-part-host")] ?? null,
-          region: element.closest("[data-prac-region]")?.getAttribute("data-prac-region") ?? null,
-          editor: !!element.querySelector(".editor-group-container"),
-          box: box(element),
-        }),
-      );
-
-      // The model, so the placement and cached-size restore are checked as state
-      // and not only as pixels.
+      const host = document.querySelector("[data-vscode-embed-file]");
       const state = globalThis.__pracLayout?.getState?.();
       const regionOf = (node, id) => {
         if (!node) return null;
@@ -184,47 +165,50 @@ async function sample(page) {
       return {
         frame: box(document.querySelector("[data-prac-frame]")),
         regions,
-        right: byId("right"),
-        console: byId("stage"),
-        consolePanes,
-        consoleExtent: consolePanes.reduce((total, pane) => total + (pane.box?.w ?? 0), 0),
-        rightPanes,
-        rightExtent: rightPanes.reduce((total, pane) => total + (pane.box?.h ?? 0), 0),
-        splits: [...document.querySelectorAll("[data-prac-split]")].map((element) => ({
-          id: element.getAttribute("data-prac-split"),
-          dir: element.getAttribute("data-prac-split-dir"),
-          box: box(element),
-        })),
+        right: byId(trackRegion),
+        rightPanes: panesOf(trackRegion),
+        // Every region except the track: the extent that absorbs a collapse.
+        othersExtent: regions
+          .filter((region) => region.id !== trackRegion)
+          .reduce((total, region) => total + (region.box?.w ?? 0), 0),
         sashes: [...document.querySelectorAll("[data-prac-sash]")].map((element) => ({
           id: element.getAttribute("data-prac-sash"),
           left: element.getAttribute("data-prac-sash-left"),
           right: element.getAttribute("data-prac-sash-right"),
+          dir: element.getAttribute("data-prac-sash-dir"),
           box: box(element),
         })),
-        conversationInConsole: !!document.querySelector(
-          '[data-prac-region="stage"] [data-slot="main.conversation"], [data-prac-region="stage"] [data-conversation-scroll]',
+        conversationInTrack: !!document.querySelector(
+          `[data-prac-region="${trackRegion}"] [data-slot="main.conversation"], [data-prac-region="${trackRegion}"] [data-conversation-scroll]`,
         ),
-        editor: hosts.find((host) => host.editor) ?? null,
-        modelEditorRegion: state?.views?.[editorView]?.region ?? null,
-        modelRightSize: regionOf(state?.tree, "right")?.size ?? null,
-        modelRightCollapsed: regionOf(state?.tree, "right")?.collapsed ?? null,
+        file: host
+          ? {
+              region: host.closest("[data-prac-region]")?.getAttribute("data-prac-region") ?? null,
+              box: box(host),
+              lines: host.querySelectorAll(".view-line").length,
+            }
+          : null,
+        fileHostCount: document.querySelectorAll("[data-vscode-embed-file]").length,
+        modelFileRegion: state?.views?.[fileView]?.region ?? null,
+        modelConversationRegion: state?.views?.["dsh:main:conversation"]?.region ?? null,
+        modelRightSize: regionOf(state?.tree, trackRegion)?.size ?? null,
+        modelRightCollapsed: regionOf(state?.tree, trackRegion)?.collapsed ?? null,
       };
     },
-    { editorView: EDITOR_VIEW, viewOfPart: VIEW_OF_PART },
+    { fileView, trackRegion: TRACK_REGION },
   );
 
   let paint = null;
-  const host = facts.editor;
+  const host = facts.file;
   if (host && host.box.w > 2 && host.box.h > 2) {
     const clip = { x: host.box.x, y: host.box.y, width: host.box.w, height: host.box.h };
     const painted = await page.screenshot({ clip });
-    // Attribute the pixels: the same clip with the part host hidden must differ.
+    // Attribute the pixels: the same clip with the file host hidden must differ.
     const hide = (visibility) =>
       page.evaluate((value) => {
-        const element = [...document.querySelectorAll("[data-vscode-embed-part-host]")].find(
-          (candidate) => candidate.querySelector(".editor-group-container"),
-        );
-        if (element) element.style.visibility = value;
+        document.querySelectorAll("[data-vscode-embed-file]").forEach((element) => {
+          element.style.visibility = value;
+        });
       }, visibility);
     await hide("hidden");
     const hidden = await page.screenshot({ clip });
@@ -248,8 +232,16 @@ page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
 
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
-await page.waitForSelector("[data-vscode-embed-part-host]", { timeout: 60_000 });
-// Give Monaco a beat to paint after the grid lays it out.
+await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
+
+// Open one file: the arrangement puts it in the centre and sends the conversation
+// to the track. This is the model's factory shape, so it is where the gate starts.
+const folder = await page.evaluate(
+  () => (globalThis.__vscodeEmbed.face.workspaceInfo().folders ?? [])[0] ?? null,
+);
+if (!folder) throw new Error("the workbench has no workspace folder");
+await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), `${folder}/package.json`);
+await page.waitForSelector("[data-vscode-embed-file] .monaco-editor", { timeout: 60_000 });
 await page.waitForTimeout(3000);
 
 const probeReady = await page.evaluate(
@@ -261,73 +253,68 @@ const probeReady = await page.evaluate(
 if (!probeReady)
   throw new Error("globalThis.__pracLayout is not reachable; the page probe is missing");
 
+const fileView = await page.evaluate(
+  (prefix) =>
+    globalThis.__pracLayout
+      .listViews()
+      .map((view) => view.id)
+      .find((id) => id.startsWith(prefix)) ?? null,
+  FILE_VIEW_PREFIX,
+);
+if (!fileView) throw new Error("no file view was declared after opening a file");
+
 /** Call one method on the plugin's own layout face. */
 const act = (name, ...args) =>
   page.evaluate(({ method, params }) => globalThis.__pracLayout[method](...params), {
     method: name,
     params: args,
   });
+const read = () => sample(page, fileView);
 
 const states = {};
-states.default = await sample(page);
+states.default = await read();
 
-// ── split: the conversation moves into a pane beside `console` ───────────────
-// `splitView` is view-centric: it creates the pane *for* the named view, so the
-// row split that results has the conversation on one side and the (now empty)
-// `console` on the other — and the editor in `right` is untouched.
-await act("splitView", CONVERSATION_VIEW, "right");
+// ── split: the conversation leaves the track for a pane the sidebar keeps alive ─
+// `splitView` is view-centric: it creates the pane *for* the named view. The
+// conversation is the track's only visible occupant, so the sidebar is placed
+// there first — otherwise the emptied track would not render and there would be
+// no pane to sit beside. The file, in the centre, is untouched.
+await act("place", VSCODE_SIDEBAR_VIEW, TRACK_REGION);
+await page.waitForTimeout(700);
+await act("splitView", CONVERSATION_VIEW, TRACK_REGION);
 await page.waitForTimeout(900);
-states.split = await sample(page);
+states.split = await read();
 
-// ── drag: the `console | right` boundary moves ~120px left, shrinking `right`
-await dragSash(page, '[data-prac-sash-right="right"]', 120);
-states.resized = await sample(page);
-
-// ── move attention out of `right` so collapse cannot blank the part ──────────
-// The default keeps the editor in `right`; collapsing then inevitably hides it,
-// so the collapse phase first places the part in `console` through the plugin's
-// own `place`. The width restore is still checked on `right` itself.
-await act("place", EDITOR_VIEW, "stage");
-await page.waitForTimeout(1200);
-states.moved = await sample(page);
+// ── drag: the `right | new pane` boundary moves ~120px left, shrinking `right` ─
+await dragSash(page, `[data-prac-sash-left="${TRACK_REGION}"]`, -120);
+states.resized = await read();
 
 // ── collapse remembers width ─────────────────────────────────────────────────
-// The pre-collapse reference is the dragged width (the last state where `right`
-// was rendered); moving the part out makes the empty region take no space, so
-// the reference must be read before the move.
+// The file is in the centre, so collapsing the track cannot blank it: the file
+// keeps painting while the track's space goes to the flexible panes.
 const preCollapseDom = states.resized.right?.box?.w ?? null;
 const preCollapseModel = states.resized.modelRightSize;
-await act("setCollapsed", "right", true);
+const preCollapseOthers = states.resized.othersExtent;
+await act("setCollapsed", TRACK_REGION, true);
 await page.waitForTimeout(900);
-states.collapsed = await sample(page);
+states.collapsed = await read();
 
-await act("setCollapsed", "right", false);
+await act("setCollapsed", TRACK_REGION, false);
 await page.waitForTimeout(900);
-states.expanded = await sample(page);
-
-// Put the part back where the restore is visible as a real region.
-await act("place", EDITOR_VIEW, "right");
-await page.waitForTimeout(1200);
-states.restored = await sample(page);
+states.expanded = await read();
 
 // ── column: a `column` split resizes on dy, not just dx ──────────────────────
-// The editor moves into a pane below `right`, which keeps the sidebar view this
-// phase places there first: a *fixed* region that empties is not rendered, so
-// without an occupant there would be no sash to drag. Splitting a fixed region
-// makes the pair fixed|flex, which is what makes a vertical drag change heights.
-// The reload is not a reset any more — decision 16 persists the tree, so this
-// phase starts from the row split and the sizes above and adds to them.
-await page.reload({ waitUntil: "load", timeout: 60_000 });
-await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
-await page.waitForSelector("[data-vscode-embed-part-host]", { timeout: 60_000 });
-await page.waitForTimeout(2500);
-await act("place", VSCODE_SIDEBAR_VIEW, "right");
-await page.waitForTimeout(1200);
-await act("splitView", EDITOR_VIEW, "down");
+// The file moves into the fixed track (which the sidebar still occupies) and is
+// split out downwards: a fixed source keeps its size, so the pair is fixed|flex
+// and the vertical boundary actually moves. Splitting the already-flexible
+// centre would make a flex|flex pair, whose sash is inert by design.
+await act("place", fileView, TRACK_REGION);
 await page.waitForTimeout(900);
-states.columnSplit = await sample(page);
+await act("splitView", fileView, "down");
+await page.waitForTimeout(900);
+states.columnSplit = await read();
 await dragSash(page, '[data-prac-sash-dir="column"]', 0, 150);
-states.columnResized = await sample(page);
+states.columnResized = await read();
 
 await page.screenshot({ path: resolve(repoRoot, ".build/layout.png") });
 await browser.close();
@@ -336,68 +323,91 @@ await browser.close();
 const painted = (state) =>
   !!state.paint && state.paint.distinctColours > 4 && state.paint.differsWhenHidden === true;
 const within = (value, low, high) => typeof value === "number" && value >= low && value <= high;
-const paneIds = (state) => state.consolePanes.map((pane) => pane.id).join(",");
-const sideBySide = (state) =>
-  state.consolePanes.length === 2 &&
-  state.consolePanes[0].box.y === state.consolePanes[1].box.y &&
-  state.consolePanes[0].box.x < state.consolePanes[1].box.x;
-const stacked = (state) =>
-  state.rightPanes.length === 2 &&
-  state.rightPanes[0].box.x === state.rightPanes[1].box.x &&
-  state.rightPanes[0].box.y < state.rightPanes[1].box.y;
+const paneIds = (state) => state.rightPanes.map((pane) => pane.id).join(",");
+const sideBySide = (panes) =>
+  panes.length === 2 &&
+  panes[0].box.y === panes[1].box.y &&
+  panes[0].box.x < panes[1].box.x &&
+  panes[0].box.h === panes[1].box.h;
+const stacked = (panes) =>
+  panes.length === 2 &&
+  panes[0].box.x === panes[1].box.x &&
+  panes[0].box.y < panes[1].box.y &&
+  panes[0].box.w === panes[1].box.w;
 
-const dragShrink = states.split.right.box.w - states.resized.right.box.w;
-const dragGrowth = states.resized.consoleExtent - states.split.consoleExtent;
-const collapseGrowth = states.collapsed.consoleExtent - states.resized.consoleExtent;
-const columnGrowth = states.columnResized.right.box.h - states.columnSplit.right.box.h;
+const paneWidth = (state, id) => state.rightPanes.find((pane) => pane.id === id)?.box.w ?? null;
+const paneHeight = (state, id) => state.rightPanes.find((pane) => pane.id === id)?.box.h ?? null;
+const otherPaneId = (state) =>
+  state.rightPanes.find((pane) => pane.id !== TRACK_REGION)?.id ?? null;
+const rowShrink = (state) => paneWidth(states.split, TRACK_REGION) - paneWidth(state, TRACK_REGION);
+const rowGrowth = (state) => {
+  const id = otherPaneId(states.split);
+  return paneWidth(state, id) - paneWidth(states.split, id);
+};
+const collapseGrowth = states.collapsed.othersExtent - preCollapseOthers;
+const columnPaneId = otherPaneId(states.columnSplit);
+const columnGrowth =
+  paneHeight(states.columnResized, columnPaneId) - paneHeight(states.columnSplit, columnPaneId);
 
 // Decision 21: the mechanism's arithmetic (region geometry, `sashSizes`' clamps,
-// `cachedSize` round-trip, where the placement table puts the editor) is a unit
-// test. This gate keeps the VS Code side of the arrangement: the editor part is
-// in the region the arrangement names and paints, a real mouse drag moves the
-// rendered boundary — on both axes — and the part survives being moved,
-// collapsed and expanded. Pixel assertions are merged per phase rather than
-// repeated per state.
+// `cachedSize` round-trip, where the placement table puts a view) is a unit test.
+// This gate keeps the VS Code side of the arrangement: the file view is in the
+// region the arrangement names and paints, a real mouse drag moves the rendered
+// boundary — on both axes — and the file survives being moved, collapsed and
+// expanded. Pixel assertions are merged per phase rather than repeated per state.
 const checks = {
-  // default: the tree reproduces today's row, with the editor as its occupant.
+  // default: the file holds the centre and the conversation parks in the track.
   defaultRegions:
     states.default.regions.map((region) => region.id).join(",") === "left,stage,right",
-  defaultConversationInConsole: states.default.conversationInConsole === true,
-  defaultEditorInTheArrangedRegion:
-    states.default.modelEditorRegion === ARRANGED_EDITOR_REGION &&
-    states.default.editor?.region === states.default.modelEditorRegion &&
-    states.default.editor?.view === EDITOR_VIEW,
+  defaultConversationInTheTrack:
+    states.default.modelConversationRegion === TRACK_REGION &&
+    states.default.conversationInTrack === true,
+  defaultFileInTheArrangedRegion:
+    states.default.modelFileRegion === ARRANGED_FILE_REGION &&
+    states.default.file?.region === states.default.modelFileRegion &&
+    states.default.file?.lines > 3,
   paintedInTheDefault: painted(states.default),
 
-  // split: two panes in `console`, the editor untouched in `right`.
+  // split: two panes beside the fixed track, the file untouched in the centre.
   splitTwoPanesSideBySide:
-    states.split.consolePanes.length === 2 &&
-    states.split.consolePanes.every((pane) => pane.box.w > 100) &&
-    sideBySide(states.split),
-  splitEditorUntouched: painted(states.split) && states.split.editor?.region === "right",
+    states.split.rightPanes.length === 2 &&
+    states.split.rightPanes.every((pane) => pane.box.w > 100) &&
+    sideBySide(states.split.rightPanes),
+  splitFileUntouched: painted(states.split) && states.split.file?.region === ARRANGED_FILE_REGION,
 
   // drag: the boundary actually moved both neighbours — a stale size would not.
-  dragMovedBothNeighbours: within(dragShrink, 100, 140) && within(dragGrowth, 100, 140),
-  paintedAfterTheMoves: painted(states.resized) && painted(states.restored),
+  dragMovedBothNeighbours:
+    within(rowShrink(states.resized), 100, 140) && within(rowGrowth(states.resized), 100, 140),
+  paintedAfterTheDrag: painted(states.resized),
 
-  // collapse: `right` goes to zero, `console` takes exactly that space.
+  // collapse: the track goes to zero, the flexible panes take exactly that space,
+  // and the file in the centre keeps painting.
   collapseZeroesAndGivesRoom:
-    states.collapsed.right?.box.w === 0 &&
+    states.collapsed.right?.box?.w === 0 &&
     states.collapsed.modelRightSize === 0 &&
     states.collapsed.modelRightCollapsed === true &&
-    within(collapseGrowth, preCollapseDom - 20, preCollapseDom + 20),
+    within(collapseGrowth, preCollapseDom - 25, preCollapseDom + 25),
   paintedWhileCollapsed: painted(states.collapsed),
 
-  // expand: the part is back in `right`, painted, at the width it had.
-  restoreBringsBackThePart:
-    states.restored.editor?.region === "right" && states.restored.right?.box.w === preCollapseDom,
+  // expand: the track is back, painted, at the width it had.
+  restoreBringsBackTheTrack:
+    states.expanded.right?.box?.w === preCollapseDom && painted(states.expanded),
 
   // column: the same drag on dy moves a vertical boundary.
   columnPanesStacked:
     states.columnSplit.rightPanes.length === 2 &&
     states.columnSplit.rightPanes.every((pane) => pane.box.h > 100) &&
-    stacked(states.columnSplit),
-  columnDragChangedHeight: within(columnGrowth, 130, 170),
+    stacked(states.columnSplit.rightPanes),
+  columnDragChangedHeight:
+    within(Math.abs(columnGrowth), 130, 170) &&
+    within(
+      Math.abs(
+        paneHeight(states.columnResized, TRACK_REGION) -
+          paneHeight(states.columnSplit, TRACK_REGION),
+      ),
+      130,
+      170,
+    ),
   paintedAfterTheColumnSplit: painted(states.columnResized),
 };
 
@@ -405,34 +415,36 @@ const report = {
   url,
   checks,
   evidence: {
+    fileView,
     arrangement: {
-      askedRegion: ARRANGED_EDITOR_REGION,
-      modelRegion: states.default.modelEditorRegion,
-      domRegion: states.default.editor?.region,
+      askedRegion: ARRANGED_FILE_REGION,
+      modelRegion: states.default.modelFileRegion,
+      domRegion: states.default.file?.region,
+      conversationRegion: states.default.modelConversationRegion,
     },
     drag: {
-      from: states.split.right.box.w,
-      to: states.resized.right.box.w,
-      shrink: dragShrink,
-      consoleGrowth: dragGrowth,
+      from: paneWidth(states.split, TRACK_REGION),
+      to: paneWidth(states.resized, TRACK_REGION),
+      shrink: rowShrink(states.resized),
+      neighbourGrowth: rowGrowth(states.resized),
     },
     collapse: {
       preCollapseDom,
       preCollapseModel,
-      consoleGrowth: collapseGrowth,
-      rightAfter: states.collapsed.right?.box.w,
+      othersGrowth: collapseGrowth,
+      rightAfter: states.collapsed.right?.box?.w,
       modelAfter: states.collapsed.modelRightSize,
     },
     expand: {
       modelRight: states.expanded.modelRightSize,
-      restoredDomWidth: states.restored.right?.box.w,
+      restoredDomWidth: states.expanded.right?.box?.w,
     },
     column: {
-      from: states.columnSplit.right.box.h,
-      to: states.columnResized.right.box.h,
+      panes: paneIds(states.columnSplit),
+      from: paneHeight(states.columnSplit, columnPaneId),
+      to: paneHeight(states.columnResized, columnPaneId),
       growth: columnGrowth,
     },
-    paneIds: { split: paneIds(states.split), resized: paneIds(states.resized) },
   },
   states,
   errorCount: errors.length,
@@ -449,5 +461,5 @@ if (failed.length) {
   process.exit(1);
 }
 console.log(
-  "\nOK: the region tree splits, resizes by sash, and collapse restores the cached width — with the editor painting throughout and placed where the arrangement asks.",
+  "\nOK: the region tree splits, resizes by sash on both axes, and collapse restores the cached width — with the file view painting throughout and placed where the arrangement asks.",
 );

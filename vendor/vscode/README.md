@@ -120,15 +120,15 @@ pnpm --filter prac-vscode vscode:clean
 
 ## 验证（活体闸门）
 
-四条闸门都打真实浏览器、看 **DOM 与像素**（不是看代码），需要 DSH 页在跑。它们也正是**交互面走 bridge** 的回归测试：bridge 若失效，workbench 会退回"自己挂 part"的默认路径、把 part 挂进不可见的 boot 容器，于是四条全红。
+这些闸门都打真实浏览器、看 **DOM 与像素**（不是看代码），需要 DSH 页在跑。它们也正是**交互面走 bridge** 的回归测试：bridge 若失效，workbench 会退回"自己挂 part"的默认路径、把 part 挂进不可见的 boot 容器，于是它们全红。
 
 ```bash
 URL='http://127.0.0.1:3084/?token=…' node scripts/verify-layout.mjs   # 14 项
-URL='…' node scripts/verify-views.mjs                                 # 25 项
+URL='…' node scripts/verify-views.mjs                                 # 28 项
 URL='…' node scripts/verify-focus.mjs                                 # 9 项
 URL='…' node scripts/verify-regions.mjs                               # 6 项（frame 托管的是 view：无 part、view 有尺寸、退役的 editor part 只在屏外）
 URL='…' node scripts/verify-view.mjs                                    # 7 项（单 view 宿主：无 part、有像素、可释放重建）
-URL='…' node scripts/verify-file.mjs                                    # 9 项（单文件编辑面：真实文本、有像素、一文件一面、可释放重建；app 自己打开文件会通过事件报到）
+URL='…' node scripts/verify-file.mjs                                    # 10 项（单文件编辑面：真实文本、有像素、一文件一面、可释放重建；app 自己打开文件会通过事件报到）
 URL='…' node scripts/verify-extension.mjs                               # 5 项（需已装扩展；没装则明确 SKIP）
 ```
 
@@ -136,9 +136,9 @@ URL='…' node scripts/verify-extension.mjs                               # 5 �
 
 **独立页（无 bridge 的默认路径）另有一条**：`vscode:serve`（默认 `:5199`）跑着时 `vscode:smoke` 断言 8 个 part 全部挂载且编辑器有内容，`errorCount: 0`。
 
-- `verify-layout`：区域树分栏、sash 拖拽、收起/展开恢复缓存尺寸，且编辑器**全程在画**并落在编排要求的位置。
+- `verify-layout`：区域树分栏、sash 拖拽（两个轴）、收起/展开恢复缓存尺寸，且**当前文件 view** 全程在画并落在编排要求的位置（`stage`）。
 - `verify-views`：调出面（recall surface）按快捷键打开、列出实时 view 目录、隐藏/调出/移区/分栏都在像素上生效。
-- `verify-focus`：注意力把编辑器 part 在轨道与中央之间搬移且仍在上屏；含不变量「一个 part 恰好存在于一个 host」。
+- `verify-focus`：注意力把**当前文件 view** 在轨道与中央之间搬移且仍在上屏（内容按渲染出的行判定）；含不变量「一个文件恰好一个编辑面」。打开文件会移动注意力，所以条与布局始终一致。
 - `verify-regions`：**frame 里没有 part**（决定 17 之后 prac 组合的是 view），被退役的 editor part 只以**离屏**形式存在（服务图需要它），view host 有尺寸且它自己的 pane 不超出宽度。
 - 活体门里只有**需要 VS Code 侧**的那些住在这里（part host / embed face / 扩展 / 编辑器像素）；**prac 自己机制的闸门放 prac 的 `tests/gates/`**（如堆叠）。
 - `verify-view`：**单个 view** 被造成自带 pane 挂进 prac 的 region（页面里没有 sidebar part），并且跨 region 搬移时释放后重建仍然上屏。

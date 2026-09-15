@@ -112,7 +112,9 @@ async function sample() {
       hasEditor: !!el.querySelector(".monaco-editor"),
       lines: el.querySelectorAll(".view-line").length,
       // Monaco renders text with non-breaking spaces; normalise before matching.
-      text: (el.querySelector(".view-lines")?.textContent ?? "").replace(/\u00a0/g, " ").slice(0, 4000),
+      text: (el.querySelector(".view-lines")?.textContent ?? "")
+        .replace(/\u00a0/g, " ")
+        .slice(0, 4000),
       box: box(el),
     }));
     return {
@@ -157,9 +159,10 @@ async function sample() {
 
 const states = {};
 
-// Opening the file is the arrangement's `openFileInto`: the file takes the centre
-// and the conversation parks in the track. Attention itself still reads
-// `conversation` — opening a file does not steal the strip.
+// Opening the file is the arrangement's `openFileInto`, and attention moves with
+// it: the file takes the centre, the conversation parks in the track, and the
+// strip reads `vscode`. A strip still saying `conversation` would be lying about
+// what holds the centre (and `Control+Alt+1` would then be a no-op).
 states.opened = await sample();
 
 // Promote the file view with the keyboard shortcut (also exercises the binding).
@@ -203,7 +206,7 @@ const checks = {
   // Attention is reported by the environment layer, not by a seat we displaced.
   stripPresent: states.opened.hasStrip && states.promoted.hasStrip && states.parked.hasStrip,
   stripFollowsFocus:
-    states.opened.focus === "conversation" &&
+    states.opened.focus === "vscode" &&
     states.promoted.focus === "vscode" &&
     states.parked.focus === "conversation",
   // Promoted: the file holds the centre, and the track's width went to it.
@@ -212,8 +215,7 @@ const checks = {
   // actually moving between regions and painting in each.)
   promotedFileCentred:
     states.promoted.host?.region === "stage" && Math.abs(offset(states.promoted)) < 200,
-  promotedWiderThanBeside:
-    states.promoted.host.box.w > states.parked.host.box.w * 1.3,
+  promotedWiderThanBeside: states.promoted.host.box.w > states.parked.host.box.w * 1.3,
   paintedThroughThePromotion:
     painted(states.opened) && painted(states.promoted) && painted(states.parked),
   // The move must not lose the editor's content: the rendered lines are still the
@@ -247,7 +249,11 @@ console.log(
       states: Object.fromEntries(
         Object.entries(states).map(([name, state]) => [
           name,
-          { ...state, hosts: state.hosts.map((host) => ({ ...host, text: undefined })), paint: state.paint },
+          {
+            ...state,
+            hosts: state.hosts.map((host) => ({ ...host, text: undefined })),
+            paint: state.paint,
+          },
         ]),
       ),
       errorCount: errors.length,
