@@ -6,14 +6,45 @@
 
 **每次工作前，先读 [.agents/always-remember.md](.agents/always-remember.md)**——那是关于「我在为谁、为什么、朝什么而做」的备忘，提醒我记得 James 的出发点、他对 agent 能力的手感、他的理念与理想，以及我要保持的克制（别过度设计、别替人拍板、别拿分析当结论、别把 rig 缺陷当能力边界、别把复杂度当价值）。
 
-你的**决策记忆**在 [.agents/notes/](.agents/notes/)（agent 面向，跨会话持久化）：这是每个设计决策的「为什么 + 放弃了什么」，按状态轴组织（`proposed` / `in-progress` / `resolved:<fine>` / `abandoned:<fine>`）。**开始工作前先读它**（看 `resolved/` 与 `proposed/` 的树），避免重新论证或与既定方向冲突。
+### 记忆的分工
 
-- [.agents/notes/](.agents/notes/)：决策记忆树（no-index）——`resolved/` = 已定方向，`proposed/` = 在论证，`in-progress/` = 已接受未完成，`abandoned/` = 被否/被取代。每条 note 的 **frontmatter** 带 `status:` 字段（`proposed`/`in-progress` 平铺；`resolved:<fine>`/`abandoned:<fine>` 前缀空间）；当前立场由 `in-progress ∪ resolved:*` 从树推导，无中央「当前状态」。
+- [.agents/always-remember.md](.agents/always-remember.md)：**为谁、为什么、朝什么**（含克制清单）。
+- [.agents/notes/](.agents/notes/)：**决策记忆**——每个设计决策的「为什么 + 放弃了什么」，按状态轴组织。
 - [docs/](docs/)：**参考**（现在时、stable）。[philosophy.md](docs/philosophy.md) 是当下的哲学论述；[docs/theory/](docs/theory/) 是继承的 LLM 限制理论根。
 
-**主动查阅**：开始工作前先查 `.agents/notes/` 和 `docs/`。
+### notes 的用法
 
-**主动记录**：发现值得保留的知识（设计决策、踩坑、有效模式）就写入 `.agents/notes/`（新的 proposed 记录或更新既有决策），不必等人类要求。
+**notes 是什么**：prac 的**开发过程**记忆，也是**我们讨论的白板**——讨论发生在 note 里（`Problem / Proposal / Alternatives / Open questions` 就是这个形状），不是散在聊天里。它不是便签，也不是通用笔记本。
+
+**粒度：一条 note = 一个工作**
+
+- **同一个工作的后续进展，在同一个 note 里进行**；修订就是**编辑**，不新开 note。
+- 只有**大的规划**才拆成 **umbrella + 多个 step**。
+- **复盘 / 阶段综述不进 note**——它不是工作；要作为**依据**附在相关的工作 note 里。
+
+**什么进 / 什么不进**
+
+- 洞察、发现、观察、复盘、开放问题、障碍**不直接成 note**（它们没有权威状态）→ 作为**依据/证据**附在相关的 note 里，或留在工作记录中。
+- 只有当**一个开放问题被决断**、或**一个洞察确立为影响 prac 方向的边界**时，才凝结为 note（或**并入**所支撑的 note）。
+
+**状态轴（唯一强制的轴）**，写在 frontmatter 的 `status:`：
+
+| 状态               | 含义                                                               |
+| ------------------ | ------------------------------------------------------------------ |
+| `proposed`         | 在考虑，未裁决                                                     |
+| `in-progress`      | 已裁决（接受为方向），工作在进行中                                 |
+| `resolved:<fine>`  | 肯定的终态（前缀空间：`implemented` / `settled` / `established`…） |
+| `abandoned:<fine>` | **终态非当前**（前缀空间：`rejected` / `superseded` / `frozen`…）  |
+
+- `proposed`/`in-progress` 平铺；终态用前缀空间。
+- **`abandoned` 是「终态非当前」，不是「错的」。** 同一个工作内的修订是**编辑**，不动状态；`abandoned` 只用于**整个工作**被否 / 被取代 / 冻结。
+- **人签字才算 `resolved`**——你不自我 promote。
+
+**no-index**：不设中央 index，也不维护单一「当前状态」（会强制串行、成写入热点、易漂移）。当前方向 = 从树上 `in-progress ∪ resolved:*` **衍生**；导航靠树 + 每条 note 自己的状态 + 搜索。
+
+**主动查阅**：开始工作前先查 `.agents/notes/` 与 `docs/`。
+
+**主动记录**：发现值得保留的知识（设计决策、踩坑、有效模式）就按上面的规则写入 notes，不必等人类要求。
 
 ## 工作原则
 

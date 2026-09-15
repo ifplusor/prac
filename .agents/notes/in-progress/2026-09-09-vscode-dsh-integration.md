@@ -56,6 +56,10 @@ DSH web 页
 
 ## 4. 决定
 
+> **编号 = 引用句柄**（对话与其它 note 直接引"决定 14"），所以**只追加、不复用、不重排**；下面的主题导航只做索引。
+> **主题导航**：与上游/补丁 `3 4 5 6` ｜ 边界与分层 `1 2 2b 7 8 9 10` ｜ 区域与布局 `14 15 16 20` ｜ 编辑器与文件 `17` ｜ 工作区与状态 `13` ｜ 生态与能力 `18 19` ｜ 工程 `11 12`
+> **当前队列（建议顺序，未裁）**：`14`（对话可放置）→ **B1**（单 view 宿主）→ `18`（server 基座 + Tier 2 扩展证明）→ frame 批次 `15 16 17 20` → 能力面（含上下文入）
+
 | # | 决定 | 状态 |
 | --- | --- | --- |
 | 1 | DSH 页当 shell，VS Code 的 parts 挂进 DSH 的**真**布局 region（不 island 化） | 生效；L2 会把"挂哪一级"细化 |
@@ -76,6 +80,9 @@ DSH web 页
 | 15 | **区域的形态**：**常驻区**（`sidebar` / `rightbar`）不分栏、但**都可堆叠**（可折叠 header、排序、尺寸记忆）；**`stage` 的分栏必须带视图**（对齐 VS Code 的 editor group）；**新增常驻底栏**（`bottom`，默认收起，放 terminal / 输出 / 问题） | **James 裁决 2026-09-15**。堆叠 = `container` 在 prac 里的落点（`dsh:` 与 `vscode:` 的 view 可同列） |
 | 16 | **持久化（最小集）**：区域尺寸 / 每个 view 的 `collapsed` / 堆叠顺序 / 哪些 view 在屏上；按决定 13 的两份 key（**per-window** 布局、**per-workspace** 展开项）；用 DSH `client-store` 的 `persist: { name }`。注意力栈与 recall 历史**不存** | **James 裁决 2026-09-15**；不做则堆叠与折叠每次刷新回默认 |
 | 17 | **`stage` 提供 tab 与分栏；VS Code 侧提供的是“单个 file view”**：prac 里的“编辑器”= **一个文件的编辑面**（一个 view），**不是 editor part / editor group**；**tab 与分栏由 `stage` 提供**（⇒ **frame 级标签页要做**，且在 stage 内）。frame 本身仍不认识“编辑器组” | **James 裁决 2026-09-15**，修正我先前的推断（“不做 frame 级标签页”是错的）。理由：若用 VS Code 的 editor part（自带 tab 条与 group 模型），chat 与 editor 就无法在 stage 里自由并排。**后果**：L1 现在挂的 `workbench.parts.editor` 是**过渡形态**；lib 的 editor 句柄应定义为 `editor(file) → view`（B1 之后的 L2 工作） |
+| 18 | **扩展基座换成完整 `server` 目标**：`build.mjs` 增加 `--target server`（**必须带 `--nls`**）的构建，host 与 code server 指向它；**验收判据 = 一个 Tier 2 扩展真的激活，且它的 UI 贡献出现在 prac 的 view 目录 / 区域里** | **James 裁决 2026-09-15**（先换基座、再验证生态）。已知坑（都在踩坑表里）：`--out` 必须相对路径；数据目录要重定向；`product.json` 要盖章；`server-cli --install-extension` 被环境守卫挡住 ⇒ 装扩展要另有路径 |
+| 19 | **terminal 用 VS Code 的**（完整 `server` 目标自带 PTY + shell integration + 扩展 API），它只是底栏里的一个 view；**agent 执行命令走 DSH 自己的 exec**，不与人那条终端共用（代价：agent 看不到人终端的输出，除非日后做桥） | **James 裁决 2026-09-15**；作废旧计划"纯 web 无 PTY ⇒ PTY 放 DSH host"（决定 18 换基座后其前提消失） |
+| 20 | **`stage` 支持任意方向分栏**（上下左右、可嵌套） | **James 裁决 2026-09-15**（细化决定 15：stage 不止左右分）。**模型层已支持**——`contract.ts` 的 `split(regionId, dir?: Dir)`、`model.ts` 的 `node.dir === "row" ? w : h` 与递归 `visit` 都吃两个轴；**缺的是**：①面向用户的动作（上下左右 /"把当前 view 分到某侧"）②`split` 现在造的是**空 region**，与决定 15「分栏必带视图」冲突 ③两个轴上的 sash 与注意力 ④树形状的持久化（决定 16） |
 
 ### 被否决 / 已撤回的路线（"放弃了什么"）
 
@@ -201,7 +208,7 @@ DSH web 页
 | 放好部件后轨道被关掉 | 被遮蔽者的卸载清理 `syncPresentation({shown:false})` → `closeRightbar()` 落在我们的 `openRightbar` **之后** | 放好部件后再断言一次轨道 |
 | 部件被搬进瞬时 0 宽 host ⇒ 只有 15 种颜色（纯背景） | 按 0 尺寸布局，轨道随后打开没人重排 | host 加 `ResizeObserver` 触发 `layout()` |
 | sash 只有下界没有上界（`left` 长到 1350，两个面板被挤成 0） | ①clamp 只用相邻 leaf 的 min ②flex leaf 的 `min-width: 0` 没表达在分割轴 | 预算改 `extent − sashes − Σ(其它子树的 min)`；修复后停在 870 / 120 |
-| 固定的空 leaf 不占空间 | 搬运唯一视图 = 关掉轨道；新建空面板不可见 | **未决**（是否要显式空占位，见 §8） |
+| 固定的空 leaf 不占空间 | 搬运唯一视图 = 关掉轨道；新建空面板不可见 | **已定（决定 15/20）**：常驻区一直有视图、stage 分栏必带视图 ⇒ 不再有"空 region"；`split` 现在造空 region 的行为要改 |
 
 ### C. 契约与类型
 
@@ -232,7 +239,7 @@ DSH web 页
 | `disabled` 写进 patch 静默无效 | 每条 patch 只索引它**之前**插入的行 | `disabled` 必须排在 `insert` **之后** |
 | `vp pack`（host 构建）把 `dist/` 清空 ⇒ DSH 报 `client bundle not found` | 两半产物分两步出 | 同一份 `pack` 配置数组同时出两半 |
 | `exports['./client']` 路径改动后页面不对 | 客户端插件清单是**启动时**组装的 | 必须重启 DSH |
-| 根 `vp check` 报 16 个文件格式不合，全是 notes/docs | 根 check 覆盖面过宽 | 根 `check` 收窄到 `scripts vite.config.ts package.json`；**范围本身仍是待裁决定**（§8） |
+| 根 `vp check` 报 16 个文件格式不合，全是 notes/docs | 根 check 覆盖面过宽 | 根 `check` 收窄到 `scripts vite.config.ts package.json`（临时）；**2026-09-15 已按 James 裁决改为**：根 `vite.config.ts` 的 `fmt.ignorePatterns` 只排除 `.agents/notes/`，根 `check` = `vp check .`（代码/脚本/配置/docs 全进） |
 | 改名后 DSH 起不来 / 页面全 404 | profile 里是**绝对路径 link**；host 半边路由变了 | `pnpm install` 重链 + 重启 DSH（`patchReload: startup`）；DSH 启动要写 `~/.dsh`（沙箱外） |
 | 在 checkout 里改了却忘了重新生成补丁 ⇒ 下次构建**成功但改动丢了** | `build.mjs` 顺序：reset → `git clean -fd` → apply patch | 改 checkout 必须立刻重新生成补丁；**载荷只以 diff 文本存在的风险**见下 |
 
@@ -251,35 +258,31 @@ DSH web 页
 
 ## 8. 开放问题
 
-### 需要 James 裁的形态问题
+> 2026-09-15 的一轮问答把原先散着的一批收敛了：**已裁决的进决定表**（`2b` / `14`–`20`）或 09-15 note，这里只留**真的还没定**的。
 
-1. **能力粒度**：L2（拆到 view / widget）+ 理想形态（kernel / views / capabilities）——方案与代价见 09-15 note。
-2. **已闭合（2026-09-15）**：容纳单位定为 **`view`**（见决定 2b），container / part 退为可选的高级形态。
-3. **已闭合（2026-09-15）**：对话改为可放置的普通 view（见决定 14）——"`main` 单占位 ⇒ 对话不能在侧边"不再成立。
-4. **已闭合（2026-09-15）**：区域形态与堆叠见决定 15、持久化见决定 16——空 region 概念不再需要（常驻区一直有视图，stage 分栏都带视图）。
-5. **已定（2026-09-15）：异步通道先不做**——排在 frame 完整性之后。现状仍是"环境条只是焦点控件"，「异步交流」这条**尚未满足**；形态选项（最小标记+双向服务 / 完整线程 / 复用 chat）记在当次问答里。
-6. **已闭合（2026-09-15）**：stage 提供 tab 与分栏，VS Code 侧只提供单个 file view（决定 17）⇒ **frame 级标签页要做**（stage 内）；侧栏用堆叠。
-7. **已明确推迟（James 说"先不管"）**：①notes 树两处合并 ②阶段二是否仍是长期目标（落 `proposed` 还是 `abandoned:superseded`）。
+### 需要 James 裁
 
-### 能力与生态
+1. **理想形态是否确认**：`kernel / views / capabilities` 三层与"view 是单位"（决定 2b 已定，三层形态待确认）——方案与代价见 09-15 note；B1 是它的先决验证。
+2. **两套 server 统一**的路线：先"共存 + 共享 workspace"，还是直接"DSH 跑进 code server"（决定 18 只定了先换基座）。
+3. **阶段二**（决策空间 / 以审决策为主界面）：**还不确定**——保持 `proposed`，不表态；C2 叫停的理由也仍待确认。
+4. **高级形态（container / part）什么时候真的需要**：逐个 view 组合 vs"把整块 sidebar 原样搬来"。
+5. **异步通道**：已定"先不做"，**形态未裁**（选项：最小标记 + 双向服务 / 完整异步线程 / 复用 chat 的留言模式）。
 
-9. **terminal 无 PTY**：纯 web 构建没有；计划在 **DSH host** 里做 PTY（与 code server 无关）。
-10. **扩展宿主 web → server**（决定扩展生态范围）；server 基座：openvscode-server 起步，还是把自建构建升级到 server 目标。已核实"我们的 pinned checkout 自己就能构建 server"⇒ 不需要第三方 fork。
-11. **两套 server 统一**：先"共存 + 共享 workspace"，还是直接"DSH 跑进 code server"。
-12. **DSH ↔ workbench 状态桥**未做（agent 改动 ↔ 编辑器/选区/文件）。
-13. **内建扩展编译**：`npm run build-fast-extensions` 被 `extensions/ipynb` 的 typecheck 挡住，现仅 **12/106** ⇒ 装真扩展确认激活是 **Tier 2 的证明**。
-14. **sidebar / panel / statusbar 的映射**：目前落位的是 sidebar + 对话 + 编辑器 + 环境条/调出面；panel / statusbar 未做。
-15. **补 stub 掉的 layout 语义**（显隐 / 持久化 / zen / centered / floating / 多窗口）。
-16. **agent 能力面（diagnostics / symbols / search / scm / tasks / terminalOutput / commands）完全没有实体**——只有"状态桥未做"这一句；**时机已定（2026-09-15）：排在 B1（单 view 宿主）之后**，形状见 09-15 note。
-17. **高级形态（container / part）什么时候真的需要**：逐个 view 组合 vs "把整块 sidebar 原样搬来"是两种用法，后者何时用未定。
+### 已排期、尚未做
 
+6. **B1（单 view 宿主）** → 之后是**能力面**（含上下文入）——见 09-15 note。
+7. **frame 批次**：决定 `15`（底栏 / 两个侧栏堆叠）、`16`（最小集持久化）、`17`（stage 的 tab）、`20`（任意方向分栏，且 `split` 造的"空 region"要按决定 15 改成"带视图"）。
+8. **决定 18**：`build.mjs` 加 `--target server`（带 `--nls`），验收 = 一个 Tier 2 扩展激活且其 UI 贡献上屏。
+9. **sidebar / panel / statusbar 的映射**：目前只落了 sidebar + 对话 + 编辑器 + 环境条/调出面；以及补 stub 掉的 layout 语义（显隐 / zen / centered / floating / 多窗口）。
 
-### 工程
+### 仍然开放（工程与生态）
 
-17. **Step B 第二部分**：view id 仍是 **6 处**字面量、`/prac-vscode` 仍是 Node/浏览器**两处**；**共享常量模块的落点与依赖方向仍未定**（这是"契约写多遍"的根因）。
-18. **机制正确的 checkout 覆盖开关**（重定向解析而非文件路径）：未做；`dsh-types --compare` 已覆盖"类型是否漂移"。
-19. **两个 native/可选缺口**（既有、非阻塞）：`@vscode/fs-copyfile` 抛 `Cannot find module '../build/Debug/vscode_fs.node'`（未捕获，宿主照样起）；`spdlog` 降级；`vsda` 缺失；页面两个 404 是客户端可选模块（`@vscode/vscode-languagedetection`、`vscode-regexp-languagedetection`）。
-20. **全部改动未提交**——按约定等 James 审阅后再 commit。
+10. **Step B 第二部分**：view id 仍是 **6 处**字面量、`/prac-vscode` 仍是 Node/浏览器**两处**；**共享常量模块的落点与依赖方向仍未定**（"契约写多遍"的根因）。
+11. **内建扩展编译**：`npm run build-fast-extensions` 被 `extensions/ipynb` 的 typecheck 挡住（现 **12/106**）——它是决定 18 那条验收的前提。
+12. **agent 能力面**目前**没有任何实体**（排期已定，见 6）；能力清单与 settled / provenance / 分页语义见 09-15 note。
+13. **两处 native / 可选缺口**（既有、非阻塞）：`@vscode/fs-copyfile` 抛 `Cannot find module '../build/Debug/vscode_fs.node'`（未捕获，宿主照样起）；`spdlog` 降级；`vsda` 缺失；页面两个 404 是客户端可选模块（`@vscode/vscode-languagedetection`、`vscode-regexp-languagedetection`）。
+14. **机制正确的 checkout 覆盖开关**（重定向解析而非文件路径）：未做；`dsh-types --compare` 已覆盖"类型是否漂移"。
+15. **进度已提交（2026-09-15）**：分支 `feat/vscode-dsh-integration`，两个 `wip:` 提交（①包重组/vendor/工具链 ②notes），tag `wip/vscode-dsh-2026-09-15`。**提交 ≠ 成果已定**——靠 James 判断的内容仍要审阅；后续进度按同样方式（feature 分支 + `wip`）提交。
 
 ## Related
 

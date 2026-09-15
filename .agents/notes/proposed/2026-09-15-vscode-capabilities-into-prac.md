@@ -117,9 +117,9 @@ James（2026-09-15）：**"我们想要的不是自定义 workbench，而是把�
 1. 理想形态（三层：kernel / views / capabilities）是否被确认？确认后 lib 的目标形状要不要直接按它分层，而不是继续往 `partHost` 上加方法。
 2. **高级形态（container / part）什么时候真的需要、chrome 保留到什么程度**：整块标准 IDE 区域（"把 sidebar 原样搬来"）与逐个 view 组合，是两种用法；全留 chrome 最省事，去掉要换掉 `ViewPaneContainer` 的 ctor options 与 `PaneView`。
 3. B1 之后第二个能力件选谁（search / SCM / outline / terminal / editor group）。
-4. agent 面（capabilities）何时开设计：它决定"能力层是否真的被拆开"，与 L2 是两件事。**目前它在任何 in-progress note 里都没有落点（本 note 是它唯一的落点）**——umbrella 只记了"状态桥未做"一句。
+4. **已定（2026-09-15）**：agent 能力面**排在 B1 之后**；上下文入（当前文件 / 选区 / 打开的 view）并入它。它决定"能力层是否真的被拆开"，与 L2 是两件事。
 5. 要不要现在就测"未挂载 part 的成本"，用它决定 A 是否值得。
-6. **已闭合（2026-09-15）**：容纳单位定为 `view`（umbrella 决定 2b），原"决定 2/3 与 09-15 方向相冲"的张力消解；container / part 退为可选的高级形态。剩下的开放点是**高级形态什么时候真的需要**（见下）。
+6. **已闭合（2026-09-15）**：容纳单位定为 `view`（umbrella 决定 2b），原"决定 2/3 与 09-15 方向相冲"的张力消解；container / part 退为可选的高级形态（"何时真的需要"列在 umbrella §8）。
 7. **与 umbrella §8 的能力/生态开放项互相引用**（扩展宿主 web → server、terminal PTY 放在 DSH host、DSH ↔ workbench 状态桥、内建扩展编译 12/106）——它们与"agent 能力面"是同一条决策链的前后段，但目前两条 note 互不链接细分。
 
 8. **从 VS Code 拿“单个 file view”的路径（决定 17 的后果）**：`IEditorService` 造出来的是“组里带 tab 的 editor”；要一个**不带 part/tab、但仍带完整 IDE 能力**（model / 语言特性 / undo / diff）的单文件编辑面，需要先确定正确构造路径（`IEditorPane` 工厂 / `EditorPane` / `CodeEditorWidget` 各自带走什么）。这是 B1 之后的 L2 工作，也是 lib 的 `editor(file)` 句柄能否成立的前提。
