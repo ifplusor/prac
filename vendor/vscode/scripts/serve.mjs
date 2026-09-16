@@ -5,7 +5,7 @@ import { extname, join, normalize, resolve } from "node:path";
 
 const packageDir = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageDir, "../..");
-const workDir = resolve(process.env.PRAC_WORKBENCH_DIR ?? join(repoRoot, ".build/workbench"));
+const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
 const ROOT = join(workDir, "web");
 const PORT = Number(process.env.PORT ?? 5199);
 

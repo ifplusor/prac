@@ -19,8 +19,8 @@
  *   5. bundle -> `out-vscode-web` (target `web`, with NLS)
  *   6. stage `<work>/web` = our `index.html` + an `out/` link to the bundle
  *
- * Everything (checkout, caches, output) lives under `PRAC_WORKBENCH_DIR`
- * (default `<repo>/.build/workbench`, gitignored), so the build writes nothing
+ * Everything (checkout, caches, output) lives under `PRAC_VSCODE_DIR`
+ * (default `<repo>/.build/vscode`, gitignored), so the build writes nothing
  * outside the repository and needs no elevated sandbox.
  *
  * Usage:
@@ -53,7 +53,7 @@ if (!pin?.repository || !pin?.tag) {
 }
 
 const flags = new Set(process.argv.slice(2));
-const workDir = resolve(process.env.PRAC_WORKBENCH_DIR ?? join(repoRoot, ".build/workbench"));
+const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
 const upstreamDir = join(workDir, "upstream");
 const webDir = join(workDir, "web");
 const cacheDir = join(workDir, "cache");

@@ -23,7 +23,7 @@ import { join, resolve } from "node:path";
 
 const packageDir = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageDir, "../..");
-const workDir = resolve(process.env.PRAC_WORKBENCH_DIR ?? join(repoRoot, ".build/workbench"));
+const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
 const upstreamDir = join(workDir, "upstream");
 const url = process.env.URL;
 /** The extension this gate needs, and one of the views it contributes. */

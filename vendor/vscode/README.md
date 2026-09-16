@@ -4,7 +4,7 @@ prac **拥有**的 VS Code——以 **pin + patch + 构建配方**的形式，�
 
 - **上游**：`https://github.com/microsoft/vscode.git`（Code - OSS），tag `1.137.0`，构建时解析到的 commit `645f29cc3176500b4b5762ba887cf2a7f0ffdf2c`。
 - **仓库拥有**（进 git）：`package.json#prac.vscode`（pin）、`patches/`（对上游的**唯一**改动源）、`scripts/build.mjs`（可复现配方）、`overlay/`（构建期放进上游/产物树的文件）、`scripts/verify-*.mjs`（活体验证）。
-- **仓库不拥有**（gitignored）：上游源码本身。它体积约 350MB，由构建在 `<repo>/.build/workbench/upstream` 里 `git clone --depth 1 --branch 1.137.0` 取得，每次构建前被 **reset 回 pristine tag**，再按名序应用补丁。
+- **仓库不拥有**（gitignored）：上游源码本身。它体积约 350MB，由构建在 `<repo>/.build/vscode/upstream` 里 `git clone --depth 1 --branch 1.137.0` 取得，每次构建前被 **reset 回 pristine tag**，再按名序应用补丁。
 
 这与 DSH 的 `vendor/` 是同一意图（框架层**可审计、可打补丁、被钉住**，见 DSH `vendor/README.md`）下的**另一种形式**：
 
@@ -65,7 +65,7 @@ import { EMBED_BRIDGE } from "prac-vscode";
    - 这份契约是**唯一被 stage 而不是被 patch 的文件**：补丁条目只能装一侧的拼写，那样字段名就又写两遍了。`git clean -fd` 每次都会删掉它，所以每次构建都重新拷。
 4. **`package.json`**：脱离 DSH 插件形状（删 `main` / `dsh` / `exports` 主入口 / 原 client 半边），scripts 收敛为构建 + 验证。
 5. **构建配方 `scripts/build.mjs` 的偏离**（相对上游 `npm install && gulp` 的常规路径）：
-   - 根依赖 `npm install --ignore-scripts`：node-gyp native、playwright 浏览器下载、copilot 扩展 postinstall 这些消费环境跑不通的步骤对 web bundle **都不需要**，跳过它们还让构建只写仓库内（缓存重定向到 `.build/workbench/cache`）。`build/` 子包（自带 lockfile）单独装，因为 esbuild 需要它的 postinstall 校验平台二进制。
+   - 根依赖 `npm install --ignore-scripts`：node-gyp native、playwright 浏览器下载、copilot 扩展 postinstall 这些消费环境跑不通的步骤对 web bundle **都不需要**，跳过它们还让构建只写仓库内（缓存重定向到 `.build/vscode/cache`）。`build/` 子包（自带 lockfile）单独装，因为 esbuild 需要它的 postinstall 校验平台二进制。
    - 补 `codicon.ttf`：web bundle 引用它，而它正常由上游 `copy-codicons` 任务产出（我们跳过脚本）。
    - `stageOverlay()`：见第 2 条（在 reset/apply 之后执行）。
    - stage `<work>/web` = 我们的 `index.html` + `out/` 符号链接 → bundle（**独立查看**用；DSH 页不读它）。
@@ -95,7 +95,7 @@ pnpm --filter prac-vscode vscode:clean
 ### 产物布局
 
 ```
-.build/workbench/                       # gitignored；PRAC_WORKBENCH_DIR 可覆盖
+.build/vscode/                       # gitignored；PRAC_VSCODE_DIR 可覆盖
   upstream/                             # Code - OSS checkout（pin tag，构建前 reset）
     src/vs/workbench/browser/embedBridge.ts   # ← 构建 stage 的桥接契约（不是补丁，见改动日志 2）
     out-vscode-web/                     # ← 真正被服务的东西：vs/… + nls.messages.js
@@ -111,7 +111,7 @@ pnpm --filter prac-vscode vscode:clean
 - **产物是扁平的**：`out-server/` 直接放 `server-main.js` 等（没有 `product.json`/`package.json`/`out/`），运行时按 `<checkout>` 解析 `node_modules` 与 `product.json`。
 - **跑法**（cwd = checkout）：
   ```bash
-  cd .build/workbench/upstream
+  cd .build/vscode/upstream
   node out-server/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token \
     --server-data-dir …/server/data --extensions-dir …/server/extensions --user-data-dir …/server/user <folder>
   ```
@@ -162,5 +162,5 @@ URL='…' node scripts/verify-extension.mjs                               # 5 �
 
 - 构建重：clone（~350MB）+ 依赖 + 转译 + 打包。
 - 只构建 **web** 目标；desktop / server 目标未覆盖（server distro 只作为 code server 使用）。
-- 构建只写仓库内（缓存全在 `.build/workbench/cache`），无需提权。
+- 构建只写仓库内（缓存全在 `.build/vscode/cache`），无需提权。
 - 上游 `postinstall` 里有些步骤在消费环境本就跑不通；本包不依赖它们。

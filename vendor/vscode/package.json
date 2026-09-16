@@ -2,7 +2,7 @@
   "name": "prac-vscode",
   "version": "0.0.0",
   "private": true,
-  "description": "The pinned, patch-vendored Code - OSS the web bundle is built from: the upstream pin, the patch set that is our only change to it, the overlay this build places into it, and the recipe that produces `.build/workbench`. It is not a DSH plugin — it carries no loader entry; what serves its output is `prac-host-vscode`, and what boots it in the DSH page is `prac-client-vscode-host`, which imports the embed bridge contract from here.",
+  "description": "The pinned, patch-vendored Code - OSS the web bundle is built from: the upstream pin, the patch set that is our only change to it, the overlay this build places into it, and the recipe that produces `.build/vscode`. It is not a DSH plugin — it carries no loader entry; what serves its output is `prac-host-vscode`, and what boots it in the DSH page is `prac-client-vscode-host`, which imports the embed bridge contract from here.",
   "license": "MIT",
   "files": [
     "overlay",

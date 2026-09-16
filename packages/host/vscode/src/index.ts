@@ -49,7 +49,7 @@ const moduleDir = fileURLToPath(new URL(".", import.meta.url));
 
 /**
  * The bundle `prac-vscode`'s `vscode:build` produced
- * (`<repo>/.build/workbench/upstream/out-vscode-web`, the directory holding
+ * (`<repo>/.build/vscode/upstream/out-vscode-web`, the directory holding
  * `vs/…` and `nls.messages.js` — *not* the `web/` staging page, which is for the
  * standalone smoke server).
  */

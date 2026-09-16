@@ -29,7 +29,7 @@ import { join, resolve } from "node:path";
 const packageDir = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageDir, "../..");
 const upstreamDir = join(
-  process.env.PRAC_WORKBENCH_DIR ?? join(repoRoot, ".build/workbench"),
+  process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"),
   "upstream",
 );
 const url = process.env.URL;

@@ -3,7 +3,7 @@
 .data/
 .npm-cache/
 
-# Vendored upstream checkout for the workbench build (fetched at build time, not committed)
+# Vendored upstream checkout for the VS Code build (fetched at build time, not committed)
 .build/
 
 # Dependencies
