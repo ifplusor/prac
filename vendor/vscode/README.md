@@ -19,12 +19,13 @@ prac **拥有**的 VS Code——以 **pin + patch + 构建配方**的形式，�
 
 **构建期被放进去的文件**都住在这里，目录名说明它的用途，而不是混进"本包源码"：
 
-| 文件                           | 去处                                                                                           |
-| ------------------------------ | ---------------------------------------------------------------------------------------------- |
-| `overlay/bridge.ts`            | `<checkout>/src/vs/workbench/browser/embedBridge.ts` —— 两侧编译的交互契约（**单一定义**）     |
-| `overlay/embeddedWorkbench.ts` | `<checkout>/src/vs/workbench/browser/embeddedWorkbench.ts` —— 组合载荷：以外部 host 为布局服务 |
-| `overlay/embeddedWebMain.ts`   | `<checkout>/src/vs/workbench/browser/embeddedWebMain.ts` —— 覆写 `createWorkbench` 的入口      |
-| `overlay/page.html`            | `<work>/web/index.html` —— 独立查看页的壳                                                      |
+| 文件                           | 去处                                                                                                                            |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `overlay/bridge.ts`            | `<checkout>/src/vs/workbench/browser/embedBridge.ts` —— 两侧编译的交互契约（**单一定义**）                                      |
+| `overlay/gallery.ts`           | `<checkout>/src/vs/workbench/browser/gallery.ts` —— 扩展市场的单一数据源（bridge 从 `./gallery.js` 再导出，**必须一起 stage**） |
+| `overlay/embeddedWorkbench.ts` | `<checkout>/src/vs/workbench/browser/embeddedWorkbench.ts` —— 组合载荷：以外部 host 为布局服务                                  |
+| `overlay/embeddedWebMain.ts`   | `<checkout>/src/vs/workbench/browser/embeddedWebMain.ts` —— 覆写 `createWorkbench` 的入口                                       |
+| `overlay/page.html`            | `<work>/stage/web/index.html` —— 独立查看页的壳                                                                                 |
 
 包的入口直接指向契约，所以其它包**直接 import**，不必知道 staging 细节：
 
@@ -109,7 +110,6 @@ vp run --filter prac-vscode vscode:clean
       # （UI 在浏览器、扩展跑服务端 Node 扩展宿主，见 docs/architecture.md §5.2）。
       # desktop / server-web / reh* 一律不构建；见到即删（2026-09-16 清掉 676M）
     stage/web/    独立查看用的页面：index.html + out/ -> upstream/out-vscode-web
-    cache/        构建自己的缓存（npm / node-gyp / playwright）—— 只写仓库内，故构建不需要提权
   run/          运行期：服务的状态（PRAC_RUN_DIR 可覆盖）
                 不能随便删 —— 删了要重装扩展、重新配置
     code-server/  data/ · extensions/ · user/
@@ -117,20 +117,21 @@ vp run --filter prac-vscode vscode:clean
     shots/  notes-backup/
 ```
 
-**工具缓存不在仓库里**——它们是机器级的，写进仓库配置无法共享（James 2026-09-16 裁决）：
+**工具缓存不在仓库里，构建的缓存也不在**——它们是机器级的，写进仓库配置无法共享（James 2026-09-16 裁决）：
 
-| 缓存                | 位置                             | 谁管                                                  |
-| ------------------- | -------------------------------- | ----------------------------------------------------- |
-| pnpm 的 store       | `/Volumes/Dev/.pnpm-store`       | 环境变量 `pnpm_config_store_dir`（见下）              |
-| npm 的 cache        | `~/.npm`（默认）                 | 不用管；VS Code 的构建自己指到 `.build/vscode/cache/` |
-| corepack 的包管理器 | `~/.cache/node/corepack`（默认） | 不用管                                                |
-| XDG 缓存            | 默认                             | 不用管                                                |
+| 缓存                  | 位置                                                | 谁管                                        |
+| --------------------- | --------------------------------------------------- | ------------------------------------------- |
+| pnpm 的 store         | `/Volumes/Dev/.pnpm-store`                          | 环境变量 `pnpm_config_store_dir`（见下）    |
+| npm 的 cache          | `~/.npm`（默认）                                    | 不用管：构建**不再覆盖** `npm_config_cache` |
+| node-gyp / playwright | `~/Library/Caches/{node-gyp,ms-playwright}`（默认） | 不用管                                      |
+| corepack 的包管理器   | `~/.cache/node/corepack`（默认）                    | 不用管                                      |
+| XDG 缓存              | 默认                                                | 不用管                                      |
 
 **一个刻意的例外：pnpm 的 store 不在仓库里**，在 `/Volumes/Dev/.pnpm-store`，由**环境变量** `pnpm_config_store_dir` 指定。
 
 - **为什么不写进仓库配置**：这是**机器/卷相关**的路径；写进 `pnpm-workspace.yaml` 等于每个仓库各抄一遍，反而不能共享。
 - **为什么不用系统缓存目录**：`~`（`/System/Volumes/Data`）与项目（`/Volumes/Dev`）是**两个卷**，而 pnpm 靠硬链接装包；store 放到 `~/Library/pnpm/store` 会让每次安装退化成**复制**（node_modules 与 store 各存一份）。卷根那份 store 与同一卷上的其他仓库（含 DSH checkout）共享。
-- **怎么装依赖**：用 **`vp install`**（不直接调 `pnpm`）。`vp` 底下就是 pnpm，所以上面那个环境变量照样管用。**npm 的缓存不在这里**——VS Code 的构建自己把 `npm_config_cache` / `XDG_CACHE_HOME` 等指到 `.build/vscode/cache/`（见 `scripts/build.mjs` 的 env），所以仓库根不需要 `.npmrc`。
+- **怎么装依赖**：用 **`vp install`**（不直接调 `pnpm`）。`vp` 底下就是 pnpm，所以上面那个环境变量照样管用。**仓库根不需要 `.npmrc`**：构建不再覆盖 `npm_config_cache` / `XDG_CACHE_HOME` 等，全部用系统默认位置（旧行为是把它们改道到 `.build/vscode/cache/`，已于 2026-09-16 删除）。
 - **坑**：pnpm 12 起环境变量前缀是 **`pnpm_config_`**（`npm_config_store_dir` 被忽略），且 `.npmrc` 里的 `store-dir` 也不再生效——两者我都实测过。判断当前用的是哪份 store 看 `node_modules/.modules.yaml` 的 `storeDir`。
 
 三条规则：
@@ -197,6 +198,6 @@ URL='…' node scripts/verify-extension.mjs                               # 5 �
 ## 已知边界
 
 - 构建重：clone（~350MB）+ 依赖 + 转译 + 打包。
-- 只构建 **web** 目标；desktop / server 目标未覆盖（server distro 只作为 code server 使用）。
-- 构建只写仓库内（缓存全在 `.build/vscode/cache`），无需提权。
+- 构建**两个目标**：`out-vscode-web`（target `web`）与 `out-vscode-reh`（target `server`）；desktop 与 server-web 不构建（`docs/architecture.md` §5.2）。
+- **构建会写仓库之外**：缓存（npm / node-gyp / playwright）用系统默认位置，即 `~/.npm`、`~/Library/Caches/node-gyp` 等——在受限沙箱里跑需要提权。2026-09-16 之前那条"缓存全在仓库内、无需提权"是旧行为。
 - 上游 `postinstall` 里有些步骤在消费环境本就跑不通；本包不依赖它们。

@@ -56,17 +56,6 @@ const flags = new Set(process.argv.slice(2));
 const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
 const upstreamDir = join(workDir, "upstream");
 const webDir = join(workDir, "stage", "web");
-const cacheDir = join(workDir, "cache");
-
-/** Keep every cache the toolchain touches inside the repository. */
-const env = {
-  ...process.env,
-  npm_config_cache: join(cacheDir, "npm"),
-  npm_config_devdir: join(cacheDir, "node-gyp"),
-  XDG_CACHE_HOME: join(cacheDir, "xdg"),
-  PLAYWRIGHT_BROWSERS_PATH: join(cacheDir, "ms-playwright"),
-};
-
 /** @param {string} step @param {string} message */
 function log(step, message) {
   console.log(`[prac-vscode] ${step}: ${message}`);
@@ -78,7 +67,7 @@ function log(step, message) {
  */
 function run(command, args, cwd = upstreamDir, options = {}) {
   log("run", `${command} ${args.join(" ")}`);
-  const result = spawnSync(command, args, { cwd, env, stdio: "inherit" });
+  const result = spawnSync(command, args, { cwd, stdio: "inherit" });
   if (result.status !== 0 && !options.tolerant) {
     throw new Error(`${command} ${args.join(" ")} exited with ${result.status}`);
   }
@@ -137,6 +126,10 @@ function ensureCheckout() {
  */
 const OVERLAY = [
   { from: "overlay/bridge.ts", to: "src/vs/workbench/browser/embedBridge.ts" },
+  // The bridge re-exports the gallery, so the checkout-side contract needs it as a
+  // sibling. It was missing from this table, which only showed up on a build whose
+  // checkout had just been cleaned (2026-09-16).
+  { from: "overlay/gallery.ts", to: "src/vs/workbench/browser/gallery.ts" },
   { from: "overlay/embeddedWorkbench.ts", to: "src/vs/workbench/browser/embeddedWorkbench.ts" },
   { from: "overlay/embeddedWebMain.ts", to: "src/vs/workbench/browser/embeddedWebMain.ts" },
 ];
@@ -175,15 +168,10 @@ function ensureInstall() {
     log("install", "skipped (--skip-install)");
     return;
   }
-  const marker = join(cacheDir, "install.marker");
-  if (existsSync(marker) && readFileSync(marker, "utf8") === pin.tag && !flags.has("--force")) {
-    log("install", "already installed");
-    return;
-  }
   // Root: JS deps + devDeps only. Lifecycle scripts are skipped on purpose — the
   // ones a consumer environment cannot run (node-gyp native builds, the playwright
   // browser download, the copilot extension postinstall) are not needed to build the
-  // web workbench, and skipping them keeps the build inside the repository. The few
+  // web workbench. The few
   // files other postinstall steps would generate (extension API proposals, extension
   // points) are committed upstream, so a checkout already has them.
   run("npm", [
@@ -195,14 +183,12 @@ function ensureInstall() {
     "--loglevel=error",
   ]);
   // The build toolchain is a separate package with its own lockfile; esbuild needs its
-  // postinstall to verify the platform binary, and it writes nothing outside the repo.
+  // postinstall to verify the platform binary.
   run(
     "npm",
     ["install", "--no-audit", "--no-fund", "--legacy-peer-deps", "--loglevel=error"],
     join(upstreamDir, "build"),
   );
-  mkdirSync(cacheDir, { recursive: true });
-  writeFileSync(marker, pin.tag);
 }
 
 function copyCodicons() {
@@ -329,7 +315,6 @@ function checkoutCommit() {
   }
 }
 
-mkdirSync(cacheDir, { recursive: true });
 ensureCheckout();
 ensureInstall();
 copyCodicons();
