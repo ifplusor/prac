@@ -94,7 +94,7 @@ vp run --filter prac-vscode vscode:clean
 
 ### 目录规范（按生命周期分，不按来源分）
 
-`.build/` 是仓库里唯一的机器状态根（gitignored）。它下面**只有四个角色目录**，判据是**删掉它要付什么代价**：
+`.build/` 是仓库里唯一的机器状态根（gitignored）。它下面**只有三个角色目录**，判据是**删掉它要付什么代价**：
 
 ```
 .build/
@@ -106,16 +106,22 @@ vp run --filter prac-vscode vscode:clean
       out-vscode-web/  真正被服务的东西：vs/… + nls.messages.js
       out-server/  code server distro（扁平产物；product.json 已盖章）
     stage/web/    独立查看用的页面：index.html + out/ -> upstream/out-vscode-web
-    cache/        构建自己的缓存（npm / node-gyp）—— 只写仓库内，故构建不需要提权
+    cache/        构建自己的缓存（npm / node-gyp / playwright）—— 只写仓库内，故构建不需要提权
   run/          运行期：服务的状态（PRAC_RUN_DIR 可覆盖）
                 不能随便删 —— 删了要重装扩展、重新配置
     code-server/  data/ · extensions/ · user/
-    dsh/          dev DSH 的数据（XDG_DATA_HOME）
-  cache/        下载/工具缓存：可丢，重下即可
-    vsix/         手工装扩展时下载的 VSIX（装完就没用了）
   scratch/      一次性产物：随便删
-    shots/  notes-backup/  legacy/
+    shots/  notes-backup/
 ```
+
+**工具缓存不在仓库里**——它们是机器级的，写进仓库配置无法共享（James 2026-09-16 裁决）：
+
+| 缓存                | 位置                             | 谁管                                                  |
+| ------------------- | -------------------------------- | ----------------------------------------------------- |
+| pnpm 的 store       | `/Volumes/Dev/.pnpm-store`       | 环境变量 `pnpm_config_store_dir`（见下）              |
+| npm 的 cache        | `~/.npm`（默认）                 | 不用管；VS Code 的构建自己指到 `.build/vscode/cache/` |
+| corepack 的包管理器 | `~/.cache/node/corepack`（默认） | 不用管                                                |
+| XDG 缓存            | 默认                             | 不用管                                                |
 
 **一个刻意的例外：pnpm 的 store 不在仓库里**，在 `/Volumes/Dev/.pnpm-store`，由**环境变量** `pnpm_config_store_dir` 指定。
 
@@ -126,7 +132,7 @@ vp run --filter prac-vscode vscode:clean
 
 三条规则：
 
-1. **谁写哪里**：构建脚本只写 `vscode/` 与 `cache/`；服务只写 `run/`；开发工具（截图、备份）只写 `scratch/`。
+1. **谁写哪里**：构建脚本只写 `vscode/`；服务只写 `run/`；开发工具（截图、备份）只写 `scratch/`；**工具缓存写各自的默认位置，不进仓库**。
 2. **构建期与运行期不互相引用**：`run/` 里不放构建产物，`vscode/` 里不放运行状态（所以 code server 的数据目录是 `.build/run/code-server`，不在构建目录里）。
 3. **脚本从环境变量派生路径**，不各自拼：`PRAC_VSCODE_DIR`（默认 `.build/vscode`）、`PRAC_RUN_DIR`（默认 `.build/run`）。仓库根只放源码。
 
