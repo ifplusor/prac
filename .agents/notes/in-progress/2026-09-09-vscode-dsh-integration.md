@@ -148,7 +148,7 @@ DSH web 页
 | 2026-09-15 | 抽出 `vendor/vscode-embed`（prac-free lib），prac 两行变薄 | 同上；staged 载荷与 `overlay/` 逐字节一致 |
 | 2026-09-15 | **决定 15 后半落地（常驻底栏）**：默认树包一层 `column`（`root`）＝ 上面那行（`top`）＋ `BOTTOM_REGION`（`bottom`，240，stack，**空**）；**空 region 不渲染**（`isPresent`）⇒ 默认布局零成本、region 列表仍是 `left,stage,right`。填了视图就出现在底部、占满宽度、上方那行让出高度；折叠后高度归零、空间还回 | 新 prac 侧门 `verify:bottom` **11/11**（空则不在 / 填了上屏并像素质 / 贴底且满宽 / 240px / 上方让位 / 折叠归零 / 还原）；vendor 五门与 smoke 全部未动 |
 | 2026-09-15 | **决定 15 前半落地（侧栏堆叠）**：`RegionNode.stack`（prac 的模型）、默认树把 `left`/`right` 标成 stack、frame 在**同一 region 有 ≥2 个可见 view 时**逐个渲染（header = view id 尾段 + 折叠开关）、`pracLayout.setViewCollapsed` 记折叠态。**vendor 一个字节没碰** | `tests/gates/verify-stack.mjs`（第七门，prac 侧）**10/10**：单 view 时**像素不变/无 header**（默认布局行为保持）、两个 view 堆叠且都有 body、折叠后 header 在/body 消失/邻居变大、点 header 也能折；原六门与 smoke 全绿 |
-| 2026-09-15 | **决定 18 落地（扩展基座换 `server` + Tier 2 证明）**：`build.mjs` 增加 `--target server`（`out-server`，带 `--nls`），并把 **checkout 根**、`out-server`、`out-server-web` 三份 `product.json` 都盖章；服务端改用 `out-server/server-main.js`；装 **GitLens**（`eamodio.gitlens-2026.9.92030`，手工解包进 `--extensions-dir`；**验收后按 James 裁决撤装**，等决定 19 给出正当安装路径） | 新第六门 `verify-extension` **5/5**：`gitlens.views.welcome` 挂进 prac 后有 pane、标题 `Welcome`、40 种颜色、可释放 ⇒ **扩展激活**（描述符只有激活后才注册）。`/oss-645f29cc…/version` 200 而 `oss-dev` 404（两侧 segment 一致）；原五门 **24/24 · 33/33 · 12/12 · 1/1 · 7/7** 不变；独立页 smoke 8/8 |
+| 2026-09-15 | **决定 18 落地（扩展基座换 `server` + Tier 2 证明）**：`build.mjs` 增加 `--target server`（`out-vscode-reh`，带 `--nls`），并把 **checkout 根**、`out-vscode-reh`、`out-vscode-reh-web` 三份 `product.json` 都盖章；服务端改用 `out-vscode-reh/server-main.js`；装 **GitLens**（`eamodio.gitlens-2026.9.92030`，手工解包进 `--extensions-dir`；**验收后按 James 裁决撤装**，等决定 19 给出正当安装路径） | 新第六门 `verify-extension` **5/5**：`gitlens.views.welcome` 挂进 prac 后有 pane、标题 `Welcome`、40 种颜色、可释放 ⇒ **扩展激活**（描述符只有激活后才注册）。`/oss-645f29cc…/version` 200 而 `oss-dev` 404（两侧 segment 一致）；原五门 **24/24 · 33/33 · 12/12 · 1/1 · 7/7** 不变；独立页 smoke 8/8 |
 | 2026-09-15 | **B1 落地（单 view 宿主）**：契约加 `mountViewInto`/`releaseView`，载荷用 `ViewPane.render()` 把单个 view 造成自带 pane 挂进外部元素（`getViewDescriptorById` 拿描述符，镜像 `ViewPaneContainer.createView` 的参数），lib 加 `view(viewId)` 句柄，explorer 座位改挂 `workbench.explorer.fileView` | 新第五门 `verify-view` **7/7**（自带 `.pane` + 标题 `dsh-dev` + 302 种颜色 + **页面无 sidebar part** + 跨 region 搬移时**释放后重建成功**）；原四闸门 **24/24 · 33/33 · 12/12 · 1/1** 不变；独立页 smoke 8/8 + `errorCount: 0` |
 | 2026-09-15 | **决定 14 落地**：`selectPanel` 把选中视图放进**它自己的** region（无家则进中心），让出中心的视图停到编排绑定的 **track**；对话按普通 view 参与注意力（聚焦谁，谁进 stage，另一个停 right） | 八包 `check` + root `vp check .` 绿；四闸门 **24/24 · 33/33 · 12/12 · 1/1**（两条断言随决策更新：`promotedTrackClosed` → `promotedChatParksInTrack`，verify-views 改为读对话的放置而不是推断轨道消失）；独立页 smoke 8/8 + `errorCount: 0` |
 | 2026-09-15 | **决定 16 落地（per-window 持久化）**：`ui-layout` 的 store 换成 DSH `client-store` 的 `createSnapshotStore(..., { persist: { name: "prac-layout/v1" } })` 薄适配；`dsh-client-store` 声明成**平台词**（`scripts/pack-client.ts` 镜像 `PLATFORM_MODULES`，`bundle-client.mjs` 的白名单＝那张表）；`arrange()` 的默认放置改成**只填空缺** | 新 prac 侧门 `verify:persistence` **16/16**；对照实验：去掉 `arrange()` 的 `continue` ⇒ 5 项立刻变红（门真的在断言这件事）；产物 +0.8 kB（内联 zustand/immer 要 ~15 kB） |
@@ -200,16 +200,16 @@ DSH web 页
 
 ### 扩展基座（`server` 目标，2026-09-15 起）
 
-- 构建产出 **两个目标**：`out-vscode-web`（web bundle）与 `out-server`（标准 server 目标，**扩展基座**）。
-- `out-server/` 是**扁平**产物（`server-main.js` 直接在里面，没有 `product.json`/`package.json`/`out/`）；运行时按 `<checkout>` 解析 `node_modules`，**`product.json` 读的是 checkout 根那份** ⇒ 盖章要盖根那份（`build.mjs` 现在盖 `.`/`out-server`/`out-server-web`）。
-- 跑法（cwd = checkout）：`node out-server/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token --server-data-dir … --extensions-dir … --user-data-dir … <folder>`。
+- 构建产出 **两个目标**：`out-vscode-web`（web bundle）与 `out-vscode-reh`（标准 server 目标，**扩展基座**）。
+- `out-vscode-reh/` 是**扁平**产物（`server-main.js` 直接在里面，没有 `product.json`/`package.json`/`out/`）；运行时按 `<checkout>` 解析 `node_modules`，**`product.json` 读的是 checkout 根那份** ⇒ 盖章要盖根那份（`build.mjs` 现在盖 `.`/`out-vscode-reh`/`out-vscode-reh-web`）。
+- 跑法（cwd = checkout）：`node out-vscode-reh/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token --server-data-dir … --extensions-dir … --user-data-dir … <folder>`。
 - **装扩展**：`server-cli --install-extension` 被守卫挡住（`src/vs/server/node/server.cli.ts:94` 要求 `VSCODE_IPC_HOOK_CLI` 或 `VSCODE_CLIENT_COMMAND`）；手工装 = 解包 VSIX，把 `extension/` 移成 `<extensions-dir>/<publisher>.<name>-<version>/`，删 `extensions.json`，重启。
 - **实测（2026-09-15，验证后已撤装）**：GitLens `2026.9.92030` 装上后 `extensions.json` 只列它；`gitlens.views.welcome` / `…repositories` 都能 `mountViewInto` 挂进 prac（有 pane、有标题、有像素）⇒ 扩展**确实激活**；`spdlog` native 缺失仍是既有非致命缺口。
 - **安装的正当路径**：`server-cli --install-extension` 走的是 **CLI 管道**（`VSCODE_IPC_HOOK_CLI`），现实里由 **VS Code 的集成终端**提供；我们还没有它 ⇒ **决定 19（terminal 用 VS Code 的）会带出这条管道**。在此之前**不装用户扩展**（第六门 SKIP）；手工解包属于"绕过有意关上的门"，James 2026-09-15 裁决不做。
 
 ### Server（自建 code server）
 
-- 服务端产物在 `out-server`（标准 `server` 目标，**不是** web bundle 也不是 `out-server-web`）：`node out-server/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token --server-data-dir … --extensions-dir … --user-data-dir … <folder>`；数据目录按目录规范放在 `.build/run/code-server/{data,extensions,user}`（不重定向会写 `~/.vscode-server-oss`）。2026-09-16 起构建与运行期的目录规范见 `vendor/vscode/README.md`·"目录规范"（`.build/{vscode,run,cache,scratch}`）。
+- 服务端产物在 `out-vscode-reh`（标准 `server` 目标，**不是** web bundle 也不是 `out-vscode-reh-web`）：`node out-vscode-reh/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token --server-data-dir … --extensions-dir … --user-data-dir … <folder>`；数据目录按目录规范放在 `.build/run/code-server/{data,extensions,user}`（不重定向会写 `~/.vscode-server-oss`）。2026-09-16 起构建与运行期的目录规范见 `vendor/vscode/README.md`·"目录规范"（`.build/{vscode,run,cache,scratch}`）。
 - **`product.json` 必须盖章**（commit = checkout 的 HEAD），否则两侧 segment 不一致（见踩坑 §7.A）。
 - distro 布局必须 `<root>/{product.json, package.json, out/}` 且 `<root>` 在 checkout 内（否则报 `Cannot find package 'cookie'`）；`--out` 必须是**相对路径**。
 - `server-cli --install-extension` 被环境守卫挡住（"only available in WSL or inside a VS Code terminal"）。
@@ -245,7 +245,7 @@ DSH web 页
   ```bash
   cd .build/vscode/upstream
   R=<repo>/.build/run/code-server
-  node out-server/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token \
+  node out-vscode-reh/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token \
     --server-data-dir $R/data --extensions-dir $R/extensions --user-data-dir $R/user <folder>
   ```
 - **DSH（profile `prac-dev`）**：`cd ../deepseek-harness/dsh-master && pnpm_config_store_dir=/Volumes/Dev/.pnpm-store pnpm dsh --profile prac-dev --port 3084 --no-open`

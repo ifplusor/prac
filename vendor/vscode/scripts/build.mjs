@@ -241,7 +241,7 @@ function buildBundle() {
     "build/next/index.ts",
     "bundle",
     "--out",
-    "out-server",
+    "out-vscode-reh",
     "--target",
     "server",
     "--nls",
@@ -290,7 +290,7 @@ function stampServerCommit() {
   // (its script dir has none), while the web bundle bakes the commit in from
   // `.git/HEAD` at build time — so both copies have to agree, which is what
   // stamping the root does.
-  for (const distro of [".", "out-server", "out-server-web"]) {
+  for (const distro of [".", "out-vscode-reh"]) {
     const productPath = join(upstreamDir, distro, "product.json");
     if (!existsSync(productPath)) {
       log("server", `${distro}: no product.json to stamp (not built)`);

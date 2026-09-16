@@ -69,7 +69,7 @@ import { EMBED_BRIDGE } from "prac-vscode";
    - 补 `codicon.ttf`：web bundle 引用它，而它正常由上游 `copy-codicons` 任务产出（我们跳过脚本）。
    - `stageOverlay()`：见第 2 条（在 reset/apply 之后执行）。
    - stage `<work>/web` = 我们的 `index.html` + `out/` 符号链接 → bundle（**独立查看**用；DSH 页不读它）。
-   - `stampServerCommit()`：把 checkout 的 commit 写进 `out-server-web/product.json`。客户端与服务端各自读一份 `product.json` 来算 `getServerProductSegment()`，不盖章时服务端算 `oss-dev`、客户端要 `/oss-<commit>`，表现为「编辑器打不开文件」而不是路径不匹配。
+   - `stampServerCommit()`：把 checkout 的 commit 写进**盖章目标**（`.` 与 `out-vscode-reh` 两处；扁平 server 产物自己那份 `product.json` 不存在）。客户端与服务端各自读一份 `product.json` 来算 `getServerProductSegment()`，不盖章时服务端算 `oss-dev`、客户端要 `/oss-<commit>`，表现为「编辑器打不开文件」而不是路径不匹配。
 6. **`overlay/page.html`** 是 prac 的壳：`create(document.body, ...)` + 每个 part 一个外部 host（**不传 bridge**，所以它走的就是"workbench 自己挂 part"的默认路径；`vscode:smoke` 盯的就是这条路）。
 
 ## 用法
@@ -104,8 +104,8 @@ vp run --filter prac-vscode vscode:clean
       src/vs/workbench/browser/embedBridge.ts   # ← 构建 stage 的桥接契约（不是补丁，见改动日志 2）
       out-build/   转译产物（打包器的输入）
       out-vscode-web/  真正被服务的东西：vs/… + nls.messages.js
-      out-server/  code server distro（扁平产物；product.json 已盖章）
-      # 构建只出 out-vscode-web 与 out-server 两个目标——prac 用 code-server 形态
+      out-vscode-reh/  code server distro（扁平产物；product.json 已盖章）
+      # 构建只出 out-vscode-web 与 out-vscode-reh 两个目标——prac 用 code-server 形态
       # （UI 在浏览器、扩展跑服务端 Node 扩展宿主，见 docs/architecture.md §5.2）。
       # desktop / server-web / reh* 一律不构建；见到即删（2026-09-16 清掉 676M）
     stage/web/    独立查看用的页面：index.html + out/ -> upstream/out-vscode-web
@@ -141,17 +141,17 @@ vp run --filter prac-vscode vscode:clean
 
 ## 扩展基座（`--target server`）
 
-除 web bundle 外，构建还产出 **标准 `server` 目标**（`out-server/`），浏览器连的就是它（WebSocket management + 扩展宿主），也是"哪些扩展算可安装"的判据来源。
+除 web bundle 外，构建还产出 **标准 `server` 目标**（`out-vscode-reh/`），浏览器连的就是它（WebSocket management + 扩展宿主），也是"哪些扩展算可安装"的判据来源。
 
-- **产物是扁平的**：`out-server/` 直接放 `server-main.js` 等（没有 `product.json`/`package.json`/`out/`），运行时按 `<checkout>` 解析 `node_modules` 与 `product.json`。
+- **产物是扁平的**：`out-vscode-reh/` 直接放 `server-main.js` 等（没有 `product.json`/`package.json`/`out/`），运行时按 `<checkout>` 解析 `node_modules` 与 `product.json`。
 - **跑法**（cwd = checkout；数据目录指到运行期根）：
   ```bash
   cd .build/vscode/upstream
   R=<repo>/.build/run/code-server
-  node out-server/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token \
+  node out-vscode-reh/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token \
     --server-data-dir $R/data --extensions-dir $R/extensions --user-data-dir $R/user <folder>
   ```
-- **`product.json` 要盖章的是 checkout 根那份**（扁平产物自己那份不存在），否则服务端算 `oss-dev` 而客户端按 build 注入的 commit 要 `/oss-<commit>`。`build.mjs` 现在给 `.` / `out-server` / `out-server-web` 都盖。
+- **`product.json` 要盖章的是 checkout 根那份**（扁平产物自己那份不存在），否则服务端算 `oss-dev` 而客户端按 build 注入的 commit 要 `/oss-<commit>`。`build.mjs` 的盖章目标是 `.` 与 `out-vscode-reh` 两处（`.build/vscode/README.md` 的 `stampServerCommit()`）。
 - **装扩展**：`server-cli --install-extension` 被守卫挡住（`server.cli.ts:94` 要求 `VSCODE_IPC_HOOK_CLI` 或 `VSCODE_CLIENT_COMMAND`，即"在 VS Code 终端里"）。手工装即可：VSIX 是 zip，解包后把 `extension/` 移成 `<extensions-dir>/<publisher>.<name>-<version>/`，删掉 `extensions.json`，重启服务端。
 - **已知边界**：扩展贡献的 **tree view** 能挂上、有标题、有像素，但 body 是 "no data provider registered"——树数据要等视图基础设施/容器把它认成"可见的视图"，裸 pane 还不够（下一步）。
 
