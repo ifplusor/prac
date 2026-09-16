@@ -1,6 +1,6 @@
 # Prac 的架构
 
-> **现在时。** prac 站在两个成熟系统上：**DSH**（agent harness 与它的扩展宿主）与 **VS Code**（编辑器的能力与生态）。prac 自己只做一件事：**把两者的能力拆散后重新组合成一种界面**。
+> **现在时。** prac 站在两个成熟系统上：**DSH**（agent harness：一切皆插件的扩展模型）与 **VS Code**（编辑器的能力与生态）。prac 自己只做一件事：**把两者的能力拆散后重新组合成一种界面**。
 >
 > 每一条结构都标了它的**依据**（`路径:行` 或文件）。理念见 [philosophy.md](philosophy.md)；每个「为什么 + 放弃了什么」见 [.agents/notes/](../.agents/notes/)。
 >
@@ -71,6 +71,20 @@ prac 的核心主张是**所有权与依赖方向**：VS Code 的 **UI 层被拆
 - **包的归属**：每个包恰好属于一个 group（`packages/README.md:27-80`）：`core/`（sessions / tools / agent loop 等产品 API 主干）、`api/`（Remote BFF + Typert gateway）、`typert/`、`host/`、`client/`、`bundle/`，以及 `fs/` `context/` `llm/` `session/` `workspace/` `interaction/` 等能力族。**没有 `kernel/` group**；"共享核心"是 `core/` group 与 `@deepseek-ai/dsh-base` 这个 bundle。
 
 **对 prac 的意义**：prac 的每一行都是普通插件，prac 的"深度定制"表现为**组装**，不表现为"改内核"。
+
+**DSH 没有"扩展宿主"**——这个 VS Code 的词不能借过来用，两边的模型正好相反：
+
+- VS Code 的扩展跑在**独立进程**里，只能经 extHost 协议与渲染器说话（§3.5）：**有进程边界，有专用协议**。
+- DSH 的插件跑在**同一棵树、同一地址空间**里——host 插件在 DSH 的 Node 进程，client 插件在页面，耦合方式是 **in-process 的 `inject`**：**没有进程边界，也没有专用协议**。
+
+DSH 最接近"第三方代码在运行时进来"的是**动态包（dynamic Cordis packages）**子系统（`packages/extensions/`）：模型能用工具**定义 / 运行 / 停止 / 删除**一个 Cordis 包（`tool-cordis` 的七个工具、`ui-cordis` 的面板），host 半边与浏览器半边各由自己的 runner 求值。它的隔离是**沙箱，不是容器**：
+
+- host 半边在 `node:vm` 的**全新 realm** 里求值，外面套一层白名单 façade（框架内部、以及"返回值是 Context"的服务被拒；参数 schema 与值被重建为宿主对象），文件 / 网络 / 进程 / 定时器被 trap 导向 `ctx.fs` / `ctx.web` / `ctx.bash` / Cordis timers（`cordis-host-runner/src/sandbox.ts`、`guard.ts`）；
+- 模块注释自己写明：_"keeps cooperative packages inspectable and disposable but **is not containment**: host-realm helper functions remain an escape route"_；
+- 浏览器半边在页面的闭包里 `new Function` 求值（`cordis-client-runner/src/client/evaluator.ts:180`）；
+- 定义**只活在进程内存**里，重启即失。
+
+**对 prac 的两点意义**：① 给 agent 的 **DSH 侧能力**是"挂进同一棵树"（`ctx.tools.register`），而 **VS Code 侧能力天然要有一个"宿主里的适配器"**（只有扩展宿主能调 `vscode.*`）——这正是 §4.4 里 diagnostics 的选路依据；② "让浏览器跑一个插件半边"这件事，DSH 是靠 §2.5 那两个 `cordis/request-run*` **转发事件**做的，**不是** RPC。
 
 ### 2.2 组装：profile → bundle → patch
 

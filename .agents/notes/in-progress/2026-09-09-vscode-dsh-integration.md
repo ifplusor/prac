@@ -174,7 +174,8 @@ DSH web 页
 ### DSH 侧
 
 - **每个 client 插件各自打包、各自内联** ⇒ 模块级单例**不共享**；跨插件共享一个面必须走模块图之外的载体（Cordis service；补丁侧无可避免时用页面级全局）。
-- **loader 行 id = 产物 id**（`clientPack(id)`），包的 `name` 只用于诊断。
+- **行的 `name` 才是产物 id**（entry 实际 import 的模块 specifier = npm 包名；浏览器的 module table row id、`clientPack(id)`、`bundle-client.mjs --id` 用的都是它）；**patch 用行的 `id` 定位**（config tree 内的稳定标识，缺省随机生成）。prac 的行把两个字段取成同一个字符串，但它们是两个东西（DSH `vendor/loader/src/config/entry.ts:8-21`；2026-09-16 核实，改正了本条原先"loader 行 id = 产物 id"的写法）。
+- **DSH 没有"扩展宿主"**（这个词属于 VS Code，不能借）：DSH 的插件跑在**同一棵树、同一地址空间**（host 在 DSH 的 Node 进程、client 在页面），耦合是 in-process 的 `inject`，没有进程边界也没有专用协议。最接近"第三方代码运行时进来"的是**动态包**子系统（`packages/extensions/`：`tool-cordis` / `cordis-host-runner` / `cordis-client-runner` / `ui-cordis`）：模型可定义/运行/停止/删除 Cordis 包，host 半边在 `node:vm` 全新 realm + 白名单 façade 里求值（模块注释自陈 *"**is not containment**"*），浏览器半边在页面闭包里 `new Function`，定义只活在进程内存、重启即失。host 让浏览器跑半边靠的是 `cordis/request-run*` **转发事件**，不是 RPC。
 - **依赖缺失的 fiber 保持 pending** ⇒ 坏组合表现为"挂起"而不是"渲染空白"（实测报 `pending (waiting for service: …)`）。
 - 固定三轨尺寸；`main` 是 **keyed 单占位**（`entryKey: panelId ?? 'conversation'`）⇒ 对话与编辑器**不能同屏**；`slot:rightbar` 默认隐藏。
 - `root` 槽明文 **DO NOT register**；`shell.overlay` 是自建浮动面的正规座位（list 槽、加性、点击穿透）。
