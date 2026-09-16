@@ -92,28 +92,49 @@ pnpm --filter prac-vscode vscode:clean
 
 `vscode:build` 是**重的上游构建**，故意不叫 `build`，这样 `vp run -r build` 不会触发它。
 
-### 产物布局
+### 目录规范（按生命周期分，不按来源分）
+
+`.build/` 是仓库里唯一的机器状态根（gitignored）。它下面**只有四个角色目录**，判据是**删掉它要付什么代价**：
 
 ```
-.build/vscode/                       # gitignored；PRAC_VSCODE_DIR 可覆盖
-  upstream/                             # Code - OSS checkout（pin tag，构建前 reset）
-    src/vs/workbench/browser/embedBridge.ts   # ← 构建 stage 的桥接契约（不是补丁，见改动日志 2）
-    out-vscode-web/                     # ← 真正被服务的东西：vs/… + nls.messages.js
-    out-server-web/                     # code server distro（product.json 已盖章）
-  web/                                  # 独立查看用的页面：index.html + out/ -> upstream/out-vscode-web
-  cache/                                # npm / node-gyp / xdg / ms-playwright 缓存
+.build/
+  vscode/       构建期：VS Code 的构建工作目录（PRAC_VSCODE_DIR 可覆盖）
+                可丢 —— 删了重新构建即可（vscode:clean 只删它）
+    upstream/      Code - OSS checkout（pin tag，构建前 reset 回 pristine，再按序打补丁）
+      src/vs/workbench/browser/embedBridge.ts   # ← 构建 stage 的桥接契约（不是补丁，见改动日志 2）
+      out-build/   转译产物（打包器的输入）
+      out-vscode-web/  真正被服务的东西：vs/… + nls.messages.js
+      out-server/  code server distro（扁平产物；product.json 已盖章）
+    stage/web/    独立查看用的页面：index.html + out/ -> upstream/out-vscode-web
+    cache/        构建自己的缓存（npm / node-gyp）—— 只写仓库内，故构建不需要提权
+  run/          运行期：服务的状态（PRAC_RUN_DIR 可覆盖）
+                不能随便删 —— 删了要重装扩展、重新配置
+    code-server/  data/ · extensions/ · user/
+    dsh/          dev DSH 的数据（XDG_DATA_HOME）
+  cache/        下载/工具缓存：可丢，重下即可
+    pnpm/store/   唯一的 pnpm store（.npmrc 的 store-dir 指向这里）
+    npm/ corepack/ xdg/ vsix/
+  scratch/      一次性产物：随便删
+    shots/  notes-backup/  legacy/
 ```
+
+三条规则：
+
+1. **谁写哪里**：构建脚本只写 `vscode/` 与 `cache/`；服务只写 `run/`；开发工具（截图、备份）只写 `scratch/`。
+2. **构建期与运行期不互相引用**：`run/` 里不放构建产物，`vscode/` 里不放运行状态（所以 code server 的数据目录是 `.build/run/code-server`，不在构建目录里）。
+3. **脚本从环境变量派生路径**，不各自拼：`PRAC_VSCODE_DIR`（默认 `.build/vscode`）、`PRAC_RUN_DIR`（默认 `.build/run`）。仓库根只放源码。
 
 ## 扩展基座（`--target server`）
 
 除 web bundle 外，构建还产出 **标准 `server` 目标**（`out-server/`），浏览器连的就是它（WebSocket management + 扩展宿主），也是"哪些扩展算可安装"的判据来源。
 
 - **产物是扁平的**：`out-server/` 直接放 `server-main.js` 等（没有 `product.json`/`package.json`/`out/`），运行时按 `<checkout>` 解析 `node_modules` 与 `product.json`。
-- **跑法**（cwd = checkout）：
+- **跑法**（cwd = checkout；数据目录指到运行期根）：
   ```bash
   cd .build/vscode/upstream
+  R=<repo>/.build/run/code-server
   node out-server/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token \
-    --server-data-dir …/server/data --extensions-dir …/server/extensions --user-data-dir …/server/user <folder>
+    --server-data-dir $R/data --extensions-dir $R/extensions --user-data-dir $R/user <folder>
   ```
 - **`product.json` 要盖章的是 checkout 根那份**（扁平产物自己那份不存在），否则服务端算 `oss-dev` 而客户端按 build 注入的 commit 要 `/oss-<commit>`。`build.mjs` 现在给 `.` / `out-server` / `out-server-web` 都盖。
 - **装扩展**：`server-cli --install-extension` 被守卫挡住（`server.cli.ts:94` 要求 `VSCODE_IPC_HOOK_CLI` 或 `VSCODE_CLIENT_COMMAND`，即"在 VS Code 终端里"）。手工装即可：VSIX 是 zip，解包后把 `extension/` 移成 `<extensions-dir>/<publisher>.<name>-<version>/`，删掉 `extensions.json`，重启服务端。

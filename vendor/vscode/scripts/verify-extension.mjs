@@ -24,6 +24,7 @@ import { join, resolve } from "node:path";
 const packageDir = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageDir, "../..");
 const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
+const runDir = resolve(process.env.PRAC_RUN_DIR ?? join(repoRoot, ".build/run"));
 const upstreamDir = join(workDir, "upstream");
 const url = process.env.URL;
 /** The extension this gate needs, and one of the views it contributes. */
@@ -35,7 +36,7 @@ const view = process.env.VIEW ?? "gitlens.views.welcome";
  * **skips loudly** rather than failing when none is installed.
  */
 const extensionsDir = resolve(
-  process.env.EXTENSIONS_DIR ?? join(workDir, "..", "vscode-server", "server", "extensions"),
+  process.env.EXTENSIONS_DIR ?? join(runDir, "code-server", "extensions"),
 );
 
 if (!url) throw new Error('URL is required, e.g. URL="http://127.0.0.1:3084/?token=..."');

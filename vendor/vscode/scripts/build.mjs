@@ -55,7 +55,7 @@ if (!pin?.repository || !pin?.tag) {
 const flags = new Set(process.argv.slice(2));
 const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
 const upstreamDir = join(workDir, "upstream");
-const webDir = join(workDir, "web");
+const webDir = join(workDir, "stage", "web");
 const cacheDir = join(workDir, "cache");
 
 /** Keep every cache the toolchain touches inside the repository. */

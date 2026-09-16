@@ -209,7 +209,7 @@ DSH web 页
 
 ### Server（自建 code server）
 
-- 服务端产物在 `out-server-web`（**不是** web bundle）：`node out-server-web/out/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token --server-data-dir … --extensions-dir … --user-data-dir … <folder>`；数据目录重定向到仓库内 `.build/vscode-server/`（不重定向会写 `~/.vscode-server-oss`）。
+- 服务端产物在 `out-server`（标准 `server` 目标，**不是** web bundle 也不是 `out-server-web`）：`node out-server/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token --server-data-dir … --extensions-dir … --user-data-dir … <folder>`；数据目录按目录规范放在 `.build/run/code-server/{data,extensions,user}`（不重定向会写 `~/.vscode-server-oss`）。2026-09-16 起构建与运行期的目录规范见 `vendor/vscode/README.md`·"目录规范"（`.build/{vscode,run,cache,scratch}`）。
 - **`product.json` 必须盖章**（commit = checkout 的 HEAD），否则两侧 segment 不一致（见踩坑 §7.A）。
 - distro 布局必须 `<root>/{product.json, package.json, out/}` 且 `<root>` 在 checkout 内（否则报 `Cannot find package 'cookie'`）；`--out` 必须是**相对路径**。
 - `server-cli --install-extension` 被环境守卫挡住（"only available in WSL or inside a VS Code terminal"）。
