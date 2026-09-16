@@ -112,11 +112,12 @@ pnpm --filter prac-vscode vscode:clean
     code-server/  data/ · extensions/ · user/
     dsh/          dev DSH 的数据（XDG_DATA_HOME）
   cache/        下载/工具缓存：可丢，重下即可
-    pnpm/store/   唯一的 pnpm store（.npmrc 的 store-dir 指向这里）
     npm/ corepack/ xdg/ vsix/
   scratch/      一次性产物：随便删
     shots/  notes-backup/  legacy/
 ```
+
+**一个刻意的例外：pnpm 的 store 不在仓库里**，在 `/Volumes/Dev/.pnpm-store`（`pnpm-workspace.yaml` 的 `storeDir`）。理由是**同卷硬链接**：home（`/System/Volumes/Data`）与项目（`/Volumes/Dev`）是两个卷，store 放到系统缓存目录（`~/Library/pnpm/store`）会让每次安装退化成**复制**——node_modules 与 store 各存一份。卷根那份 store 本来就存在（pnpm 11 在这台机器上的默认选择），且与同一卷上的其他仓库（含 DSH checkout）共享。
 
 三条规则：
 
