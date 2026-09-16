@@ -213,6 +213,27 @@ DSH web 页
 - server-web 构建（313MB/20 bundles）**自带客户端启动失败**：HTML 引用的 `/oss-dev/static/out/…` 全 404（构建输出与服务端静态路由根没对齐）——所以我们用 web bundle 当客户端。
 - 不要 desktop / server 目标当成本工作的目标：server distro 只作为 code server 使用。
 
+### code server 的协议（2026-09-15 核实于 1.137.0 checkout；行号均指该 checkout）
+
+**一句话**：一个 HTTP 端口 + 同一端点上**按首消息分三型**的 WebSocket + 两组子进程通道（node fork 消息 / 命名管道）+ 一条只存在于 VS Code 终端里的 CLI 管道。**没有任何一条是"客户端注册、服务端调用"的方向**。
+
+| # | 通道 | 形状（证据） | 对 prac 的意义 |
+| --- | --- | --- | --- |
+| 1 | **HTTP(S)** | `remoteExtensionHostAgentServer.handle`：`/version`(151)、`/delay-shutdown`(157)、**`/vscode-remote-resource?path=…`**(168，为渲染器取扩展/工作区文件，带 CSP `sandbox`；给 web worker ext host 放 CORS)、其余交 `WebClientServer`(204)：`/static/*`(113,186)、`/callback`(114,192)、`/web-extension-resource/*`(115,196) + workbench HTML。鉴权 `?tkn=<token>`（`connectionTokenQueryName='tkn'`，`network.ts:188`），`--without-connection-token` 时跳过 | 我们已经在代理它（`prac-host-vscode`）；**这里只有“取字节”，没有可查询的状态** |
+| 2 | **WebSocket · Management** | 与 3/4 同一端点，首消息分型。握手：`AuthRequest{type:'auth'}` → 服务端 `{type:'sign'}` → 客户端 `ConnectionTypeRequest{commit, signedData, desiredConnectionType}`（`remoteAgentConnection.ts:243-284`）。**每个连接型各开一条自己的 WS**（各自 `socketFactory.connect`，`:231-235`），靠 `reconnectionToken` 重连。管理连接上跑 `IPCServer`/`SocketServer`（`serverServices.ts:430`）：**服务端 `registerChannel`，浏览器消费** | 服务端注册的 channel：`logger` `remoteextensionsenvironment` `telemetry` `remotefilesystem` `remoteterminal` `extensions` `remoteextensionsscanner` `userDataProfiles` `request` `mcpManagement` `sandboxHelper` `NativeMcpDiscoveryHelper` `mcpGateway` agentHost `RemoteProxy` `extensionHostDebugBroadcast`（`:125-406`）。**没有 diagnostics channel**——marker 在渲染器的 `IMarkerService`，不在服务端；且方向是服务端被客户端调，不支持"host 问页面" |
+| 3 | **WebSocket · ExtensionHost** | 服务端 `ExtensionHostConnection` fork 扩展宿主（`cp.fork(bootstrap-fork, ['--type=extensionHost'], {silent:true})`，`extensionHostConnection.ts:290`）；宿主与该连接用**命名管道或它自己回送的 socket**（`VSCODE_EXTHOST_IPC_HOOK` / `VSCODE_EXTHOST_WILL_SEND_SOCKET`，`extensionHostEnv.ts:17-40`；控制消息 `VSCODE_EXTHOST_IPC_SOCKET` / `…_READY` / `…_REDUCE_GRACE_TIME`），服务器把这条管道**桥到 WS**。扩展宿主的 RPC（含 `MainThreadDiagnostics.$changeMany`）走的就是它 | **diagostics 的原产地在扩展宿主**（本机 node 进程），而它与外界唯一的既定通道是"通向渲染器"。要 host 侧拿到，就得在这扇门里放代码——即那三扇门里的 (b) |
+| 4 | **WebSocket · Tunnel** | `_createTunnel`（`remoteExtensionHostAgentServer.ts:516-536`）：按 `{host, port}` 连本机 socket 并把 WS 当管道转发 | 端口转发走的是 WS，**不是** `/proxy/<port>` HTTP 路由 |
+| 5 | **子进程 IPC（node fork 消息）** | PTY host：`NodePtyHostStarter.start()` → `ipc.cp.ts` 的 `Client` fork `bootstrap-fork --type=ptyHost`，`VSBuffer` 帧、`VSCODE_PIPE_LOGGING`（`nodePtyHostStarter.ts:22-45`） | 决定 19 的 PTY 住在这个进程里；协议是 VS Code 自己的，不对外 |
+| 6 | **CLI 管道** | `server-cli` 从 `VSCODE_IPC_HOOK_CLI` 读写 JSON 请求（`server.cli.ts:87`）；该 env 由**终端**注入（`remoteTerminalChannel.ts:268`） | 证实 note 里的判断：`--install-extension` 的正当路径要等决定 19 把终端带出来 |
+| 7 | **扩展面向的协议** | DAP（`extHostDebugService`，adapter 通常是子进程 stdio）、LSP（扩展自己 spawn）、web extension host 在页面的 worker/iframe 里用 `postMessage` + `MessagePort`（`webWorkerExtensionHost.ts:198,233`） | 生态协议，不是 server 的传输层 |
+| 8 | **调试口** | ext host / pty host 均可 `--inspect`；ExtensionHost 连接首消息回 `{debugPort}`（`remoteAgentConnection.ts:362`），另有 `extensionHostDebugBroadcast` channel | 与我们无关，记录在案 |
+
+**由此确定的直接后果**（诊断那扇门的依据）：
+1. 服务端**没有** diagnostics channel ⇒ "让 DSH host 直连管理连接去读 marker"这条路不存在——marker 是渲染器状态。
+2. 管理连接方向是**服务端被调**（`registerChannel` 在服务端）⇒ 也不存在"host 向页面要"的方向。
+3. 管理连接上的 channel 用 `tkn` + 握手即可被**任意本机进程**消费（不必须是浏览器）；这是"DSH host 自己当 RPC 客户端"的技术可能性所在——但它读不到 marker（见 1）。
+4. 扩展宿主是**本机 node 进程**，且是**唯一**能调 `vscode.languages.getDiagnostics()` 的地方 ⇒ 我们在那里放的适配器可以用**任意 node 通道**（unix socket / 文件）与 DSH host 通信，**完全不必经过 VS Code 的协议**。这既印证了 (b)-①（自足扩展），也说明它**不需要动上游**。
+
 ### 我们自己的机制
 
 - 座位契约 = `prac.view` 槽；机制**按注册表成员**判定座位，不按 id 前缀。
