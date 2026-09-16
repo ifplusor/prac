@@ -237,6 +237,22 @@ DSH web 页
 3. 管理连接上的 channel 用 `tkn` + 握手即可被**任意本机进程**消费（不必须是浏览器）；这是"DSH host 自己当 RPC 客户端"的技术可能性所在——但它读不到 marker（见 1）。
 4. 扩展宿主是**本机 node 进程**，且是**唯一**能调 `vscode.languages.getDiagnostics()` 的地方 ⇒ 我们在那里放的适配器可以用**任意 node 通道**（unix socket / 文件）与 DSH host 通信，**完全不必经过 VS Code 的协议**。这既印证了 (b)-①（自足扩展），也说明它**不需要动上游**。
 
+### dev rig 的启动命令（2026-09-16 起）
+
+原则：**机器相关的路径放环境，仓库配置只管组合**；**prac 仓内一律用 `vp`**。
+
+- **code server**（cwd = checkout；数据在运行期根）：
+  ```bash
+  cd .build/vscode/upstream
+  R=<repo>/.build/run/code-server
+  node out-server/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token \
+    --server-data-dir $R/data --extensions-dir $R/extensions --user-data-dir $R/user <folder>
+  ```
+- **DSH（profile `prac-dev`）**：`cd ../deepseek-harness/dsh-master && pnpm_config_store_dir=/Volumes/Dev/.pnpm-store pnpm dsh --profile prac-dev --port 3084 --no-open`
+  - 这里**仍用 `pnpm`**：DSH 仓自己的 `packageManager` 是 `pnpm@11.7.0`，而 `vp` 在那个仓里初始化缓存被文件沙箱拒（`Failed to initialize cache: EPERM`，仓库在工作区外）。prac 仓内不用 `pnpm`。
+- **standalone 查看页**：`vp run --filter prac-vscode vscode:serve`（默认 `:5199`）。
+- **2026-09-16 去掉的三个环境变量**：旧命令带 `COREPACK_HOME` / `XDG_CACHE_HOME` / `XDG_DATA_HOME` 指向仓库内。去掉的理由是实测多余：corepack 的默认家 `~/.cache/node/corepack` 已有同样的 pnpm 版本（11.7.0 / 12.3.4），`XDG_DATA_HOME` 那个目录是**空的**（DSH 真正的状态在 `~/.dsh`，44M），`XDG_CACHE_HOME` 那份 132M 是 pnpm 的 cache（不是 store）。三者合计 188M 已移到 `.build/scratch/legacy/`。
+
 ### 我们自己的机制
 
 - 座位契约 = `prac.view` 槽；机制**按注册表成员**判定座位，不按 id 前缀。
