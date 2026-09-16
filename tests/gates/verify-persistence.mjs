@@ -21,7 +21,7 @@
  * "persistence" that undoes itself. `arrange()` therefore skips views the state
  * already knows.
  *
- * Usage: URL='http://127.0.0.1:3084/?token=...' pnpm verify:persistence
+ * Usage: URL='http://127.0.0.1:3084/?token=...' vp run verify:persistence
  */
 import { openPrac, report, requireUrl } from "./harness.mjs";
 

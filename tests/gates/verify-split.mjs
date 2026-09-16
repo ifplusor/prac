@@ -20,7 +20,7 @@
  * orderings reach different DOM layouts, and verifying one direction only is the
  * same trap as a sash gate that only ever drags one way.
  *
- * Usage: URL='http://127.0.0.1:3084/?token=...' pnpm verify:split
+ * Usage: URL='http://127.0.0.1:3084/?token=...' vp run verify:split
  */
 import { distinctColours, openPrac, report, requireUrl } from "./harness.mjs";
 

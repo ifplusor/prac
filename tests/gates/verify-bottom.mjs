@@ -11,7 +11,7 @@
  *  3. **the row gives room** — the row above shrinks by the bar's height, and
  *     collapsing the bar hands the room back.
  *
- * Usage: URL='http://127.0.0.1:3084/?token=...' pnpm verify:bottom
+ * Usage: URL='http://127.0.0.1:3084/?token=...' vp run verify:bottom
  */
 import { distinctColours, openPrac, report, requireUrl } from "./harness.mjs";
 

@@ -76,16 +76,16 @@ import { EMBED_BRIDGE } from "prac-vscode";
 
 ```bash
 # 构建（首次 clone 上游 + 装依赖 + 转译 + 打包，约数分钟）
-pnpm --filter prac-vscode vscode:build
+vp run --filter prac-vscode vscode:build
 
 # 起本地静态服务独立查看（默认 http://127.0.0.1:5199/）
-pnpm --filter prac-vscode vscode:serve
+vp run --filter prac-vscode vscode:serve
 
 # 无头冒烟：断言 workbench 真的渲染出来（需要上面的服务在跑）
-pnpm --filter prac-vscode vscode:smoke
+vp run --filter prac-vscode vscode:smoke
 
 # 清掉构建目录（上游 checkout、缓存、产物）
-pnpm --filter prac-vscode vscode:clean
+vp run --filter prac-vscode vscode:clean
 ```
 
 `node scripts/build.mjs [--force] [--skip-install] [--skip-build]`：`--force` 清空工作目录从零重建；`--skip-install` 复用已有依赖；`--skip-build` 只确保 checkout/install。
@@ -121,7 +121,8 @@ pnpm --filter prac-vscode vscode:clean
 
 - **为什么不写进仓库配置**：这是**机器/卷相关**的路径；写进 `pnpm-workspace.yaml` 等于每个仓库各抄一遍，反而不能共享。
 - **为什么不用系统缓存目录**：`~`（`/System/Volumes/Data`）与项目（`/Volumes/Dev`）是**两个卷**，而 pnpm 靠硬链接装包；store 放到 `~/Library/pnpm/store` 会让每次安装退化成**复制**（node_modules 与 store 各存一份）。卷根那份 store 与同一卷上的其他仓库（含 DSH checkout）共享。
-- **坑**：pnpm 12 起环境变量前缀是 **`pnpm_config_`**（`npm_config_store_dir` 被忽略），且 `.npmrc` 里的 `store-dir` 也不再生效——两者我都实测过。
+- **怎么装依赖**：用 **`vp install`**（不直接调 `pnpm`）。`vp` 底下就是 pnpm，所以上面那个环境变量照样管用。
+- **坑**：pnpm 12 起环境变量前缀是 **`pnpm_config_`**（`npm_config_store_dir` 被忽略），且 `.npmrc` 里的 `store-dir` 也不再生效——两者我都实测过。判断当前用的是哪份 store 看 `node_modules/.modules.yaml` 的 `storeDir`。
 
 三条规则：
 
@@ -159,7 +160,7 @@ URL='…' node scripts/verify-file.mjs                                    # 33 �
 URL='…' node scripts/verify-extension.mjs                               # 5 项（需已装扩展；没装则明确 SKIP。`VIEW=none` 用于没有 view 的扩展：改用它产生的诊断来证明激活）
 ```
 
-数目是**决定 21 删减后**的（机制断言搬进了各包的 `*.spec.ts`，用 `pnpm test` 跑）；vendor 门只留真页面能证明的事实。
+数目是**决定 21 删减后**的（机制断言搬进了各包的 `*.spec.ts`，用 `vp test` 跑）；vendor 门只留真页面能证明的事实。
 
 **独立页（无 bridge 的默认路径）另有一条**：`vscode:serve`（默认 `:5199`）跑着时 `vscode:smoke` 断言 8 个 part 全部挂载且编辑器有内容，`errorCount: 0`。
 

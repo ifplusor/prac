@@ -15,7 +15,7 @@
  *     space to the neighbour, both through the layout face and through a real
  *     click on the header.
  *
- * Usage: URL='http://127.0.0.1:3084/?token=...' pnpm verify:stack
+ * Usage: URL='http://127.0.0.1:3084/?token=...' vp run verify:stack
  */
 import { distinctColours, openPrac, report, requireUrl } from "./harness.mjs";
 

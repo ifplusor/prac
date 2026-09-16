@@ -336,4 +336,4 @@ copyCodicons();
 buildBundle();
 stampServerCommit();
 stage();
-console.log("[prac-vscode] done. serve it with: pnpm --filter prac-vscode vscode:serve");
+console.log("[prac-vscode] done. serve it with: vp run --filter prac-vscode vscode:serve");
