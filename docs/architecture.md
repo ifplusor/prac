@@ -19,7 +19,7 @@
 
 ### 1.2 目标形态（一句话）
 
-> prac 是一个**两端的（CS/BS）系统**：有 **client** 与 **server** 两端，**主干是 DSH**（跨两端：client 半边是页面的壳，server 半边是 harness 与进程；其插件机制本身就是 prac 的扩展宿主）；**VS Code 以一组插件的方式被带入**，把它的**能力**交给 server 半边、把它的 **UI 组件**交给 client 半边。**权威不属于某一端**，而是逐条事实判定：真相住 server，呈现住 client（§2.1）。
+> prac 是一个**两端的（CS/BS）系统**：有 **client** 与 **server** 两端，**主干是 DSH**（跨两端：client 半边是页面的壳，server 半边是 harness 与进程；它自己的扩展方式是**插件**）；**VS Code 以一组插件的方式被带入**，把它的**能力**交给 server 半边、把它的 **UI 组件**交给 client 半边。**权威不属于某一端**，而是逐条事实判定：真相住 server，呈现住 client（§2.1）。
 
 ### 1.3 三条不变量（架构变更的判据）
 
@@ -54,10 +54,16 @@
 | **client** | **页面的壳**：loader 与模块表、`ctx.slots`、服务注册表、boot 注入——prac 的 frame 与座位挂在它的壳上         |
 | **server** | **harness 与进程**：Cordis 插件树（host 插件）、profile / bundle / patch 组装、服务、agent loop、子进程管理 |
 
-**DSH 的插件机制本身就是 prac 的扩展宿主**：Cordis 插件树（加上运行时的动态包）承担"扩展跑在哪里"这个角色。它与 VS Code 的 ext host **角色对等、形状不同**——同一地址空间、无专用协议、耦合是 in-process 的 `inject`。因此：
+**DSH 的扩展方式就是插件**：Cordis 插件树（加上运行时的动态包）——host 半边在 Node、client 半边在页面，**同一地址空间**，耦合是 in-process 的 `inject`。
 
-- "给 agent 的能力"在 DSH 侧就是**挂进主干**（工具 / 上下文 / 呈现三类插件），**不需要另造宿主**；
-- 主干的**组装机制**（profile → bundle → patch，按行 id 定位、可 insert / 可 disabled）就是 prac 的"定制方式"——定制表现为**组装**，不表现为改内核。
+> **不要把"扩展宿主"这个词带到 DSH 上**：**扩展宿主只是 VS Code 架构里的概念**（一个隔离的进程，扩展只能经 extHost 协议与主线程通信，§5.2）。DSH **没有**对应物，也不需要**另造**一个。两者是**两种不同的机制**，不是"同一角色的两种形状"。
+
+因此，两条路要分清：
+
+- **DSH 侧**：给 agent 的能力 = **写一个插件挂进主干**（工具 / 上下文 / 呈现三类）；
+- **VS Code 侧**：能力**必须经过它的扩展宿主**——那是唯一能调 `vscode.*` 的地方。这条差别正是 §3.3 通信层设计要处理的东西，**不能用一个词把两边统起来**。
+
+主干的**组装机制**（profile → bundle → patch，按行 id 定位、可 insert / 可 disabled）就是 prac 的"定制方式"——定制表现为**组装**，不表现为改内核。
 
 ### 2.3 prac 自己写什么，继承什么
 
@@ -183,14 +189,14 @@ packages/* 的 DSH 插件  基于这个 lib 构建（**一组**）
 
 ### 5.1 DSH 提供
 
-| 能力           | 形态                                                                                           | 设计怎么用                                   |
-| -------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| **插件与宿主** | Cordis 插件（`apply(ctx)`、`inject` / `provide` / `effect`，卸载可逆）                         | prac 的每一行；扩展宿主这一角色              |
-| **组装**       | profile → bundle → patch（按行 id 定位、insert / disabled、`--dump-config`）                   | 把 prac 与 VS Code 插件装进主干；不动内核    |
-| **双平面**     | host 半边（Node ESM）与 client 半边（loader 产物）                                             | 能力在 host、UI 在 client（§3.1）            |
-| **页面外壳**   | `ctx.slots` 命名槽 + 服务注册表（消费方 pending 直到提供方出现）                               | prac 的 frame 与座位；跨插件传面             |
-| **协议**       | remote（host 声明、client 调用）+ 转发事件 + 流复用                                            | 服务调用、状态变化、以及 §3.3 要设计的通信层 |
-| **服务面**     | 工具（`ctx.tools.register` / `defineTool`）、会话、session 投影、资源（client 侧）、快照 store | agent 面（工具 / 上下文）、frame 的持久化    |
+| 能力         | 形态                                                                                           | 设计怎么用                                                            |
+| ------------ | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| **插件**     | Cordis 插件（`apply(ctx)`、`inject` / `provide` / `effect`，卸载可逆）                         | prac 的每一行（**这是 DSH 自己的扩展方式，不是 VS Code 的扩展宿主**） |
+| **组装**     | profile → bundle → patch（按行 id 定位、insert / disabled、`--dump-config`）                   | 把 prac 与 VS Code 插件装进主干；不动内核                             |
+| **双平面**   | host 半边（Node ESM）与 client 半边（loader 产物）                                             | 能力在 host、UI 在 client（§3.1）                                     |
+| **页面外壳** | `ctx.slots` 命名槽 + 服务注册表（消费方 pending 直到提供方出现）                               | prac 的 frame 与座位；跨插件传面                                      |
+| **协议**     | remote（host 声明、client 调用）+ 转发事件 + 流复用                                            | 服务调用、状态变化、以及 §3.3 要设计的通信层                          |
+| **服务面**   | 工具（`ctx.tools.register` / `defineTool`）、会话、session 投影、资源（client 侧）、快照 store | agent 面（工具 / 上下文）、frame 的持久化                             |
 
 **稳定性分级**（设计要在上面站得住）：`dsh` 字段的三个角色（bundle / client / profile）、patch 语义、loader 产物形状、平台词表、`provide`/`inject` 等待语义、命名槽、快照 store 的持久化——这些是**约定**；而具体行 id、API 包的导出名、快照字段形状是**实现细节**，设计不应依赖后者。
 
