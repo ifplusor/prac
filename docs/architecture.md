@@ -19,7 +19,7 @@
 
 ### 1.2 目标形态（一句话）
 
-> prac 是一个**两端的（CS/BS）系统**：**server 是主干与权威**，**client 是它的视图**；主干是 **DSH**（其插件机制本身就是 prac 的扩展宿主）；**VS Code 以一组插件的方式被带入**，把它的**能力**交给 server、把它的 **UI 组件**交给 client。
+> prac 是一个**两端的（CS/BS）系统**：有 **client** 与 **server** 两端，**主干是 DSH**（跨两端：client 半边是页面的壳，server 半边是 harness 与进程；其插件机制本身就是 prac 的扩展宿主）；**VS Code 以一组插件的方式被带入**，把它的**能力**交给 server 半边、把它的 **UI 组件**交给 client 半边。**权威不属于某一端**，而是逐条事实判定：真相住 server，呈现住 client（§2.1）。
 
 ### 1.3 三条不变量（架构变更的判据）
 
@@ -31,15 +31,28 @@
 
 ## 2. 总体形态
 
-### 2.1 两端：server 是主干与权威
+### 2.1 两端：client 与 server
 
 **看架构先分 client / server 两端**，而不是先分 DSH / VS Code——两个系统各自又都跨在线上（§4），这正是最容易搞错的地方。
 
-判据（用来检验任何新设计）：**这条状态 / 这个能力 / 这个决定，属于哪一端？** 凡是"真相"与"权威"性质的，归 **server**；页面只负责渲染与人的直接操作。
+两端各有自己的形态与机制（§4.1），但**主干不落在一端**（§2.2）：DSH 的 client 半边是页面的壳，server 半边是 harness 与进程。
 
-### 2.2 主干是 DSH
+要判一件事属于哪一端，问三个问题：
 
-组合、状态、进程、生命周期都归主干。
+1. **这是"真相"还是"呈现"**？真相（agent 或所有窗口都要用的）住 server；纯呈现住 client。
+2. **agent 需不需要它**？需要 ⇒ 必须在 server 侧能找到真相（§4.4 原则 1）。
+3. **谁有权改它**？跟着真相走——例如工作区身份是会话事实，页面无权改。
+
+**判据只有一条：一件事只有一个家**（§4.4 原则 4）。
+
+### 2.2 主干是 DSH——跨两端
+
+组合、状态、进程、生命周期都归主干。**主干不只在 server**：DSH 的主干性在两端表现为不同的具体机制，prac 与 VS Code 的插件都挂在它上面（**两端各一半**）。
+
+| 端         | DSH 作为主干的具体形态                                                                                      |
+| ---------- | ----------------------------------------------------------------------------------------------------------- |
+| **client** | **页面的壳**：loader 与模块表、`ctx.slots`、服务注册表、boot 注入——prac 的 frame 与座位挂在它的壳上         |
+| **server** | **harness 与进程**：Cordis 插件树（host 插件）、profile / bundle / patch 组装、服务、agent loop、子进程管理 |
 
 **DSH 的插件机制本身就是 prac 的扩展宿主**：Cordis 插件树（加上运行时的动态包）承担"扩展跑在哪里"这个角色。它与 VS Code 的 ext host **角色对等、形状不同**——同一地址空间、无专用协议、耦合是 in-process 的 `inject`。因此：
 
@@ -58,20 +71,22 @@
 ### 2.4 一张图
 
 ```
-client（浏览器里的一页）
-│  DSH 客户端平面：web shell（loader / 模块表 / ctx.slots）
-│    · prac 自己的：frame（区域树 / 分割 / 折叠 / 目录 / 持久化）· 编排与角色 · 注意力
-│    · VS Code 插件的 client 半边：用 VS Code 的 UI 组件渲染
+主干 = DSH（跨两端：client 半边是壳，server 半边是 harness 与进程）
 │
-│  ← DSH 的通信层（页面上屏、服务调用、事件转发、流）
-│
-server（Node，主干）
-│  DSH host：agent loop · 会话 · 工具 · 上下文 · 审批 · webserver
-│    · prac 自己的：host 侧插件（服务与策略）
-│    · VS Code 插件的 server 半边：拥有 code server 与它的能力
-│         └─ code server：IDE 基础能力（文件 / 语言特性 / 扩展 / 终端 / 搜索）
-│              ├─ 扩展宿主进程（VS Code 的扩展跑在这里）
-│              └─ PTY host 进程
+├─ client（浏览器里的一页）
+│  │  DSH 的 client 半边：web shell（loader / 模块表 / ctx.slots / 服务注册表）
+│  │    · prac 自己的：frame（区域树 / 分割 / 折叠 / 目录 / 持久化）· 编排与角色 · 注意力
+│  │    · VS Code 插件的 client 半边：用 VS Code 的 UI 组件渲染
+│  │
+│  │  ← DSH 的通信层（页面上屏、服务调用、事件转发、流）
+│  │
+└─ server（Node）
+   │  DSH 的 host 半边：agent loop · 会话 · 工具 · 上下文 · 审批 · webserver
+   │    · prac 自己的：host 侧插件（服务与策略）
+   │    · VS Code 插件的 server 半边：拥有 code server 与它的能力
+   │         └─ code server：IDE 基础能力（文件 / 语言特性 / 扩展 / 终端 / 搜索）
+   │              ├─ 扩展宿主进程（VS Code 的扩展跑在这里）
+   │              └─ PTY host 进程
 ```
 
 ---
