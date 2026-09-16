@@ -105,6 +105,8 @@ vp run --filter prac-vscode vscode:clean
       out-build/   转译产物（打包器的输入）
       out-vscode-web/  真正被服务的东西：vs/… + nls.messages.js
       out-server/  code server distro（扁平产物；product.json 已盖章）
+      # 构建只出 out-vscode-web 与 out-server 两个目标；out-server-web / out-vscode-reh* 是
+      # 上游别的目标的产物，我们不生产也不使用（见到即删——2026-09-16 清掉 676M）
     stage/web/    独立查看用的页面：index.html + out/ -> upstream/out-vscode-web
     cache/        构建自己的缓存（npm / node-gyp / playwright）—— 只写仓库内，故构建不需要提权
   run/          运行期：服务的状态（PRAC_RUN_DIR 可覆盖）
