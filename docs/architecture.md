@@ -189,6 +189,17 @@ server（Node）
 | **可组合的缝**       | `create()` 的构造选项、可覆写的 workbench 组合、`IWorkbenchLayoutService`、模块级命令面         | 让 prac 拥有布局与编排，而不是被 workbench 拥有 |
 | **pin + patch 形式** | 源码树 + 我们的 delta（patches）                                                                | 改动可审计（不变量 2）                          |
 
+**采用哪种运行形态**：VS Code 有四种形态，prac 只用**第三种**——[_"UI in the browser, extensions run in code server"_](https://github.com/microsoft/vscode/wiki/How-to-Contribute)：
+
+| 形态                                             | UI 在哪 | 扩展在哪               | prac                                                                    |
+| ------------------------------------------------ | ------- | ---------------------- | ----------------------------------------------------------------------- |
+| `code-web`（`--target web` 单独跑）              | 浏览器  | 浏览器的 web worker    | ✗ 只有 web 扩展：终端 / 调试 / 任务 / 源码管理都不可用                  |
+| **code server（`--target server` + 浏览器 UI）** | 浏览器  | **服务端的 Node 进程** | ✓ **就是它**：完整扩展生态，且能力天然在 server 侧                      |
+| `server-web` / `reh-web`（server 自带客户端）    | 浏览器  | 服务端 Node            | ✗ 与"DSH 发前端"重合；它的 product 还被 `tweakProductForServerWeb` 改过 |
+| `desktop` / `reh`（Electron / 远程开发包）       | 桌面    | 本地或远端 Node        | ✗ 不做桌面应用，也不给桌面 VS Code 当 remote                            |
+
+因此构建只要**两个目标**：`--target web`（浏览器里的 UI，由 DSH 发）与 `--target server`（code server，扩展宿主在这里）。桌面、`server-web`、`reh*` 一律不构建。
+
 ---
 
 ## 6. prac 自己的机制
