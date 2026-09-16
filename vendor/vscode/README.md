@@ -112,7 +112,7 @@ vp run --filter prac-vscode vscode:clean
     code-server/  data/ · extensions/ · user/
     dsh/          dev DSH 的数据（XDG_DATA_HOME）
   cache/        下载/工具缓存：可丢，重下即可
-    npm/ corepack/ xdg/ vsix/
+    vsix/         手工装扩展时下载的 VSIX（装完就没用了）
   scratch/      一次性产物：随便删
     shots/  notes-backup/  legacy/
 ```
@@ -121,7 +121,7 @@ vp run --filter prac-vscode vscode:clean
 
 - **为什么不写进仓库配置**：这是**机器/卷相关**的路径；写进 `pnpm-workspace.yaml` 等于每个仓库各抄一遍，反而不能共享。
 - **为什么不用系统缓存目录**：`~`（`/System/Volumes/Data`）与项目（`/Volumes/Dev`）是**两个卷**，而 pnpm 靠硬链接装包；store 放到 `~/Library/pnpm/store` 会让每次安装退化成**复制**（node_modules 与 store 各存一份）。卷根那份 store 与同一卷上的其他仓库（含 DSH checkout）共享。
-- **怎么装依赖**：用 **`vp install`**（不直接调 `pnpm`）。`vp` 底下就是 pnpm，所以上面那个环境变量照样管用。
+- **怎么装依赖**：用 **`vp install`**（不直接调 `pnpm`）。`vp` 底下就是 pnpm，所以上面那个环境变量照样管用。**npm 的缓存不在这里**——VS Code 的构建自己把 `npm_config_cache` / `XDG_CACHE_HOME` 等指到 `.build/vscode/cache/`（见 `scripts/build.mjs` 的 env），所以仓库根不需要 `.npmrc`。
 - **坑**：pnpm 12 起环境变量前缀是 **`pnpm_config_`**（`npm_config_store_dir` 被忽略），且 `.npmrc` 里的 `store-dir` 也不再生效——两者我都实测过。判断当前用的是哪份 store 看 `node_modules/.modules.yaml` 的 `storeDir`。
 
 三条规则：
