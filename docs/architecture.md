@@ -57,6 +57,45 @@ code server 进程（我们的 `out-server` 构建）
 
 prac 的核心主张是**所有权与依赖方向**：VS Code 的 **UI 层被拆散、渲染进 prac 的 frame**（而不是 prac 变成 VS Code 的一个 panel）；VS Code 的**能力层**（编辑器、诊断、终端、扩展宿主）经**面**（face）暴露，最终也要暴露给 **agent**。
 
+## 1.5 两端视角：client / server 各有什么
+
+整体是 **BS**（浏览器 + Node 服务端）：客户端零安装，服务端持有 agent、会话与工作区。真正要看的是 **2×2**，而不是一条线——两个系统各自又都跨在线上：
+
+|                 | **client（浏览器里的那一页）**                                                                     | **server（Node 进程）**                                                                                |
+| --------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **DSH**         | web shell（loader / 模块表 / `ctx.slots`）+ prac 那几行客户端插件                                  | host 插件（`prac-host-vscode`、DSH 自己的工具/上下文/会话）+ webserver（页面、`/api`、`/prac-vscode`） |
+| **VS Code**     | renderer（web bundle）：editor widget、parts/views、`IMarkerService`（**镜像**）、`IEditorService` | code server（**独立进程**）+ 它 fork 的**扩展宿主进程**与 **PTY host 进程**                            |
+| **prac 自己的** | frame（ui-layout）、启动与 view↔part 策略、两个座位、编排（web-app）、能力面                       | 路由与代理策略（`/prac-vscode` 静态服务 + code server 的 HTTP/WS 代理）                                |
+
+**两端之间只有三条线**：
+
+| 线                 | 载体                                                                               | 内容                                                                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **DSH 自己的**     | HTTP RPC（`/api`）+ WS（`/api/remote.mux`）+ 启动 token 鉴权                       | 页面上屏与 `client.js` 产物、typert remote（客户端调 host 声明的方法）、转发事件（host→client）、stream / `$events/result` |
+| **prac 的**        | `/prac-vscode`（DSH 服务 VS Code 的构建产物）+ code server 的 HTTP/WS 代理         | 让 VS Code 的两个半边在页面看来**同源可达**                                                                                |
+| **VS Code 自己的** | WS（Management / ExtensionHost / Tunnel）+ HTTP（静态、`vscode-remote-resource`…） | 渲染器 ↔ code server / 扩展宿主（§3.6）                                                                                    |
+
+**状态住在哪一端**（这张表决定"谁能让 agent 看见什么"）：
+
+| 状态                              | 住在                                                                   | 依据    |
+| --------------------------------- | ---------------------------------------------------------------------- | ------- |
+| 工作区注册表 / 会话 / session log | **server**（DSH host）                                                 | §2.6    |
+| 工具与 agent loop                 | **server**（DSH host）                                                 | §2.6    |
+| 扩展与其激活状态                  | **server**（扩展宿主进程）                                             | §3.5    |
+| 终端（PTY、scrollback）           | **server**（PTY host 进程；跨断线保活）                                | 决定 19 |
+| 诊断 marker                       | **源在 server 的扩展宿主进程**，**镜像在 client**                      | §3.5    |
+| 编辑器缓冲区与模型                | **client**（renderer 的 `IModelService`；扩展宿主另有 API 那一份镜像） | §3.4    |
+| 打开的文件集合                    | **client**（`IEditorService`）——座位把它投影成 view                    | §4.3    |
+| VS Code 自己的 UI 状态            | **client**（IndexedDB，按 `workspace.id`）                             | §4.6    |
+| prac 的 frame 布局                | **client**（localStorage，per-origin）                                 | §4.6    |
+
+**这个视角给出的两条原则**：
+
+1. **agent 住在 server，而编辑器的真相大多住在 client** ⇒ 任何"要给 agent 的编辑器能力"都必须在 server 侧找到真相；否则拿到的只能是一个**被页面把关的、有损的**视图（页面得活着，还得把话带到）。这一条把三件看起来无关的事统一了：diagnostics 的选路（§4.4）、`documents` 能力的缺失（§5）、以及"扩展宿主是唯一能调 `vscode.*` 的地方"（§3.5）。
+2. **页面是唯一的组装点**：两个 app 都是**每页单例**（`create()` 每页一次、loader 的模块表、store）⇒ **多窗口 = 多页面**；服务端要共享的东西必须挂在 **per-connection** 上（扩展宿主按 `reconnectionToken`，§4.6），不能挂在页面上。
+
+**"以 DSH 为主干"到什么程度**：在**组装与事实**上成立（页面外壳、组合、工作区/会话真相、agent 都在它这边）；在**运行时所有权**上还差一步——`prac-host-vscode/src/index.ts` 里 `CODE_SERVER = { host: "127.0.0.1", port: 3091 }` 是**写死的**，而且**没有任何地方启动它**：主干目前只是"代理一个别人起的进程"。谁起、谁重启、谁关，是记在案的缺口（§5）。
+
 ## 2. DSH 的架构（prac 依赖的那部分）
 
 > 本节只写 prac 实际踩到的结构；完整论述见 DSH 自己的 `docs/architecture.md`。
