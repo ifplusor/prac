@@ -1,6 +1,6 @@
 # Prac 的架构
 
-> **现在时。** prac 站在两个成熟系统上：**DSH**（agent harness：一切皆插件的扩展模型）与 **VS Code**（编辑器的能力与生态）。prac 自己只做一件事：**把两者的能力拆散后重新组合成一种界面**。
+> **现在时。** prac 是 **DSH 主干上的一族插件**：它自己写 frame、编排、以及给 agent 的能力面；从 DSH 继承 harness 的全部机制；从 VS Code 引入编辑器的能力与生态——**很重要的一部分，但不是全部**（§1.6）。
 >
 > 每一条结构都标了它的**依据**（`路径:行` 或文件）。理念见 [philosophy.md](philosophy.md)；每个「为什么 + 放弃了什么」见 [.agents/notes/](../.agents/notes/)。
 >
@@ -117,6 +117,20 @@ prac 的核心主张是**所有权与依赖方向**：VS Code 的 **UI 层被拆
 2. **组装与权威在主干（server），页面是渲染目标**：客户端那两个 app 都恰好是**每页单例**（`create()` 每页一次、loader 的模块表、store），于是"多窗口 = 多页面"——这是**当前实现的形状**，不是设计原则。设计上：**权威与组合在 server**；服务端要共享的东西必须挂在 **per-connection** 上（扩展宿主按 `reconnectionToken`，§4.6），不能挂在页面上。
 
 **与设计的偏差**（按设计这是错的，不是可选项；详见 §5）：`prac-host-vscode/src/index.ts` 里 `CODE_SERVER = { host: "127.0.0.1", port: 3091 }` 是**写死的**，而且**没有任何地方启动它**——主干目前只是"代理一个别人起的进程"。设计（§设计总纲 2）要求**主干拥有这个进程**：它起、它重启、它关、它给端口。
+
+## 1.6 prac 由什么组成（VS Code 只是其中很重要的一部分）
+
+prac **不是**"把 DSH 与 VS Code 拼起来"——那是当前的工作重心，不是 prac 的全部。按主干/插件的视角：
+
+| 组成                     | 是什么                                                                                                                                                    | 现状                                                                                                                                                      |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **主干（DSH）**          | harness 本身：agent loop、会话与 session log、工具运行时、上下文、审批与沙箱、设置、凭据、持久化                                                          | **直接继承**（组装而非改写）                                                                                                                              |
+| **prac 自己写的插件**    | ① **frame**（`ui-layout`：区域树 / sash / 堆叠 / 折叠 / 底栏 / 视图目录 / 持久化）② **编排与角色**（`web-app`：默认视图与落位、角色绑定、注意力、快捷键） | 已落地（决定 7 / 14 / 15 / 16 / 17 / 20）                                                                                                                 |
+| **prac 要做的 agent 面** | 六件事在 DSH 机制上的落点：决策空间、依据一等公民、可逆检查点、审查主界面、架构记忆、活的计划                                                             | **一个都还没有实体**（[proposed/2026-09-16-epistemic-six-on-dsh-mechanisms.md](../.agents/notes/proposed/2026-09-16-epistemic-six-on-dsh-mechanisms.md)） |
+| **VS Code 集成族**       | 三层的第 3 层（`prac-host-vscode` / `prac-client-vscode-host` / 两个座位）+ 它依赖的 lib 与 vendor                                                        | 已落地一部分（§4 整节讲它）——**重要，但只是 prac 的一部分**                                                                                               |
+| **继承的 DSH 能力族**    | 已在 `dsh-base` 里的：`dsh-tools`、`dsh-skill*`、`dsh-goal` + `dsh-goal-round-driver`、`dsh-plan-mode`、`dsh-subagent*`、`dsh-workflow-worker-thread` 等  | prac 作为消费者**已经拿到**；prac 要做的是**编排与呈现**，不是重写（`packages/bundle/base/cordis.patch.yml`）                                             |
+
+**这条区分的用处**：任何"prac 的架构"的讨论若只围着 VS Code 转，就会把**当前的界面工作**误当成 **prac 的全部**——我此前正是这么写的。界面形态是重点之一，agent 面才是 prac 的立身之本（`docs/philosophy.md`）。
 
 ## 2. DSH 的架构（prac 依赖的那部分）
 
@@ -340,7 +354,9 @@ base → platform → editor → workbench → code → server → sessions
 
 **一次踩坑定型的设计**：editor part **必须存在**（服务图需要它），但**不该上屏**。做法是 `createDetachedPart("workbench.parts.editor")`——造出来、留在屏外、永不挂载；否则 `openEditor` 会在 `isLocked` 上抛错、任何文件都打不开。
 
-## 4. prac 的整合
+## 4. prac 的界面与集成（当前工作重心）
+
+> 本节讲的是 prac 的**界面形态**：frame 与编排，以及 VS Code 集成族怎么落进它。**这不是 prac 的全部**——prac 由什么组成见 §1.6。
 
 ### 4.1 包与职责
 
