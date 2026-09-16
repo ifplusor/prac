@@ -53,7 +53,7 @@ prac 同时说三套词：DSH 的（slot / 视图 / 服务）、prac 自己的�
 
 | 词 | 归属 |
 | --- | --- |
-| `workbench`（概念、`workbench.parts.*`、`.monaco-workbench`、`out/vs/workbench/…`、`.build/workbench`） | **vendor**——上游的词：part id / CSS 类 / 路径，改了会坏 |
+| `workbench`（概念、`workbench.parts.*`、`.monaco-workbench`、`out/vs/workbench/…`、`.build/vscode`） | **vendor**——上游的词：part id / CSS 类 / 路径，改了会坏 |
 | `vscode` | **产品身份 token**：vendor 的目录与包名 ＋ prac 侧指代那个实例与它的资产（路由、服务、view id、surface id） |
 | prac 自己的词（frame / region / seat / view / slot / arrangement） | **prac** |
 
@@ -67,7 +67,7 @@ prac 同时说三套词：DSH 的（slot / 视图 / 服务）、prac 自己的�
 ### 判据（都有输出）
 
 ```bash
-grep -rn 'workbench' packages | grep -vE 'workbench\.parts|monaco-workbench|out-vscode-web|\.build/workbench|workbench\.web\.main\.internal|vscode-workbench-web-configuration'   # ⇒ 0
+grep -rn 'workbench' packages | grep -vE 'workbench\.parts|monaco-workbench|out-vscode-web|\.build/vscode|workbench\.web\.main\.internal|vscode-workbench-web-configuration'   # ⇒ 0
 grep -rnE 'vs:|Vs[A-Z]|prac-vs-proxy|data-prac-vs' packages | grep -v vscode                                                                                                # ⇒ 0
 grep -rn 'prac\|Prac\|PRAC\|DSH' vendor/vscode/overlay/bridge.ts vendor/vscode/overlay/embeddedWorkbench.ts vendor/vscode/overlay/embeddedWebMain.ts vendor/vscode/patches      # ⇒ 0
 ```
