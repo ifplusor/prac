@@ -62,22 +62,24 @@ DSH 在两端都提供骨架：client 侧是页面的壳（loader、模块表、
 ### 2.4 一张图
 
 ```
-主干 = DSH（client 侧是壳，server 侧是 harness 与进程）
+主干 = DSH，两端各一半。
+
+client（浏览器里的一页）
 │
-├─ client（浏览器里的一页）
-│  │  DSH 的 client 半边：web shell（loader / 模块表 / ctx.slots / 服务注册表）
-│  │    · prac 自己的：frame（区域树 / 分割 / 折叠 / 目录 / 持久化）· 编排与角色 · 注意力
-│  │    · VS Code 插件的 client 半边：用 VS Code 的 UI 组件渲染
-│  │
-│  │  ← DSH 的通信层（页面上屏、服务调用、事件转发、流）
-│  │
-└─ server（Node）
-   │  DSH 的 host 半边：agent loop · 会话 · 工具 · 上下文 · 审批 · webserver
-   │    · prac 自己的：host 侧插件（服务与策略）
-   │    · VS Code 插件的 server 半边：拥有 code server 与它的能力
-   │         └─ code server：**完整的 IDE**（编辑 / 语言特性 / 搜索 / 源码管理 / 调试 / 任务 / 测试 / 终端 / 扩展）
-   │              ├─ 扩展宿主进程（VS Code 的扩展跑在这里）
-   │              └─ PTY host 进程
+├─ DSH 的 client 半边：web shell（loader / 模块表 / ctx.slots / 服务注册表）
+│    ├─ prac 的 client 插件：frame（区域树 / 分割 / 折叠 / 目录 / 持久化）· 编排与角色 · 能力面的消费端
+│    └─ VS Code 插件的 client 半边：VS Code 的 UI 组件
+│
+⇅  DSH 的通信层：页面上屏与产物 · 服务调用 · 事件与流
+│
+server（Node）
+│
+├─ DSH 的 host 半边：agent loop · 会话 · 工具 · 上下文 · 审批 · webserver
+│    ├─ prac 的 host 插件：服务与策略 · 能力面的提供端 · 进程生命周期
+│    └─ VS Code 插件的 server 半边：拥有 code server
+│         └─ code server 进程：完整的 IDE（编辑 / 语言特性 / 搜索 / 源码管理 / 调试 / 任务 / 测试 / 终端 / 扩展）
+│              ├─ 扩展宿主进程（VS Code 的扩展跑在这里）
+│              └─ PTY host 进程
 ```
 
 ---
