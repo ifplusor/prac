@@ -49,8 +49,9 @@ import { EMBED_BRIDGE } from "prac-vscode";
 
 保持这份清单**穷尽**：任何与上游的偏离都要列在这里。
 
-1. **补丁集 `patches/0001-prac-vscode-composition.patch`（74 行）只装 delta** —— 对上游**已有文件**的两处改动：
-   - 改 `src/vs/workbench/browser/web.factory.ts`：`create()` 用 `EmbeddedBrowserMain`。
+1. **补丁集 `patches/0001-prac-vscode-composition.patch` 只装 delta** —— 对上游**已有文件**的**三处**改动（**两个**文件）：
+   - 改 `src/vs/workbench/browser/web.factory.ts`：`create()` 用 `EmbeddedBrowserMain`（import 与调用，两处 hunk）。
+   - 改 `src/vs/workbench/browser/web.main.ts`：`BrowserMain` 的 `configuration` 由 `private` 改 `protected`。覆写 `createWorkbench` 的组合者必须能把它交给自己的 workbench——construction options 里带着 `workspaceProvider` 这类"部件够不到"的事实，而 `createWorkbench` 那个 `IWorkbenchOptions` 参数是另一个小得多的袋子（`extraClasses`/`resetLayout`）。
    - 改 `src/vs/workbench/browser/web.main.ts`：`resolveWorkspace()` 里 `URI.revive()` 序列化的 `UriComponents`。不 revive 就过不了 `isSingleFolderWorkspaceIdentifier` 的 `URI.isUri` 守卫，表现为「工作区打开了但是空的」。
 2. **我们自己的文件走 `overlay/`，由构建放置（不走补丁）**：
    - `overlay/embeddedWorkbench.ts`（790 行）：`EmbeddedWorkbench implements IWorkbenchLayoutService`，把每个 part 挂进 `[data-vscode-embed-part-host="<part id>"]` **外部 host**，`layout()` 按 host 尺寸驱动（zen / centered / floating / 多窗口暂 stub）；服务图恢复后把面（`mountPartInto` / `movePartInto`（part 是单实例，只能**搬**不能重建）、`openUntitled`、`openWorkspaceFolder`（页侧构造不出 `vscode.openFolder` 要求的 `URI` 实例，故由 hold 着 `URI` 的 workbench 侧代调，且**不带**窗口选项——`forceReuseWindow` 会走 embedder 那个只会导航的 `workspaceProvider.open()`））**交回 embedder**。

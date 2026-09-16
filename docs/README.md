@@ -5,5 +5,5 @@
 | 文档                               | 内容                                                          |
 | ---------------------------------- | ------------------------------------------------------------- |
 | [philosophy.md](philosophy.md)     | 两个轴 + 认识论循环 + 决策单元（本项目如何思考 agent 的形态） |
-| [architecture.md](architecture.md) | 如何映射到 DSH（bundle / profile / plugin）                   |
+| [architecture.md](architecture.md) | 系统结构：DSH 的架构、VS Code 的架构、prac 对两者的整合       |
 | [theory/](theory/)                 | 继承的 LLM 限制理论：固有特征、记忆模型、双 Agent、设计模式   |
