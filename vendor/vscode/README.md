@@ -117,7 +117,11 @@ pnpm --filter prac-vscode vscode:clean
     shots/  notes-backup/  legacy/
 ```
 
-**一个刻意的例外：pnpm 的 store 不在仓库里**，在 `/Volumes/Dev/.pnpm-store`（`pnpm-workspace.yaml` 的 `storeDir`）。理由是**同卷硬链接**：home（`/System/Volumes/Data`）与项目（`/Volumes/Dev`）是两个卷，store 放到系统缓存目录（`~/Library/pnpm/store`）会让每次安装退化成**复制**——node_modules 与 store 各存一份。卷根那份 store 本来就存在（pnpm 11 在这台机器上的默认选择），且与同一卷上的其他仓库（含 DSH checkout）共享。
+**一个刻意的例外：pnpm 的 store 不在仓库里**，在 `/Volumes/Dev/.pnpm-store`，由**环境变量** `pnpm_config_store_dir` 指定。
+
+- **为什么不写进仓库配置**：这是**机器/卷相关**的路径；写进 `pnpm-workspace.yaml` 等于每个仓库各抄一遍，反而不能共享。
+- **为什么不用系统缓存目录**：`~`（`/System/Volumes/Data`）与项目（`/Volumes/Dev`）是**两个卷**，而 pnpm 靠硬链接装包；store 放到 `~/Library/pnpm/store` 会让每次安装退化成**复制**（node_modules 与 store 各存一份）。卷根那份 store 与同一卷上的其他仓库（含 DSH checkout）共享。
+- **坑**：pnpm 12 起环境变量前缀是 **`pnpm_config_`**（`npm_config_store_dir` 被忽略），且 `.npmrc` 里的 `store-dir` 也不再生效——两者我都实测过。
 
 三条规则：
 

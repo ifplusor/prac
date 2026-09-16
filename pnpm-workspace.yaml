@@ -50,4 +50,3 @@ peerDependencyRules:
 allowBuilds:
   bufferutil: false
   utf-8-validate: false
-storeDir: /Volumes/Dev/.pnpm-store
