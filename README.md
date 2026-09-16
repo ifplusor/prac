@@ -22,9 +22,9 @@ DSH 是一个**全插件、可插拔**的 agent harness：每个部分（模型�
 ## 目录结构
 
 ```
-docs/                       # 参考：prac 是什么、怎么运作（现在时，stable）
+docs/                       # 参考：理念（现在时）+ 目标架构（面向目标的设计）
   philosophy.md             #   两个轴 + 认识论循环 + 决策单元
-  architecture.md           #   系统结构：DSH / VS Code 的架构与 prac 的整合
+  architecture.md           #   目标架构：prac 要成为什么（不是实现现状）
   theory/                   #   继承的 LLM 限制理论（固有特征、记忆模型、双 Agent、设计模式）
 .agents/notes/              # 决策记忆：agent 面向，状态轴（proposed/in-progress/resolved:<fine>/abandoned:<fine>，no-index）
   resolved/                 #   已定方向（决策定案/结论成立/代码实现且验证）
