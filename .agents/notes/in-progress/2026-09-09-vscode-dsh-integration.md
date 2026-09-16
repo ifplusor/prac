@@ -315,6 +315,7 @@ DSH web 页
 | `disabled` 写进 patch 静默无效 | 每条 patch 只索引它**之前**插入的行 | `disabled` 必须排在 `insert` **之后** |
 | `vp pack`（host 构建）把 `dist/` 清空 ⇒ DSH 报 `client bundle not found` | 两半产物分两步出 | 同一份 `pack` 配置数组同时出两半 |
 | `exports['./client']` 路径改动后页面不对 | 客户端插件清单是**启动时**组装的 | 必须重启 DSH |
+| 页面控制台稳定出现 `pageerror: [createInstance] CodeActionController depends on UNKNOWN service editorProgressService`（门仍全绿） | **未查明**：像是内置编辑器贡献要的某个服务不在我们的嵌入组合里（`EmbeddedWorkbench` 只实现布局服务，其余走 workbench 自己的 service 图） | 待查：`IEditorProgressService` 由谁注册（哪个 part / contribution），我们的组合为什么没带上；**2026-09-16 两次 `verify-layout` 都复现**，不在任何噪音白名单里 |
 | 根 `vp check` 报 16 个文件格式不合，全是 notes/docs | 根 check 覆盖面过宽 | 根 `check` 收窄到 `scripts vite.config.ts package.json`（临时）；**2026-09-15 已按 James 裁决改为**：根 `vite.config.ts` 的 `fmt.ignorePatterns` 只排除 `.agents/notes/`，根 `check` = `vp check .`（代码/脚本/配置/docs 全进） |
 | 设了 `store-dir` 但 store 不跟着变 | **pnpm 12 不再从 `.npmrc` 读设置**（搬去 `pnpm-workspace.yaml`），且环境变量前缀从 `npm_config_` 改成 **`pnpm_config_`** | 按机器/卷设 store 用 **`pnpm_config_store_dir`**（CLI `--store-dir` 也行）；**不要**写进 `pnpm-workspace.yaml`——那是仓库共享文件，机器路径写进去每个仓库都得抄（James 2026-09-16 裁决）。**装依赖用 `vp install`，不要直接 `pnpm`**（James 2026-09-16）；store 的判断看 `node_modules/.modules.yaml` 的 `storeDir`，而不是 `pnpm store path` |
 | store 在不同目录/不同人那里不一样 | 同卷 ≠ 同一个 store：pnpm 11 选**卷根**（`/Volumes/Dev/.pnpm-store`），pnpm 12 默认选 `<repo>/node_modules/.pnpm-store`；两个版本、两种默认 | 判据看 `node_modules/.modules.yaml` 里记的 `storeDir`；统一靠 `pnpm_config_store_dir`（本机：`/Volumes/Dev/.pnpm-store`，与 DSH checkout 共享） |
