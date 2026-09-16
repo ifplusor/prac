@@ -12,9 +12,21 @@
 
 1. **prac 是 CS/BS 两端结构**：**server 是主干与权威**，client 是它的视图。看架构先分 **client / server** 两端，而不是先分 DSH / VS Code——两个系统各自又都跨在线上（§1.5）。
 2. **主干是 DSH**：组合、状态、进程与生命周期都归它。**DSH 的插件机制本身就是 prac 的扩展宿主**——Cordis 插件树（加上运行时的动态包）承担的正是"扩展跑在哪里"这个角色；它的**形状**与 VS Code 的 ext host 不同（同一地址空间、无专用协议），但**角色对等**。所以"给 agent 的能力"在 DSH 侧是"挂进主干"，不需要另造宿主。
-3. **VS Code 以插件的方式集成**：它是**主干上的一个插件**，两端各一半——server 半边拥有 VS Code 的进程与能力，client 半边把它的 UI 贡献进 prac 的 frame。它**不是**"被嵌进来的第三方 app 加一层接缝"：接缝（bridge / part host / `prac-vscode-embed`）是**这个插件的内部实现**，不是两个对等系统之间的外交协定。
+3. **VS Code 以插件的方式集成**：它是**主干上的一个插件**，两端各一半——server 半边拥有 VS Code 的进程与能力，client 半边把它的 UI 贡献进 prac 的 frame。
+4. **三层，各归其位**（这是"以插件方式集成"的具体形状）：
 
-**这条总纲纠正的是我积累的设计错误**，不是实现细节：把"嵌入 app"当设计、把"页面是唯一的组装点"当原则、把 code server 的生命周期做成选项、把"两个服务端"当中性缺口（§5 有对照清单）。
+   ```
+   vendor/vscode          引入的 VS Code 源码树 + 我们的 patch
+                          —— "我们拥有的上游"（当前以 pin + patch + overlay + 构建配方落地）
+   vendor/vscode-embed    在它之上封装的可复用 lib
+                          —— 把 VS Code 变成"可被程序驱动的部件"；**可利用、不绑定 prac**
+   packages/* 的 DSH 插件  基于这个 lib 构建
+                          —— **这一层才是"把 VS Code 的能力与生态带入 prac"的地方**
+   ```
+
+   **边界因此是清楚的**：lib 只提供机制（资产服务、HTTP/WS 代理、每页一次的启动、part 宿主元素工厂、能力面的骨架），**不承担任何 prac/DSH 政策**；政策全在插件层——谁放在哪、何时启动、哪个 view 用哪个 part、能力怎么暴露给 agent、以及 code server 进程的生命周期（§5 偏差 1）。
+
+**这条总纲纠正的是我积累的设计错误**，不是实现细节：把"嵌入 app"当设计、把"页面是唯一的组装点"当原则、把 code server 的生命周期做成选项、把"两个服务端"当中性缺口，以及**把 lib 与插件层混为一谈**（§5 有对照清单）。
 
 ## 0. 一张图
 
@@ -332,20 +344,25 @@ base → platform → editor → workbench → code → server → sessions
 
 ### 4.1 包与职责
 
+按 §设计总纲 4 的三层读这张图（现在是**实现现状**；哪些与设计不符见 §5）：
+
 ```
-packages/
-  client/ui-layout            机制：frame（区域树 / sash / 折叠 / 视图目录 / prac.view 槽 / ctx.pracLayout / ctx.layout 兼容 shim / 持久化）
-  client/vscode-host          策略：何时启动 VS Code（一旦 DSH 报出工作区）、view↔part 映射、pracVscode 面（含能力面）
+vendor/                       第 1、2 层
+  vscode                      引入的 VS Code 源码树 + 我们的 patch，外加 pin/overlay/构建配方
+                              （**不是 DSH 插件**：无 main、无 dsh 字段、exports 只有 package.json 与契约）
+  vscode-embed                在它之上封装的可复用 lib：host 半边（同源静态服务 + code server HTTP/WS 代理）
+                              与浏览器半边（每页一次启动 + part 宿主元素工厂 + 能力面骨架）
+                              —— 只给机制，**不绑定 prac**、不含 prac/DSH 政策
+packages/                     第 3 层：基于 lib 构建的 DSH 插件（政策与集成在这一层）
+  host/vscode                 server 半边：/prac-vscode 路由、code server 的端口与位置、开发覆盖
+  client/vscode-host          client 半边：何时启动 VS Code（一旦 DSH 报出工作区）、view↔part 映射、pracVscode 面
   client/ui-vscode-editor     座位：声明 vscode:editor
   client/ui-vscode-explorer   座位：声明 vscode:sidebar
+  client/ui-layout            frame 机制：区域树 / sash / 折叠 / 视图目录 / prac.view 槽 / ctx.pracLayout / ctx.layout 兼容 shim / 持久化
   bundle/web-app              编排：默认视图与落位、角色绑定、注意力条、快捷键（host 半边什么都不做，只为让 client 半边被扫到）
-  host/vscode                 服务策略：/prac-vscode 路由、code server 端口、构建位置与开发覆盖
-vendor/
-  vscode                      pin + patch + overlay + 构建配方（**不是 DSH 插件**：无 main、无 dsh 字段、exports 只有 package.json 与契约）
-  vscode-embed                嵌入机制：host 半边（同源静态服务 + code server HTTP/WS 代理）与浏览器半边（每页一次启动 + part 宿主元素工厂）；**不知道 prac 与 DSH**
 ```
 
-**依赖方向**：`prac-vscode`（契约）← `prac-vscode-embed` ← `prac-host-vscode` / `prac-client-vscode-host` ← 两个座位 / `web-app`。**运行时**的耦合不走 import，只走 DSH 的服务注册表与槽：座位不 import 机制，而是 `inject: ["pracVscode"]` 等它出现。
+**依赖方向**：`prac-vscode`（契约）← `prac-vscode-embed`（lib）← 插件层的两半（`prac-host-vscode` / `prac-client-vscode-host`）← 座位 / `web-app`。**运行时**的耦合不走 import，只走 DSH 的服务注册表与槽：座位不 import 机制，而是 `inject: ["pracVscode"]` 等它出现。
 
 ### 4.2 组合
 
@@ -405,14 +422,14 @@ vendor/
 
 按 §设计总纲，下面四条是**必须收束的实现偏差**，不是可以商量的选项：
 
-| #   | 设计                                                   | 现状                                                                                                                           | 偏差                                                 |
-| --- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
-| 1   | **主干拥有 VS Code 的进程**（起 / 重启 / 关 / 给端口） | `prac-host-vscode` 里端口**写死 3091**，且没有任何地方启动它                                                                   | 主干只"代理一个别人起的进程"；页面在它缺席时静默半死 |
-| 2   | **主干（server）是组装与权威，页面是视图**             | 组合确实是主干的（profile / bundle patch / loader 行），但**UI 组装、能力面的唯一实现**都在页面                                | 能力面的真相被放在 client，agent（server 侧）够不着  |
-| 3   | **VS Code 是主干上的一个插件**（接缝是插件内部实现）   | 它目前是"被嵌的 app + 一层接缝"：`vendor/vscode-embed` 被写成"不知道 prac 与 DSH"的机制库，bridge 被写成两个系统之间的外交协定 | 抽象层级错了 ⇒ 生命周期、能力归属、状态归属都跟着错  |
-| 4   | **一个主干**                                           | **两个服务端**（DSH 一个、code server 一个），且 code server 的 `--folder` 与 DSH 活动工作区不是同一个目录                     | 双权威：工作区、进程、状态各有一半                   |
+| #   | 设计                                                                                                                                                    | 现状                                                                                                                                                                                            | 偏差                                                                  |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| 1   | **主干拥有 VS Code 的进程**（起 / 重启 / 关 / 给端口）                                                                                                  | `prac-host-vscode` 里端口**写死 3091**，且没有任何地方启动它                                                                                                                                    | 主干只"代理一个别人起的进程"；页面在它缺席时静默半死                  |
+| 2   | **主干（server）是组装与权威，页面是视图**                                                                                                              | 组合确实是主干的（profile / bundle patch / loader 行），但**UI 组装、能力面的唯一实现**都在页面                                                                                                 | 能力面的真相被放在 client，agent（server 侧）够不着                   |
+| 3   | **三层各归其位**：`vendor/vscode`（上游 + patch）→ `vendor/vscode-embed`（可复用 lib、不绑定 prac）→ **基于 lib 构建的 DSH 插件**（政策与集成在这一层） | lib 那一半是对的（纯机制、无 prac/DSH 政策）；错在**集成单位没有被命名**——`prac-host-vscode` / `prac-client-vscode-host` 被写成"策略/接缝"，而不是"把 VS Code 的能力与生态带入 prac 的那个插件" | 政策与机制的分界没被表述清楚 ⇒ 能力归属、生命周期、状态归属都无处安放 |
+| 4   | **一个主干**                                                                                                                                            | **两个服务端**（DSH 一个、code server 一个），且 code server 的 `--folder` 与 DSH 活动工作区不是同一个目录                                                                                      | 双权威：工作区、进程、状态各有一半                                    |
 
-第 3 条的正确形状（插件的边界划在哪、`vendor/vscode-embed` 与 `prac-host-vscode` 还该不该分家）**待 James 定**——这是设计问题，不是实现问题。
+第 3 条要收束的是**表述与归属**（lib 与插件层各自是什么、政策归谁），不是 lib 本身要不要存在——**lib 是可利用的资产，不绑定 prac**。
 
 ### 未实现 / 已知缺口
 
