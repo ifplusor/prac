@@ -61,6 +61,7 @@ import { EMBED_BRIDGE } from "prac-vscode";
    - `overlay/bridge.ts`：桥接契约（下面是单独一段）。
    - 这四份（`bridge.ts` / `gallery.ts` / `embeddedWorkbench.ts` / `embeddedWebMain.ts`）由 `build.mjs` 的 `stageOverlay()` 拷进 checkout 的上游路径。`scripts/page.html` **不在其中**：它不落盘，由 `vscode:serve` 就地服务。
    - **为什么载荷不进补丁**：补丁应当是 _delta_。载荷是我们**自己的完整文件**（959 行，含契约），放进补丁会让"我们对上游做了什么"淹没在自己的代码里；作为真文件它还能被 review / grep / fmt（类型检查除外，见下）。
+   - **载荷不带上游版权头**：它们不是上游代码，所以 `embeddedWorkbench.ts` / `embeddedWebMain.ts` 只以 prac 的注释开头（`bridge.ts` / `gallery.ts` 本来就没有）。代价说清楚：若在 checkout 里跑**上游自己的** eslint，`header/header` 会对这两个文件报"缺版权头"——我们本来就不跑上游 lint（见下），而挂一个不属于自己的版权头是更糟的问题。产物不受影响：esbuild 会丢注释，web bundle 里只剩构建注入的那一条版权横幅（实测 1 处）。
    - **它不被我们的类型检查覆盖**：这两个文件按上游树的位置写相对导入（`../../base/common/…`），只有在上游 checkout 里才成立。`vendor/vscode/.eslintignore` 因此排除它们（`vp check` 的检查集），`tsconfig.json` 的 `include` 也只收 `overlay/bridge.ts`。要真正检查它们，得在 checkout 里跑上游自己的 tsc（分钟级，未做）。
 3. **桥接契约由构建放置，不进补丁**：`vendor/vscode/overlay/bridge.ts` 是 prac ↔ workbench 交互面的**单一定义**（options 字段名 `vscodeEmbed`、`deferParts`、面的类型、`readEmbedBridge()` 校验器）。`build.mjs` 把它拷成 `<checkout>/src/vs/workbench/browser/embedBridge.ts`，两侧编译同一份文件（client 半边直接 `import ... from "prac-vscode"`，拿到的是同一份原件），所以字段名只拼写一次。
    - 交互面**不再走 window 全局**（原 `__pracDeferVsParts` 入、`__vscodeEmbed` 出已删除）：prac 在 `create()` 的 construction options 里交进一个 bridge 对象，VS Code 侧用 `IBrowserWorkbenchEnvironmentService.options` 读它（补丁本来就持有这个服务），并把面经 `bridge.publish(face)` 交回。**无 bridge（独立页）= 走默认路径**：VS Code 自己把 part 挂进带 part id 的文档 host。
