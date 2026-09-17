@@ -53,7 +53,7 @@ DSH web 页
 - DSH 侧：prac 的包作为**行**由 `prac-web-app` 的 patch `insert`；**loader 行 id 取的是产物 id**（`clientPack(id)`），包的 `name` 只用于诊断。
 - 跨插件共享的页面级状态只有一处：`globalThis.__vscodeEmbed`（boot 守卫、boot 元素、命令面、失败原因、part→元素表）。
 - **空 region 不渲染**（`isPresent`：非 flex 且没有可见 view ⇒ 不在 DOM 里）⇒ 新增区域可以"零成本地存在"，填了才出现；这也让底栏这种"默认收起"的东西不需要单独的状态。
-- 构建期契约只有一处：`vendor/vscode/overlay/bridge.ts`（`EMBED_BRIDGE` / `PART_HOST_ATTR` / `PartHostFace` / `EmbedBridge`），两侧编译同一份原件。
+- 构建期契约只有一处：`vendor/vscode/overlay/embedBridge.ts`（`EMBED_BRIDGE` / `PART_HOST_ATTR` / `PartHostFace` / `EmbedBridge`），两侧编译同一份原件。
 
 ## 4. 决定
 
@@ -258,7 +258,7 @@ DSH web 页
 - 座位契约 = `prac.view` 槽；机制**按注册表成员**判定座位，不按 id 前缀。
 - `pracVscode` 服务面 = 工作区解析（来自 DSH 会话/工作区注册表）+ view→part 映射；机制（boot / part host / 主题 / 命令）在 `prac-vscode-embed`。
 - 页面级状态只有一处：`globalThis.__vscodeEmbed`（`VscodeEmbedPage`）。
-- 构建期契约只有一处：`vendor/vscode/overlay/bridge.ts`。
+- 构建期契约只有一处：`vendor/vscode/overlay/embedBridge.ts`。
 
 ## 7. 踩坑与根因
 

@@ -11,7 +11,7 @@
   ],
   "type": "module",
   "exports": {
-    ".": "./overlay/bridge.ts",
+    ".": "./overlay/embedBridge.ts",
     "./package.json": "./package.json"
   },
   "scripts": {

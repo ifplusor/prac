@@ -122,11 +122,11 @@ function ensureCheckout() {
  * `to` is checkout-relative.
  */
 const OVERLAY = [
-  { from: "overlay/bridge.ts", to: "src/vs/workbench/browser/embedBridge.ts" },
+  { from: "overlay/embedBridge.ts", to: "src/vs/workbench/browser/embedBridge.ts" },
   // The bridge re-exports the gallery, so the checkout-side contract needs it as a
   // sibling. It was missing from this table, which only showed up on a build whose
   // checkout had just been cleaned (2026-09-16).
-  { from: "overlay/gallery.ts", to: "src/vs/workbench/browser/gallery.ts" },
+  { from: "overlay/extensionsGallery.ts", to: "src/vs/workbench/browser/extensionsGallery.ts" },
   { from: "overlay/embeddedWorkbench.ts", to: "src/vs/workbench/browser/embeddedWorkbench.ts" },
   { from: "overlay/embeddedWebMain.ts", to: "src/vs/workbench/browser/embeddedWebMain.ts" },
 ];
@@ -247,7 +247,7 @@ function buildBundle() {
  * `codeServerPath()` derives the one segment both channels actually use.
  */
 /** The extension gallery both planes are configured from (the vendor's own module). */
-const { EXTENSIONS_GALLERY: gallery } = await import("../overlay/gallery.ts");
+const { EXTENSIONS_GALLERY: gallery } = await import("../overlay/extensionsGallery.ts");
 
 function stampServerCommit() {
   const commit = checkoutCommit();

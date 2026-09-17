@@ -77,7 +77,7 @@ James（2026-09-15）：**"我们想要的不是自定义 workbench，而是把�
 
 目标：把 **explorer 的文件树 view** 挂进 prac 的一个 region；prac 侧**不认识 container，也不认识 part**。
 
-1. `vendor/vscode/overlay/bridge.ts`：face 加 `mountViewInto(viewId, element)`（契约是我们自己的文件，不进补丁；stage 进 checkout 供两侧编译）。
+1. `vendor/vscode/overlay/embedBridge.ts`：face 加 `mountViewInto(viewId, element)`（契约是我们自己的文件，不进补丁；stage 进 checkout 供两侧编译）。
 2. `vendor/vscode/overlay/embeddedWorkbench.ts`：实现它——用 `viewDescriptor.ctorDescriptor` + `instantiationService.createInstance(...)` 造 `ViewPane`，挂进外部元素；生命周期进 `disposables`，`layout()` 时把 host 尺寸算进去。
    - **可能要"偷偷"造一个 container 当它的 parent**：VS Code 里 view 的家是 container（`IViewletViewOptions` 带容器引用），所以实现上或许必须有一个 container 对象存在。这是**实现细节，不暴露给 prac**——prac 只拿到 view 的句柄。
 3. `vendor/vscode-embed/src/client/index.ts`：句柄加 `view(viewId)`（与 `partHost(partId)` 并列；`partHost` 从此定位为**高级形态**的入口，**加方法不改形状**）。
@@ -145,7 +145,7 @@ interface Capability<T, A> {
 
 ## B2 第一步已落地（`editors`，2026-09-15）
 
-**能力外壳**（`vendor/vscode/overlay/bridge.ts`）：`Capability<T, A> = { snapshot, subscribe, settled, version, actions }`；`editors` 的数据是 `EditorEntry { resource, active, dirty, preview }`，动作是 `activate(resource)` / `close(resource)`。**实的部分**：工作台自己的 `IEditorService`（打开集合 / active）+ 每个 `EditorInput.isDirty()` + 各 group 的 `previewEditor`；`settled()` 对这条能力是立即 resolve（它的数据全是同步状态，信封统一是刻意的），`version()` 每次变化自增。跨层透传：`vendor/vscode-embed` 的句柄 → `PracVscodeFace.capabilities.editors`，订阅在 face 到达前先记录（与 `fileState` 同一条理由）。
+**能力外壳**（`vendor/vscode/overlay/embedBridge.ts`）：`Capability<T, A> = { snapshot, subscribe, settled, version, actions }`；`editors` 的数据是 `EditorEntry { resource, active, dirty, preview }`，动作是 `activate(resource)` / `close(resource)`。**实的部分**：工作台自己的 `IEditorService`（打开集合 / active）+ 每个 `EditorInput.isDirty()` + 各 group 的 `previewEditor`；`settled()` 对这条能力是立即 resolve（它的数据全是同步状态，信封统一是刻意的），`version()` 每次变化自增。跨层透传：`vendor/vscode-embed` 的句柄 → `PracVscodeFace.capabilities.editors`，订阅在 face 到达前先记录（与 `fileState` 同一条理由）。
 
 **门里被逼出来的两条真实语义**（都不是 bug，是 VS Code 的正确行为，记在案）：
 
@@ -165,7 +165,7 @@ interface Capability<T, A> {
 **数据路径已实测（2026-09-15，James 授权装扩展后）**：装 **cSpell 4.9.3** 后，能力返回了**真实 marker**——`source: "cSpell"`、severity `info`、`resource` 是打开的那个文件、`version` 自增、`settled()` 等了 402ms 才 resolve（即"等到了到达的 markers"，而不是立刻说完成）。`verify-extension` 因此扩成两半：**有 view 的扩展**仍验"view 挂进 prac 并上屏"，**没有 view 的扩展（linter / spell checker）**改用它**知道什么**来证明激活——诊断的 `source` 就是它的 UI。判据 `verify-extension` **5/5**（`EXTENSION=streetsidesoftware.code-spell-checker VIEW=none`）。`verify-file` 的契约断言同时改成**相对形状**（summary 必须等于 query 返回的同一集合、page 有界、`offset` 如实回报），这样**有没有 marker 都成立**（实测 51 条 / 4 个文件时一样绿）。
 
 **装扩展这条路上的三件坑（都实测，记在案）**：
-1. **OSS 的 `product.json` 没有 gallery** ⇒ 产品自己的安装路径（`workbench.extensions.installExtension`）答"No extension gallery service configured"；而**客户端**的 product configuration 与**服务端**的 product.json 是两份 ⇒ 两边都要喂。现在 gallery 由 `overlay/gallery.ts` **单一来源**给出：build 脚本 import 它去盖服务端三份 product.json，prac 的 host 把它放进 embed 的构造选项（客户端那份）。
+1. **OSS 的 `product.json` 没有 gallery** ⇒ 产品自己的安装路径（`workbench.extensions.installExtension`）答"No extension gallery service configured"；而**客户端**的 product configuration 与**服务端**的 product.json 是两份 ⇒ 两边都要喂。现在 gallery 由 `overlay/extensionsGallery.ts` **单一来源**给出：build 脚本 import 它去盖服务端三份 product.json，prac 的 host 把它放进 embed 的构造选项（客户端那份）。
 2. **产品自己的两条安装路径在我们这套组合里会挂住**：`workbench.extensions.installExtension` 与 `server-cli --install-extension` 都**永远不返回**（实测 25s / 120s 超时），因为它们要弹"确认/重载"对话框，而**我们不托管任何对话框/通知的面**——prac 的 frame 里没有 part，通知/弹窗没有 DOM。这是一条**真实的缺口**（也解释了编辑器"脏文件关闭要确认"那条路为什么在 prac 里没法走）：prac 需要给对话框/通知一个座位（`shell.overlay` 或某个 region），否则任何"问用户一句"的产品流程都会挂住。
 3. **`--extensions-dir` 里的 `extensions.json` 是缓存**：手工放进去一个扩展目录后不删它，扫描器不会发现新扩展（实测：不删 → 一个 marker 都没有；删掉 → cSpell 立刻产出 23 条）。`
 

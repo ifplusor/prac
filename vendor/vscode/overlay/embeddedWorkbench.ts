@@ -1,6 +1,3 @@
-// prac's own file (see `overlay/`): the build stages it into the upstream tree, but it
-// is not upstream code — so it carries no upstream copyright header.
-
 /**
  * The embedded workbench: VS Code's parts mounted into hosts the embedder owns.
  *
@@ -89,7 +86,7 @@ import { setHoverDelegateFactory } from "../../base/browser/ui/hover/hoverDelega
 import { setBaseLayerHoverDelegate } from "../../base/browser/ui/hover/hoverDelegate2.js";
 // The embed bridge contract. `embedBridge.ts` is staged into this tree by this
 // package's build (`vendor/vscode/scripts/build.mjs`) from
-// `vendor/vscode/overlay/bridge.ts`, so both sides read one definition.
+// `vendor/vscode/overlay/embedBridge.ts`, so both sides read one definition.
 import { PART_HOST_ATTR, readEmbedBridge } from "./embedBridge.js";
 import { IHoverService, WorkbenchHoverDelegate } from "../../platform/hover/browser/hover.js";
 import { IMarkdownRendererService } from "../../platform/markdown/browser/markdownRenderer.js";

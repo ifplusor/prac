@@ -2,7 +2,7 @@
 # path, so they only compile inside the checkout, by upstream's build. Our
 # checker would report every import as unresolved — they are excluded here, not
 # because they are unchecked in principle, but because this program cannot see
-# the tree they belong to. `overlay/bridge.ts` (the contract both sides compile)
+# the tree they belong to. `overlay/embedBridge.ts` (the contract both sides compile)
 # stays checked.
 overlay/embeddedWorkbench.ts
 overlay/embeddedWebMain.ts

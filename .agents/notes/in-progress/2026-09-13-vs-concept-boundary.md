@@ -69,7 +69,7 @@ prac 同时说三套词：DSH 的（slot / 视图 / 服务）、prac 自己的�
 ```bash
 grep -rn 'workbench' packages | grep -vE 'workbench\.parts|monaco-workbench|out-vscode-web|\.build/vscode|workbench\.web\.main\.internal|vscode-workbench-web-configuration'   # ⇒ 0
 grep -rnE 'vs:|Vs[A-Z]|prac-vs-proxy|data-prac-vs' packages | grep -v vscode                                                                                                # ⇒ 0
-grep -rn 'prac\|Prac\|PRAC\|DSH' vendor/vscode/overlay/bridge.ts vendor/vscode/overlay/embeddedWorkbench.ts vendor/vscode/overlay/embeddedWebMain.ts vendor/vscode/patches      # ⇒ 0
+grep -rn 'prac\|Prac\|PRAC\|DSH' vendor/vscode/overlay/embedBridge.ts vendor/vscode/overlay/embeddedWorkbench.ts vendor/vscode/overlay/embeddedWebMain.ts vendor/vscode/patches      # ⇒ 0
 ```
 
 （`scripts/page.html` 仍叫 `prac-shell` / `__pracVscode`：它是 `prac-vscode` 自己的**独立查看页**，不写进 checkout。）
@@ -81,7 +81,7 @@ grep -rn 'prac\|Prac\|PRAC\|DSH' vendor/vscode/overlay/bridge.ts vendor/vscode/o
 | 入口 | 内容 |
 | --- | --- |
 | `.`（`src/host/index.ts`） | `resolveBundleRoot({ from, override })`、`resolveCodeServerSegment({ distRoot, override })`、`createAssetHandler({ root, mountPath })`、`createCodeServerProxy({ host, port })` |
-| `./client`（`src/client/index.ts`） | `createVscodeEmbed({ route, productName, … })` → `{ boot({ workspacePath }), partHost(partId), commands(), host(), error(), page }`；并再导出 `prac-vscode` 的 embed 契约（唯一的家仍在 `overlay/bridge.ts`） |
+| `./client`（`src/client/index.ts`） | `createVscodeEmbed({ route, productName, … })` → `{ boot({ workspacePath }), partHost(partId), commands(), host(), error(), page }`；并再导出 `prac-vscode` 的 embed 契约（唯一的家仍在 `overlay/embedBridge.ts`） |
 
 prac 两侧随之变薄：`packages/host/vscode` = 路由 `/prac-vscode` + 端口 `3091` + 两个环境变量（`PRAC_VSCODE_ROOT` / `PRAC_CODE_SERVER_PATH`）+ DSH 路由注册；`packages/client/vscode-host` = 工作区解析 + view→part 映射 + `pracVscode` 服务。约 600 行机制搬进 lib。
 

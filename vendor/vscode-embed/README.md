@@ -35,4 +35,4 @@
 
 ## 上游契约在哪
 
-`EMBED_BRIDGE`（options 字段名）、`PART_HOST_ATTR`（part host 属性名）、`PartHostFace` / `EmbedBridge` 类型都定义在 `vendor/vscode/overlay/bridge.ts`——那份文件会被构建 stage 进 checkout 供两侧编译，所以它是**唯一的家**；本包只再导出，不重新拼写。
+`EMBED_BRIDGE`（options 字段名）、`PART_HOST_ATTR`（part host 属性名）、`PartHostFace` / `EmbedBridge` 类型都定义在 `vendor/vscode/overlay/embedBridge.ts`——那份文件会被构建 stage 进 checkout 供两侧编译，所以它是**唯一的家**；本包只再导出，不重新拼写。

@@ -19,14 +19,21 @@ prac **拥有**的 VS Code——以 **pin + patch + 构建配方**的形式，�
 
 **构建期被放进去的文件**都住在这里，目录名说明它的用途，而不是混进"本包源码"：
 
-| 文件                           | 去处                                                                                                                            |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `overlay/bridge.ts`            | `<checkout>/src/vs/workbench/browser/embedBridge.ts` —— 两侧编译的交互契约（**单一定义**）                                      |
-| `overlay/gallery.ts`           | `<checkout>/src/vs/workbench/browser/gallery.ts` —— 扩展市场的单一数据源（bridge 从 `./gallery.js` 再导出，**必须一起 stage**） |
-| `overlay/embeddedWorkbench.ts` | `<checkout>/src/vs/workbench/browser/embeddedWorkbench.ts` —— 组合载荷：以外部 host 为布局服务                                  |
-| `overlay/embeddedWebMain.ts`   | `<checkout>/src/vs/workbench/browser/embeddedWebMain.ts` —— 覆写 `createWorkbench` 的入口                                       |
+| 文件                           | 去处                                                                                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `overlay/embedBridge.ts`       | `<checkout>/src/vs/workbench/browser/embedBridge.ts` —— 两侧编译的交互契约（**单一定义**）                                                                    |
+| `overlay/extensionsGallery.ts` | `<checkout>/src/vs/workbench/browser/extensionsGallery.ts` —— 扩展市场的单一数据源（`embedBridge.ts` 从 `./extensionsGallery.js` 再导出，**必须一起 stage**） |
+| `overlay/embeddedWorkbench.ts` | `<checkout>/src/vs/workbench/browser/embeddedWorkbench.ts` —— 组合载荷：以外部 host 为布局服务                                                                |
+| `overlay/embeddedWebMain.ts`   | `<checkout>/src/vs/workbench/browser/embeddedWebMain.ts` —— 覆写 `createWorkbench` 的入口                                                                     |
 
 （`scripts/page.html` **不在这里**：它不落盘，由 `vscode:serve` 就地服务，见改动日志 6。）
+
+**命名规则**（两条，跟上游的做法一致；**overlay 里的名字 = stage 后的名字**，所以上表四行都是同名映射）：
+
+1. **文件跟它定义的东西同名**——上游也是这么做的（`codeEditorWidget.ts` → `CodeEditorWidget`）。所以 `embedBridge.ts` 定义 `EMBED_BRIDGE` / `EmbedBridge` / `readEmbedBridge`，`extensionsGallery.ts` 定义 `EXTENSIONS_GALLERY`，`embeddedWorkbench.ts` 定义 `EmbeddedWorkbench`。
+2. **替代或扩展上游某个文件时，镜像它的名字**——`embeddedWebMain.ts` 对 `web.main.ts`（它定义 `EmbeddedBrowserMain`，改的是上游 `BrowserMain` 的组合缝），`embeddedWorkbench.ts` 对 `workbench.ts`。这样它落在树里、紧挨着被替代的那个文件时读起来是自然的。
+
+> 2026-09-16 之前 `embedBridge.ts` 在 overlay 里叫 `bridge.ts`（唯一"stage 后改名"的文件），`extensionsGallery.ts` 叫 `gallery.ts`（泛名，且与上游将来可能新增的同名文件有覆盖冲突）。改成现在这两个名字后，规则有了出处，表里也不再有例外。
 
 包的入口直接指向契约，所以其它包**直接 import**，不必知道 staging 细节：
 
@@ -58,12 +65,12 @@ import { EMBED_BRIDGE } from "prac-vscode";
 2. **我们自己的文件走 `overlay/`，由构建放置（不走补丁）**：
    - `overlay/embeddedWorkbench.ts`（790 行）：`EmbeddedWorkbench implements IWorkbenchLayoutService`，把每个 part 挂进 `[data-vscode-embed-part-host="<part id>"]` **外部 host**，`layout()` 按 host 尺寸驱动（zen / centered / floating / 多窗口暂 stub）；服务图恢复后把面（`mountPartInto` / `movePartInto`（part 是单实例，只能**搬**不能重建）、`openUntitled`、`openWorkspaceFolder`（页侧构造不出 `vscode.openFolder` 要求的 `URI` 实例，故由 hold 着 `URI` 的 workbench 侧代调，且**不带**窗口选项——`forceReuseWindow` 会走 embedder 那个只会导航的 `workspaceProvider.open()`））**交回 embedder**。
    - `overlay/embeddedWebMain.ts`（44 行）：`EmbeddedBrowserMain extends BrowserMain`，覆写 `createWorkbench`。
-   - `overlay/bridge.ts`：桥接契约（下面是单独一段）。
+   - `overlay/embedBridge.ts`：桥接契约（下面是单独一段）。
    - 这四份（`bridge.ts` / `gallery.ts` / `embeddedWorkbench.ts` / `embeddedWebMain.ts`）由 `build.mjs` 的 `stageOverlay()` 拷进 checkout 的上游路径。`scripts/page.html` **不在其中**：它不落盘，由 `vscode:serve` 就地服务。
    - **为什么载荷不进补丁**：补丁应当是 _delta_。载荷是我们**自己的完整文件**（959 行，含契约），放进补丁会让"我们对上游做了什么"淹没在自己的代码里；作为真文件它还能被 review / grep / fmt（类型检查除外，见下）。
-   - **载荷不带上游版权头**：它们不是上游代码，所以 `embeddedWorkbench.ts` / `embeddedWebMain.ts` 只以 prac 的注释开头（`bridge.ts` / `gallery.ts` 本来就没有）。代价说清楚：若在 checkout 里跑**上游自己的** eslint，`header/header` 会对这两个文件报"缺版权头"——我们本来就不跑上游 lint（见下），而挂一个不属于自己的版权头是更糟的问题。产物不受影响：esbuild 会丢注释，web bundle 里只剩构建注入的那一条版权横幅（实测 1 处）。
-   - **它不被我们的类型检查覆盖**：这两个文件按上游树的位置写相对导入（`../../base/common/…`），只有在上游 checkout 里才成立。`vendor/vscode/.eslintignore` 因此排除它们（`vp check` 的检查集），`tsconfig.json` 的 `include` 也只收 `overlay/bridge.ts`。要真正检查它们，得在 checkout 里跑上游自己的 tsc（分钟级，未做）。
-3. **桥接契约由构建放置，不进补丁**：`vendor/vscode/overlay/bridge.ts` 是 prac ↔ workbench 交互面的**单一定义**（options 字段名 `vscodeEmbed`、`deferParts`、面的类型、`readEmbedBridge()` 校验器）。`build.mjs` 把它拷成 `<checkout>/src/vs/workbench/browser/embedBridge.ts`，两侧编译同一份文件（client 半边直接 `import ... from "prac-vscode"`，拿到的是同一份原件），所以字段名只拼写一次。
+   - **载荷不带上游版权头**：它们不是上游代码，所以 `embeddedWorkbench.ts` / `embeddedWebMain.ts` 直接以自己的文档注释开头（`bridge.ts` / `gallery.ts` 本来就没有）。代价说清楚：若在 checkout 里跑**上游自己的** eslint，`header/header` 会对这两个文件报"缺版权头"——我们本来就不跑上游 lint（见下），而挂一个不属于自己的版权头是更糟的问题。产物不受影响：esbuild 会丢注释，web bundle 里只剩构建注入的那一条版权横幅（实测 1 处）。
+   - **它不被我们的类型检查覆盖**：这两个文件按上游树的位置写相对导入（`../../base/common/…`），只有在上游 checkout 里才成立。`vendor/vscode/.eslintignore` 因此排除它们（`vp check` 的检查集），`tsconfig.json` 的 `include` 也只收 `overlay/embedBridge.ts`。要真正检查它们，得在 checkout 里跑上游自己的 tsc（分钟级，未做）。
+3. **桥接契约由构建放置，不进补丁**：`vendor/vscode/overlay/embedBridge.ts` 是 prac ↔ workbench 交互面的**单一定义**（options 字段名 `vscodeEmbed`、`deferParts`、面的类型、`readEmbedBridge()` 校验器）。`build.mjs` 把它拷成 `<checkout>/src/vs/workbench/browser/embedBridge.ts`，两侧编译同一份文件（client 半边直接 `import ... from "prac-vscode"`，拿到的是同一份原件），所以字段名只拼写一次。
    - 交互面**不再走 window 全局**（原 `__pracDeferVsParts` 入、`__vscodeEmbed` 出已删除）：prac 在 `create()` 的 construction options 里交进一个 bridge 对象，VS Code 侧用 `IBrowserWorkbenchEnvironmentService.options` 读它（补丁本来就持有这个服务），并把面经 `bridge.publish(face)` 交回。**无 bridge（独立页）= 走默认路径**：VS Code 自己把 part 挂进带 part id 的文档 host。
    - 这份契约是**唯一被 stage 而不是被 patch 的文件**：补丁条目只能装一侧的拼写，那样字段名就又写两遍了。`git clean -fd` 每次都会删掉它，所以每次构建都重新拷。
 4. **`package.json`**：脱离 DSH 插件形状（删 `main` / `dsh` / `exports` 主入口 / 原 client 半边），scripts 收敛为构建 + 验证。

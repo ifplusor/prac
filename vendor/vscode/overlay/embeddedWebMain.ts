@@ -1,6 +1,3 @@
-// prac's own file (see `overlay/`): the build stages it into the upstream tree, but it
-// is not upstream code — so it carries no upstream copyright header.
-
 /**
  * Embedded web main: the same `BrowserMain` service bootstrap, but composed by
  * `EmbeddedWorkbench` instead of VS Code's classic `Workbench`/`Layout`.
