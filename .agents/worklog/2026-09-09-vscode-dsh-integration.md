@@ -69,6 +69,8 @@
 
 > **进度入档（2026-09-15）**：分支 `feat/vscode-dsh-integration`，`wip:` 提交（含签名），检查点 tag `wip/vscode-dsh-2026-09-15`；后续进度按同样方式。提交 ≠ 成果已定。
 
+| 2026-09-17 | **code server 的进程归主干**：`prac-host-vscode` 自己 spawn `out-vscode-reh/server-main.js`——端口取空闲（不再写死 3091）、等 `/version` 就绪、fiber dispose 时 SIGTERM；代理改读句柄；状态目录仍走 XDG。机制落在 `prac-vscode-embed`（`startCodeServer` / `codeServerArgv` / `freePort` / `waitForReady`，12 条单测），政策（哪个 build、哪些目录、何时起）留在插件。逃生口 `PRAC_CODE_SERVER_URL` 指向外置 server、`PRAC_CODE_SERVER_ENTRY` 换 build | 机制单测 12/12；重启 DSH 后日志 `Server bound to 127.0.0.1:58518` + `code server started … (pid …)`；门禁 layout **14/14** · views **28/28** · focus **9/9** · regions **6/6** · view **7/7** · extension **5/5**。`verify-file` 31/33——两项是新的坑（见踩坑与根因）：无 `--folder` 时「未保存」态不成立 |
+
 ## 当时的形态快照（2026-09-15）
 
 > 这是**当时**的快照，不是目标（目标见 `docs/architecture.md`）。
@@ -241,6 +243,8 @@ DSH web 页
 
 **载荷风险（改名后重算）**：改名前补丁 773 行里 **687 行是我们自己的新文件**（真改上游 ~27 行）、只以 diff 文本存在（`grep` 找不到代码、没有类型检查、构建只用 esbuild 转译、当时的每次构建 reset 会静默丢失）。**改名后这个形状已消除**：补丁 **74 行 delta-only**，我们自己的文件走 `overlay/`（真文件、可 grep、可 review、被 `vp check` 覆盖契约那一份）。2026-09-17 之前每次构建都 `git clean -fd` 把它们删掉再由 `cpSync` 重新放置；现在只有 pin 变化或 `vscode:clean` 会删，而 `stageOverlay()` 仍然每次构建都覆盖一遍——所以仓库里的 `overlay/` 始终是唯一那份。**仍有风险**：checkout 里的改动不再是"下次构建就丢"，而是"仓库里没有、只有那份工作树有"（drift 警告会提示，但不会替你修）。
 
+
+| 无 `--folder` 起的 code server：打字后 DOM 变了、磁盘没存，但 `editors` 能力与 tab 都报 `dirty: false`（`verify-file` 的 `tabMarksUnsavedChanges` / `capabilityReportsUnsavedChanges` 红） | 服务端没有工作区 ⇒ 编辑面改的那份 model 没进 VS Code 的「未保存」账（文件服务 / 工作副本那层没接上）。**实测对照**：同一页面、同一资源串（`vscode-remote://127.0.0.1:3084/…/dsh-dev/AGENTS.md`），外置 server 带 `--folder /Volumes/Dev/prac/prac-dev`（**甚至不是客户端打开的目录**）时 **33/33**；不带时 **31/33**。所以差异是「服务端有没有工作区」，不是 URI、不是进程归谁、不是端口 | 起 server 时必须给它一个 folder；「哪个 folder」就是工作区归属（note §3.6、§4 差距 4），在它定下来之前用 `PRAC_CODE_SERVER_URL` 指外置 server |
 
 ## 已知缺口（仍然存在，非阻塞）
 

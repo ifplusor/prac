@@ -1,10 +1,22 @@
 /**
  * prac-host-vscode — prac's policy for serving the embedded VS Code build.
  *
- * The mechanism (asset serving on a same-origin route, code-server HTTP/WS proxy)
- * lives in `prac-vscode-embed`; what lives here is prac's choices: the route, the
- * code server's port, where this repository keeps its build, and how a dev
- * environment overrides those.
+ * The mechanism (asset serving on a same-origin route, the code-server HTTP/WS
+ * proxy, starting and stopping the server process) lives in `prac-vscode-embed`;
+ * what lives here is prac's choices: the route, where the code server's state
+ * goes, when one is started at all, and how a dev environment overrides those.
+ *
+ * **The trunk owns the process.** The code server is a child of this host: it is
+ * started when the plugin activates, listens on a port the OS picked, and is
+ * stopped when this fiber is disposed. Nothing external has to start it, and no
+ * port is hardcoded — the proxy is pointed at whatever the handle reports.
+ *
+ * The server is started **without** a workspace folder. DSH knows the active
+ * workspace on the client side only (`ctx.workspaces` is a client service), and
+ * the app already opens the workspace it was booted for through the embed face,
+ * so a folder chosen here would be a second, stale answer to a question the
+ * client owns. Where the workspace should come from belongs to the transport
+ * design, not to this step.
  *
  * Runtime note: the DSH platform package `@deepseek-ai/cordis` is intentionally
  * **not** bundled here. It resolves at runtime from the DSH installation through
@@ -15,12 +27,19 @@
 
 import type { Context } from "@deepseek-ai/cordis";
 import type { WebServer } from "@deepseek-ai/dsh-host-webserver";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   createAssetHandler,
   createCodeServerProxy,
+  freePort,
   resolveBundleRoot,
+  resolveCodeServer,
   resolveCodeServerSegment,
+  startCodeServer,
+  type CodeServerHandle,
 } from "prac-vscode-embed";
 
 /** The cordis plugin name used by loader diagnostics. */
@@ -32,11 +51,14 @@ export const VSCODE_ROUTE = "/prac-vscode";
 /** Overrides where the built bundle is read from (a dev escape hatch). */
 const ROOT_ENV = "PRAC_VSCODE_ROOT";
 
+/** Overrides the path of the built code server (a dev escape hatch). */
+const SERVER_ENV = "PRAC_CODE_SERVER_ENTRY";
+
+/** Points at a code server someone else manages; no process is started here. */
+const URL_ENV = "PRAC_CODE_SERVER_URL";
+
 /** Overrides the server's product segment, for a server that is not this build. */
 const SEGMENT_ENV = "PRAC_CODE_SERVER_PATH";
-
-/** The self-built VS Code server this host proxies for the browser. */
-const CODE_SERVER = { host: "127.0.0.1", port: 3091 };
 
 /**
  * Where this module sits — the starting point of the upward search for the build.
@@ -80,6 +102,107 @@ export function codeServerPath(): string | undefined {
   return segment;
 }
 
+/** A directory under an XDG base, with the spec's default when the variable is unset. */
+function xdg(variable: string, fallback: string): string {
+  const value = process.env[variable];
+  return value !== undefined && value !== "" ? value : join(homedir(), fallback);
+}
+
+/**
+ * The code server's state directories, one per XDG category.
+ *
+ * Extensions are installed files (`data`), logs and workspace/global storage are
+ * state that must survive a restart (`state`), and the user data directory is
+ * configuration — which is where VS Code itself puts it on Linux. Caches keep
+ * their system defaults; no knob is passed for them.
+ *
+ * @see vendor/vscode/README.md·目录规范 for why these are not in the repository.
+ */
+function codeServerDirs(): { serverDataDir: string; extensionsDir: string; userDataDir: string } {
+  return {
+    serverDataDir: join(xdg("XDG_STATE_HOME", ".local/state"), "prac/code-server"),
+    extensionsDir: join(xdg("XDG_DATA_HOME", ".local/share"), "prac/code-server/extensions"),
+    userDataDir: join(xdg("XDG_CONFIG_HOME", ".config"), "prac/code-server"),
+  };
+}
+
+/** Where the proxy should forward: an outside server, or one we started. */
+interface CodeServerTarget {
+  readonly host: string;
+  readonly port: number;
+  /** Present only when this plugin started it — then it also stops it. */
+  readonly handle?: CodeServerHandle;
+}
+
+/**
+ * The code server an escape hatch points at, if one does.
+ *
+ * A dev environment may keep its own server (a debugger attached to it, a build
+ * being compared): `PRAC_CODE_SERVER_URL=http://127.0.0.1:3091` then takes over
+ * completely — nothing is spawned, and nothing is stopped on dispose.
+ */
+function externalTarget(): CodeServerTarget | undefined {
+  const raw = process.env[URL_ENV];
+  if (raw === undefined || raw === "") return undefined;
+  try {
+    const url = new URL(raw);
+    return {
+      host: url.hostname,
+      port: Number(url.port === "" ? (url.protocol === "https:" ? 443 : 80) : url.port),
+    };
+  } catch {
+    console.warn(`${name}: ${URL_ENV} is not a URL: ${raw} — ignoring it`);
+    return undefined;
+  }
+}
+
+/**
+ * Start the code server this checkout built, unless something else already is.
+ *
+ * @returns the proxy target, or `undefined` when no server is available — the
+ * page then works without a remote session, which is the same degradation the
+ * proxy's absence has always produced.
+ */
+async function launchCodeServer(): Promise<CodeServerTarget | undefined> {
+  const external = externalTarget();
+  if (external) {
+    console.log(`${name}: using the code server at ${external.host}:${external.port} (${URL_ENV})`);
+    return external;
+  }
+
+  const { entry, cwd } = resolveCodeServer({
+    from: moduleDir,
+    override: process.env[SERVER_ENV],
+  });
+  if (!existsSync(entry)) {
+    console.warn(
+      `${name}: no built code server at ${entry}; run vscode:build (or set ${SERVER_ENV})`,
+    );
+    return undefined;
+  }
+
+  const handle = await startCodeServer({
+    entry,
+    cwd,
+    port: await freePort(),
+    ...codeServerDirs(),
+    // The prac dev rig is local and single-user; a token would have to travel to
+    // the page, which is the transport design's business, not this step's.
+    extraArgs: ["--without-connection-token"],
+    onOutput: (line, stream) => {
+      const write = stream === "stderr" ? console.warn : console.log;
+      write(`${name}: code-server | ${line}`);
+    },
+    onExit: (code, signal) => {
+      console.warn(
+        `${name}: the code server exited (code=${code ?? "none"}, signal=${signal ?? "none"})`,
+      );
+    },
+  });
+  console.log(`${name}: code server started on ${handle.host}:${handle.port} (pid ${handle.pid})`);
+  return { host: handle.host, port: handle.port, handle };
+}
+
 /**
  * Attach the code-server proxy to the host server.
  *
@@ -92,13 +215,13 @@ export function codeServerPath(): string | undefined {
  *
  * @param webCtx - the context resolved once `webServer` exists.
  */
-function attachCodeServerProxy(webCtx: Context): void {
+function attachCodeServerProxy(webCtx: Context, target: CodeServerTarget): void {
   const server: WebServer = webCtx.webServer;
   try {
     const segment = codeServerPath();
     if (segment === undefined) return; // already logged by codeServerPath()
 
-    const proxy = createCodeServerProxy(CODE_SERVER);
+    const proxy = createCodeServerProxy(target);
     // The HTTP channel: CORS applies to it, so a page on DSH's origin cannot
     // fetch the server's port directly. Same-origin proxying removes the
     // boundary — the browser only ever talks to DSH.
@@ -109,7 +232,7 @@ function attachCodeServerProxy(webCtx: Context): void {
           path: segment,
           handler: async (rawReq: unknown, res: unknown) => proxy.handle(rawReq, res),
         }),
-      `${name}: proxy ${segment}/* → ${CODE_SERVER.host}:${CODE_SERVER.port}`,
+      `${name}: proxy ${segment}/* → ${target.host}:${target.port}`,
     );
 
     // The channel that actually carries the session: management and extension
@@ -117,7 +240,7 @@ function attachCodeServerProxy(webCtx: Context): void {
     // pathname.
     webCtx.effect(
       () => server.registerUpgrade({ path: segment, handler: proxy.upgrade }),
-      `${name}: upgrade ${segment} → ${CODE_SERVER.host}:${CODE_SERVER.port}`,
+      `${name}: upgrade ${segment} → ${target.host}:${target.port}`,
     );
   } catch (error) {
     console.warn(
@@ -127,7 +250,42 @@ function attachCodeServerProxy(webCtx: Context): void {
   }
 }
 
-/** Serve the VS Code bundle on a same-origin route. */
+/**
+ * Own the code server's lifetime: start it once the host server exists, and stop
+ * it when this fiber goes away.
+ *
+ * A second `attachCodeServerProxy` on the same context would register the routes
+ * twice, so the proxy is attached from the same effect that started the process —
+ * one owner, one registration.
+ */
+function manageCodeServer(webCtx: Context): void {
+  webCtx.effect(() => {
+    let cancelled = false;
+    let handle: CodeServerHandle | undefined;
+    void launchCodeServer()
+      .then((target) => {
+        if (target === undefined) return;
+        if (cancelled) {
+          void target.handle?.stop();
+          return;
+        }
+        handle = target.handle;
+        attachCodeServerProxy(webCtx, target);
+      })
+      .catch((error: unknown) => {
+        console.warn(
+          `${name}: the code server could not be started; the VS Code route stays served ` +
+            `without a remote session: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+    return () => {
+      cancelled = true;
+      void handle?.stop();
+    };
+  }, `${name}: code server`);
+}
+
+/** Serve the VS Code bundle on a same-origin route, and reach a code server. */
 export function apply(ctx: Context): void {
   // Optional: only web profiles carry `webServer`, so inject it lazily rather
   // than declaring it required (which would keep the plugin from activating on a
@@ -145,6 +303,6 @@ export function apply(ctx: Context): void {
         }),
       `${name}: GET ${VSCODE_ROUTE}`,
     );
-    attachCodeServerProxy(webCtx);
+    manageCodeServer(webCtx);
   });
 }

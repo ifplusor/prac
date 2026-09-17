@@ -11,7 +11,8 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "check": "vp check"
+    "check": "vp check",
+    "test": "vp test run"
   },
   "devDependencies": {
     "@types/node": "catalog:",

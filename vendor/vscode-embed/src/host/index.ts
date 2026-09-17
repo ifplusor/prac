@@ -9,7 +9,9 @@
  * 2. **the server channels** — the code server answers on WebSocket (management
  *    + extension host) and plain HTTP (remote resources). WebSocket is not
  *    subject to CORS, so the page can reach it directly; HTTP is, so it has to be
- *    proxied through the embedding origin.
+ *    proxied through the embedding origin;
+ * 3. **running the server** — start the built server on a free port, wait until
+ *    it answers, stop it again ({@link ./code-server}).
  *
  * Everything is a parameter here. Which route, which port, which origin and where
  * the bundle lives are the consumer's policy — this package knows nothing about
@@ -308,3 +310,21 @@ export function createCodeServerProxy(options: CodeServerProxyOptions): CodeServ
 
   return { handle: upstreamRequest, upgrade };
 }
+
+export {
+  SERVER_ENTRY_RELATIVE_PATH,
+  codeServerArgv,
+  freePort,
+  isReady,
+  resolveCodeServer,
+  startCodeServer,
+  waitForReady,
+} from "./code-server.js";
+export type {
+  CodeServerArgvOptions,
+  CodeServerHandle,
+  CodeServerLocation,
+  CodeServerLocationOptions,
+  StartCodeServerOptions,
+  WaitForReadyOptions,
+} from "./code-server.js";
