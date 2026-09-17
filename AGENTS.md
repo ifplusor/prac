@@ -10,6 +10,7 @@
 
 - [.agents/always-remember.md](.agents/always-remember.md)：**为谁、为什么、朝什么**（含克制清单）。
 - [.agents/notes/](.agents/notes/)：**决策记忆**——每个设计决策的「为什么 + 放弃了什么」，按状态轴组织。
+- [.agents/worklog/](.agents/worklog/)：**过程记忆**——依据/证据（里程碑与工作记录、当时的事实、踩坑与根因、验证元教训）。**不是 note**：没有 `status:`、不签字、不进「当前方向」的推导；由相关的工作 note 与 `always-remember.md` 引用。
 - [docs/](docs/)：**参考**（现在时、stable）。[philosophy.md](docs/philosophy.md) 是当下的哲学论述；[docs/theory/](docs/theory/) 是继承的 LLM 限制理论根。
 
 ### notes 的用法

@@ -202,8 +202,8 @@ interface Capability<T, A> {
 3. B1 之后第二个能力件选谁（search / SCM / outline / terminal / editor group）。
 4. **已定（2026-09-15）**：agent 能力面**排在 B1 之后**；上下文入（当前文件 / 选区 / 打开的 view）并入它。它决定"能力层是否真的被拆开"，与 L2 是两件事。
 5. 要不要现在就测"未挂载 part 的成本"，用它决定 A 是否值得。
-6. **已闭合（2026-09-15）**：容纳单位定为 `view`（umbrella 决定 2b），原"决定 2/3 与 09-15 方向相冲"的张力消解；container / part 退为可选的高级形态（"何时真的需要"列在 umbrella §8）。
-7. **与 umbrella §8 的能力/生态开放项互相引用**（扩展宿主 web → server、terminal PTY 放在 DSH host、DSH ↔ workbench 状态桥、内建扩展编译 12/106）——它们与"agent 能力面"是同一条决策链的前后段，但目前两条 note 互不链接细分。
+6. **已闭合（2026-09-15）**：容纳单位定为 `view`（umbrella 决定 2b），原"决定 2/3 与 09-15 方向相冲"的张力消解；container / part 退为可选的高级形态（"何时真的需要"列在 umbrella §4）。
+7. **与 umbrella §4 的能力/生态开放项互相引用**（扩展宿主 web → server、terminal PTY 放在 DSH host、DSH ↔ workbench 状态桥、内建扩展编译 12/106）——它们与"agent 能力面"是同一条决策链的前后段，但目前两条 note 互不链接细分。
 
 8. **已闭合（2026-09-15，决定 17 落地）**：路径是 `CodeEditorWidget` + `ITextModelService.createModelReference(uri)`（镜像工作台的 `TextCodeEditor.createEditorControl`）。**实测带走的**：工作台自己的文本模型（语言特性 / markers / undo / save）。**实测没有的**：挂在 `EditorInput`+`EditorPane` 上的贡献——面包屑 / peek / diff 与自定义编辑器 / 热退出。⇒ `editor(file) → view` 成立；上面那份"没有的"清单就是能力面（尤其 `diagnostics`）要补的洞，也是"tab 的脏点/预览/关闭要 `editors` 能力"这条结论的证据。
 9. **已定（2026-09-15）**：先做 `editors`（见上一节"B2 第一步已落地"）；`diagnostics` 紧随其后。
