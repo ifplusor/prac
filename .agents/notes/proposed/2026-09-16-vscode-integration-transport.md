@@ -120,4 +120,4 @@ server：VS Code 插件的 server 半边 = broker
 - [../../../docs/architecture.md](../../../docs/architecture.md)：§1.4 / §3.1 / §3.3 / §4.3 / §7（本文是 §7 第 1 件的设计）。
 - [2026-09-15-vscode-capabilities-into-prac.md](2026-09-15-vscode-capabilities-into-prac.md)：能力面 `Capability<T, A>` 的形态。
 - [../in-progress/2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)：决定 22、与目标架构的差距（§4）。
-- [../../worklog/2026-09-09-vscode-dsh-integration.md](../../worklog/2026-09-09-vscode-dsh-integration.md)：工作记录——协议清单（§C 的"code server 的协议"）。
+- [../../worklog/2026-09-09-vscode-dsh-integration.md](../../worklog/2026-09-09-vscode-dsh-integration.md)：工作记录——协议清单（工作记录·"code server 的协议"）。

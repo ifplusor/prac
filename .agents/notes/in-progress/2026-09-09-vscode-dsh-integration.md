@@ -146,7 +146,7 @@ status: in-progress
 
 ### 已排期、尚未做
 
-6. **能力面（capabilities）**（含上下文入）：B1 已完成（工作记录 §A），它是 09-15 note 里紧随其后的那块——agent 读数/动作的 settled + provenance + 分页语义见该 note。
+6. **能力面（capabilities）**（含上下文入）：B1 已完成（工作记录·里程碑），它是 09-15 note 里紧随其后的那块——agent 读数/动作的 settled + provenance + 分页语义见该 note。
 7. **frame 批次（进行中）**：区域形态（§3.5）已完成——堆叠 `verify:stack` 10/10、底栏 `verify:bottom` 11/11、任意方向分栏 `verify:split` 25/25（上下左右、可嵌套、竖 sash 可拖、形状持久，且**任何方向都不造空 region**）；持久化（§3.6）的 per-window 那半已完成（`verify:persistence` 16/16），**per-workspace 那半未做**——门全在 prac 侧 `tests/gates/`。**还差** `stage` 的 tab（§3.5 的 frame 级标签页，需要 VS Code 侧的 `editor(file)`）。堆叠与底栏目前**没有**：拖拽排序、view 间 sash 调尺寸（靠 flex 均分）、底栏的开合入口（现在靠 `setCollapsed`，还没有 UI 按钮/快捷键）——记在案。
 8. **扩展视图的"数据"**：`mountViewInto` 能让扩展贡献的视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——`ViewPane.setVisible(true)` 不够，树数据要等视图基础设施/容器把裸 pane 认成"可见的视图"。两条候选路：把视图登记进 `IViewsService` 的可见性/容器模型，或改走"container 作为高级形态"（§3.2 / §3.5 已允许）。
 9. **扩展安装的正当路径**：等 §3.7 的 terminal（VS Code terminal 提供 `VSCODE_IPC_HOOK_CLI`）落地后，用 `server-cli --install-extension` 正规安装并重跑第六门；在那之前不装用户扩展。

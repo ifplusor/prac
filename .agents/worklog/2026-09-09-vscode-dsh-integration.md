@@ -5,7 +5,7 @@
 > 放在 `.agents/worklog/` 而不是 `.agents/notes/`：notes 是**决策记忆**（状态轴 + 人签字），这是**过程记忆**（`AGENTS.md`：观察/发现/复盘/障碍作为依据附在工作 note 里，或留在工作记录中）。
 > 2026-09-17 从 umbrella 拆出——那时它的 5.7 万字符里 **79% 是这类依据**，决定只占 16%。拆的时候**正文逐字搬**，只做了三件事：改标题层级、删掉已被 `vendor/vscode/README.md` 接管的重复段（构建两个目标 / 扁平产物与盖章 / 跑法 / 手工装扩展 / code server 命令行副本）、改掉两条与后来事实不符的旧句（各在文中标了日期）。
 
-## A. 里程碑与依据
+## 里程碑
 
 
 | 日期 | 做了什么 | 依据（判据 / 证据） |
@@ -63,10 +63,10 @@
 | 2026-09-15 | **决定 17 前半（vendor 侧的 file 级宿主）**：bridge 的 `PartHostFace` 加 `mountFileInto(resource, element)` / `releaseFile(resource)`——**单位是文件**（谁开着哪些文件、怎么分组、tab 条长什么样，都是 prac 的事）；载荷里的实现镜像工作台自己的造法：`CodeEditorWidget`（`TextCodeEditor.createEditorControl` 用的就是它）+ `ITextModelService.createModelReference(uri)`（工作台自己的文本模型 ⇒ 语言特性/marker/undo/save 都是真的），只多一个 `automaticLayout`（宿主 region 会 resize，没有别的东西会通知 widget 重排）。**一个资源一个编辑面**：重复 mount 是同一实例换宿主（一个文件一个模型，第二个编辑器就是同一份文本的第二视图），`releaseFile` 只释放引用（模型留给别人） | 新门 `vendor/vscode/scripts/verify-file.mjs` **7/7**：两个文件各自上屏且渲染出**该文件真实文本**（期望值由 gate 自己从磁盘读同一个文件算出，因为 app 的工作区不是 prac 仓——见下）、都有像素质、同文件第三次 mount 得到同一实例（第一个宿主被搬空）、release 后同一文件能再 mount、无 mount 报错；其余六门 + smoke 8/8 未动。**诚实的缺口**（决定 17 的下一步要补）：面包屑/peek/diff/自定义编辑器/热退出这些挂在 `EditorInput`+`EditorPane` 上的贡献**没有**；tab 条与分组按决定 17 归 prac，所以 frame 级 tab 还没做 |
 | 2026-09-15 | **一个实测到的运行事实（工作区归属）**：app 的工作区是 **DSH 的活动工作区**——本次是 `vscode-remote://127.0.0.1:3084/Volumes/Dev/deepseek-harness/dsh-dev`，而不是 code server 启动时给的那个目录（`/Volumes/Dev/prac/prac-dev`） | 与决定 13「IDE 侧随 DSH 工作区」一致（`prac-client-vscode-host` 的 `activeWorkspace(ctx)` 读 DSH 注册表），但**两处路径不一致**：code server 的 `--folder` 只影响它自己的 CLI / 终端 cwd（决定 19 要确认这算不算 bug）。也是 `verify-file` 不能写死文件名的原因 |
 | 2026-09-15 | **决定 21 第三步（按清单删减活体断言）**：把活体层里"纯机制的算术题"删掉——prac 侧 `verify:stack` 10→**6**（`isStacked` 的判定、`visibleViews` 顺序进单测）、`verify:bottom` 11→**6**（`isPresent`/`resolveSizes`/`cachedSize` 进单测，几何四条并成一条）、`verify:persistence` 16→**6**（`arrange` 只填空缺与"改动生效"进单测；**存活断言一律改成绝对式**，相对式会在"改动其实没发生"时真空通过）、`verify:split` 25→**11**；vendor 侧 `verify-layout` 25→**14**（模型侧放置/几何/clamp 进单测，6 条像素并成 3 条）、`verify-views` 35→**25**（只删纯模型断言——它本就是 recall 面的 UI 契约）、`verify-focus` 12→**9**（摆放规则进单测）；`verify-regions` 1、`verify-view` 7、smoke、extension 未动 | 活体断言 **142 → 85**（prac 62→29、vendor 80→56），单测 48 条；所有门重跑全绿：prac 6/6 · 6/6 · 6/6 · 11/11，vendor 14/14 · 25/25 · 9/9 · 1/1 · 7/7，smoke 8/8 + `errorCount: 0`；`vp run -r check` 与 root `vp check .` 绿。**留下的是三类**：产物过真 loader、VS Code 部件挂进/搬出 prac 区域并画出像素、几何与算术镜像的**漂移检查** |
-| 2026-09-16 | **两份"结构"入档**：① code server 的**协议清单**（HTTP 一个端口 / WS 按首消息分三型 / 子进程 node-fork IPC / 只在 VS Code 终端里存在的 CLI 管道 / 扩展面向的 DAP·LSP·worker postMessage）核实后写进本文件 §C 的"code server 的协议"；② `docs/architecture.md` **原地重写**为三段式系统参考（DSH 的架构 / VS Code 的架构 / prac 的整合）＋边界清单；旧的"六件事 → DSH 机制"映射搬到 `notes/proposed/2026-09-16-epistemic-six-on-dsh-mechanisms.md`（**James 裁决**：参考文档只写现在时，规划进 notes——它上次变陈旧正是因为计划混在参考里） | 两侧架构各由子代理在**上游 checkout 里逐条取证**（DSH 与 Code - OSS 各一份带 `路径:行` 的摘要）。核对时抓到我方文档**三处错**并已改：① 行的 `id` 与 `name` 的关系（**`name` 才是产物 id**，patch 用 `id` 定位）；② host→client 并非绝对单向（allowlist 里的 **waterfall** 事件是受限的应答通路）；③ `ctx.resources` 只在 client 半边存在。另抓到 `vendor/vscode/README.md` 的改动日志**自称穷尽却漏了一处**（`web.main.ts` 的 `configuration` 由 `private` 改 `protected` ⇒ 补丁实为**两个文件三处**）——已补齐。`pnpm check` 绿（4 条既有 warning） |
+| 2026-09-16 | **两份"结构"入档**：① code server 的**协议清单**（HTTP 一个端口 / WS 按首消息分三型 / 子进程 node-fork IPC / 只在 VS Code 终端里存在的 CLI 管道 / 扩展面向的 DAP·LSP·worker postMessage）核实后写进本文件的"code server 的协议"；② `docs/architecture.md` **原地重写**为三段式系统参考（DSH 的架构 / VS Code 的架构 / prac 的整合）＋边界清单；旧的"六件事 → DSH 机制"映射搬到 `notes/proposed/2026-09-16-epistemic-six-on-dsh-mechanisms.md`（**James 裁决**：参考文档只写现在时，规划进 notes——它上次变陈旧正是因为计划混在参考里） | 两侧架构各由子代理在**上游 checkout 里逐条取证**（DSH 与 Code - OSS 各一份带 `路径:行` 的摘要）。核对时抓到我方文档**三处错**并已改：① 行的 `id` 与 `name` 的关系（**`name` 才是产物 id**，patch 用 `id` 定位）；② host→client 并非绝对单向（allowlist 里的 **waterfall** 事件是受限的应答通路）；③ `ctx.resources` 只在 client 半边存在。另抓到 `vendor/vscode/README.md` 的改动日志**自称穷尽却漏了一处**（`web.main.ts` 的 `configuration` 由 `private` 改 `protected` ⇒ 补丁实为**两个文件三处**）——已补齐。`pnpm check` 绿（4 条既有 warning） |
 
 
-## B. 现在的形态（2026-09-15 快照）
+## 当时的形态快照（2026-09-15）
 
 > 这是**当时**的快照，不是目标（目标见 `docs/architecture.md`）。
 
@@ -88,13 +88,13 @@ DSH web 页
 - 一页 `create()` 一次；part 是**单实例** ⇒ 只能 `movePartInto` 搬、不能重建；隐藏 region 必须留 host（`verify-focus` 的 `partInOneHost` 是这条的化石）。
 - 扩展宿主、文件/配置/存储随 workbench 的 bootstrap 起来；`workspace.id` 在 `create()` 时定死（IndexedDB key + profile 选择）⇒ 启动必须等"工作区已知"，且**不能先建后纠**。
 - 补丁只动上游两个文件（`web.factory.ts`、`web.main.ts`，**74 行 delta-only**）；载荷走 `overlay/`，由构建放进 checkout（构建把 overlay 拷进去；只在 pin 变化或 `vscode:clean` 时 reset，所以 checkout 不是第二份真相靠的是「我们写的东西都能被覆盖 + 别人的改动有 drift 警告」，不是每次清空）。
-- DSH 侧：prac 的包作为**行**由 `prac-web-app` 的 patch `insert`；**行的 `name` 才是产物 id**（`clientPack(id)`），包的 `name` 与 patch 用的行 `id` 是两个东西（2026-09-16 核实更正；这条快照原先写的是"loader 行 id 取的是产物 id"，与 §C 的 DSH 侧那条更正相冲）。
+- DSH 侧：prac 的包作为**行**由 `prac-web-app` 的 patch `insert`；**行的 `name` 才是产物 id**（`clientPack(id)`），包的 `name` 与 patch 用的行 `id` 是两个东西（2026-09-16 核实更正；这条快照原先写的是"loader 行 id 取的是产物 id"，与"已核实事实"里 DSH 侧那条更正相冲）。
 - 跨插件共享的页面级状态只有一处：`globalThis.__vscodeEmbed`（boot 守卫、boot 元素、命令面、失败原因、part→元素表）。
 - **空 region 不渲染**（`isPresent`：非 flex 且没有可见 view ⇒ 不在 DOM 里）⇒ 新增区域可以"零成本地存在"，填了才出现；这也让底栏这种"默认收起"的东西不需要单独的状态。
 - 构建期契约只有一处：`vendor/vscode/overlay/embedBridge.ts`（`EMBED_BRIDGE` / `PART_HOST_ATTR` / `PartHostFace` / `EmbedBridge`），两侧编译同一份原件。
 
 
-## C. 已核实事实
+## 已核实事实
 
 ### DSH 侧
 
@@ -171,10 +171,10 @@ DSH web 页
 - 页面级状态只有一处：`globalThis.__vscodeEmbed`（`VscodeEmbedPage`）。
 - 构建期契约只有一处：`vendor/vscode/overlay/embedBridge.ts`。
 
-## D. 踩坑与根因
+## 踩坑与根因
 
 
-### A. 通道与代理
+### 通道与代理
 
 | 症状 | 根因 | 修法 / 规则 |
 | --- | --- | --- |
@@ -185,7 +185,7 @@ DSH web 页
 | `apply` 中途抛错带走其它路由（两条路由一起 404） | `codeServerPath()` 从错误目录上溯必然抛错 | 失败返回 `undefined` + warn；代理整段 `try/catch`；最坏降级为"没有代理" |
 | WS 已通/没通判错 | `wsErrors: []` 被当成成功证据 | **空错误列表可以意味着"什么都没发生"**：先写判据（路由 200 / 有像素 / 有连接日志） |
 
-### B. 渲染与布局
+### 渲染与布局
 
 | 症状 | 根因 | 修法 / 规则 |
 | --- | --- | --- |
@@ -198,7 +198,7 @@ DSH web 页
 | 固定的空 leaf 不占空间 | 搬运唯一视图 = 关掉轨道；新建空面板不可见 | **已定（决定 15/20）**：常驻区一直有视图、stage 分栏必带视图 ⇒ 分栏的门面已改成 `splitView(viewId, side)`（**为 view 建区域**），造空 region 的 `split(regionId)` 已删除 |
 | 竖 sash 根本不存在（`no sash matching [data-prac-sash-dir="column"]`） | 分栏的**源 region 是固定尺寸且被搬空** ⇒ `isPresent` 为假 ⇒ 整块不渲染 ⇒ 没有 sash 可拖 | 让源区域留一个可见 view，或让它本身是 flex（flex 区域空着也在）；`verify-layout` 的 column 段就先 `place` 一个 occupant 再分栏 |
 
-### C. 契约与类型
+### 契约与类型
 
 | 症状 | 根因 | 修法 / 规则 |
 | --- | --- | --- |
@@ -216,7 +216,7 @@ DSH web 页
 | 机制层承载 DSH 的 slot/service 契约，任一错 ⇒ 整页白页 | 契约有 5 项（四区域槽声明 + `ctx.layout` + `panelInfo` + 主题 + `document.title`） | 先忠实替换、像素验证，再改拓扑 |
 | `Escape` 监听器从来不触发且 `defaultPrevented === false` | workbench 在 **`document` 捕获阶段**就消费了它（路径 `window-capture → document-capture` 后不再冒泡） | 挂 **`window` 捕获**，且只在该面板打开时认领；另修 `[open]` 闭包恒 false 的真 bug |
 
-### D. 工程与工具链
+### 工程与工具链
 
 | 症状 | 根因 | 修法 / 规则 |
 | --- | --- | --- |
@@ -239,7 +239,7 @@ DSH web 页
 **载荷风险（改名后重算）**：改名前补丁 773 行里 **687 行是我们自己的新文件**（真改上游 ~27 行）、只以 diff 文本存在（`grep` 找不到代码、没有类型检查、构建只用 esbuild 转译、当时的每次构建 reset 会静默丢失）。**改名后这个形状已消除**：补丁 **74 行 delta-only**，我们自己的文件走 `overlay/`（真文件、可 grep、可 review、被 `vp check` 覆盖契约那一份）。2026-09-17 之前每次构建都 `git clean -fd` 把它们删掉再由 `cpSync` 重新放置；现在只有 pin 变化或 `vscode:clean` 会删，而 `stageOverlay()` 仍然每次构建都覆盖一遍——所以仓库里的 `overlay/` 始终是唯一那份。**仍有风险**：checkout 里的改动不再是"下次构建就丢"，而是"仓库里没有、只有那份工作树有"（drift 警告会提示，但不会替你修）。
 
 
-## E. 验证方法与元教训
+## 验证方法（元教训）
 
 
 | 症状 | 根因 | 规则 |
@@ -255,9 +255,10 @@ DSH web 页
 | 持久化落地后，vendor 门里"reload 即回到默认树"的假设失效 | 决定 16 让 reload **恢复上次状态** ⇒ 门里 `page.reload()` 之后不再是出厂布局 | 凡是 reload 后按默认断言的门要么先清 key，要么把该阶段改成"在恢复的树上继续"（`verify-layout` 的 column 段如今是叠加而不是重置） |
 
 > 这是**旧的台账**：每条按时间追加、带日期与"已完成/验证数字"。2026-09-17 之后 note 不再用这个形状（James：*把 note 当成台账不好*），当下的决定写在 [umbrella §3](../notes/in-progress/2026-09-09-vscode-dsh-integration.md)。
+> 它是**逐字归档**，所以里面提到的 `§A`/`§C`/`§D` 是改名前的分节字母——那些节现在按名字称呼（里程碑 / 已核实事实 / 踩坑与根因 / 验证方法）。
 > 它原样留在这里有两个用处：① 旧引用 `决定 N` 按它解析（编号不再新增）；② 编年、当时的理由、被纠正过什么、落地时验了多少，都在这里。
 
-## F. 决定台账（2026-09-09 → 2026-09-17，原样保留）
+## 决定台账（2026-09-09 → 2026-09-17，原样保留）
 
 > **编号 = 引用句柄**（对话与其它 note 直接引"决定 14"），所以**只追加、不复用、不重排**；下面的主题导航只做索引。
 > **主题导航**：与上游/补丁 `3 4 5 6` ｜ 边界与分层 `1 2 2b 7 8 9 10` ｜ 区域与布局 `14 15 16 20` ｜ 编辑器与文件 `17` ｜ 工作区与状态 `13` ｜ 生态与能力 `18 19` ｜ 工程 `11 12 23`
@@ -289,26 +290,3 @@ DSH web 页
 | 21 | **机制断言用单测（`vp test`），活体门冻结在集成层**：`vp test` = vite-plus **内置的 vitest 4.1.10**（零新依赖，`vite-plus` 的依赖里就有）；单测覆盖纯函数与纯算术（区域树重写、`resolveSizes` 的分配、`isPresent`/`isStacked`、折叠与 `cachedSize`、`sideGeometry`/`splitRegionWith` 的子序、`sashSizes` 的两端 clamp、编排的"只填空缺"、持久化往返）；活体门**只留真页面能证明的事实**（产物过真 loader、VS Code 部件挂进/搬出 prac 区域并画出像素、扩展激活）；**新增机制断言只进单测**，要加活体门必须先写清"单测证明不了它" | **James 裁决 2026-09-15**（原话：*一直增加 verify 不是好思路，我们应该利用 test*）。判据：现在 ~130 条活体断言里大半是"在浏览器里给纯函数做算术题"——`sash 上界` 那类 bug 单测 5 行就能抓，而当时的门 23 项全绿。**代价（必须记住）**：单测看不见"模型对了、渲染器没跟上"的假绿（载荷漏 `mountViewInto` 那次全员绿）⇒ **每个能力在活体层至少保留一条渲染断言**，几何类多条并成**一条漂移检查**（`resolveSizes` 是 flexbox 的算术镜像，镜像要有人在真 CSS 上对一次） |
 | 22 | **架构总纲：prac 是 CS/BS 两端结构 —— 以 DSH 为主干，VS Code 以插件方式集成**。① 看架构**先分 client / server 两端**（不是先分 DSH / VS Code：两个系统各自又都跨在线上）；② **主干是 DSH**，组合、状态、进程与生命周期都归它；**DSH 的扩展方式就是插件**（Cordis 插件树 + 动态包，同一地址空间、in-process 的 `inject`）——**“扩展宿主”只是 VS Code 架构里的概念，不能带到 DSH 上**（2026-09-16 三次更正，见下）；③ **VS Code 是主干上的一个插件**，两端各一半（server 半边拥有它的进程与能力，client 半边把 UI 贡献进 frame），**不是"被嵌进来的第三方 app 加一层接缝"**——bridge / part host / `prac-vscode-embed` 是**这个插件的内部实现**，不是两个对等系统之间的外交协定 | **James 裁决 2026-09-16**。原话：*不要以当前的代码实现为权威，听我说的，我是在纠正你积累的架构设计上的错误*。**它纠正的是设计，不是实现细节**——我此前把实现现状当成了设计权威（典型：我上一条用"VS Code 的词不能借"去否掉"DSH 有扩展宿主"，方向反了；实现只证明设计有没有落地，没有资格裁决设计）。**要收束的偏差**（已写进 `docs/architecture.md` §5）：① code server 的生命周期归主干（现在端口写死、无人启动，我此前还把它做成 A/B/C 选项——按设计**不存在选择**）；② 组装与权威在 server，页面是渲染目标（"页面是唯一的组装点"是我把实现现象写成了原则）；③ **集成单位没有被命名**（把 lib 与插件层混成了一层：lib 那一半是对的，缺的是“基于 lib 构建的 DSH 插件”这一层明确承担政策与集成）；④ 一个主干（现在两个服务端、双权威）。**2026-09-16 James 补充：三层各归其位** —— `vendor/vscode` = **引入的 VS Code 源码树 + 我们的 patch**；`vendor/vscode-embed` = 在它之上封装的 **lib**，**可利用、不绑定 prac**；**我们基于这个 lib 构建 DSH 插件**，把 VS Code 的能力与生态集成/带入 prac。⇒ 我此前把 lib 与插件层混为一谈（写成"接缝 = 插件内部实现"）**也错了**：lib 只给机制、不背政策，政策全在插件层（谁放哪 / 何时启动 / 哪个 view 用哪个 part / 能力怎么给 agent / code server 的生命周期）。**已澄清（James 2026-09-16）：没有 `vendor/vscode-lib` 这个包，那个 lib 就是 `vendor/vscode-embed`**——不改名。**2026-09-16 James 再纠一条**：*prac 中不只有基于 vscode 构建的一组插件，vscode 只是其中很重要的一部分* ⇒ **VS Code 集成族不是 prac 的主干内容**，它只是 prac 的一族插件；prac 自己还有 frame / 编排 / 角色 / 注意力 / 持久化，**尤其还有尚未落地的 agent 面（六件事）**，外加从 DSH 直接继承的能力族（`dsh-tools` / `dsh-skill*` / `dsh-goal` / `dsh-plan-mode` / `dsh-subagent*` / `dsh-workflow-worker-thread`，见 `packages/bundle/base/cordis.patch.yml`）。**教训**：我把"当前界面工作"误当成了"prac 的全部"，这是本文档与多轮讨论里反复出现的同一个错—— **2026-09-16 James 三条设计更正（同一决定内）**：① **不是“一个插件”**——*我们是基于 vendor/vscode-embed 开发**一组**插件*；② **VS Code 本身按 prac 的两端切成两半**：**code server = server 侧的 remote，提供 IDE 的基础功能**，**web = client 侧，提供 UI 组件**；③ **前后端通信层需要基于 DSH 的架构重新设计实现**——即**不能**把 VS Code 自己的传输（管理/扩展宿主 WS + HTTP 资源）从浏览器透传到 code server。⇒ 我的“透传代理 + 整包 workbench 嵌入”是**实现占位**，不是设计：浏览器现在绕过 DSH 直接跟 code server 讲 VS Code 的协议，而“UI 组件”这个单位完全没落地（client 侧嵌的是整个 workbench app，能力面也长在 client）。**这是尚未开始的设计工作，不是待修的 bug** |
 | 23 | **机器状态按 XDG 分类：构建期与一次性的在仓库内（`.build/`），运行期状态在仓库外**。装好的扩展 → `$XDG_DATA_HOME/prac/code-server/extensions`；服务端状态（`workspaceStorage`/`globalStorage`/`History`/logs/`Machine`/`CachedProfilesData`）→ `$XDG_STATE_HOME/prac/code-server`；用户数据目录 → `$XDG_CONFIG_HOME/prac/code-server`（实测为空，留着是为了永不回退到 `~/.vscode-server-oss`）；缓存用系统默认 | **James 裁决 2026-09-17**（我问 `.build/run` 是否不合适，他答"应该遵循 XDG"）。依据：① 判据是"删掉它要付什么代价"——`.build/vscode` 是派生的、`scratch` 是一次性的，而那 9.5M（装好的扩展 + 各 `workspaceStorage`）删了就没了；把两者放进一个文档写着"可整份删"的根里，等于让那句话只对一半内容成立；② 与主干一致：DSH 的运行期状态也在家目录（`~/.dsh`，45M），不在任何 checkout 里；③ 分类有出处：扩展是**装好的文件**（data）、`workspaceStorage`/logs 是**重启后要留的状态**（state）、用户数据目录是**配置**——VS Code 自己在 Linux 上就把 `--user-data-dir` 放在 `$XDG_CONFIG_HOME`。**代价**：状态不再"看一眼就在仓库里"；闸门与启动命令都得从 `XDG_*` 派生（`verify-extension.mjs` 已改，`PRAC_RUN_DIR` 删除，`EXTENSIONS_DIR` 留作单点覆盖） |
-
-### 被否决 / 已撤回的路线（"放弃了什么"）
-
-| 原判断 | 为什么被否决 |
-| --- | --- |
-| workbench 当 shell、agent 当 part | 会得到**两个壳**（DSH 外壳 + workbench 各一套 sidebar/右栏） |
-| 「frame 交给 grid 后可以删掉 `mountPartInto`/`movePartInto`」 | 方向错了：部件永远是被容纳的一方，host 机制保留 |
-| 路线①：patch 经典 `Layout` | 要换掉的正是布局模型本身；路线① 只是跟 VS Code 的 grid 语义周旋 |
-| 让 VS Code 的 grid 拥有 prac 的 frame（选项 a/c） | 会把关系倒过来；只借行为 |
-| 「遮蔽 `root` 即可拥有拓扑」 | `ui-slots` 明文 DO NOT register；第二份注册会遮蔽整个 frame ⇒ 正规座位是 `shell.overlay`（list 槽） |
-| `?folder=` 自建导航 | 那是 VS Code 自带 standalone bootstrap 读的，我们的入口是 `create()`，没有那层 |
-| 「重载会打散 DSH 壳」 | 对照实验证明是**当时补丁损坏**的后果；带 `?folder=` 全新加载 / in-app `location.href='/'` / `openWorkspaceFolder` 三条路径 frame 全在 |
-| 「`workspaceProvider.open()` 能打开文件夹」 | API 语义只是**构造 URL 开新窗口**；现明确返回 `false`（让调用方看见失败） |
-| 「`create()` 的返回值是 workbench facade」 | 只返回 disposable；公开面是模块的 `commands` 命名空间 |
-| 「`wsErrors: []` ⇒ WS 通了」 | 空错误可以意味着**什么都没发生**（当时 workbench 根本没启动） |
-| 「派生路由（`codeServerRoutes()`）就修好了 segment 不一致」 | 只保证两侧一致地错；真正修法是给服务端 distro 的 `product.json` 盖章 |
-| tsconfig `paths` 指向 checkout 作为覆盖开关 | 会把声明合并劈成两份（`keyof SlotMap` 有键、`register` 报 TS2769）⇒ 假错；机制正确的覆盖必须重定向**解析** |
-| `dts: { only: true }` 出纯类型 | 不生效，还会覆盖 loader 产物 `client.js` ⇒ 用"类型再导出入口" |
-| 「`intro` 会进产物」 | 被**静默丢弃**⇒ envelope 拼进 `banner`，并在 `bundle-client.mjs` 断言 |
-| 「两个包到 `.build/` 的相对深度相同」 | 数 `../` 的想当然；失败形态是整片 404 ⇒ 改为逐级上溯"找" |
-| `ctx.reflect.provide` 写法 | 文档拼写是 `ctx.provide`；行为不变 |
-| 让补丁侧走全局 `__pracVsPartHost` / `__pracDeferVsParts` | 已被 S2 取代：走 `create()` 的 construction options（补丁本来就持有该服务） |
-| 在机制里按 id 前缀判座位（`VS_VIEW_SOURCE`） | 机制不该认识来源词 ⇒ 按注册表成员判定 |
