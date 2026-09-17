@@ -1,4 +1,16 @@
-/** Static file server for the staged prac workbench surface. */
+/**
+ * Static server for the independent viewing page.
+ *
+ * Two routes, no staging on disk: `/` is our own shell
+ * (`overlay/page.html`) and `/out/*` is the built web bundle inside the
+ * checkout. The shell refers to its assets relatively (`./out/…`), so those
+ * two mappings are all it needs — nothing has to be copied or symlinked, which
+ * is why the old `stage/` directory is gone.
+ *
+ * This page boots the workbench **without** the embed bridge, so it exercises
+ * VS Code's default path; `vscode:smoke` runs against it as the canary for
+ * "our patch did not break the normal web app".
+ */
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
@@ -6,7 +18,8 @@ import { extname, join, normalize, resolve } from "node:path";
 const packageDir = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageDir, "../..");
 const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
-const ROOT = join(workDir, "stage", "web");
+const PAGE = join(packageDir, "overlay/page.html");
+const BUNDLE = join(workDir, "out-vscode-web");
 const PORT = Number(process.env.PORT ?? 5199);
 
 const TYPES = {
@@ -28,12 +41,22 @@ const TYPES = {
   ".scm": "text/plain; charset=utf-8",
 };
 
+/** Map a request path to a file: the shell itself, or anything under the bundle. */
+function fileFor(path) {
+  if (path === "/" || path === "/index.html") return PAGE;
+  if (path.startsWith("/out/")) {
+    const relative = normalize(path.slice("/out/".length)).replace(/^(\.\.[/\\])+/, "");
+    return join(BUNDLE, relative);
+  }
+  return undefined;
+}
+
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? "/", "http://localhost");
-    let path = decodeURIComponent(url.pathname);
-    if (path.endsWith("/")) path += "index.html";
-    const filePath = join(ROOT, normalize(path).replace(/^(\.\.[/\\])+/, ""));
+    const path = decodeURIComponent(url.pathname);
+    const filePath = fileFor(path);
+    if (filePath === undefined) throw new Error(`no route for ${path}`);
     const info = await stat(filePath);
     if (info.isDirectory()) {
       res.writeHead(302, { location: `${path}/` });
@@ -51,5 +74,5 @@ createServer(async (req, res) => {
     res.end(`not found: ${error instanceof Error ? error.message : String(error)}`);
   }
 }).listen(PORT, "127.0.0.1", () => {
-  console.log(`[prac-vscode] serving ${ROOT} at http://127.0.0.1:${PORT}/`);
+  console.log(`[prac-vscode] serving ${PAGE} + ${BUNDLE} at http://127.0.0.1:${PORT}/`);
 });

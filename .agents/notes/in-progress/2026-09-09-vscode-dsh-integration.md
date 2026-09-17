@@ -243,7 +243,7 @@ DSH web 页
 
 - **code server**（cwd = checkout；数据在运行期根）：
   ```bash
-  cd .build/vscode/upstream
+  cd .build/vscode
   R=<repo>/.build/run/code-server
   node out-vscode-reh/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token \
     --server-data-dir $R/data --extensions-dir $R/extensions --user-data-dir $R/user <folder>

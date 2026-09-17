@@ -10,10 +10,7 @@ import { join, resolve } from "node:path";
 
 const packageDir = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageDir, "../..");
-const upstreamDir = join(
-  process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"),
-  "upstream",
-);
+const upstreamDir = process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode");
 const url = process.env.URL;
 const view = process.env.VIEW ?? "vscode:editor";
 if (!url) throw new Error("URL is required");

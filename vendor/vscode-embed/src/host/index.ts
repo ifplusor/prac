@@ -47,7 +47,7 @@ const MIME: Record<string, string> = {
 };
 
 /** Where a build recipe conventionally leaves the web bundle, under a repo root. */
-export const BUNDLE_RELATIVE_PATH = join(".build", "vscode", "upstream", "out-vscode-web");
+export const BUNDLE_RELATIVE_PATH = join(".build", "vscode", "out-vscode-web");
 
 /** A minimal view of an HTTP response, so callers need not share a server's types. */
 interface Response {

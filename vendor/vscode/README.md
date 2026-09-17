@@ -4,7 +4,7 @@ prac **拥有**的 VS Code——以 **pin + patch + 构建配方**的形式，�
 
 - **上游**：`https://github.com/microsoft/vscode.git`（Code - OSS），tag `1.137.0`，构建时解析到的 commit `645f29cc3176500b4b5762ba887cf2a7f0ffdf2c`。
 - **仓库拥有**（进 git）：`package.json#prac.vscode`（pin）、`patches/`（对上游的**唯一**改动源）、`scripts/build.mjs`（可复现配方）、`overlay/`（构建期放进上游/产物树的文件）、`scripts/verify-*.mjs`（活体验证）。
-- **仓库不拥有**（gitignored）：上游源码本身。它体积约 350MB，由构建在 `<repo>/.build/vscode/upstream` 里 `git clone --depth 1 --branch 1.137.0` 取得，每次构建前被 **reset 回 pristine tag**，再按名序应用补丁。
+- **仓库不拥有**（gitignored）：上游源码本身。它体积约 350MB，由构建在 `<repo>/.build/vscode` 里 `git clone --depth 1 --branch 1.137.0` 取得，每次构建前被 **reset 回 pristine tag**，再按名序应用补丁。
 
 这与 DSH 的 `vendor/` 是同一意图（框架层**可审计、可打补丁、被钉住**，见 DSH `vendor/README.md`）下的**另一种形式**：
 
@@ -25,7 +25,7 @@ prac **拥有**的 VS Code——以 **pin + patch + 构建配方**的形式，�
 | `overlay/gallery.ts`           | `<checkout>/src/vs/workbench/browser/gallery.ts` —— 扩展市场的单一数据源（bridge 从 `./gallery.js` 再导出，**必须一起 stage**） |
 | `overlay/embeddedWorkbench.ts` | `<checkout>/src/vs/workbench/browser/embeddedWorkbench.ts` —— 组合载荷：以外部 host 为布局服务                                  |
 | `overlay/embeddedWebMain.ts`   | `<checkout>/src/vs/workbench/browser/embeddedWebMain.ts` —— 覆写 `createWorkbench` 的入口                                       |
-| `overlay/page.html`            | `<work>/stage/web/index.html` —— 独立查看页的壳                                                                                 |
+| `overlay/page.html`            | **不落盘**：`vscode:serve` 的 `/` 路由直接服务它（`/out/*` 映到 checkout 里的 web bundle）                                      |
 
 包的入口直接指向契约，所以其它包**直接 import**，不必知道 staging 细节：
 
@@ -69,7 +69,7 @@ import { EMBED_BRIDGE } from "prac-vscode";
    - 根依赖 `npm install --ignore-scripts`：node-gyp native、playwright 浏览器下载、copilot 扩展 postinstall 这些消费环境跑不通的步骤对 web bundle **都不需要**，跳过它们还让构建只写仓库内（缓存重定向到 `.build/vscode/cache`）。`build/` 子包（自带 lockfile）单独装，因为 esbuild 需要它的 postinstall 校验平台二进制。
    - 补 `codicon.ttf`：web bundle 引用它，而它正常由上游 `copy-codicons` 任务产出（我们跳过脚本）。
    - `stageOverlay()`：见第 2 条（在 reset/apply 之后执行）。
-   - stage `<work>/web` = 我们的 `index.html` + `out/` 符号链接 → bundle（**独立查看**用；DSH 页不读它）。
+   - **独立查看页不落盘**（2026-09-16 起）：`vscode:serve` 的 `/` 映到 `overlay/page.html`、`/out/*` 映到 checkout 的 bundle；旧的 `stage/` 目录与那个指向 checkout 的绝对符号链接已删。
    - `stampServerCommit()`：把 checkout 的 commit 写进**盖章目标**（`.` 与 `out-vscode-reh` 两处；扁平 server 产物自己那份 `product.json` 不存在）。客户端与服务端各自读一份 `product.json` 来算 `getServerProductSegment()`，不盖章时服务端算 `oss-dev`、客户端要 `/oss-<commit>`，表现为「编辑器打不开文件」而不是路径不匹配。
 6. **`overlay/page.html`** 是 prac 的壳：`create(document.body, ...)` + 每个 part 一个外部 host（**不传 bridge**，所以它走的就是"workbench 自己挂 part"的默认路径；`vscode:smoke` 盯的就是这条路）。
 
@@ -99,23 +99,26 @@ vp run --filter prac-vscode vscode:clean
 
 ```
 .build/
-  vscode/       构建期：VS Code 的构建工作目录（PRAC_VSCODE_DIR 可覆盖）
-                可丢 —— 删了重新构建即可（vscode:clean 只删它）
-    upstream/      Code - OSS checkout（pin tag，构建前 reset 回 pristine，再按序打补丁）
-      src/vs/workbench/browser/embedBridge.ts   # ← 构建 stage 的桥接契约（不是补丁，见改动日志 2）
-      out-build/   转译产物（打包器的输入）
-      out-vscode-web/  真正被服务的东西：vs/… + nls.messages.js
-      out-vscode-reh/  code server distro（扁平产物；product.json 已盖章）
-      # 构建只出 out-vscode-web 与 out-vscode-reh 两个目标——prac 用 code-server 形态
-      # （UI 在浏览器、扩展跑服务端 Node 扩展宿主，见 docs/architecture.md §5.2）。
-      # desktop / server-web / reh* 一律不构建；见到即删（2026-09-16 清掉 676M）
-    stage/web/    独立查看用的页面：index.html + out/ -> upstream/out-vscode-web
+  vscode/       构建期：**就是那份 Code - OSS checkout 本身**（PRAC_VSCODE_DIR 可覆盖）
+                可丢 —— 删了重新构建即可（vscode:clean 只删它）；构建前 reset 回 pristine tag
+                依赖与产物都在里面，因为上游的构建就是这样工作的：
+    node_modules/   根依赖（npm install --ignore-scripts，~1.5G）
+    build/          构建工具链自己的依赖
+    src/vs/workbench/browser/{embedBridge,gallery,embeddedWorkbench,embeddedWebMain}.ts
+                    ← 构建 stage 进去的我们的文件（每次构建重建）
+    out-build/      转译产物（打包器的输入）
+    out-vscode-web/ 真正被服务的东西：vs/… + nls.messages.js
+    out-vscode-reh/ code server distro（扁平产物；product.json 已盖章）
+    # 构建只出这两个目标——prac 用 code-server 形态（UI 在浏览器、扩展跑服务端
+    # Node 扩展宿主，见 docs/architecture.md §5.2）；desktop / server-web 不构建。
   run/          运行期：服务的状态（PRAC_RUN_DIR 可覆盖）
                 不能随便删 —— 删了要重装扩展、重新配置
     code-server/  data/ · extensions/ · user/
   scratch/      一次性产物：随便删
     shots/  notes-backup/
 ```
+
+**没有卫星目录**：构建缓存用机器默认位置（见下），独立查看页不落盘（`vscode:serve` 直接把 `/` 映到 `overlay/page.html`、`/out/*` 映到 checkout 里的 bundle），所以 checkout 之外只剩运行期状态与一次性产物。
 
 **工具缓存不在仓库里，构建的缓存也不在**——它们是机器级的，写进仓库配置无法共享（James 2026-09-16 裁决）：
 
@@ -147,7 +150,7 @@ vp run --filter prac-vscode vscode:clean
 - **产物是扁平的**：`out-vscode-reh/` 直接放 `server-main.js` 等（没有 `product.json`/`package.json`/`out/`），运行时按 `<checkout>` 解析 `node_modules` 与 `product.json`。
 - **跑法**（cwd = checkout；数据目录指到运行期根）：
   ```bash
-  cd .build/vscode/upstream
+  cd .build/vscode
   R=<repo>/.build/run/code-server
   node out-vscode-reh/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token \
     --server-data-dir $R/data --extensions-dir $R/extensions --user-data-dir $R/user <folder>

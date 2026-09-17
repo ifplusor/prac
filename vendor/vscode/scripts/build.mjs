@@ -6,22 +6,21 @@
  * source: upstream (Code - OSS) is fetched at the tag pinned in `package.json`
  * (`prac.vscode`) into a gitignored work directory, reset to that pristine tag,
  * and patched with `patches/*.patch` — that patch set is prac's only change to
- * it. The build then produces the web workbench bundle and stages it together
- * with prac's own entry point (`src/index.html`), which boots the workbench
- * through the public web-embedder API `create()` from
- * `workbench.web.main.internal`.
+ * it. The build then produces two bundles: the web workbench (`out-vscode-web`)
+ * and the code server (`out-vscode-reh`). The independent viewing page is not
+ * staged — `scripts/serve.mjs` serves `overlay/page.html` and the bundle itself.
  *
  * Steps:
  *   1. ensure the upstream checkout at the pinned tag
  *   2. install dependencies (root + the `build/` toolchain)
  *   3. copy the codicon font the web bundle references
  *   4. transpile `src/` -> `out-build`
- *   5. bundle -> `out-vscode-web` (target `web`, with NLS)
- *   6. stage `<work>/web` = our `index.html` + an `out/` link to the bundle
+ *   5. bundle -> `out-vscode-web` (target `web`) 与 `out-vscode-reh` (target `server`), both with NLS
  *
- * Everything (checkout, caches, output) lives under `PRAC_VSCODE_DIR`
- * (default `<repo>/.build/vscode`, gitignored), so the build writes nothing
- * outside the repository and needs no elevated sandbox.
+ * Everything the build produces lives inside the checkout, i.e. under
+ * `PRAC_VSCODE_DIR` (default `<repo>/.build/vscode`, gitignored). Tool caches
+ * (npm / node-gyp / playwright) use the machine's defaults, so the build does
+ * write outside the repository.
  *
  * Usage:
  *   node scripts/build.mjs [--force] [--skip-install] [--skip-build]
@@ -37,7 +36,6 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -54,8 +52,7 @@ if (!pin?.repository || !pin?.tag) {
 
 const flags = new Set(process.argv.slice(2));
 const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
-const upstreamDir = join(workDir, "upstream");
-const webDir = join(workDir, "stage", "web");
+const upstreamDir = workDir;
 /** @param {string} step @param {string} message */
 function log(step, message) {
   console.log(`[prac-vscode] ${step}: ${message}`);
@@ -234,14 +231,6 @@ function buildBundle() {
   ]);
 }
 
-function stage() {
-  rmSync(webDir, { recursive: true, force: true });
-  mkdirSync(webDir, { recursive: true });
-  cpSync(join(packageDir, "overlay/page.html"), join(webDir, "index.html"));
-  symlinkSync(join(upstreamDir, "out-vscode-web"), join(webDir, "out"), "dir");
-  log("stage", `web surface staged at ${webDir}`);
-}
-
 /**
  * Stamp the checked-out commit into the server distro's `product.json`.
  *
@@ -320,5 +309,4 @@ ensureInstall();
 copyCodicons();
 buildBundle();
 stampServerCommit();
-stage();
 console.log("[prac-vscode] done. serve it with: vp run --filter prac-vscode vscode:serve");

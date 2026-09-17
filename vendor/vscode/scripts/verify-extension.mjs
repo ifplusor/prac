@@ -25,7 +25,7 @@ const packageDir = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageDir, "../..");
 const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
 const runDir = resolve(process.env.PRAC_RUN_DIR ?? join(repoRoot, ".build/run"));
-const upstreamDir = join(workDir, "upstream");
+const upstreamDir = workDir;
 const url = process.env.URL;
 /** The extension this gate needs, and one of the views it contributes. */
 const extension = process.env.EXTENSION ?? "eamodio.gitlens";

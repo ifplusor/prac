@@ -56,7 +56,7 @@ James（2026-09-15）：**"我们想要的不是自定义 workbench，而是把�
 1. **agent 面要"settled + provenance + 分页"**：VS Code 的状态是异步收敛的（诊断等 LSP、SCM 等 git 进程）。只返回"此刻的值"，agent 会基于半成品行事 ⇒ 要暴露**静默/版本**语义（`waitForSettled(uri)`、`version`）与来源；diagnostics 这类还可能很大 ⇒ 结构化分页与摘要，而不是把原始数组塞给模型。
 2. **无 UI 可用**：agent 要能在没有编辑器、没有 problems 面板时读诊断、跑任务、查引用。这是"能力层与 UI 层拆开"最硬的判据——**若某能力只在某个 part 挂着时才工作，它就没被拆开**。
 
-## 关键结构事实（都在 `.build/vscode/upstream` 里，可复读）
+## 关键结构事实（都在 `.build/vscode` 里，可复读）
 
 1. **`createWorkbench` 是上游给"换一个 app"留的缝**（`workbench/browser/web.main.ts:103,271`：`IBrowserMainWorkbench` 只有 `{ startup, onWillShutdown, onDidShutdown }`）。上游自己的第二个 app 用的也是它：`sessions/browser/web.main.ts:33` `SessionsBrowserMain extends BrowserMain` 覆写 `createWorkbench` → `createSessionsWorkbench`，并另覆写 `createWorkspaceConfigAndStorageServices` 换掉工作区/配置服务。**我们的补丁用的正是这道缝**，不是 hack。
 2. **part 不是 app 造的，是服务造的**（这一条改变了备选的判断）：

@@ -25,7 +25,7 @@ import { join, resolve } from "node:path";
 const packageDir = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageDir, "../..");
 const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
-const upstreamDir = join(workDir, "upstream");
+const upstreamDir = workDir;
 const url = process.env.URL;
 
 if (!url) throw new Error('URL is required, e.g. URL="http://127.0.0.1:3082/?token=..."');

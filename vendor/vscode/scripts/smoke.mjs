@@ -1,4 +1,4 @@
-/** Smoke check: boot the staged surface headlessly and assert the workbench rendered. */
+/** Smoke check: boot the independent viewing page (no bridge) and assert the workbench rendered. */
 import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 const packageDir = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageDir, "../..");
 const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
-const upstreamDir = join(workDir, "upstream");
+const upstreamDir = workDir;
 const url = process.env.URL ?? `http://127.0.0.1:${process.env.PORT ?? 5199}/`;
 
 if (!existsSync(join(upstreamDir, "node_modules/@playwright/test"))) {
