@@ -131,7 +131,13 @@ export function apply(ctx: Context): void {
   const boot = (): boolean => {
     const workspace = activeWorkspace(ctx);
     if (workspace === undefined) return false;
-    return embed.boot({ workspacePath: workspace.path });
+    return embed.boot({
+      workspacePath: workspace.path,
+      // A **web** workbench defaults `files.autoSave` to `afterDelay`
+      // (`files.contribution.ts:270`), while the documented behaviour is `off`.
+      // prac wants the documented one: the person decides when a file is written.
+      configurationDefaults: { "files.autoSave": "off" },
+    });
   };
 
   // The seat packages are separate bundles and cannot share the mechanism's state

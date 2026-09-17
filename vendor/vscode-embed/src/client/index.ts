@@ -168,6 +168,16 @@ export interface VscodeEmbedOptions {
 export interface VscodeEmbedLaunch {
   /** Absolute path of the workspace folder this window is for. */
   readonly workspacePath: string;
+  /**
+   * Configuration defaults for the workbench, merged into its own.
+   *
+   * Mechanism only: which defaults a product wants is its policy. It exists
+   * because a **web** workbench differs from the documented desktop one —
+   * notably `files.autoSave`, whose upstream default is
+   * `isWeb ? afterDelay : off` (`files.contribution.ts:270`), so a product that
+   * wants the documented behaviour has to say so.
+   */
+  readonly configurationDefaults?: Record<string, unknown>;
 }
 
 export interface VscodeEmbedHandle {
@@ -324,6 +334,9 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
           // are mounted from.
           record.commands = mod.commands;
           mod.create(bootHost, {
+            ...(launch.configurationDefaults === undefined
+              ? {}
+              : { configurationDefaults: launch.configurationDefaults }),
             productConfiguration: {
               nameShort: productName,
               nameLong: productName,
