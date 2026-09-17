@@ -97,6 +97,6 @@ proposed → in-progress → resolved:<fine>
 
 ## Related
 
-- [2026-09-08-first-increment-c1.md](../accepted/2026-09-08-first-increment-c1.md)
-- [2026-09-08-dev-environment-worktrees.md](../accepted/2026-09-08-dev-environment-worktrees.md)
+- [2026-09-08-first-increment-c1.md](2026-09-08-first-increment-c1.md)
+- [2026-09-08-dev-environment-worktrees.md](2026-09-08-dev-environment-worktrees.md)
 - [../../../docs/philosophy.md](../../../docs/philosophy.md)
