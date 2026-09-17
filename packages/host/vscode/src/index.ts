@@ -57,6 +57,9 @@ const SERVER_ENV = "PRAC_CODE_SERVER_ENTRY";
 /** Points at a code server someone else manages; no process is started here. */
 const URL_ENV = "PRAC_CODE_SERVER_URL";
 
+/** Pins the port a started server listens on (a debugger or a fixed rig wants one). */
+const PORT_ENV = "PRAC_CODE_SERVER_PORT";
+
 /** Overrides the server's product segment, for a server that is not this build. */
 const SEGMENT_ENV = "PRAC_CODE_SERVER_PATH";
 
@@ -184,7 +187,7 @@ async function launchCodeServer(): Promise<CodeServerTarget | undefined> {
   const handle = await startCodeServer({
     entry,
     cwd,
-    port: await freePort(),
+    port: Number(process.env[PORT_ENV] ?? "") || (await freePort()),
     ...codeServerDirs(),
     // The prac dev rig is local and single-user; a token would have to travel to
     // the page, which is the transport design's business, not this step's.

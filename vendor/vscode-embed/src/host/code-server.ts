@@ -67,13 +67,16 @@ export function resolveCodeServer(options: CodeServerLocationOptions): CodeServe
   let dir = resolve(options.from);
   for (;;) {
     const candidate = join(dir, SERVER_ENTRY_RELATIVE_PATH);
-    if (existsSync(candidate)) return { entry: candidate, cwd: dir };
+    // `<repo>/.build/vscode/out-vscode-reh/server-main.js`: the directory the
+    // server must run in is the *checkout* (`<repo>/.build/vscode`), not the
+    // directory the search happened to find the file under.
+    if (existsSync(candidate)) return { entry: candidate, cwd: resolve(dirname(candidate), "..") };
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
   const fallback = resolve(options.from, "..", SERVER_ENTRY_RELATIVE_PATH);
-  return { entry: fallback, cwd: resolve(options.from, "..") };
+  return { entry: fallback, cwd: resolve(dirname(fallback), "..") };
 }
 
 export interface CodeServerArgvOptions {
@@ -194,6 +197,8 @@ export interface StartCodeServerOptions extends CodeServerArgvOptions {
   readonly readyTimeoutMs?: number;
   /** How long `stop()` waits after SIGTERM before SIGKILL. Defaults to 5s. */
   readonly stopTimeoutMs?: number;
+  /** Environment for the child. Defaults to the parent's. */
+  readonly env?: NodeJS.ProcessEnv;
 }
 
 /** A running code server. */
@@ -222,6 +227,7 @@ export async function startCodeServer(options: StartCodeServerOptions): Promise<
   const tail: string[] = [];
   const child: ChildProcess = spawn(process.execPath, [options.entry, ...codeServerArgv(options)], {
     cwd: options.cwd,
+    env: options.env ?? process.env,
     stdio: ["ignore", "pipe", "pipe"],
   });
 

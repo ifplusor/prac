@@ -244,7 +244,7 @@ DSH web 页
 **载荷风险（改名后重算）**：改名前补丁 773 行里 **687 行是我们自己的新文件**（真改上游 ~27 行）、只以 diff 文本存在（`grep` 找不到代码、没有类型检查、构建只用 esbuild 转译、当时的每次构建 reset 会静默丢失）。**改名后这个形状已消除**：补丁 **74 行 delta-only**，我们自己的文件走 `overlay/`（真文件、可 grep、可 review、被 `vp check` 覆盖契约那一份）。2026-09-17 之前每次构建都 `git clean -fd` 把它们删掉再由 `cpSync` 重新放置；现在只有 pin 变化或 `vscode:clean` 会删，而 `stageOverlay()` 仍然每次构建都覆盖一遍——所以仓库里的 `overlay/` 始终是唯一那份。**仍有风险**：checkout 里的改动不再是"下次构建就丢"，而是"仓库里没有、只有那份工作树有"（drift 警告会提示，但不会替你修）。
 
 
-| 无 `--folder` 起的 code server：打字后 DOM 变了、磁盘没存，但 `editors` 能力与 tab 都报 `dirty: false`（`verify-file` 的 `tabMarksUnsavedChanges` / `capabilityReportsUnsavedChanges` 红） | 服务端没有工作区 ⇒ 编辑面改的那份 model 没进 VS Code 的「未保存」账（文件服务 / 工作副本那层没接上）。**实测对照**：同一页面、同一资源串（`vscode-remote://127.0.0.1:3084/…/dsh-dev/AGENTS.md`），外置 server 带 `--folder /Volumes/Dev/prac/prac-dev`（**甚至不是客户端打开的目录**）时 **33/33**；不带时 **31/33**。所以差异是「服务端有没有工作区」，不是 URI、不是进程归谁、不是端口 | 起 server 时必须给它一个 folder；「哪个 folder」就是工作区归属（note §3.6、§4 差距 4），在它定下来之前用 `PRAC_CODE_SERVER_URL` 指外置 server |
+| **同一个门禁，插件起的 server 31/33、外置起的 33/33，且两者进程层面查不出差异**：打字后 DOM 变了、磁盘没存，`editors` 能力与 tab 都报 `dirty: false`（`verify-file` 的 `tabMarksUnsavedChanges` / `capabilityReportsUnsavedChanges` 红） | **未查明**。已逐一排除：`--folder`（它在 1.137.0 里是**废弃且被忽略**的 flag，`serverEnvironmentService.ts:67` 原文 *No longer supported*；工作区按上游设计由浏览器 URL / `--default-folder` 给，扩展宿主 fork 参数里没有 folder）· 端口（钉到同一个端口仍红）· cwd（已修成 checkout 根，仍红）· 环境（空环境、去掉 npm/pnpm/VP/COREPACK 记账变量，都仍红）· 进程组（detached）· stdio（inherit）· 参数集（逐项相同） | 现象稳定可复现（插件起 4 次全 31/33；外置起 3 次全 33/33），所以不是 flake。下一步该做**客户端侧对账**（两次运行的 console/网络差异），而不是继续在进程层猜；在此之前 rig 用 `PRAC_CODE_SERVER_URL` 指外置 server |
 
 ## 已知缺口（仍然存在，非阻塞）
 

@@ -84,7 +84,12 @@ describe("resolveCodeServer", () => {
     writeFileSync(entry, "");
     mkdirSync(nested, { recursive: true });
 
-    expect(resolveCodeServer({ from: nested })).toEqual({ entry, cwd: root });
+    // The cwd is the checkout (`<root>/.build/vscode`), what the flat distro
+    // resolves product.json and node_modules from — not the repository root.
+    expect(resolveCodeServer({ from: nested })).toEqual({
+      entry,
+      cwd: join(root, ".build", "vscode"),
+    });
   });
 
   it("returns the conventional path (not a crash) when nothing was built", () => {
