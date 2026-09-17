@@ -4,7 +4,7 @@ prac **拥有**的 VS Code——以 **pin + patch + 构建配方**的形式，�
 
 - **上游**：`https://github.com/microsoft/vscode.git`（Code - OSS），tag `1.137.0`，构建时解析到的 commit `645f29cc3176500b4b5762ba887cf2a7f0ffdf2c`。
 - **仓库拥有**（进 git）：`package.json#prac.vscode`（pin）、`patches/`（对上游的**唯一**改动源）、`scripts/build.mjs`（可复现配方）、`overlay/`（构建期放进上游/产物树的文件）、`scripts/verify-*.mjs`（活体验证）。
-- **仓库不拥有**（gitignored）：上游源码本身。它体积约 350MB，由构建在 `<repo>/.build/vscode` 里 `git clone --depth 1 --branch 1.137.0` 取得，每次构建前被 **reset 回 pristine tag**，再按名序应用补丁。
+- **仓库不拥有**（gitignored）：上游源码本身。它体积约 350MB，由构建在 `<repo>/.build/vscode` 里 `git clone --depth 1 --branch 1.137.0` 取得，之后只在 **pin 变化**时被 reset 回 pristine tag，再按名序应用补丁（已应用的跳过）。要手动回到 pristine 用 `vscode:clean`。
 
 这与 DSH 的 `vendor/` 是同一意图（框架层**可审计、可打补丁、被钉住**，见 DSH `vendor/README.md`）下的**另一种形式**：
 
@@ -66,18 +66,20 @@ import { EMBED_BRIDGE } from "prac-vscode";
    - `overlay/embeddedWorkbench.ts`（790 行）：`EmbeddedWorkbench implements IWorkbenchLayoutService`，把每个 part 挂进 `[data-vscode-embed-part-host="<part id>"]` **外部 host**，`layout()` 按 host 尺寸驱动（zen / centered / floating / 多窗口暂 stub）；服务图恢复后把面（`mountPartInto` / `movePartInto`（part 是单实例，只能**搬**不能重建）、`openUntitled`、`openWorkspaceFolder`（页侧构造不出 `vscode.openFolder` 要求的 `URI` 实例，故由 hold 着 `URI` 的 workbench 侧代调，且**不带**窗口选项——`forceReuseWindow` 会走 embedder 那个只会导航的 `workspaceProvider.open()`））**交回 embedder**。
    - `overlay/embeddedWebMain.ts`（44 行）：`EmbeddedBrowserMain extends BrowserMain`，覆写 `createWorkbench`。
    - `overlay/embedBridge.ts`：桥接契约（下面是单独一段）。
-   - 这四份（`bridge.ts` / `gallery.ts` / `embeddedWorkbench.ts` / `embeddedWebMain.ts`）由 `build.mjs` 的 `stageOverlay()` 拷进 checkout 的上游路径。`scripts/page.html` **不在其中**：它不落盘，由 `vscode:serve` 就地服务。
+   - 这四份（`embedBridge.ts` / `extensionsGallery.ts` / `embeddedWorkbench.ts` / `embeddedWebMain.ts`）由 `build.mjs` 的 `stageOverlay()` 拷进 checkout 的上游路径。`scripts/page.html` **不在其中**：它不落盘，由 `vscode:serve` 就地服务。
    - **为什么载荷不进补丁**：补丁应当是 _delta_。载荷是我们**自己的完整文件**（959 行，含契约），放进补丁会让"我们对上游做了什么"淹没在自己的代码里；作为真文件它还能被 review / grep / fmt（类型检查除外，见下）。
-   - **载荷不带上游版权头**：它们不是上游代码，所以 `embeddedWorkbench.ts` / `embeddedWebMain.ts` 直接以自己的文档注释开头（`bridge.ts` / `gallery.ts` 本来就没有）。代价说清楚：若在 checkout 里跑**上游自己的** eslint，`header/header` 会对这两个文件报"缺版权头"——我们本来就不跑上游 lint（见下），而挂一个不属于自己的版权头是更糟的问题。产物不受影响：esbuild 会丢注释，web bundle 里只剩构建注入的那一条版权横幅（实测 1 处）。
+   - **载荷不带上游版权头**：它们不是上游代码，所以 `embeddedWorkbench.ts` / `embeddedWebMain.ts` 直接以自己的文档注释开头（`embedBridge.ts` / `extensionsGallery.ts` 本来就没有）。代价说清楚：若在 checkout 里跑**上游自己的** eslint，`header/header` 会对这两个文件报"缺版权头"——我们本来就不跑上游 lint（见下），而挂一个不属于自己的版权头是更糟的问题。产物不受影响：esbuild 会丢注释，web bundle 里只剩构建注入的那一条版权横幅（实测 1 处）。
    - **它不被我们的类型检查覆盖**：这两个文件按上游树的位置写相对导入（`../../base/common/…`），只有在上游 checkout 里才成立。`vendor/vscode/.eslintignore` 因此排除它们（`vp check` 的检查集），`tsconfig.json` 的 `include` 也只收 `overlay/embedBridge.ts`。要真正检查它们，得在 checkout 里跑上游自己的 tsc（分钟级，未做）。
 3. **桥接契约由构建放置，不进补丁**：`vendor/vscode/overlay/embedBridge.ts` 是 prac ↔ workbench 交互面的**单一定义**（options 字段名 `vscodeEmbed`、`deferParts`、面的类型、`readEmbedBridge()` 校验器）。`build.mjs` 把它拷成 `<checkout>/src/vs/workbench/browser/embedBridge.ts`，两侧编译同一份文件（client 半边直接 `import ... from "prac-vscode"`，拿到的是同一份原件），所以字段名只拼写一次。
    - 交互面**不再走 window 全局**（原 `__pracDeferVsParts` 入、`__vscodeEmbed` 出已删除）：prac 在 `create()` 的 construction options 里交进一个 bridge 对象，VS Code 侧用 `IBrowserWorkbenchEnvironmentService.options` 读它（补丁本来就持有这个服务），并把面经 `bridge.publish(face)` 交回。**无 bridge（独立页）= 走默认路径**：VS Code 自己把 part 挂进带 part id 的文档 host。
-   - 这份契约是**唯一被 stage 而不是被 patch 的文件**：补丁条目只能装一侧的拼写，那样字段名就又写两遍了。`git clean -fd` 每次都会删掉它，所以每次构建都重新拷。
+   - 这份契约是**唯一被 stage 而不是被 patch 的文件**：补丁条目只能装一侧的拼写，那样字段名就又写两遍了。
 4. **`package.json`**：脱离 DSH 插件形状（删 `main` / `dsh` / `exports` 主入口 / 原 client 半边），scripts 收敛为构建 + 验证。
 5. **构建配方 `scripts/build.mjs` 的偏离**（相对上游 `npm install && gulp` 的常规路径）：
    - 根依赖 `npm install --ignore-scripts`：node-gyp native、playwright 浏览器下载、copilot 扩展 postinstall 这些消费环境跑不通的步骤对 web bundle **都不需要**，跳过它们还让构建只写仓库内（缓存重定向到 `.build/vscode/cache`）。`build/` 子包（自带 lockfile）单独装，因为 esbuild 需要它的 postinstall 校验平台二进制。
    - 补 `codicon.ttf`：web bundle 引用它，而它正常由上游 `copy-codicons` 任务产出（我们跳过脚本）。
-   - `stageOverlay()`：见第 2 条（在 reset/apply 之后执行）。
+   - `stageOverlay()`：见第 2 条（在 drift 检查与 apply 之后执行）。
+   - **构建不 reset checkout**（2026-09-16 起）：pin 没变就直接在现有树上继续，补丁逐条用 `git apply --check -R` 判定，已应用就跳过（正向 `--check` 在已应用的树上必然失败，反向能过即「已在树里」）。第一次构建之外的构建因此不会再走一遍 reset + apply。
+   - **drift 警告（只报告，不修正）**：构建开始前跑一次 `git status --porcelain`，把不属于本配方写的路径（补丁目标、盖章的 `product.json`、`overlay/` 四份的落点）逐条打出来，并提示 `vscode:clean`。checkout 是构建工作树、不是第二份真源，别人的改动会静默进 bundle，所以值得一行警告；但**自动改回会毁掉正在被 debug 的树**，所以只是警告。
    - **独立查看页不落盘**（2026-09-16 起）：`vscode:serve` 的 `/` 映到 `scripts/page.html`、`/out/*` 映到 checkout 的 bundle；旧的 `stage/` 目录与那个指向 checkout 的绝对符号链接已删。
    - `stampServerCommit()`：把 checkout 的 commit 写进**盖章目标**（`.` 与 `out-vscode-reh` 两处；扁平 server 产物自己那份 `product.json` 不存在）。客户端与服务端各自读一份 `product.json` 来算 `getServerProductSegment()`，不盖章时服务端算 `oss-dev`、客户端要 `/oss-<commit>`，表现为「编辑器打不开文件」而不是路径不匹配。
 6. **`scripts/page.html`** 是**测试件**（产品里零引用：`packages/` 与 `vendor/vscode-embed/` 都不碰它）。它 `create(document.body, ...)` + 给每个 part 一个外部 host，且**不传 bridge**。
@@ -96,8 +98,11 @@ vp run --filter prac-vscode vscode:serve
 # 无头冒烟：断言 workbench 真的渲染出来（需要上面的服务在跑）
 vp run --filter prac-vscode vscode:smoke
 
-# 清掉构建目录（上游 checkout、缓存、产物）
+# 清构建：checkout 回到 pin + 删 out-*（保留 clone 与 node_modules，下次只重构）
 vp run --filter prac-vscode vscode:clean
+
+# 全清：连 clone 与 node_modules 一起删（下次构建从零）
+vp run --filter prac-vscode vscode:clean-all
 ```
 
 `node scripts/build.mjs [--force] [--skip-install] [--skip-build]`：`--force` 清空工作目录从零重建；`--skip-install` 复用已有依赖；`--skip-build` 只确保 checkout/install。
@@ -111,12 +116,13 @@ vp run --filter prac-vscode vscode:clean
 ```
 .build/
   vscode/       构建期：**就是那份 Code - OSS checkout 本身**（PRAC_VSCODE_DIR 可覆盖）
-                可丢 —— 删了重新构建即可（vscode:clean 只删它）；构建前 reset 回 pristine tag
+                可丢 —— `vscode:clean` 让它回到 pin 并删产物（保留 clone 与 node_modules），
+                `vscode:clean-all` 整份删掉、下次构建从零
                 依赖与产物都在里面，因为上游的构建就是这样工作的：
     node_modules/   根依赖（npm install --ignore-scripts，~1.5G）
     build/          构建工具链自己的依赖
-    src/vs/workbench/browser/{embedBridge,gallery,embeddedWorkbench,embeddedWebMain}.ts
-                    ← 构建 stage 进去的我们的文件（每次构建重建）
+    src/vs/workbench/browser/{embedBridge,extensionsGallery,embeddedWorkbench,embeddedWebMain}.ts
+                    ← 构建 stage 进去的我们的文件（与 overlay 里的原件逐字节相同）
     out-build/      转译产物（打包器的输入）
     out-vscode-web/ 真正被服务的东西：vs/… + nls.messages.js
     out-vscode-reh/ code server distro（扁平产物；product.json 已盖章）

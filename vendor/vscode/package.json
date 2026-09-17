@@ -28,6 +28,7 @@
     "vscode:inspect-region": "node scripts/inspect-region.mjs",
     "vscode:screenshot": "node scripts/screenshot.mjs",
     "vscode:clean": "node scripts/clean.mjs",
+    "vscode:clean-all": "node scripts/clean.mjs --all",
     "vscode:check": "vp check",
     "check": "vp check"
   },

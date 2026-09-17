@@ -100,16 +100,67 @@ function ensureCheckout() {
         upstreamDir,
         { tolerant: true },
       );
+      resetCheckout();
     }
-    // Always start from a pristine tree so the patch set below is the single source of
-    // truth. `git clean -fd` (no -x) keeps ignored dirs, so node_modules and build output
-    // survive; only tracked edits and our previously applied files are removed.
-    log("upstream", `resetting to pristine ${pin.tag}`);
-    run("git", ["checkout", "--force", pin.tag]);
-    run("git", ["clean", "-fd"]);
   }
+  warnDrift();
   applyPatches();
   stageOverlay();
+}
+
+/**
+ * Put the checkout back on the pinned tag: tracked edits and untracked files go.
+ * `git clean -fd` (no `-x`) keeps ignored paths, so `node_modules` and build output
+ * survive. A build does this only when the pin moves; `vscode:clean` runs it on demand.
+ */
+function resetCheckout() {
+  log("upstream", `resetting to pristine ${pin.tag}`);
+  run("git", ["checkout", "--force", pin.tag]);
+  run("git", ["clean", "-fd"]);
+}
+
+/**
+ * Checkout paths this package is expected to touch: the patch targets, the stamped
+ * root `product.json`, and the {@link OVERLAY} destinations. Untracked directories
+ * holding build output (`out-*`) are ignored by upstream's `.gitignore` and never
+ * show up in `git status`.
+ */
+function expectedPaths() {
+  const expected = new Set(["product.json"]);
+  const patchesDir = join(packageDir, "patches");
+  if (existsSync(patchesDir)) {
+    for (const file of readdirSync(patchesDir).filter((name) => name.endsWith(".patch"))) {
+      const patch = readFileSync(join(patchesDir, file), "utf8");
+      for (const [, target] of patch.matchAll(/^\+\+\+ b\/(.+)$/gm)) expected.add(target.trim());
+    }
+  }
+  for (const { to } of OVERLAY) expected.add(to);
+  return expected;
+}
+
+/**
+ * Report — never correct — anything modified in the checkout that this recipe did not
+ * write. The checkout is a build work tree, not a second source of truth; a foreign edit
+ * would silently end up in the bundle, so it is worth one line of warning. `vscode:clean`
+ * is the way out.
+ */
+function warnDrift() {
+  const result = spawnSync("git", ["-C", upstreamDir, "status", "--porcelain"], {
+    encoding: "utf8",
+  });
+  if (result.status !== 0) return;
+  const expected = expectedPaths();
+  const unexpected = result.stdout
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => line.slice(3).split(" -> ").pop().trim())
+    .filter((path) => !expected.has(path));
+  if (unexpected.length === 0) return;
+  log(
+    "drift",
+    `unexpected changes in ${upstreamDir} (kept, not corrected): ${unexpected.join(", ")}`,
+  );
+  log("drift", "run `vp run --filter prac-vscode vscode:clean` to return to the pinned tag");
 }
 
 /**
@@ -132,11 +183,8 @@ const OVERLAY = [
 ];
 
 /**
- * Place {@link OVERLAY} into the checkout.
- *
- * The copy is the point of the reset: `git clean -fd` removes everything here on
- * every build, so the checkout can never become a second source of truth for files
- * this repository owns.
+ * Place {@link OVERLAY} into the checkout. Always overwrites, so the copy here stays the
+ * only copy this repository answers for.
  */
 function stageOverlay() {
   for (const { from, to } of OVERLAY) {
@@ -148,16 +196,34 @@ function stageOverlay() {
   }
 }
 
-/** Apply every `patches/*.patch` (name order) onto the pristine checkout. */
+/**
+ * Apply every `patches/*.patch` (name order) onto the checkout. A patch that is already
+ * in place is skipped: `git apply --check -R` succeeding means the tree already carries
+ * it, which is the normal case for the second and later builds at the same pin.
+ */
 function applyPatches() {
   const patchesDir = join(packageDir, "patches");
   if (!existsSync(patchesDir)) return;
   for (const patch of readdirSync(patchesDir)
     .filter((file) => file.endsWith(".patch"))
     .sort()) {
-    run("git", ["apply", "--whitespace=nowarn", join(patchesDir, patch)]);
+    const file = join(patchesDir, patch);
+    if (canReverse(file)) {
+      log("patch", `already applied ${patch}`);
+      continue;
+    }
+    run("git", ["apply", "--whitespace=nowarn", file]);
     log("patch", `applied ${patch}`);
   }
+}
+
+/** True when `patch` applies in reverse, i.e. the checkout already carries it. */
+function canReverse(patch) {
+  const result = spawnSync("git", ["apply", "--check", "-R", patch], {
+    cwd: upstreamDir,
+    stdio: "ignore",
+  });
+  return result.status === 0;
 }
 
 function ensureInstall() {
@@ -258,8 +324,8 @@ function stampServerCommit() {
   // the Extensions view is empty and installing by id fails. The ecosystem is the
   // point of embedding VS Code at all (decision 18's criterion is "a real
   // extension activates"), so the gallery is stamped in here — read from the same
-  // `overlay/gallery.json` the client passes to the workbench, so the two planes
-  // cannot drift.
+  // `overlay/extensionsGallery.ts` the client passes to the workbench, so the two
+  // planes cannot drift.
 
   // The flat `server` build reads the **checkout root's** product.json at runtime
   // (its script dir has none), while the web bundle bakes the commit in from
