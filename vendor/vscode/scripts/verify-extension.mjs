@@ -19,24 +19,30 @@
  */
 import { createRequire } from "node:module";
 import { existsSync, readdirSync } from "node:fs";
+import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
 const packageDir = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageDir, "../..");
 const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
-const runDir = resolve(process.env.PRAC_RUN_DIR ?? join(repoRoot, ".build/run"));
 const upstreamDir = workDir;
 const url = process.env.URL;
 /** The extension this gate needs, and one of the views it contributes. */
 const extension = process.env.EXTENSION ?? "eamodio.gitlens";
 const view = process.env.VIEW ?? "gitlens.views.welcome";
 /**
- * Where the server's user extensions live. Installing one is a deliberate,
- * reviewed act (the CLI refuses to run outside a VS Code terminal), so this gate
- * **skips loudly** rather than failing when none is installed.
+ * Where the server's user extensions live. Installed extensions are data, so they
+ * follow `$XDG_DATA_HOME` — the README's launch command passes the same path.
+ * Installing one is a deliberate, reviewed act (the CLI refuses to run outside a
+ * VS Code terminal), so this gate **skips loudly** rather than failing when none
+ * is installed.
  */
 const extensionsDir = resolve(
-  process.env.EXTENSIONS_DIR ?? join(runDir, "code-server", "extensions"),
+  process.env.EXTENSIONS_DIR ??
+    join(
+      process.env.XDG_DATA_HOME ?? join(homedir(), ".local/share"),
+      "prac/code-server/extensions",
+    ),
 );
 
 if (!url) throw new Error('URL is required, e.g. URL="http://127.0.0.1:3084/?token=..."');

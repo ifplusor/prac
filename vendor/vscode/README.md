@@ -111,12 +111,12 @@ vp run --filter prac-vscode vscode:clean-all
 
 ### 目录规范（按生命周期分，不按来源分）
 
-`.build/` 是仓库里唯一的机器状态根（gitignored）。它下面**只有三个角色目录**，判据是**删掉它要付什么代价**：
+**构建期与一次性的东西在仓库里，运行期状态在仓库外**（James 2026-09-17：遵循 XDG）。
 
 ```
-.build/
+.build/                     可整份删 —— 里面只有能重新造出来的东西
   vscode/       构建期：**就是那份 Code - OSS checkout 本身**（PRAC_VSCODE_DIR 可覆盖）
-                可丢 —— `vscode:clean` 让它回到 pin 并删产物（保留 clone 与 node_modules），
+                `vscode:clean` 让它回到 pin 并删产物（保留 clone 与 node_modules），
                 `vscode:clean-all` 整份删掉、下次构建从零
                 依赖与产物都在里面，因为上游的构建就是这样工作的：
     node_modules/   根依赖（npm install --ignore-scripts，~1.5G）
@@ -128,14 +128,25 @@ vp run --filter prac-vscode vscode:clean-all
     out-vscode-reh/ code server distro（扁平产物；product.json 已盖章）
     # 构建只出这两个目标——prac 用 code-server 形态（UI 在浏览器、扩展跑服务端
     # Node 扩展宿主，见 docs/architecture.md §5.2）；desktop / server-web 不构建。
-  run/          运行期：服务的状态（PRAC_RUN_DIR 可覆盖）
-                不能随便删 —— 删了要重装扩展、重新配置
-    code-server/  data/ · extensions/ · user/
   scratch/      一次性产物：随便删
     shots/  notes-backup/
 ```
 
-**没有卫星目录**：构建缓存用机器默认位置（见下），独立查看页不落盘（`vscode:serve` 直接把 `/` 映到 `scripts/page.html`、`/out/*` 映到 checkout 里的 bundle），所以 checkout 之外只剩运行期状态与一次性产物。
+运行期状态**不在仓库里**——它在 XDG 目录下，按数据的性质分（`$XDG_*_HOME` 未设时用规范里的默认值，macOS 上同样如此，所以三平台一套话）：
+
+| 角色                                                                                                                    | 落在哪                                                            | 默认（相对 `$HOME`）                       | 谁来定                                 |
+| ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------ | -------------------------------------- |
+| **装好的扩展**（第三方包本体，可重装）                                                                                  | `--extensions-dir` → `$XDG_DATA_HOME/prac/code-server/extensions` | `.local/share/prac/code-server/extensions` | 启动命令；闸门用 `EXTENSIONS_DIR` 覆盖 |
+| **服务端状态**（`data/data/User/{workspaceStorage,globalStorage,History}`、`logs/`、`Machine/`、`CachedProfilesData/`） | `--server-data-dir` → `$XDG_STATE_HOME/prac/code-server`          | `.local/state/prac/code-server`            | 启动命令                               |
+| **用户数据目录**（实测为空；留着是为了永不回退到 `~/.vscode-server-oss`）                                               | `--user-data-dir` → `$XDG_CONFIG_HOME/prac/code-server`           | `.config/prac/code-server`                 | 启动命令                               |
+| **缓存**                                                                                                                | 不传 knob，用系统默认                                             | macOS `~/Library/Caches`                   | 不用管                                 |
+
+- **为什么不在 `.build/run/`**：判据是「删掉它要付什么代价」。`.build/vscode` 是派生的、`scratch` 是一次性的，而扩展与 `workspaceStorage`/`globalStorage` 删了就没了（重装扩展、丢 workspace 状态）。把它们放在一个名字叫 build、且文档写着"可整份删"的根下，等于让那句话只对一半内容成立——`rm -rf .build` 是这个仓库里很自然的手势。XDG 的分类轴（config / data / state / cache）恰好就是这条判据。
+- **为什么是这三个变量**：扩展是**装好的文件**（data，类比 `/usr/share`）；`workspaceStorage`/`globalStorage`/logs 是**重启后要留、但不是数据的状态**（state，类比 `/var/lib`）；用户数据目录是**配置**——VS Code 自己在 Linux 上就是这么放的（`$XDG_CONFIG_HOME/Code`）。
+- **与主干一致**：DSH 的运行期状态也在家目录（`~/.dsh`，45M），不在任何 checkout 里；prac 的机器级缓存此前已经按同一条理由推出了仓库（见下）。
+- **`--user-data-dir` 实测是空的**（2026-09-17，`find` 过一遍）：服务端把用户状态写进 `--server-data-dir`。仍然传它，是为了任何一条上游路径都不至于回退到 `~/.vscode-server-oss`。
+
+**没有卫星目录**：独立查看页不落盘（`vscode:serve` 直接把 `/` 映到 `scripts/page.html`、`/out/*` 映到 checkout 里的 bundle），所以 checkout 之外只剩 XDG 下的运行期状态。
 
 **工具缓存不在仓库里，构建的缓存也不在**——它们是机器级的，写进仓库配置无法共享（James 2026-09-16 裁决）：
 
@@ -156,21 +167,23 @@ vp run --filter prac-vscode vscode:clean-all
 
 三条规则：
 
-1. **谁写哪里**：构建脚本只写 `vscode/`；服务只写 `run/`；开发工具（截图、备份）只写 `scratch/`；**工具缓存写各自的默认位置，不进仓库**。
-2. **构建期与运行期不互相引用**：`run/` 里不放构建产物，`vscode/` 里不放运行状态（所以 code server 的数据目录是 `.build/run/code-server`，不在构建目录里）。
-3. **脚本从环境变量派生路径**，不各自拼：`PRAC_VSCODE_DIR`（默认 `.build/vscode`）、`PRAC_RUN_DIR`（默认 `.build/run`）。仓库根只放源码。
+1. **谁写哪里**：构建脚本只写 `.build/vscode/`；开发工具（截图、备份）只写 `.build/scratch/`；**服务写 XDG 目录，不写仓库**；**工具缓存写各自的默认位置，也不进仓库**。
+2. **构建期与运行期不互相引用**：XDG 里不放构建产物，`.build/` 里不放运行状态。
+3. **脚本从环境变量派生路径**，不各自拼：`PRAC_VSCODE_DIR`（默认 `.build/vscode`）；服务路径从 `XDG_DATA_HOME` / `XDG_STATE_HOME` / `XDG_CONFIG_HOME` 派生（未设时用规范默认值），需要指到别处就设那几个变量，闸门要单个覆盖用 `EXTENSIONS_DIR`。仓库根只放源码。
 
 ## 扩展基座（`--target server`）
 
 除 web bundle 外，构建还产出 **标准 `server` 目标**（`out-vscode-reh/`），浏览器连的就是它（WebSocket management + 扩展宿主），也是"哪些扩展算可安装"的判据来源。
 
 - **产物是扁平的**：`out-vscode-reh/` 直接放 `server-main.js` 等（没有 `product.json`/`package.json`/`out/`），运行时按 `<checkout>` 解析 `node_modules` 与 `product.json`。
-- **跑法**（cwd = checkout；数据目录指到运行期根）：
+- **跑法**（cwd = checkout；状态目录按上面的 XDG 表派生）：
   ```bash
   cd .build/vscode
-  R=<repo>/.build/run/code-server
+  D=${XDG_DATA_HOME:-$HOME/.local/share}; S=${XDG_STATE_HOME:-$HOME/.local/state}
+  C=${XDG_CONFIG_HOME:-$HOME/.config}
   node out-vscode-reh/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token \
-    --server-data-dir $R/data --extensions-dir $R/extensions --user-data-dir $R/user <folder>
+    --server-data-dir $S/prac/code-server --extensions-dir $D/prac/code-server/extensions \
+    --user-data-dir $C/prac/code-server <folder>
   ```
 - **`product.json` 要盖章的是 checkout 根那份**（扁平产物自己那份不存在），否则服务端算 `oss-dev` 而客户端按 build 注入的 commit 要 `/oss-<commit>`。`build.mjs` 的盖章目标是 `.` 与 `out-vscode-reh` 两处（`.build/vscode/README.md` 的 `stampServerCommit()`）。
 - **装扩展**：`server-cli --install-extension` 被守卫挡住（`server.cli.ts:94` 要求 `VSCODE_IPC_HOOK_CLI` 或 `VSCODE_CLIENT_COMMAND`，即"在 VS Code 终端里"）。手工装即可：VSIX 是 zip，解包后把 `extension/` 移成 `<extensions-dir>/<publisher>.<name>-<version>/`，删掉 `extensions.json`，重启服务端。

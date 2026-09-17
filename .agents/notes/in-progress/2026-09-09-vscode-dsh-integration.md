@@ -58,7 +58,7 @@ DSH web 页
 ## 4. 决定
 
 > **编号 = 引用句柄**（对话与其它 note 直接引"决定 14"），所以**只追加、不复用、不重排**；下面的主题导航只做索引。
-> **主题导航**：与上游/补丁 `3 4 5 6` ｜ 边界与分层 `1 2 2b 7 8 9 10` ｜ 区域与布局 `14 15 16 20` ｜ 编辑器与文件 `17` ｜ 工作区与状态 `13` ｜ 生态与能力 `18 19` ｜ 工程 `11 12`
+> **主题导航**：与上游/补丁 `3 4 5 6` ｜ 边界与分层 `1 2 2b 7 8 9 10` ｜ 区域与布局 `14 15 16 20` ｜ 编辑器与文件 `17` ｜ 工作区与状态 `13` ｜ 生态与能力 `18 19` ｜ 工程 `11 12 23`
 > **当前队列（建议顺序，未裁）**：~~`14`~~、~~**B1**~~、~~`18`~~（均已完成，见 §5）→ frame 批次 `15 16 17 20` → 能力面（含上下文入）
 
 | # | 决定 | 状态 |
@@ -87,6 +87,7 @@ DSH web 页
 
 | 21 | **机制断言用单测（`vp test`），活体门冻结在集成层**：`vp test` = vite-plus **内置的 vitest 4.1.10**（零新依赖，`vite-plus` 的依赖里就有）；单测覆盖纯函数与纯算术（区域树重写、`resolveSizes` 的分配、`isPresent`/`isStacked`、折叠与 `cachedSize`、`sideGeometry`/`splitRegionWith` 的子序、`sashSizes` 的两端 clamp、编排的"只填空缺"、持久化往返）；活体门**只留真页面能证明的事实**（产物过真 loader、VS Code 部件挂进/搬出 prac 区域并画出像素、扩展激活）；**新增机制断言只进单测**，要加活体门必须先写清"单测证明不了它" | **James 裁决 2026-09-15**（原话：*一直增加 verify 不是好思路，我们应该利用 test*）。判据：现在 ~130 条活体断言里大半是"在浏览器里给纯函数做算术题"——`sash 上界` 那类 bug 单测 5 行就能抓，而当时的门 23 项全绿。**代价（必须记住）**：单测看不见"模型对了、渲染器没跟上"的假绿（载荷漏 `mountViewInto` 那次全员绿）⇒ **每个能力在活体层至少保留一条渲染断言**，几何类多条并成**一条漂移检查**（`resolveSizes` 是 flexbox 的算术镜像，镜像要有人在真 CSS 上对一次） |
 | 22 | **架构总纲：prac 是 CS/BS 两端结构 —— 以 DSH 为主干，VS Code 以插件方式集成**。① 看架构**先分 client / server 两端**（不是先分 DSH / VS Code：两个系统各自又都跨在线上）；② **主干是 DSH**，组合、状态、进程与生命周期都归它；**DSH 的扩展方式就是插件**（Cordis 插件树 + 动态包，同一地址空间、in-process 的 `inject`）——**“扩展宿主”只是 VS Code 架构里的概念，不能带到 DSH 上**（2026-09-16 三次更正，见下）；③ **VS Code 是主干上的一个插件**，两端各一半（server 半边拥有它的进程与能力，client 半边把 UI 贡献进 frame），**不是"被嵌进来的第三方 app 加一层接缝"**——bridge / part host / `prac-vscode-embed` 是**这个插件的内部实现**，不是两个对等系统之间的外交协定 | **James 裁决 2026-09-16**。原话：*不要以当前的代码实现为权威，听我说的，我是在纠正你积累的架构设计上的错误*。**它纠正的是设计，不是实现细节**——我此前把实现现状当成了设计权威（典型：我上一条用"VS Code 的词不能借"去否掉"DSH 有扩展宿主"，方向反了；实现只证明设计有没有落地，没有资格裁决设计）。**要收束的偏差**（已写进 `docs/architecture.md` §5）：① code server 的生命周期归主干（现在端口写死、无人启动，我此前还把它做成 A/B/C 选项——按设计**不存在选择**）；② 组装与权威在 server，页面是渲染目标（"页面是唯一的组装点"是我把实现现象写成了原则）；③ **集成单位没有被命名**（把 lib 与插件层混成了一层：lib 那一半是对的，缺的是“基于 lib 构建的 DSH 插件”这一层明确承担政策与集成）；④ 一个主干（现在两个服务端、双权威）。**2026-09-16 James 补充：三层各归其位** —— `vendor/vscode` = **引入的 VS Code 源码树 + 我们的 patch**；`vendor/vscode-embed` = 在它之上封装的 **lib**，**可利用、不绑定 prac**；**我们基于这个 lib 构建 DSH 插件**，把 VS Code 的能力与生态集成/带入 prac。⇒ 我此前把 lib 与插件层混为一谈（写成"接缝 = 插件内部实现"）**也错了**：lib 只给机制、不背政策，政策全在插件层（谁放哪 / 何时启动 / 哪个 view 用哪个 part / 能力怎么给 agent / code server 的生命周期）。**已澄清（James 2026-09-16）：没有 `vendor/vscode-lib` 这个包，那个 lib 就是 `vendor/vscode-embed`**——不改名。**2026-09-16 James 再纠一条**：*prac 中不只有基于 vscode 构建的一组插件，vscode 只是其中很重要的一部分* ⇒ **VS Code 集成族不是 prac 的主干内容**，它只是 prac 的一族插件；prac 自己还有 frame / 编排 / 角色 / 注意力 / 持久化，**尤其还有尚未落地的 agent 面（六件事）**，外加从 DSH 直接继承的能力族（`dsh-tools` / `dsh-skill*` / `dsh-goal` / `dsh-plan-mode` / `dsh-subagent*` / `dsh-workflow-worker-thread`，见 `packages/bundle/base/cordis.patch.yml`）。**教训**：我把"当前界面工作"误当成了"prac 的全部"，这是本文档与多轮讨论里反复出现的同一个错—— **2026-09-16 James 三条设计更正（同一决定内）**：① **不是“一个插件”**——*我们是基于 vendor/vscode-embed 开发**一组**插件*；② **VS Code 本身按 prac 的两端切成两半**：**code server = server 侧的 remote，提供 IDE 的基础功能**，**web = client 侧，提供 UI 组件**；③ **前后端通信层需要基于 DSH 的架构重新设计实现**——即**不能**把 VS Code 自己的传输（管理/扩展宿主 WS + HTTP 资源）从浏览器透传到 code server。⇒ 我的“透传代理 + 整包 workbench 嵌入”是**实现占位**，不是设计：浏览器现在绕过 DSH 直接跟 code server 讲 VS Code 的协议，而“UI 组件”这个单位完全没落地（client 侧嵌的是整个 workbench app，能力面也长在 client）。**这是尚未开始的设计工作，不是待修的 bug** |
+| 23 | **机器状态按 XDG 分类：构建期与一次性的在仓库内（`.build/`），运行期状态在仓库外**。装好的扩展 → `$XDG_DATA_HOME/prac/code-server/extensions`；服务端状态（`workspaceStorage`/`globalStorage`/`History`/logs/`Machine`/`CachedProfilesData`）→ `$XDG_STATE_HOME/prac/code-server`；用户数据目录 → `$XDG_CONFIG_HOME/prac/code-server`（实测为空，留着是为了永不回退到 `~/.vscode-server-oss`）；缓存用系统默认 | **James 裁决 2026-09-17**（我问 `.build/run` 是否不合适，他答"应该遵循 XDG"）。依据：① 判据是"删掉它要付什么代价"——`.build/vscode` 是派生的、`scratch` 是一次性的，而那 9.5M（装好的扩展 + 各 `workspaceStorage`）删了就没了；把两者放进一个文档写着"可整份删"的根里，等于让那句话只对一半内容成立；② 与主干一致：DSH 的运行期状态也在家目录（`~/.dsh`，45M），不在任何 checkout 里；③ 分类有出处：扩展是**装好的文件**（data）、`workspaceStorage`/logs 是**重启后要留的状态**（state）、用户数据目录是**配置**——VS Code 自己在 Linux 上就把 `--user-data-dir` 放在 `$XDG_CONFIG_HOME`。**代价**：状态不再"看一眼就在仓库里"；闸门与启动命令都得从 `XDG_*` 派生（`verify-extension.mjs` 已改，`PRAC_RUN_DIR` 删除，`EXTENSIONS_DIR` 留作单点覆盖） |
 
 ### 被否决 / 已撤回的路线（"放弃了什么"）
 
@@ -209,7 +210,7 @@ DSH web 页
 
 ### Server（自建 code server）
 
-- 服务端产物在 `out-vscode-reh`（标准 `server` 目标，**不是** web bundle 也不是 `out-vscode-reh-web`）：`node out-vscode-reh/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token --server-data-dir … --extensions-dir … --user-data-dir … <folder>`；数据目录按目录规范放在 `.build/run/code-server/{data,extensions,user}`（不重定向会写 `~/.vscode-server-oss`）。2026-09-16 起构建与运行期的目录规范见 `vendor/vscode/README.md`·"目录规范"（`.build/{vscode,run,cache,scratch}`）。
+- 服务端产物在 `out-vscode-reh`（标准 `server` 目标，**不是** web bundle 也不是 `out-vscode-reh-web`）：`node out-vscode-reh/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token --server-data-dir … --extensions-dir … --user-data-dir … <folder>`；状态目录**跟随 XDG**（`$XDG_{STATE,DATA,CONFIG}_HOME/prac/code-server`，不重定向会写 `~/.vscode-server-oss`）——2026-09-17 之前它在 `.build/run/code-server/{data,extensions,user}`，那让"`.build` 可整份删"只对一半内容成立（决定 23）。三份规范与实测见 `vendor/vscode/README.md`·"目录规范"。
 - **`product.json` 必须盖章**（commit = checkout 的 HEAD），否则两侧 segment 不一致（见踩坑 §7.A）。
 - distro 布局必须 `<root>/{product.json, package.json, out/}` 且 `<root>` 在 checkout 内（否则报 `Cannot find package 'cookie'`）；`--out` 必须是**相对路径**。
 - `server-cli --install-extension` 被环境守卫挡住（"only available in WSL or inside a VS Code terminal"）。
@@ -241,12 +242,14 @@ DSH web 页
 
 原则：**机器相关的路径放环境，仓库配置只管组合**；**prac 仓内一律用 `vp`**。
 
-- **code server**（cwd = checkout；数据在运行期根）：
+- **code server**（cwd = checkout；状态目录按 XDG 派生，见 `vendor/vscode/README.md`·目录规范）：
   ```bash
   cd .build/vscode
-  R=<repo>/.build/run/code-server
+  D=${XDG_DATA_HOME:-$HOME/.local/share}; S=${XDG_STATE_HOME:-$HOME/.local/state}
+  C=${XDG_CONFIG_HOME:-$HOME/.config}
   node out-vscode-reh/server-main.js --port 3091 --host 127.0.0.1 --without-connection-token \
-    --server-data-dir $R/data --extensions-dir $R/extensions --user-data-dir $R/user <folder>
+    --server-data-dir $S/prac/code-server --extensions-dir $D/prac/code-server/extensions \
+    --user-data-dir $C/prac/code-server <folder>
   ```
 - **DSH（profile `prac-dev`）**：`cd ../deepseek-harness/dsh-master && pnpm_config_store_dir=/Volumes/Dev/.pnpm-store pnpm dsh --profile prac-dev --port 3084 --no-open`
   - 这里**仍用 `pnpm`**：DSH 仓自己的 `packageManager` 是 `pnpm@11.7.0`，而 `vp` 在那个仓里初始化缓存被文件沙箱拒（`Failed to initialize cache: EPERM`，仓库在工作区外）。prac 仓内不用 `pnpm`。

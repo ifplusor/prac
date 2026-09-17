@@ -1,7 +1,7 @@
-# Machine state: build (vscode/), run-time (run/), caches (cache/), scratch.
-# Everything the build and the services write lives under this one root, so the
-# repository root stays source-only and the whole thing is disposable by design
-# (see vendor/vscode/README.md, 目录规范).
+# Machine state, build-time only: the vendored VS Code checkout (vscode/) and
+# one-off developer outputs (scratch/). Both can be regenerated, so this root is
+# disposable by design. Run-time state is NOT here -- it follows XDG and lives
+# outside the repository (see vendor/vscode/README.md, 目录规范).
 .build/
 
 # Dependencies
