@@ -8,7 +8,7 @@
  * and patched with `patches/*.patch` — that patch set is prac's only change to
  * it. The build then produces two bundles: the web workbench (`out-vscode-web`)
  * and the code server (`out-vscode-reh`). The independent viewing page is not
- * staged — `scripts/serve.mjs` serves `overlay/page.html` and the bundle itself.
+ * staged — `scripts/serve.mjs` serves `scripts/page.html` and the bundle itself.
  *
  * Steps:
  *   1. ensure the upstream checkout at the pinned tag

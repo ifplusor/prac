@@ -72,7 +72,7 @@ grep -rnE 'vs:|Vs[A-Z]|prac-vs-proxy|data-prac-vs' packages | grep -v vscode    
 grep -rn 'prac\|Prac\|PRAC\|DSH' vendor/vscode/overlay/bridge.ts vendor/vscode/overlay/embeddedWorkbench.ts vendor/vscode/overlay/embeddedWebMain.ts vendor/vscode/patches      # ⇒ 0
 ```
 
-（`overlay/page.html` 仍叫 `prac-shell` / `__pracVscode`：它是 `prac-vscode` 自己的**独立查看页**，不写进 checkout。）
+（`scripts/page.html` 仍叫 `prac-shell` / `__pracVscode`：它是 `prac-vscode` 自己的**独立查看页**，不写进 checkout。）
 
 ## 2026-09-15：wrapper lib 抽出（执行完成）
 

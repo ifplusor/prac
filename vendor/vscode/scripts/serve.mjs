@@ -2,7 +2,7 @@
  * Static server for the independent viewing page.
  *
  * Two routes, no staging on disk: `/` is our own shell
- * (`overlay/page.html`) and `/out/*` is the built web bundle inside the
+ * (`scripts/page.html`, next to this server) and `/out/*` is the web bundle inside the
  * checkout. The shell refers to its assets relatively (`./out/…`), so those
  * two mappings are all it needs — nothing has to be copied or symlinked, which
  * is why the old `stage/` directory is gone.
@@ -18,7 +18,7 @@ import { extname, join, normalize, resolve } from "node:path";
 const packageDir = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageDir, "../..");
 const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
-const PAGE = join(packageDir, "overlay/page.html");
+const PAGE = join(packageDir, "scripts/page.html");
 const BUNDLE = join(workDir, "out-vscode-web");
 const PORT = Number(process.env.PORT ?? 5199);
 

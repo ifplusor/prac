@@ -25,7 +25,8 @@ prac **拥有**的 VS Code——以 **pin + patch + 构建配方**的形式，�
 | `overlay/gallery.ts`           | `<checkout>/src/vs/workbench/browser/gallery.ts` —— 扩展市场的单一数据源（bridge 从 `./gallery.js` 再导出，**必须一起 stage**） |
 | `overlay/embeddedWorkbench.ts` | `<checkout>/src/vs/workbench/browser/embeddedWorkbench.ts` —— 组合载荷：以外部 host 为布局服务                                  |
 | `overlay/embeddedWebMain.ts`   | `<checkout>/src/vs/workbench/browser/embeddedWebMain.ts` —— 覆写 `createWorkbench` 的入口                                       |
-| `overlay/page.html`            | **不落盘**：`vscode:serve` 的 `/` 路由直接服务它（`/out/*` 映到 checkout 里的 web bundle）                                      |
+
+（`scripts/page.html` **不在这里**：它不落盘，由 `vscode:serve` 就地服务，见改动日志 6。）
 
 包的入口直接指向契约，所以其它包**直接 import**，不必知道 staging 细节：
 
@@ -58,7 +59,7 @@ import { EMBED_BRIDGE } from "prac-vscode";
    - `overlay/embeddedWorkbench.ts`（790 行）：`EmbeddedWorkbench implements IWorkbenchLayoutService`，把每个 part 挂进 `[data-vscode-embed-part-host="<part id>"]` **外部 host**，`layout()` 按 host 尺寸驱动（zen / centered / floating / 多窗口暂 stub）；服务图恢复后把面（`mountPartInto` / `movePartInto`（part 是单实例，只能**搬**不能重建）、`openUntitled`、`openWorkspaceFolder`（页侧构造不出 `vscode.openFolder` 要求的 `URI` 实例，故由 hold 着 `URI` 的 workbench 侧代调，且**不带**窗口选项——`forceReuseWindow` 会走 embedder 那个只会导航的 `workspaceProvider.open()`））**交回 embedder**。
    - `overlay/embeddedWebMain.ts`（44 行）：`EmbeddedBrowserMain extends BrowserMain`，覆写 `createWorkbench`。
    - `overlay/bridge.ts`：桥接契约（下面是单独一段）。
-   - 这三份由 `build.mjs` 的 `stageOverlay()` 拷进 checkout 的上游路径；`overlay/page.html` 拷进产物树。
+   - 这四份（`bridge.ts` / `gallery.ts` / `embeddedWorkbench.ts` / `embeddedWebMain.ts`）由 `build.mjs` 的 `stageOverlay()` 拷进 checkout 的上游路径。`scripts/page.html` **不在其中**：它不落盘，由 `vscode:serve` 就地服务。
    - **为什么载荷不进补丁**：补丁应当是 _delta_。载荷是我们**自己的完整文件**（959 行，含契约），放进补丁会让"我们对上游做了什么"淹没在自己的代码里；作为真文件它还能被 review / grep / fmt（类型检查除外，见下）。
    - **它不被我们的类型检查覆盖**：这两个文件按上游树的位置写相对导入（`../../base/common/…`），只有在上游 checkout 里才成立。`vendor/vscode/.eslintignore` 因此排除它们（`vp check` 的检查集），`tsconfig.json` 的 `include` 也只收 `overlay/bridge.ts`。要真正检查它们，得在 checkout 里跑上游自己的 tsc（分钟级，未做）。
 3. **桥接契约由构建放置，不进补丁**：`vendor/vscode/overlay/bridge.ts` 是 prac ↔ workbench 交互面的**单一定义**（options 字段名 `vscodeEmbed`、`deferParts`、面的类型、`readEmbedBridge()` 校验器）。`build.mjs` 把它拷成 `<checkout>/src/vs/workbench/browser/embedBridge.ts`，两侧编译同一份文件（client 半边直接 `import ... from "prac-vscode"`，拿到的是同一份原件），所以字段名只拼写一次。
@@ -69,9 +70,11 @@ import { EMBED_BRIDGE } from "prac-vscode";
    - 根依赖 `npm install --ignore-scripts`：node-gyp native、playwright 浏览器下载、copilot 扩展 postinstall 这些消费环境跑不通的步骤对 web bundle **都不需要**，跳过它们还让构建只写仓库内（缓存重定向到 `.build/vscode/cache`）。`build/` 子包（自带 lockfile）单独装，因为 esbuild 需要它的 postinstall 校验平台二进制。
    - 补 `codicon.ttf`：web bundle 引用它，而它正常由上游 `copy-codicons` 任务产出（我们跳过脚本）。
    - `stageOverlay()`：见第 2 条（在 reset/apply 之后执行）。
-   - **独立查看页不落盘**（2026-09-16 起）：`vscode:serve` 的 `/` 映到 `overlay/page.html`、`/out/*` 映到 checkout 的 bundle；旧的 `stage/` 目录与那个指向 checkout 的绝对符号链接已删。
+   - **独立查看页不落盘**（2026-09-16 起）：`vscode:serve` 的 `/` 映到 `scripts/page.html`、`/out/*` 映到 checkout 的 bundle；旧的 `stage/` 目录与那个指向 checkout 的绝对符号链接已删。
    - `stampServerCommit()`：把 checkout 的 commit 写进**盖章目标**（`.` 与 `out-vscode-reh` 两处；扁平 server 产物自己那份 `product.json` 不存在）。客户端与服务端各自读一份 `product.json` 来算 `getServerProductSegment()`，不盖章时服务端算 `oss-dev`、客户端要 `/oss-<commit>`，表现为「编辑器打不开文件」而不是路径不匹配。
-6. **`overlay/page.html`** 是 prac 的壳：`create(document.body, ...)` + 每个 part 一个外部 host（**不传 bridge**，所以它走的就是"workbench 自己挂 part"的默认路径；`vscode:smoke` 盯的就是这条路）。
+6. **`scripts/page.html`** 是**测试件**（产品里零引用：`packages/` 与 `vendor/vscode-embed/` 都不碰它）。它 `create(document.body, ...)` + 给每个 part 一个外部 host，且**不传 bridge**。
+
+   **它守的不是"上游 pristine 路径"**——补丁把 `create()` 换成了 `EmbeddedBrowserMain`，所以两条路都走我们的 `EmbeddedWorkbench`；它守的是**我们 composition 的"无 embedder 策略"分支**：没有 bridge 时，8 个 part 是否仍然挂进页面自己声明的 `[data-vscode-embed-part-host]` host 并画出像素。`vscode:smoke` 盯的就是它，`vscode:serve` 只是给人肉查看这条分支用。若哪天砍掉这条分支（"没有 embedder 时的回退形态"），这个夹具与那条 smoke 应当一起删。
 
 ## 用法
 
@@ -118,7 +121,7 @@ vp run --filter prac-vscode vscode:clean
     shots/  notes-backup/
 ```
 
-**没有卫星目录**：构建缓存用机器默认位置（见下），独立查看页不落盘（`vscode:serve` 直接把 `/` 映到 `overlay/page.html`、`/out/*` 映到 checkout 里的 bundle），所以 checkout 之外只剩运行期状态与一次性产物。
+**没有卫星目录**：构建缓存用机器默认位置（见下），独立查看页不落盘（`vscode:serve` 直接把 `/` 映到 `scripts/page.html`、`/out/*` 映到 checkout 里的 bundle），所以 checkout 之外只剩运行期状态与一次性产物。
 
 **工具缓存不在仓库里，构建的缓存也不在**——它们是机器级的，写进仓库配置无法共享（James 2026-09-16 裁决）：
 
@@ -175,7 +178,7 @@ URL='…' node scripts/verify-extension.mjs                               # 5 �
 
 数目是**决定 21 删减后**的（机制断言搬进了各包的 `*.spec.ts`，用 `vp test` 跑）；vendor 门只留真页面能证明的事实。
 
-**独立页（无 bridge 的默认路径）另有一条**：`vscode:serve`（默认 `:5199`）跑着时 `vscode:smoke` 断言 8 个 part 全部挂载且编辑器有内容，`errorCount: 0`。
+**无 bridge 分支另有一条**：`vscode:smoke`（对着 `scripts/page.html`，默认 `:5199`，需 `vscode:serve` 在跑）断言 8 个 part 全部挂载且编辑器有内容、`errorCount: 0`——守的是“没有 embedder 策略时我们的 composition 仍能独立起来”。
 
 - `verify-layout`：区域树分栏、sash 拖拽（两个轴）、收起/展开恢复缓存尺寸，且**当前文件 view** 全程在画并落在编排要求的位置（`stage`）。
 - `verify-views`：调出面（recall surface）按快捷键打开、列出实时 view 目录、隐藏/调出/移区/分栏都在像素上生效。

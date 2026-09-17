@@ -352,7 +352,7 @@ export interface EmbedBridge {
    * `true` (an embedder that renders its own part hosts): the workbench mounts
    * nothing on its own and publishes {@link PartHostFace} through
    * {@link EmbedBridge.publish}. `false`/absent (a page that wants the workbench
-   * composed by its own containers, e.g. `vendor/vscode/overlay/page.html`): the
+   * composed by its own containers, e.g. `vendor/vscode/scripts/page.html`): the
    * workbench mounts each part into the document host carrying
    * {@link PART_HOST_ATTR} for its part id, or into its own container when there
    * is none.
