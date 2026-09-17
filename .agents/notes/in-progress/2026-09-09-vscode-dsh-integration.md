@@ -93,6 +93,7 @@ status: in-progress
 - **profile `prac-dev`**：三 bundle；prac 的包以 `link:` 挂。
 - **断言分层**：机制断言进单测（`vp test`，vite-plus 内置的 vitest），**活体门只留真页面能证明的事实**；新增机制断言只进单测，要加活体门必须先写清"单测证明不了它"。
   - 代价（必须记住）：单测看不见"模型对了、渲染器没跟上"⇒ 每个能力在活体层**至少留一条渲染断言**，几何类多条并成一条漂移检查。
+- **进度提交**：feature 分支 + `wip:` 提交（检查点打 tag）；**提交 ≠ 成果已定**，靠人判断的内容仍要人先看。
 - **机器状态**：构建期与一次性的在仓库内（`.build/`，可整份删），**运行期状态跟随 XDG、在仓库外**（`$XDG_{DATA,STATE,CONFIG}_HOME/prac/code-server`）；工具缓存用系统默认。
 
 ### 3.9 已否决 / 已撤回的路线（"放弃了什么"）
@@ -120,12 +121,12 @@ status: in-progress
 
 ## 4. 开放问题
 
-> 2026-09-15 的一轮问答把原先散着的一批收敛了：**已成决定的进 §3**，这里只留**真的还没定**的。
-> **下一步顺序（建议，未裁）**：frame 批次剩下的（`stage` 的 tab、持久化的 per-workspace 那半）→ 能力面（含上下文入）→ §3.1 那几处与目标架构的偏差。
+> 只列**还没定**的：要什么、有哪些选项、代价是什么。已成决定的在 §3；编年、当时的数字、"怎么收敛到现在的"在工作记录。
+> **下一步顺序（建议，未裁）**：frame 批次剩下的（`stage` 的 tab、持久化的 per-workspace 那半）→ 能力面（含上下文入）→ 与目标架构的那几处差距。
 
 ### 与目标架构的差距（待收束）
 
-> 2026-09-16：`docs/architecture.md` 改成**面向目标的设计**（James：*不建议再引用实现现状，我们是面向目标的架构设计*），"实现 vs 目标"的对照归这里（决定的出处见 §3.1）。
+> 对照 [docs/architecture.md](../../../docs/architecture.md)（**面向目标**的设计）：这段距离就是待设计的工作（出处见 §3.1）。
 
 | #   | 目标                                                                       | 现状                                                                                                           |
 | --- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -138,28 +139,25 @@ status: in-progress
 
 ### 需要 James 裁
 
-1. **理想形态是否确认**：`kernel / views / capabilities` 三层与"view 是单位"（§3.2 已定，三层形态待确认）——方案与代价见 09-15 note。
-2. **两套 server 统一**的路线：先"共存 + 共享 workspace"，还是直接"DSH 跑进 code server"（§3.7 只定了先换基座，已完成）。
-3. **阶段二**（决策空间 / 以审决策为主界面）：**还不确定**——保持 `proposed`，不表态；C2 叫停的理由也仍待确认。
-4. **高级形态（container / part）什么时候真的需要**：逐个 view 组合 vs"把整块 sidebar 原样搬来"。
+1. **理想形态是否确认**：`kernel / views / capabilities` 三层，以及"view 是单位"之上的服务形态（§3.2 只定了单位）——方案与代价见 09-15 note。
+2. **两套 server 统一**的路线：先"共存 + 共享 workspace"，还是直接"DSH 跑进 code server"（§3.7 只定了先换基座）。
+3. **阶段二**（决策空间 / 以审决策为主界面）：保持 `proposed`，不表态；当时叫停的理由也仍待确认。
+4. **高级形态（container / part）什么时候真的需要**：逐个 view 组合，还是"把整块 sidebar 原样搬来"。
 5. **异步通道**：已定"先不做"，**形态未裁**（选项：最小标记 + 双向服务 / 完整异步线程 / 复用 chat 的留言模式）。
 
-### 已排期、尚未做
+### 已定方向、尚未做
 
-6. **能力面（capabilities）**（含上下文入）：B1 已完成（工作记录·里程碑），它是 09-15 note 里紧随其后的那块——agent 读数/动作的 settled + provenance + 分页语义见该 note。
-7. **frame 批次（进行中）**：区域形态（§3.5）已完成——堆叠 `verify:stack` 10/10、底栏 `verify:bottom` 11/11、任意方向分栏 `verify:split` 25/25（上下左右、可嵌套、竖 sash 可拖、形状持久，且**任何方向都不造空 region**）；持久化（§3.6）的 per-window 那半已完成（`verify:persistence` 16/16），**per-workspace 那半未做**——门全在 prac 侧 `tests/gates/`。**还差** `stage` 的 tab（§3.5 的 frame 级标签页，需要 VS Code 侧的 `editor(file)`）。堆叠与底栏目前**没有**：拖拽排序、view 间 sash 调尺寸（靠 flex 均分）、底栏的开合入口（现在靠 `setCollapsed`，还没有 UI 按钮/快捷键）——记在案。
-8. **扩展视图的"数据"**：`mountViewInto` 能让扩展贡献的视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——`ViewPane.setVisible(true)` 不够，树数据要等视图基础设施/容器把裸 pane 认成"可见的视图"。两条候选路：把视图登记进 `IViewsService` 的可见性/容器模型，或改走"container 作为高级形态"（§3.2 / §3.5 已允许）。
-9. **扩展安装的正当路径**：等 §3.7 的 terminal（VS Code terminal 提供 `VSCODE_IPC_HOOK_CLI`）落地后，用 `server-cli --install-extension` 正规安装并重跑第六门；在那之前不装用户扩展。
-10. **sidebar / panel / statusbar 的映射**：目前只落了 sidebar + 对话 + 编辑器 + 环境条/调出面；以及补 stub 掉的 layout 语义（显隐 / zen / centered / floating / 多窗口）。
+6. **能力面（capabilities）**（含上下文入）：方向上已定（view 为单位、能力面要暴露给 agent），但**目前没有任何实体**——能力清单与 settled / provenance / 分页语义见 09-15 note。
+7. **frame 批次**：还差 `stage` 的 tab（§3.5 的 frame 级标签页，需要 VS Code 侧的 `editor(file)`）；持久化（§3.6）的 **per-workspace 那半**未做。堆叠与底栏还缺：拖拽排序、view 间 sash 调尺寸、底栏的开合入口（现在只有 `setCollapsed`）。
+8. **扩展视图的"数据"**：`mountViewInto` 能让扩展贡献的视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——`ViewPane.setVisible(true)` 不够。两条候选路：把视图登记进 `IViewsService` 的可见性/容器模型，或改走"container 作为高级形态"（§3.2 / §3.5 已允许）。
+9. **扩展安装的正当路径**：等 §3.7 的 terminal 落地（它提供 `VSCODE_IPC_HOOK_CLI`）后，用 `server-cli --install-extension` 正规安装；在那之前不装用户扩展。
+10. **sidebar / panel / statusbar 的映射**：目前只落了 sidebar + 对话 + 编辑器 + 环境条 / 调出面；还欠被 stub 掉的 layout 语义（显隐 / zen / centered / floating / 多窗口）。
 
 ### 仍然开放（工程与生态）
 
-11. **Step B 第二部分**：view id 仍是 **6 处**字面量、`/prac-vscode` 仍是 Node/浏览器**两处**；**共享常量模块的落点与依赖方向仍未定**（"契约写多遍"的根因）。
-12. **内建扩展编译**：`npm run build-fast-extensions` 被 `extensions/ipynb` 的 typecheck 挡住（现 **12/106**）。§3.7 的验收已用**市场扩展**（GitLens）走通，所以它不再是"生态是否可用"的前提；但它仍挡着**内建**扩展（git / search / emmet 等）在服务端可用。
-13. **agent 能力面**目前**没有任何实体**（排期见 6）；能力清单与 settled / provenance / 分页语义见 09-15 note。
-14. **两处 native / 可选缺口**（既有、非阻塞）：`@vscode/fs-copyfile` 抛 `Cannot find module '../build/Debug/vscode_fs.node'`（未捕获，宿主照样起）；`spdlog` 降级（server 目标上同样出现）；`vsda` 缺失；页面两个 404 是客户端可选模块（`@vscode/vscode-languagedetection`、`vscode-regexp-languagedetection`）。
-15. **机制正确的 checkout 覆盖开关**（重定向解析而非文件路径）：未做；`dsh-types --compare` 已覆盖"类型是否漂移"。
-16. **进度已提交（2026-09-15）**：分支 `feat/vscode-dsh-integration`，`wip:` 提交（含签名），tag `wip/vscode-dsh-2026-09-15`。**提交 ≠ 成果已定**——靠 James 判断的内容仍要审阅；后续进度按同样方式（feature 分支 + `wip`）提交。
+11. **契约写多遍**：view id 仍是 **6 处**字面量、`/prac-vscode` 仍是 Node/浏览器**两处**；**共享常量模块的落点与依赖方向未定**（Step B 第二部分）。`dsh-types --compare` 已覆盖"类型是否漂移"。
+12. **内建扩展**：挡在 `extensions/ipynb` 的 typecheck（`npm run build-fast-extensions`），所以 git / search / emmet 这些**内建**扩展在服务端还不可用——这不影响"生态是否可用"（市场扩展已走通）。
+13. **机制正确的 checkout 覆盖开关**（重定向解析，而不是文件路径）：未做。
 
 ## Related
 

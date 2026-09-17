@@ -108,7 +108,7 @@ prac 两侧随之变薄：`packages/host/vscode` = 路由 `/prac-vscode` + 端�
 ## 仍然开放
 
 - **Step B（第二部分）**：值类跨包契约**已改名但仍是重复字面量**——view id `vscode:editor`/`vscode:sidebar` 仍是 **6 处**拼写（两个座位、`vscode-host` 的 `PART_OF_VIEW`、编排、以及注释），`/prac-vscode` 路由仍是 Node/浏览器**两处**。方案：座位在自己的 host 半边导出 view id 常量（消费方构建期内联）；路由常量由 host 包通过一个**无 Node 依赖的子路径导出**给 client 半边（直接 import 主入口会把 `node:http` 拖进浏览器 bundle）。
-  - **这个方案里最大的空洞仍未填**：那个共享常量模块**放哪、依赖方向朝哪**（"浏览器侧边界包由 Node 侧 import" vs "独立的最小模块"）——umbrella 只定了"构建期内联"，没定落点。它是"契约写 6 遍 / 2 遍"的根因。
+  - **这个方案里最大的空洞仍未填**：那个共享常量模块**放哪、依赖方向朝哪**（"浏览器侧边界包由 Node 侧 import" vs "独立的最小模块"）——umbrella 只定了"构建期内联"，没定落点（未决项记在 umbrella §4 第 11 条）。它是"契约写 6 遍 / 2 遍"的根因。
 - **边界由哪些包构成**：本 note 前半写的是"两个 prac 包 + 一个上游本家"；2026-09-15 之后实际是 **`vendor/vscode` + `vendor/vscode-embed` + `packages/{host/vscode, client/vscode-host}`**（vendor 双子 + prac 两行）。以 umbrella §3 的图为准。
 - **类型重复**（曾记"两个座位各自手写我们的面"）：**已闭合**——Step B 第一部分发布了 `dist/client.d.mts`，两个座位改成从 `prac-client-vscode-host/client` 导入 `PracVscodeFace`。
 - **`node_modules` 里的 DSH 类型是 npm 精确 pin**，与 checkout 的一致性靠 `scripts/dsh-types.mjs --compare --checkout <path>`；机制正确的 checkout 覆盖开关（重定向解析而非文件路径）未做——只有真需要时才做。

@@ -67,6 +67,8 @@
 | 2026-09-16 | **两份"结构"入档**：① code server 的**协议清单**（HTTP 一个端口 / WS 按首消息分三型 / 子进程 node-fork IPC / 只在 VS Code 终端里存在的 CLI 管道 / 扩展面向的 DAP·LSP·worker postMessage）核实后写进本文件的"code server 的协议"；② `docs/architecture.md` **原地重写**为三段式系统参考（DSH 的架构 / VS Code 的架构 / prac 的整合）＋边界清单；旧的"六件事 → DSH 机制"映射搬到 `notes/proposed/2026-09-16-epistemic-six-on-dsh-mechanisms.md`（**James 裁决**：参考文档只写现在时，规划进 notes——它上次变陈旧正是因为计划混在参考里） | 两侧架构各由子代理在**上游 checkout 里逐条取证**（DSH 与 Code - OSS 各一份带 `路径:行` 的摘要）。核对时抓到我方文档**三处错**并已改：① 行的 `id` 与 `name` 的关系（**`name` 才是产物 id**，patch 用 `id` 定位）；② host→client 并非绝对单向（allowlist 里的 **waterfall** 事件是受限的应答通路）；③ `ctx.resources` 只在 client 半边存在。另抓到 `vendor/vscode/README.md` 的改动日志**自称穷尽却漏了一处**（`web.main.ts` 的 `configuration` 由 `private` 改 `protected` ⇒ 补丁实为**两个文件三处**）——已补齐。`pnpm check` 绿（4 条既有 warning） |
 
 
+> **进度入档（2026-09-15）**：分支 `feat/vscode-dsh-integration`，`wip:` 提交（含签名），检查点 tag `wip/vscode-dsh-2026-09-15`；后续进度按同样方式。提交 ≠ 成果已定。
+
 ## 当时的形态快照（2026-09-15）
 
 > 这是**当时**的快照，不是目标（目标见 `docs/architecture.md`）。
@@ -239,6 +241,14 @@ DSH web 页
 
 **载荷风险（改名后重算）**：改名前补丁 773 行里 **687 行是我们自己的新文件**（真改上游 ~27 行）、只以 diff 文本存在（`grep` 找不到代码、没有类型检查、构建只用 esbuild 转译、当时的每次构建 reset 会静默丢失）。**改名后这个形状已消除**：补丁 **74 行 delta-only**，我们自己的文件走 `overlay/`（真文件、可 grep、可 review、被 `vp check` 覆盖契约那一份）。2026-09-17 之前每次构建都 `git clean -fd` 把它们删掉再由 `cpSync` 重新放置；现在只有 pin 变化或 `vscode:clean` 会删，而 `stageOverlay()` 仍然每次构建都覆盖一遍——所以仓库里的 `overlay/` 始终是唯一那份。**仍有风险**：checkout 里的改动不再是"下次构建就丢"，而是"仓库里没有、只有那份工作树有"（drift 警告会提示，但不会替你修）。
 
+
+## 已知缺口（仍然存在，非阻塞）
+
+- **内建扩展编译**：`npm run build-fast-extensions` 被 `extensions/ipynb` 的 typecheck 挡住，现 **12/106** ⇒ git / search / emmet 这类**内建**扩展在服务端不可用。它**不是**"生态是否可用"的前提（市场扩展已走通）。
+- **原生 / 可选缺口**：`@vscode/fs-copyfile` 抛 `Cannot find module '../build/Debug/vscode_fs.node'`（未捕获，宿主照样起）；`spdlog` 降级；`vsda` 缺失；页面两个 404 是客户端可选模块（`@vscode/vscode-languagedetection`、`vscode-regexp-languagedetection`）。
+- **扩展贡献的 tree view 没有数据**：`mountViewInto` 能让它出 pane、标题与像素，但 body 是 `no data provider registered`——`ViewPane.setVisible(true)` 不够（待解的两条路见 note §4）。
+- **契约仍是字面量**：view id **6 处**、`/prac-vscode` 是 Node/浏览器**两处**；**共享常量模块的落点与依赖方向未定**（"契约写多遍"的根因，Step B 第二部分）。
+- 页面控制台一条稳定 `pageerror`：`[createInstance] CodeActionController depends on UNKNOWN service editorProgressService`（门仍全绿；未查明，见踩坑与根因）。
 
 ## 验证方法（元教训）
 
