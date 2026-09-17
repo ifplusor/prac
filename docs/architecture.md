@@ -208,7 +208,7 @@ server（Node）
 
 一个**通用多区域容器**，不认识任何具体视图：区域树 + 分割（任意方向，**以 view 为主语**，因此任何方向都造不出空区域）+ 堆叠 + 折叠（记尺寸）+ 常驻底栏 + 视图目录（`prac.view` 槽）+ 持久化。
 
-视图契约、树形摆放、收起记宽这类做法借鉴上游，frame 由 prac 拥有（决定 7）。
+视图契约、树形摆放、收起记宽这类做法借鉴上游，frame 由 prac 拥有（[umbrella note](../.agents/notes/in-progress/2026-09-09-vscode-dsh-integration.md) §3.3）。
 
 ### 6.2 编排与角色
 

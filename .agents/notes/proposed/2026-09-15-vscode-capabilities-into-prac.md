@@ -109,9 +109,9 @@ interface Capability<T, A> {
 
 | 能力 | 内容 | 为什么它第一个 |
 | --- | --- | --- |
-| `editors` | 打开的文件、active、**dirty**、**preview**；`actions.close(resource)` | 决定 17 的 tab 条**缺的就是这一半**（脏点 / 预览斜体 / ×），也是"用户正在看什么"的上下文来源；tab 的 × 走 `actions.close`，**不新增 face 方法** |
+| `editors` | 打开的文件、active、**dirty**、**preview**；`actions.close(resource)` | §3.5 的 tab 条**缺的就是这一半**（脏点 / 预览斜体 / ×），也是"用户正在看什么"的上下文来源；tab 的 × 走 `actions.close`，**不新增 face 方法** |
 | `diagnostics` | 按 URI 的 markers + `settled()` + version；**分页 + 摘要**（不把原始数组塞给模型） | 旗舰：IDE 知道而 agent 不知道的东西，且异步收敛语义最典型 |
-| `documents` | 当前文件内容 / 选区 / 版本 | 决定 12/13 已定"上下文入并入能力面"，这是它的载体 |
+| `documents` | 当前文件内容 / 选区 / 版本 | "上下文入并入能力面"已定（umbrella §4 第 6 条），这是它的载体 |
 | 之后 | `search` / `scm` / `tasks` / `symbols`+`references` / `terminal` | 每个都要单独定"数据结构 + 收敛判据 + 成本" |
 
 **三层落点（每层形状不同，别混）**
@@ -156,7 +156,7 @@ interface Capability<T, A> {
 
 **UI 消费者已接上（2026-09-15）**：机制侧加两个**通用**入口——`setViewFlags(viewId, { dirty, preview })`（view 的声明者推、frame 渲染：tab 上一个点、预览斜体；`flags` 进 `ViewRecord`，因此随布局持久化）与 `activeView()`（**中心区域的前景 view**，是个通用事实、不含任何 view 名）。座位（`prac-client-ui-vscode-editor`）订阅 `editors` 能力 + 布局，把两者对上：脏/预览推给机制；当 **prac 的前景 view 与 app 的 active editor 不一致**时调用 `actions.activate`（两个状态在座位这里汇合；守卫在 app 自己的回答上，两个订阅不会乒乓）。
 
-**门里被逼出来的第三条不变式**：**一个资源只有一个编辑面**这条（决定 17）在门自己身上兑现——旧的探针 host 挂的文件恰好也是 frame 会显示的文件，于是"释放探针挂载"把编辑器从 frame 的 view 里搬走了，而那个 view 一直挂着、没人重建它。修法是给两方**各自的文件**（探针一套、app 一套），并把这条不变式写进门的注释。活体判据（`verify-file` **26/26**）：打字后 **tab 出现脏点**、撤销后消失；**点 tab 之后 app 的 active editor 跟着换**（`activeAfterTabClick` === 被点的那条 tab）；隐藏 view 之后能力照样回答；`close` 之后编辑器与 view 一起消失。
+**门里被逼出来的第三条不变式**：**一个资源只有一个编辑面**这条（umbrella §3.5）在门自己身上兑现——旧的探针 host 挂的文件恰好也是 frame 会显示的文件，于是"释放探针挂载"把编辑器从 frame 的 view 里搬走了，而那个 view 一直挂着、没人重建它。修法是给两方**各自的文件**（探针一套、app 一套），并把这条不变式写进门的注释。活体判据（`verify-file` **26/26**）：打字后 **tab 出现脏点**、撤销后消失；**点 tab 之后 app 的 active editor 跟着换**（`activeAfterTabClick` === 被点的那条 tab）；隐藏 view 之后能力照样回答；`close` 之后编辑器与 view 一起消失。
 
 **第二条能力：`diagnostics`（2026-09-15 落地）**。数据直接来自工作台的 `IMarkerService`（`read({resource})` + `onMarkerChanged`），形状是**摘要 + 分页**（`summary {error,warning,info,hint,resources}` + `page {entries,total,offset,truncated}`，最严重的先出；另有 `query({resource,limit,offset})`）——不是把原始数组塞给消费者。动作是**空的**（`Record<string, never>`）：诊断只读，"拿它怎么办"不是 marker service 的事，能力表里宁可空着也不编动作。
 
@@ -193,7 +193,7 @@ interface Capability<T, A> {
 
 ## Verification
 
-**B1 已验收**（当时的数字：四闸门 24/24 · 33/33 · 12/12 · 1/1 ＋独立页 smoke）；决定 17 之后口径变为 vendor `14/14 · 28/28 · 9/9 · 6/6 · 7/7 · 17/17`（layout · views · focus · regions · view · file）＋ prac 四门 `6/6 · 6/6 · 6/6 · 11/11` ＋ smoke `8/8`。B2 的验收见上面「第一步的验收」。
+**B1 已验收**（当时的数字：四闸门 24/24 · 33/33 · 12/12 · 1/1 ＋独立页 smoke）；§3.5 落地之后口径变为 vendor `14/14 · 28/28 · 9/9 · 6/6 · 7/7 · 17/17`（layout · views · focus · regions · view · file）＋ prac 四门 `6/6 · 6/6 · 6/6 · 11/11` ＋ smoke `8/8`。B2 的验收见上面「第一步的验收」。
 
 ## Open questions
 
@@ -202,8 +202,8 @@ interface Capability<T, A> {
 3. B1 之后第二个能力件选谁（search / SCM / outline / terminal / editor group）。
 4. **已定（2026-09-15）**：agent 能力面**排在 B1 之后**；上下文入（当前文件 / 选区 / 打开的 view）并入它。它决定"能力层是否真的被拆开"，与 L2 是两件事。
 5. 要不要现在就测"未挂载 part 的成本"，用它决定 A 是否值得。
-6. **已闭合（2026-09-15）**：容纳单位定为 `view`（umbrella 决定 2b），原"决定 2/3 与 09-15 方向相冲"的张力消解；container / part 退为可选的高级形态（"何时真的需要"列在 umbrella §4）。
+6. **已闭合（2026-09-15）**：容纳单位定为 `view`（umbrella §3.2），原"'部件被容纳'与'只做便宜那层'跟 09-15 方向相冲"的张力消解；container / part 退为可选的高级形态（"何时真的需要"列在 umbrella §4）。
 7. **与 umbrella §4 的能力/生态开放项互相引用**（扩展宿主 web → server、terminal PTY 放在 DSH host、DSH ↔ workbench 状态桥、内建扩展编译 12/106）——它们与"agent 能力面"是同一条决策链的前后段，但目前两条 note 互不链接细分。
 
-8. **已闭合（2026-09-15，决定 17 落地）**：路径是 `CodeEditorWidget` + `ITextModelService.createModelReference(uri)`（镜像工作台的 `TextCodeEditor.createEditorControl`）。**实测带走的**：工作台自己的文本模型（语言特性 / markers / undo / save）。**实测没有的**：挂在 `EditorInput`+`EditorPane` 上的贡献——面包屑 / peek / diff 与自定义编辑器 / 热退出。⇒ `editor(file) → view` 成立；上面那份"没有的"清单就是能力面（尤其 `diagnostics`）要补的洞，也是"tab 的脏点/预览/关闭要 `editors` 能力"这条结论的证据。
+8. **已闭合（2026-09-15，umbrella §3.5 落地）**：路径是 `CodeEditorWidget` + `ITextModelService.createModelReference(uri)`（镜像工作台的 `TextCodeEditor.createEditorControl`）。**实测带走的**：工作台自己的文本模型（语言特性 / markers / undo / save）。**实测没有的**：挂在 `EditorInput`+`EditorPane` 上的贡献——面包屑 / peek / diff 与自定义编辑器 / 热退出。⇒ `editor(file) → view` 成立；上面那份"没有的"清单就是能力面（尤其 `diagnostics`）要补的洞，也是"tab 的脏点/预览/关闭要 `editors` 能力"这条结论的证据。
 9. **已定（2026-09-15）**：先做 `editors`（见上一节"B2 第一步已落地"）；`diagnostics` 紧随其后。
