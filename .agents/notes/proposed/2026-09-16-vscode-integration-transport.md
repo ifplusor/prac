@@ -16,30 +16,82 @@ prac 的目标（`docs/architecture.md` §1.2）要求：**IDE 能力在 server 
 
 ### 术语：渲染器 / 扩展宿主 / 主线程
 
-**名字最容易误会的是"主线程"：它不是线程概念，是那套 RPC 的*角色名***。`extHost.protocol.ts`（`api/common/`，168 个代理）里成对出现：`MainContext.MainThreadXxx` ↔ `MainContext.ExtHostXxx`——一侧是扩展宿主，另一侧就是"主线程"。调用以扩展宿主发起为主，主线程另有 `$accept*` 一类推送。
+**名字最容易误会的是"主线程"：它不是线程概念，是那套 RPC 的*角色名***。`extHost.protocol.ts`（`api/common/`，168 个代理）里成对出现：`MainContext.MainThreadXxx` ↔ `ExtHostContext.ExtHostXxx`——一侧是扩展宿主，另一侧就是"主线程"。**主线程是渲染器进程里的一层**：渲染器 = workbench UI + `MainThread*` 的实现 + 两者共用的平台服务；扩展宿主在另一个进程，两侧按协议逐个成对（见下图）。调用以扩展宿主发起为主，主线程另有 `$accept*` 一类推送。
 
 | 词 | 是什么 | 住在哪（桌面） | 住在哪（远程 / 浏览器） | 上游落点 |
 | --- | --- | --- | --- | --- |
 | **渲染器（renderer）** | 跑 **workbench**（UI）的那个进程/页面：编辑器、视图、命令面板都在这里 | Electron renderer 进程 | 浏览器页 | `src/vs/workbench/**` |
 | **扩展宿主（extension host）** | 跑**扩展代码**的独立进程：只有 `vscode.*` API，**没有 DOM、没有 UI** | 本地 fork 的进程 | **code server 里** fork 的进程 | `api/common/extHost*` + `api/node/**` |
-| **主线程（main thread）** | 扩展宿主协议的**另一端**：在 workbench 里替扩展宿主做 UI / 编辑器 / 存储 / 诊断那些事的那套实现 | 渲染器里 | **渲染器里**（= 今天的页面） | `api/browser/**` 的 `@extHostNamedCustomer(MainContext.MainThreadXxx)`，**77 个不同的 MainThread / 78 个文件**（如 `mainThreadDiagnostics.ts:14`） |
+| **主线程（main thread）** | 扩展宿主协议的**另一端**：在 workbench 里替扩展宿主做 UI / 编辑器 / 存储 / 诊断那些事的那套实现 | 渲染器里 | **渲染器里**（= 今天的页面） | `api/browser/**` 的 `@extHostNamedCustomer(MainContext.MainThreadXxx)`：**78 个在 78 个文件里**（如 `mainThreadDiagnostics.ts:14`），另有 **9 个手工注册**（Documents / TextEditors / Webviews / WebviewPanels / WebviewViews / CustomEditors / NotebookDocuments / NotebookEditors / ChatOutputRenderer）⇒ 与 `MainContext` 的 **87** 个标识全部对上 |
 
 ```mermaid
-flowchart LR
-  subgraph Desktop["桌面：渲染器与扩展宿主是两个进程"]
+flowchart TB
+  PROTO["协议定义：src/vs/workbench/api/common/extHost.protocol.ts（4218 行 · 168 个代理）<br/>逐个成对，一侧一个：MainContext.MainThreadXxx ↔ ExtHostContext.ExtHostXxx"]
+
+  subgraph Desktop["形态一 · 桌面：渲染器与扩展宿主是两个本地进程"]
     direction LR
-    DR["渲染器进程<br/>workbench（UI）<br/>主线程 = MainThread* 的实现"]
-    DE["扩展宿主进程<br/>ExtHost* 的实现<br/>扩展代码 · 无 DOM"]
-    DR <-->|"命名管道 / MessagePort"| DE
+    subgraph D_R["渲染器进程 renderer —— 主线程是它内部的一层"]
+      direction TB
+      subgraph D_R_UI["workbench（UI 层）· src/vs/workbench/browser/parts/ · src/vs/workbench/services/ · src/vs/workbench/contrib/"]
+        D_UI_ED["编辑器 / 视图<br/>parts/editor/editorPart.ts:100 · parts/views/viewPane.ts:311"]
+        D_UI_CMD["命令 / 主题 / 通知 UI<br/>services/commands/common/commandService.ts:15<br/>services/themes/browser/workbenchThemeService.ts:78<br/>parts/notifications/notificationsCenter.ts:38"]
+        D_PROB["Problems 视图<br/>contrib/markers/browser/markersView.ts:146（:549 读 markerService）"]
+      end
+      subgraph D_R_MT["主线程（MainThread* 的实现）· src/vs/workbench/api/browser/<br/>每个 @extHostNamedCustomer(MainContext.MainThreadXxx) 一个，全部只在这个目录"]
+        D_MT_DIAG["MainThreadDiagnostics<br/>mainThreadDiagnostics.ts:14（$changeMany :69）"]
+        D_MT_DOC["MainThreadDocuments<br/>mainThreadDocuments.ts:126<br/>（在 mainThreadDocumentsAndEditors.ts:306 注册）"]
+        D_MT_UI["MainThreadQuickOpen / MessageService / Window …<br/>扩展宿主碰不到 UI，由这一层代答"]
+      end
+      subgraph D_R_PLAT["平台服务 · src/vs/platform/"]
+        D_PLAT_MARK["IMarkerService<br/>markers/common/markers.ts:213 · markerService.ts:150"]
+        D_PLAT_REST["IFileService · IStorageService<br/>IConfigurationService · ITelemetryService"]
+      end
+      D_MT_UI -->|"把扩展宿主的请求落到 workbench 的服务上"| D_UI_CMD
+      D_MT_DOC --> D_UI_ED
+      D_MT_DOC -->|"文本模型 / 文件 / 存储"| D_PLAT_REST
+      D_UI_CMD -.-> D_PLAT_REST
+      D_PLAT_MARK -->|"read / onMarkerChanged"| D_PROB
+    end
+    subgraph D_EH["扩展宿主进程 extension host（另一个进程 · 没有 DOM、没有 UI）"]
+      direction TB
+      D_EH_DIAG["ExtHostDiagnostics<br/>extHostDiagnostics.ts:170"]
+      D_EH_DOC["ExtHostDocuments<br/>extHostDocuments.ts:39"]
+      D_EH_UI["ExtHostMessageService / ExtHostQuickOpen …<br/>extHostMessageService.ts:25 把 UI 请求代理给 MainThreadMessageService"]
+      D_EH_CODE["扩展代码：工作区扩展 / UI 扩展<br/>入口 api/node/extensionHostProcess.ts"]
+    end
+    D_EH_DIAG -->|"成对 1 · $changeMany（扩展宿主发起）· 桌面走命名管道 / MessagePort"| D_MT_DIAG
+    D_MT_DIAG -->|"changeOne / changeAll"| D_PLAT_MARK
+    D_EH_DOC -->|"成对 2 · $tryOpenDocument / $trySaveDocument（扩展宿主请求）"| D_MT_DOC
+    D_MT_DOC -->|"同一条成对通道的推送：$acceptModelChanged · $acceptDocumentsAndEditorsDelta"| D_EH_DOC
+    D_EH_UI -->|"成对 3 · UI 方法：扩展宿主只发请求，实现在主线程"| D_MT_UI
   end
-  subgraph Remote["远程（我们的形态）：主线程留在页面里"]
+
+  subgraph Remote["形态二 · 远程（我们的形态）：渲染器在浏览器页，扩展宿主在 code server"]
     direction LR
-    RW["浏览器页 = 渲染器<br/>workbench（UI）<br/>主线程 = MainThread* 的实现（77 个）"]
-    RC["code server 进程<br/>Management · ExtensionHost · Tunnel"]
-    RE["扩展宿主进程<br/>扩展代码 · 无 DOM"]
-    RW <-->|"WS"| RC
-    RC <-->|"管道 / socket"| RE
+    subgraph RM_R["浏览器页 = 渲染器（主线程仍留在页面里，和桌面是同一套 MainThread* 实现）"]
+      direction TB
+      subgraph RM_R_UI["workbench（UI 层）"]
+        RM_UI["编辑器 / 视图 / 命令 / 主题 / 通知 UI<br/>src/vs/workbench/browser/parts/ · contrib/"]
+      end
+      subgraph RM_R_MT["主线程（MainThread* 的实现）· src/vs/workbench/api/browser/"]
+        RM_MT["MainThreadDiagnostics · MainThreadDocuments · MainThreadWindow …"]
+      end
+      subgraph RM_R_PLAT["平台服务 · src/vs/platform/"]
+        RM_PLAT["IMarkerService · IFileService<br/>IStorageService · IConfigurationService …"]
+      end
+      RM_R_MT --> RM_R_UI
+      RM_R_MT --> RM_R_PLAT
+    end
+    subgraph RM_CS["code server 进程（Management · ExtensionHost · Tunnel）"]
+      direction TB
+      subgraph RM_EH["扩展宿主进程（在 code server 里 fork）"]
+        RM_EH_N["ExtHost* 的实现 + 扩展代码<br/>没有 DOM、没有 UI<br/>server/node/extensionHostConnection.ts:290"]
+      end
+    end
+    RM_MT <-->|"仍是同一份 extHost.protocol.ts 的成对代理：MainThreadXxx ↔ ExtHostXxx<br/>渲染器 WS 到 code server，再管道 / socket 到扩展宿主；主线程没有跟着走"| RM_EH_N
   end
+
+  D_MT_DIAG -.->|"两种形态下是同一套 MainThread* 实现：主线程始终在渲染器里"| RM_MT
 ```
 
 **对 prac 的意义**：三条能力边界的划分就是从这张图来的——扩展宿主能拿到的东西（文档、诊断、语言特性、搜索、终端、任务）是 **tier S**；只有主线程能答的（可见编辑器与选择、对话框、quick pick、进度）是 **tier C**；而在今天的形态里主线程**住在页面**，所以"页面不在 ⇒ 没有能力"。broker 要做的，就是把主线程这一角色从渲染器搬到 server 侧（最小面 18 个代理，见「证据」）。
@@ -60,11 +112,11 @@ flowchart LR
 
 管理面的 channel（服务端注册）：`remotefilesystem`、`remoteterminal`、`extensions`、`remoteextensionsenvironment`、`remoteextensionsscanner`、`userDataProfiles`、`request`、`telemetry`、`logger`、`mcpManagement`、`mcpGateway`、`sandboxHelper`、`NativeMcpDiscoveryHelper`、agentHost `RemoteProxy`、`extensionHostDebugBroadcast`。**没有 diagnostics channel**——marker 在渲染器的 `IMarkerService`。
 
-**扩展宿主协议（renderer ↔ ext host）**：`api/common/extHost.protocol.ts`（**4218 行**；代理标识 **168** 个，主线程接口 **76** 个 / **447** 个 `$` 方法，扩展宿主接口 **82** 个），主线程侧由渲染器实现——`@extHostNamedCustomer(MainContext.MainThreadXxx)` 共 **77 个不同的 MainThread**（78 个文件，**全部在 `src/vs/workbench/api/browser/**`**）。诊断的流向是 **ext host → 渲染器**：ext host 调 `MainThreadDiagnostics.$changeMany`（`extHostDiagnostics.ts:170`），渲染器写进自己的 `IMarkerService`（实现只有 `api/browser/mainThreadDiagnostics.ts` 一处）。
+**扩展宿主协议（renderer ↔ ext host）**：`api/common/extHost.protocol.ts`（**4218 行**；代理标识 **168** 个 = `MainContext` **87** + `ExtHostContext` **81**；`MainThreadXxxShape` **86** 个接口 / **500** 个 `$` 方法；`ExtHostXxxShape` **81** 个接口 / **441** 个 `$` 方法。**数法**：代理标识按两个 `export const …Context` 表里的条目数，方法按 `interface XxxShape` 体内以 `$` 开头的方法数——这样任何一个数都能用一条命令复算），主线程侧由渲染器实现——`@extHostNamedCustomer(MainContext.MainThreadXxx)` 共 **78 个在 78 个文件里**（**全部在 `src/vs/workbench/api/browser/**`**，另有 9 个手工注册的也在那里）。诊断的流向是 **ext host → 渲染器**：ext host 调 `MainThreadDiagnostics.$changeMany`（`extHostDiagnostics.ts:170`），渲染器写进自己的 `IMarkerService`（实现只有 `api/browser/mainThreadDiagnostics.ts` 一处）。
 
 ### 关键结构约束（设计就是围着它转）
 
-1. **主线程对端是渲染器**。扩展宿主的一切（开文档、语言特性、诊断、命令）都要一个"主线程"回答；**上游没有 headless 主线程实现**：77 个 `MainThread*` 客户端的实现文件全在 `src/vs/workbench/api/browser/**`（78 个文件），协议之外没有任何服务端实现可复用。
+1. **主线程对端是渲染器**。扩展宿主的一切（开文档、语言特性、诊断、命令）都要一个"主线程"回答；**上游没有 headless 主线程实现**：78 个 `@extHostNamedCustomer` 实现与 9 个手工注册的实现，全在 `src/vs/workbench/api/browser/**`；协议之外没有任何服务端实现可复用。
 2. **扩展宿主由渲染器发起**：只有 `desiredConnectionType === ExtensionHost` 的连接才会 `new ExtensionHostConnection` 并 fork 进程 ⇒ **没有页面就没有扩展宿主**，也就没有任何扩展能力。
 3. **DSH 的反向能力很窄**：remote 面是"host 声明方法、client 调用"；host→client 只有**转发事件**（`emit` 通知 / `waterfall` 可带回答），且**只有一个源**、由 DSH 的组装注册；流复用 `/api/remote.mux` 是**单向推送**（client 只 `open` / `cancel`），见下节 §2。
 
@@ -198,7 +250,7 @@ flowchart LR
 | 诊断 | `MainThreadDiagnostics` | 2 | `$changeMany/$clear`（`:254-257`），调用点 `extHostDiagnostics.ts:170` |
 | 文档推送（**主线程 → 扩展宿主**） | `ExtHostDocuments` 侧接收 | 4 | `$acceptDocumentsAndEditorsDelta`（`mainThreadDocumentsAndEditors.ts:366`）、`$acceptModelChanged`（`mainThreadDocuments.ts:114`）、`$acceptModelSaved`/`$acceptDirtyStateChanged`（`extHost.protocol.ts:2401,2402`） |
 
-**量级**：`ExtensionService 8 + Errors 1 + Documents 3 + Diagnostics 2 + Languages 5 + Configuration 2 + Workspace 20 + Commands 5 + MessageService 1 + Telemetry 2 + Storage 3 + SecretState 4 + BulkEdits 1 + FileSystem 12 + OutputService 5 + Window 3 + Progress 3 + StatusBar 2` = **18 个代理 / 82 个方法**。若扩展还注册语言特性，加 `MainThreadLanguageFeatures`（**47**）⇒ **19 个 / 129 个**。占全集（76 / 447）约 **24% / 18–29%**。
+**量级**：`ExtensionService 8 + Errors 1 + Documents 3 + Diagnostics 2 + Languages 5 + Configuration 2 + Workspace 20 + Commands 5 + MessageService 1 + Telemetry 2 + Storage 3 + SecretState 4 + BulkEdits 1 + FileSystem 12 + OutputService 5 + Window 3 + Progress 3 + StatusBar 2` = **18 个代理 / 82 个方法**。若扩展还注册语言特性，加 `MainThreadLanguageFeatures`（**47**）⇒ **19 个 / 129 个**。占全集（86 个 `MainThreadXxxShape` / 500 个 `$` 方法）约 **21% / 16%**（扩到 19 个代理时约 **22% / 26%**）。
 
 **边界（必须先有）**：① 三条启动推送；② `ExtensionService` + `Errors`（激活本身与错误上报）；③ 文档三条请求 + 诊断两条（验收 1/3）。其余按扩展实际调用的 API 补齐；**没有任何一条是"纯 UI 才能激活"**。所以 tier 的划线是**按代理**，不是按机制。
 
@@ -228,11 +280,11 @@ flowchart LR
 
 | 方案 | 为什么不行 / 代价 |
 | --- | --- |
-| **A. 完整实现主线程**（76 个主线程接口 / 447 个 `$` 方法） | 成本高且要跟着上游漂移；但**方向是对的**，我们按 tier 只做子集（最小 18 个代理，见「证据」） |
+| **A. 完整实现主线程**（87 个 `MainContext` 标识 / 500 个 `$` 方法） | 成本高且要跟着上游漂移；但**方向是对的**，我们按 tier 只做子集（最小 18 个代理，见「证据」） |
 | **B. 保留渲染器当主线程**（今天的形态） | 能力与状态被页面把关，agent 够不着——正是要消除的 |
 | **C. 不用扩展宿主，自建能力**（自己跑 LSP、自己读文件） | 放弃 VS Code 的扩展生态 ⇒ 违反目标（"利用 vscode 的生态"） |
 | **D. 起一个隐藏浏览器当主线程**（Playwright 之类） | 荒谬：为了不实现协议而跑一个浏览器 |
-| **E. 让 client 直接讲 extHost 协议**（经 DSH 透传） | 等于把 76 个主线程接口的实现搬到浏览器，还让协议跨越 CS 边界 |
+| **E. 让 client 直接讲 extHost 协议**（经 DSH 透传） | 等于把 87 个 `MainContext` 标识的实现搬到浏览器，还让协议跨越 CS 边界 |
 | **F. 自定义双工流当 tier C 载体**（本文原推荐） | **已否**：`/api/remote.mux` 的流是单向推送，client 只有 `open`/`cancel`（见「证据」·tier C 的载体） |
 
 ## 待裁（Open questions）
