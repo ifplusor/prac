@@ -196,6 +196,8 @@ client 做**乐观回显**（本地先应用，等 `applied` 确认版本）；�
 | 诊断 | `MainThreadDiagnostics` | 2 | `$changeMany/$clear`（`:254-257`），调用点 `extHostDiagnostics.ts:170` |
 | 文档推送（**主线程 → 扩展宿主**） | `ExtHostDocuments` 侧接收 | 4 | `$acceptDocumentsAndEditorsDelta`（`mainThreadDocumentsAndEditors.ts:366`）、`$acceptModelChanged`（`mainThreadDocuments.ts:114`）、`$acceptModelSaved`/`$acceptDirtyStateChanged`（`extHost.protocol.ts:2401,2402`） |
 
+**诊断这条线是推-only**：触发在扩展手里（它自己监听文档事件后才 `set()`），协议两侧都**没有**「拉」的请求方法——拉只有读本地（扩展宿主的 `languages.getDiagnostics()`、渲染器的 `IMarkerService.read()`）。⇒ broker 自己就是那份 store：agent 的「拉」= 读 broker 的 store（同步、无协议）；同时 broker 要把**别人**的 marker 经 `$acceptMarkersChange` 回推给扩展宿主，否则扩展里的 `getDiagnostics()` 不全。上游细节（触发点、`origin`、上限、`modelVersionId`）见 [`docs/vscode.md`](../../../docs/vscode.md) 的「诊断这条线」。
+
 **量级**：`ExtensionService 8 + Errors 1 + Documents 3 + Diagnostics 2 + Languages 5 + Configuration 2 + Workspace 20 + Commands 5 + MessageService 1 + Telemetry 2 + Storage 3 + SecretState 4 + BulkEdits 1 + FileSystem 12 + OutputService 5 + Window 3 + Progress 3 + StatusBar 2` = **18 个代理 / 82 个方法**。若扩展还注册语言特性，加 `MainThreadLanguageFeatures`（**47**）⇒ **19 个 / 129 个**。占全集（86 个 `MainThreadXxxShape` / 500 个 `$` 方法）约 **21% / 16%**（扩到 19 个代理时约 **22% / 26%**）。
 
 **边界（必须先有）**：① 三条启动推送；② `ExtensionService` + `Errors`（激活本身与错误上报）；③ 文档三条请求 + 诊断两条（验收 1/3）。其余按扩展实际调用的 API 补齐；**没有任何一条是"纯 UI 才能激活"**。所以 tier 的划线是**按代理**，不是按机制。

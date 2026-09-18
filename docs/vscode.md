@@ -60,3 +60,13 @@ flowchart LR
 - **远程 / web（prac 的形态）**：浏览器 `new WebSocket`（`browserSocketFactory.ts:80`）→ code server `upgradeToISocket`（`remoteExtensionHostAgentServer.ts:237`）→ `cp.fork` 扩展宿主（`extensionHostConnection.ts:290`）→ 把这条 WS 与扩展宿主的管道 / socket 对拷（`:180-183` / `:190-200`，控制消息 `VSCODE_EXTHOST_IPC_SOCKET` / `…_READY`，连接方式由 `VSCODE_EXTHOST_WILL_SEND_SOCKET` / `VSCODE_EXTHOST_IPC_HOOK` 二选一）。
 
 **发起方永远是渲染器**：远程要渲染器发 `desiredConnectionType === ExtensionHost`（`remoteAgentConnection.ts:362`）服务端才 fork，桌面由渲染器 `createExtensionHost()`（`localProcessExtensionHost.ts:225`）让主进程起 utility 进程 ⇒ **没有页面就没有扩展宿主**，也就没有任何扩展能力。
+
+**诊断（`DiagnosticCollection`）这条线**：全程是**推**，协议上没有「拉」的请求方法。
+
+- **触发在扩展手里**。公开面只有 `languages.createDiagnosticCollection()`（`vscode.d.ts:14822`）——扩展自己决定何时算、何时写：php 扩展在 `onDidOpenTextDocument`（`php-language-features/src/features/validationProvider.ts:110`）与 `onDidChangeTextDocument` / `onDidSaveTextDocument`（`:163-166`，按 `php.validate.run` 二选一）之后跑 lint，再 `set()`（`:250`）；git 扩展监听自己 scheme 的文档变化（`git/src/diagnostics.ts:26`）。VS Code 不排期、也没有「诊断 provider」这种注册（`vscode.d.ts` 里没有）。
+- **推**：`set()` 里同步调 `MainThreadDiagnostics.$changeMany(owner, entries)`（`api/common/extHostDiagnostics.ts:170`；`delete` ⇒ `:177`，`clear` / `dispose` ⇒ `$clear` `:184`/`:49`）；主线程落到 `IMarkerService.changeOne/changeAll`（`api/browser/mainThreadDiagnostics.ts:87`/`:93`），并给每条 marker 盖 `origin = extHostId`（`:82-84`）。**上限在扩展宿主侧就先砍**：1000/文件、1100 总，另加一条「还有 N 条」的 Info marker（`extHostDiagnostics.ts:134-156`）。
+- **回推**：`IMarkerService.onMarkerChanged` → `$acceptMarkersChange`（`mainThreadDiagnostics.ts:32`、`:57-66`），且**按 `origin` 把「这个扩展宿主自己推的」滤掉**（`:61`）⇒ 扩展宿主里的镜像装的是**别人的** marker。`languages.getDiagnostics()` 读的是**本地**（自己的 collections + 这份镜像，`extHostDiagnostics.ts:313-345`），不是 RPC。
+- **「拉」只有两处，都是读本地**：扩展宿主的 `languages.getDiagnostics()`（读上面那份本地 map）；渲染器的 `IMarkerService.read()`（接口 `platform/markers/common/markers.ts`；Problems 视图就是 `contrib/markers/browser/markersView.ts:549` 这么读）。两侧协议都**没有请求方法**——`MainThreadDiagnosticsShape` 只有 `$changeMany`/`$clear`，`ExtHostDiagnosticsShape` 只有 `$acceptMarkersChange`（`extHost.protocol.ts:254-257`、`:2382-2384`）。
+- marker 带 `modelVersionId`（写的时候扩展宿主按当前文档版本盖，`extHostDiagnostics.ts:140`/`:158`；`markerService.ts:234` 原样保留）⇒ 消费方能判断「这条是对哪个版本算的」。
+- **扩展宿主一死，它推的 marker 就消失**：`MainThreadDiagnostics.dispose()` 把每个 owner 里 `origin === extHostId` 的剔掉、重写剩下的（`mainThreadDiagnostics.ts:36-55`）。
+- 未核实：LSP 那层自己的 pull（`textDocument/diagnostic`）不在本文范围（`vscode-languageclient` 不在这个 checkout 里，没读）。
