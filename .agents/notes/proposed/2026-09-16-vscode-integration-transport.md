@@ -25,74 +25,36 @@ prac 的目标（`docs/architecture.md` §1.2）要求：**IDE 能力在 server 
 | **主线程（main thread）** | 扩展宿主协议的**另一端**：在 workbench 里替扩展宿主做 UI / 编辑器 / 存储 / 诊断那些事的那套实现 | 渲染器里 | **渲染器里**（= 今天的页面） | `api/browser/**` 的 `@extHostNamedCustomer(MainContext.MainThreadXxx)`：**78 个在 78 个文件里**（如 `mainThreadDiagnostics.ts:14`），另有 **9 个手工注册**（Documents / TextEditors / Webviews / WebviewPanels / WebviewViews / CustomEditors / NotebookDocuments / NotebookEditors / ChatOutputRenderer）⇒ 与 `MainContext` 的 **87** 个标识全部对上 |
 
 ```mermaid
-flowchart TB
-  PROTO["协议定义：src/vs/workbench/api/common/extHost.protocol.ts（4218 行 · 168 个代理）<br/>逐个成对，一侧一个：MainContext.MainThreadXxx ↔ ExtHostContext.ExtHostXxx"]
-
-  subgraph Desktop["形态一 · 桌面：渲染器与扩展宿主是两个本地进程"]
+flowchart LR
+  subgraph D["桌面"]
     direction LR
-    subgraph D_R["渲染器进程 renderer —— 主线程是它内部的一层"]
+    subgraph DR["渲染器（进程）"]
       direction TB
-      subgraph D_R_UI["workbench（UI 层）· src/vs/workbench/browser/parts/ · src/vs/workbench/services/ · src/vs/workbench/contrib/"]
-        D_UI_ED["编辑器 / 视图<br/>parts/editor/editorPart.ts:100 · parts/views/viewPane.ts:311"]
-        D_UI_CMD["命令 / 主题 / 通知 UI<br/>services/commands/common/commandService.ts:15<br/>services/themes/browser/workbenchThemeService.ts:78<br/>parts/notifications/notificationsCenter.ts:38"]
-        D_PROB["Problems 视图<br/>contrib/markers/browser/markersView.ts:146（:549 读 markerService）"]
-      end
-      subgraph D_R_MT["主线程（MainThread* 的实现）· src/vs/workbench/api/browser/<br/>每个 @extHostNamedCustomer(MainContext.MainThreadXxx) 一个，全部只在这个目录"]
-        D_MT_DIAG["MainThreadDiagnostics<br/>mainThreadDiagnostics.ts:14（$changeMany :69）"]
-        D_MT_DOC["MainThreadDocuments<br/>mainThreadDocuments.ts:126<br/>（在 mainThreadDocumentsAndEditors.ts:306 注册）"]
-        D_MT_UI["MainThreadQuickOpen / MessageService / Window …<br/>扩展宿主碰不到 UI，由这一层代答"]
-      end
-      subgraph D_R_PLAT["平台服务 · src/vs/platform/"]
-        D_PLAT_MARK["IMarkerService<br/>markers/common/markers.ts:213 · markerService.ts:150"]
-        D_PLAT_REST["IFileService · IStorageService<br/>IConfigurationService · ITelemetryService"]
-      end
-      D_MT_UI -->|"把扩展宿主的请求落到 workbench 的服务上"| D_UI_CMD
-      D_MT_DOC --> D_UI_ED
-      D_MT_DOC -->|"文本模型 / 文件 / 存储"| D_PLAT_REST
-      D_UI_CMD -.-> D_PLAT_REST
-      D_PLAT_MARK -->|"read / onMarkerChanged"| D_PROB
+      DUI["workbench（UI 层）"]
+      DMT["主线程：MainThread* 的实现"]
+      DPS["平台服务"]
+      DUI --- DMT --- DPS
     end
-    subgraph D_EH["扩展宿主进程 extension host（另一个进程 · 没有 DOM、没有 UI）"]
-      direction TB
-      D_EH_DIAG["ExtHostDiagnostics<br/>extHostDiagnostics.ts:170"]
-      D_EH_DOC["ExtHostDocuments<br/>extHostDocuments.ts:39"]
-      D_EH_UI["ExtHostMessageService / ExtHostQuickOpen …<br/>extHostMessageService.ts:25 把 UI 请求代理给 MainThreadMessageService"]
-      D_EH_CODE["扩展代码：工作区扩展 / UI 扩展<br/>入口 api/node/extensionHostProcess.ts"]
-    end
-    D_EH_DIAG -->|"成对 1 · $changeMany（扩展宿主发起）· 桌面走命名管道 / MessagePort"| D_MT_DIAG
-    D_MT_DIAG -->|"changeOne / changeAll"| D_PLAT_MARK
-    D_EH_DOC -->|"成对 2 · $tryOpenDocument / $trySaveDocument（扩展宿主请求）"| D_MT_DOC
-    D_MT_DOC -->|"同一条成对通道的推送：$acceptModelChanged · $acceptDocumentsAndEditorsDelta"| D_EH_DOC
-    D_EH_UI -->|"成对 3 · UI 方法：扩展宿主只发请求，实现在主线程"| D_MT_UI
+    DEH["扩展宿主（进程）<br/>ExtHost* · 扩展代码 · 无 DOM"]
+    DR <-->|"成对：MainThreadXxx ↔ ExtHostXxx<br/>一侧一个，以宿主发起为主"| DEH
   end
-
-  subgraph Remote["形态二 · 远程（我们的形态）：渲染器在浏览器页，扩展宿主在 code server"]
+  subgraph R["远程（我们的形态）"]
     direction LR
-    subgraph RM_R["浏览器页 = 渲染器（主线程仍留在页面里，和桌面是同一套 MainThread* 实现）"]
+    subgraph RR["渲染器 = 浏览器页"]
       direction TB
-      subgraph RM_R_UI["workbench（UI 层）"]
-        RM_UI["编辑器 / 视图 / 命令 / 主题 / 通知 UI<br/>src/vs/workbench/browser/parts/ · contrib/"]
-      end
-      subgraph RM_R_MT["主线程（MainThread* 的实现）· src/vs/workbench/api/browser/"]
-        RM_MT["MainThreadDiagnostics · MainThreadDocuments · MainThreadWindow …"]
-      end
-      subgraph RM_R_PLAT["平台服务 · src/vs/platform/"]
-        RM_PLAT["IMarkerService · IFileService<br/>IStorageService · IConfigurationService …"]
-      end
-      RM_R_MT --> RM_R_UI
-      RM_R_MT --> RM_R_PLAT
+      RUI["workbench（UI 层）"]
+      RMT["主线程：MainThread* 的实现"]
+      RPS["平台服务"]
+      RUI --- RMT --- RPS
     end
-    subgraph RM_CS["code server 进程（Management · ExtensionHost · Tunnel）"]
-      direction TB
-      subgraph RM_EH["扩展宿主进程（在 code server 里 fork）"]
-        RM_EH_N["ExtHost* 的实现 + 扩展代码<br/>没有 DOM、没有 UI<br/>server/node/extensionHostConnection.ts:290"]
-      end
+    subgraph CS["code server 进程"]
+      REH["扩展宿主<br/>ExtHost* · 无 DOM"]
     end
-    RM_MT <-->|"仍是同一份 extHost.protocol.ts 的成对代理：MainThreadXxx ↔ ExtHostXxx<br/>渲染器 WS 到 code server，再管道 / socket 到扩展宿主；主线程没有跟着走"| RM_EH_N
+    RR <-->|"同一套配对"| REH
   end
-
-  D_MT_DIAG -.->|"两种形态下是同一套 MainThread* 实现：主线程始终在渲染器里"| RM_MT
 ```
+
+**两种形态下主线程都在渲染器里**——远程形态搬走的只有扩展宿主。落到具体一条链路看：`ExtHostDiagnostics` → `MainThreadDiagnostics.$changeMany` → `IMarkerService` → Problems 视图（都在渲染器里）。
 
 **对 prac 的意义**：三条能力边界的划分就是从这张图来的——扩展宿主能拿到的东西（文档、诊断、语言特性、搜索、终端、任务）是 **tier S**；只有主线程能答的（可见编辑器与选择、对话框、quick pick、进度）是 **tier C**；而在今天的形态里主线程**住在页面**，所以"页面不在 ⇒ 没有能力"。broker 要做的，就是把主线程这一角色从渲染器搬到 server 侧（最小面 18 个代理，见「证据」）。
 
