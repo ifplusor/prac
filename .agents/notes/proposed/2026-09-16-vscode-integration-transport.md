@@ -187,6 +187,8 @@ client 做**乐观回显**（本地先应用，等 `applied` 确认版本）；�
 
 **激活路径上扩展宿主往外只调两个代理**：`MainThreadExtensionService.$activateExtension`（`extHostExtensionService.ts:193`）、`MainThreadErrors.$onUnexpectedError`（`extensionHostMain.ts:52,156`）。
 
+两点语义要分清（都有出处，见 [`docs/vscode.md`](../../../docs/vscode.md)）：① **远程形态下激活不等主线程的回答**——`$onWillActivateExtension` 在 `isRemote` 时发了不等（`extHostExtensionService.ts:445-455`），所以没有页面，扩展照样激活、照样能自己 `set()` 诊断；② 但 **UI-kind 的扩展激活被交给主线程**（`:193`，`isHostExtension`）——没人答就**永久挂住**，这正是 tier X 要明确报错的那个现象。另外**产生诊断的不只是扩展宿主**：任务 / 设置 / notebook / prompt / MCP 这些 owner 直接写在渲染器里（清单见 `docs/vscode.md`）⇒ 扮主线程就得自己产生它们，或者明确划进 tier C/X。
+
 **按验收（无页面也能拿诊断与文档）补的**：
 
 | 面 | 代理 | 方法数 | 证据 |
