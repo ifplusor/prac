@@ -56,6 +56,36 @@ flowchart LR
 
 **两种形态下主线程都在渲染器里**——远程形态搬走的只有扩展宿主。落到具体一条链路看：`ExtHostDiagnostics` → `MainThreadDiagnostics.$changeMany` → `IMarkerService` → Problems 视图（都在渲染器里）。
 
+#### 平台服务是什么
+
+`src/vs/platform/**` 是**服务层**：与 UI 无关的能力实现——文件、配置、存储、命令、遥测、日志、诊断等，每个服务一个目录，下分 `common/` 与 `browser/`（或 `node/`、`electron-main/`）。`src/vs/workbench/**` 是**UI 层**：workbench 的视图与贡献，主线程的 `MainThread*` 实现也在这一层。依赖单向——workbench 大量 import platform，而 **platform → workbench 的真实 import 是 0 处**（`grep -rn "from '.*vs/workbench" src/vs/platform --include=*.ts` 为空）。
+
+DI 的来法：服务先由 `createDecorator<T>('id')` 换出一个 `ServiceIdentifier`（`src/vs/platform/instantiation/common/instantiation.ts:109`），实现于启动时注册（`registerSingleton(IMarkerService, MarkerService, InstantiationType.Delayed)`，`src/vs/workbench/workbench.common.main.ts:189`），再由 `IInstantiationService`（接口 `instantiation.ts:52`，实现 `instantiationService.ts:28`）按构造参数注入。platform 下共 **233 个** `createDecorator` 标识（1946 个 `.ts` 文件，不含 test）。所以"平台服务"是这批按 id 注入的服务，不是某一层框架。
+
+**主线程实际用到的平台服务**：`src/vs/workbench/api/browser/mainThread*.ts` 共 **97 个文件**，其中从 `platform/**` import 的服务接口为 **42 个 / 166 处**（按 `I*Service` 计）。Top：
+
+| 服务（import 处数） | 代表 file:line |
+| --- | --- |
+| `ILogService` (22) | `api/browser/mainThreadAuthentication.ts:23` |
+| `IConfigurationService` (14) · `IInstantiationService` (14) | `mainThreadAuthentication.ts:35` · `mainThreadCLICommands.ts:16` |
+| `IUriIdentityService` (13) · `IFileService` (7) · `ITelemetryService` (7) | `mainThreadBulkEdits.ts:11` · `mainThreadDocuments.ts:13` · `mainThreadAuthentication.ts:15` |
+| `IStorageService` (5) · `ICommandService` (5) · `IMarkerService` (1) | `mainThreadStorage.ts:6` · `mainThreadCommands.ts:8` · `mainThreadDiagnostics.ts:6` |
+
+扩展宿主的 `$` 调用最终就落到这些服务上。例：`ExtHostDiagnostics` 调 `$changeMany`（`api/common/extHostDiagnostics.ts:170`）→ `MainThreadDiagnostics.$changeMany`（`api/browser/mainThreadDiagnostics.ts:69`）→ `IMarkerService.changeOne`（`:51`）/ `changeAll`（`:93`）→ Problems 视图。整条链都在渲染器里，终点是平台服务。
+
+#### 渲染器 ↔ 扩展宿主怎么通
+
+**协议层**：`IRPCProtocol` 在 `src/vs/workbench/services/extensions/common/proxyIdentifier.ts:8`，实现 `RPCProtocol` 在同目录 `rpcProtocol.ts:115`；两端各一个实例——渲染器侧 `extensionHostManager.ts:258`，扩展宿主侧 `api/common/extensionHostMain.ts:176`。消息是一帧一消息的二进制：帧头 `uint8 type` + `uint32 req`（`rpcProtocol.ts:518-522`），type 枚举 12 个（`:940-953`）——请求 4 种（1–4，JSON 参数 / 混合参数 × 是否带取消）、`Acknowledged=5`、`Cancel=6`、回复 6 种（`ReplyOKEmpty`/`VSBuffer`/`JSON`/`JSONWithBuffers` = 7–10，`ReplyErrError=11`/`ReplyErrEmpty=12`）。请求体 = `rpcId`（代理标识）+ `method` + `args`（`:783`）；`req` 是关联 id，取消发 `serializeCancel(req)`（`:833`），回包 `serializeReplyOK/Err`（`:837`/`:915`），收到请求先回 `Acknowledged`（`:378`）。**`$` 的派发**：代理是 `Proxy`，取属性时若名字首字符是 `$`（`name.charCodeAt(0) === CharCode.DollarSign`，`:252`）就现造一个函数发 `_remoteCall(rpcId, name, args)`（`:461`）；对端收到帧后 `_doInvokeHandler` 按 `rpcId` 取本地对象、按 `method` 取方法并 `apply`（`:449`）。所以 `$` 只是"经 RPC 的方法"这个命名约定，派发靠 `rpcId` + `method` 两个字符串。
+
+**载体层**：两端都不碰物理通道——`RPCProtocol` 只吃一个 `IMessagePassingProtocol`（`send(buffer)` / `onMessage` / `drain?`，`src/vs/base/parts/ipc/common/ipc.ts:99-106`）。
+
+- **桌面**：扩展宿主是 Electron **utility process**（不是 `child_process.fork`），由主进程 `utilityProcess.fork` 拉起（`platform/utilityProcess/electron-main/utilityProcess.ts:261`）。通道是 **MessagePort**：渲染器先 `writeExtHostConnection(new MessagePortExtHostConnection(), env)`（`localProcessExtensionHost.ts:416`，env key `VSCODE_WILL_SEND_MESSAGE_PORT`，`extensionHostEnv.ts:47-55`），响应 channel 是 `vscode:startExtensionHostMessagePortResult`（`:251`），随后 `port.onmessage` / `postMessage` 就是协议收发（`:436-446`）；扩展宿主侧对称（`api/node/extensionHostProcess.ts:183-203`）。另有命名管道与 socket 两种备选连接（`IPCExtHostConnection` / `SocketExtHostConnection`，`extensionHostEnv.ts:17-44`）。
+- **远程 / web（我们的形态）**：渲染器用 **WebSocket** 连 code server（`new WebSocket(url)`，`platform/remote/browser/browserSocketFactory.ts:80`）。服务端把它 `upgradeToISocket` 成 `NodeSocket | WebSocketNodeSocket`（`server/node/remoteExtensionHostAgentServer.ts:237`），按这条 WS 建 `ExtensionHostConnection`（`:502`）并 `cp.fork` 扩展宿主进程（`server/node/extensionHostConnection.ts:290`），再把这条 WS 桥到扩展宿主进程的管道/socket：桥的一端是 `ConnectionData.socket`（即这条 WS，`server/node/extensionHostConnection.ts:73`），另一端是扩展宿主的 socket——`_pipeSockets` 双向对拷字节（`:180-183`），或把 socket 经 `child_process` IPC 发过去（`_sendSocketToExtensionHost`，`:190-200`，消息 `VSCODE_EXTHOST_IPC_SOCKET`，`:99`；扩展宿主侧收，`api/node/extensionHostProcess.ts:220-243`）。环境变量分两种：能传 socket 时 `SocketExtHostConnection`（key `VSCODE_EXTHOST_WILL_SEND_SOCKET`，`extensionHostConnection.ts:266`），不能时监听命名管道并 `IPCExtHostConnection(pipeName)`（key `VSCODE_EXTHOST_IPC_HOOK`，`:269-271`）。`VSCODE_EXTHOST_IPC_SOCKET` / `_READY`（`:322`）/ `_REDUCE_GRACE_TIME`（`:208`）是 `child_process` IPC 上的控制消息名，不是环境变量。
+
+**谁发起**：两种形态都是渲染器。远程由渲染器发 `desiredConnectionType`（`platform/remote/common/remoteAgentConnection.ts:288`）且取 `ConnectionType.ExtensionHost`（`:362`，枚举 `:28`）才 fork（`remoteExtensionHostAgentServer.ts:461` → `:502`）；桌面由渲染器 `createExtensionHost()`（`localProcessExtensionHost.ts:225`）经主进程起 utility 进程。
+
+一句总结：**同一套 `IRPCProtocol` 跑在不同载体上**——桌面 = utility 进程的 MessagePort，远程 = 渲染器 WS + 服务端到扩展宿主进程的 socket/管道桥；主线程与扩展宿主两侧只看得到 `IMessagePassingProtocol`，都不知道自己跑在哪种载体上。
+
 **对 prac 的意义**：三条能力边界的划分就是从这张图来的——扩展宿主能拿到的东西（文档、诊断、语言特性、搜索、终端、任务）是 **tier S**；只有主线程能答的（可见编辑器与选择、对话框、quick pick、进度）是 **tier C**；而在今天的形态里主线程**住在页面**，所以"页面不在 ⇒ 没有能力"。broker 要做的，就是把主线程这一角色从渲染器搬到 server 侧（最小面 18 个代理，见「证据」）。
 
 ### 上游协议清单（2026-09-16 核实于 1.137.0 checkout）
