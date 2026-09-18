@@ -16,39 +16,29 @@
 
 **推导流程图**：
 
-```text
-┌───────────────────────────────────────────────────────────────┐
-│                      理论输入                                 │
-├───────────────────────────────┬───────────────────────────────┤
-│  LLM 固有限制                 │  设计模式                     │
-│  (agent_foundations.md)       │  (agent_design_guide.md)      │
-├───────────────────────────────┼───────────────────────────────┤
-│  • 无状态性                   │  • 学习型执行循环             │
-│  • 上下文窗口限制             │  • 长流程状态管理             │
-│  • 知识滞后 + 幻觉倾向        │  • 鲁棒性执行                 │
-│  • 长流程衰减                 │  • 人机协作边界               │
-│  • Token 成本                 │  • 反模式警示                 │
-└───────────────────────────────┴───────────────────────────────┘
-                              │
-          ┌───────────────────┴─────────────────────┐
-          │               推导映射                  │
-          ├─────────────────────────────────────────┤
-          │  无状态性 ──────────────→ 持久化存储    │
-          │  上下文窗口限制 ────────→ 智能检索      │
-          │  知识滞后 + 幻觉 ───────→ 可验证知识库  │
-          │  长流程衰减 ────────────→ 外化工作流    │
-          │  Token 成本 ────────────→ 遗忘与压缩    │
-          │  学习型执行循环 ────────→ 经验沉淀机制  │
-          │  长流程状态管理 ────────→ Checkpoint    │
-          │  人机协作边界 ──────────→ 帮扶触发条件  │
-          └─────────────────────────────────────────┘
-                              │
-                              ▼
-   三层记忆模型 + RAG 检索 + 编码/遗忘机制
-          │
-          ├─ 语义记忆（知识）────→ 解决知识滞后
-          ├─ 情节记忆（经验）────→ 提供事实依据，防止幻觉
-          └─ 程序记忆（技能）────→ 减轻长流程认知负荷
+```mermaid
+flowchart TB
+  subgraph inputs["理论输入"]
+    limits["LLM 固有限制 (agent_foundations.md)<br/>• 无状态性<br/>• 上下文窗口限制<br/>• 知识滞后 + 幻觉倾向<br/>• 长流程衰减<br/>• Token 成本"]
+    patterns["设计模式 (agent_design_guide.md)<br/>• 学习型执行循环<br/>• 长流程状态管理<br/>• 鲁棒性执行<br/>• 人机协作边界<br/>• 反模式警示"]
+  end
+  subgraph mapping["推导映射"]
+    direction LR
+    m1["无状态性"] --> r1["持久化存储"]
+    m2["上下文窗口限制"] --> r2["智能检索"]
+    m3["知识滞后 + 幻觉"] --> r3["可验证知识库"]
+    m4["长流程衰减"] --> r4["外化工作流"]
+    m5["Token 成本"] --> r5["遗忘与压缩"]
+    m6["学习型执行循环"] --> r6["经验沉淀机制"]
+    m7["长流程状态管理"] --> r7["Checkpoint"]
+    m8["人机协作边界"] --> r8["帮扶触发条件"]
+  end
+  model["三层记忆模型 + RAG 检索 + 编码/遗忘机制"]
+  inputs --> mapping
+  mapping --> model
+  model -->|"解决知识滞后"| semantic["语义记忆（知识）"]
+  model -->|"提供事实依据，防止幻觉"| episodic["情节记忆（经验）"]
+  model -->|"减轻长流程认知负荷"| procedural["程序记忆（技能）"]
 ```
 
 #### 1. 核心限制 → 记忆系统必要性
@@ -135,14 +125,15 @@
 
 **目录结构：**
 
-```text
-knowledge/
-├── tools_catalog.md      # 工具能力矩阵
-├── design_patterns.md    # 已知设计模式
-└── domain_concepts/      # 领域知识（Python、Git、HTTP）
-    ├── python.md
-    ├── git.md
-    └── http.md
+```mermaid
+flowchart TB
+  knowledge["knowledge/"]
+  knowledge --> toolsCatalog["tools_catalog.md<br/># 工具能力矩阵"]
+  knowledge --> designPatterns["design_patterns.md<br/># 已知设计模式"]
+  knowledge --> domainConcepts["domain_concepts/<br/># 领域知识（Python、Git、HTTP）"]
+  domainConcepts --> python["python.md"]
+  domainConcepts --> git["git.md"]
+  domainConcepts --> http["http.md"]
 ```
 
 **检索触发条件：**
@@ -182,14 +173,15 @@ knowledge/
 
 **目录结构：**
 
-```text
-episodes/
-├── successes/
-│   └── 2026-01-20_large-file-edit.md
-├── failures/
-│   └── 2026-01-15_binary-grep-timeout.md
-└── context/
-    └── project_prac.json
+```mermaid
+flowchart TB
+  episodes["episodes/"]
+  episodes --> successes["successes/"]
+  successes --> largeFileEdit["2026-01-20_large-file-edit.md"]
+  episodes --> failures["failures/"]
+  failures --> binaryGrepTimeout["2026-01-15_binary-grep-timeout.md"]
+  episodes --> context["context/"]
+  context --> projectPrac["project_prac.json"]
 ```
 
 **检索触发条件：**
@@ -223,15 +215,16 @@ episodes/
 
 **目录结构：**
 
-```text
-procedures/
-├── workflows/
-│   ├── bug_fix.md
-│   ├── feature_add.md
-│   └── refactor.md
-└── strategies/
-    ├── debugging.md
-    └── code_search.md
+```mermaid
+flowchart TB
+  procedures["procedures/"]
+  procedures --> workflows["workflows/"]
+  workflows --> bugFix["bug_fix.md"]
+  workflows --> featureAdd["feature_add.md"]
+  workflows --> refactor["refactor.md"]
+  procedures --> strategies["strategies/"]
+  strategies --> debugging["debugging.md"]
+  strategies --> codeSearch["code_search.md"]
 ```
 
 **触发机制：**
@@ -264,61 +257,27 @@ procedures/
 
 ## 记忆分层架构
 
-```text
- ┌─────────────────────────────────────┐
- │          LLM (短期工作记忆)         │
- │          - 当前对话上下文           │
- │          - 正在执行的计划           │
- │          - 最近 N 轮对话            │
- └──────────────────┬──────────────────┘
-                    │
-           ┌────────┴────────┐
-           │  检索层 (RAG)   │  ← 基于向量/关键词检索
-           └────────┬────────┘
-                    │
-     ┌──────────────┼──────────────┐
-     │              │              │
-     ▼              ▼              ▼
-┌─────────┐  ┌─────────────┐  ┌─────────┐
-│ 语义库  │  │   情节库    │  │ 程序库  │
-│ (知识)  │  │   (经验)    │  │ (技能)  │
-│         │  │             │  │         │
-│ - 工具  │  │ - 成功案例  │  │ - 工作流│
-│ - 概念  │  │ - 失败案例  │  │ - 策略  │
-│ - 模式  │  │ - 项目上下文│  │ - 技巧  │
-└─────────┘  └─────────────┘  └─────────┘
+```mermaid
+flowchart TB
+  llm["LLM (短期工作记忆)<br/>- 当前对话上下文<br/>- 正在执行的计划<br/>- 最近 N 轮对话"]
+  rag["检索层 (RAG)<br/>← 基于向量/关键词检索"]
+  llm --> rag
+  rag --> semantic["语义库 (知识)<br/><br/>- 工具<br/>- 概念<br/>- 模式"]
+  rag --> episodic["情节库 (经验)<br/><br/>- 成功案例<br/>- 失败案例<br/>- 项目上下文"]
+  rag --> procedural["程序库 (技能)<br/><br/>- 工作流<br/>- 策略<br/>- 技巧"]
 ```
 
 ## 控制层级
 
 记忆系统的控制权分布于三个层级：
 
-```text
-┌─────────────────────────────────────────────────┐
-│                  人类（帮扶层）                 │
-│  - 澄清模糊意图                                 │
-│  - 确认高风险操作（遗忘核心记忆、版本切换）     │
-│  - 裁决冲突                                     │
-└────────────────────┬────────────────────────────┘
-                     │ 请求确认 / 主动咨询
-                     ▼
-┌─────────────────────────────────────────────────┐
-│                  LLM（主导层）                  │
-│  - 理解任务意图，选择工作流                     │
-│  - 判断记录时机和内容                           │
-│  - 评估记忆相关性，决定注入                     │
-│  - 审查遗忘候选，可否决或保留                   │
-│  - 请求更多上下文或人类帮助                     │
-└────────────────────┬────────────────────────────┘
-                     │ 调用 / 查询
-                     ▼
-┌─────────────────────────────────────────────────┐
-│                程序/工具（辅助层）              │
-│  - 执行检索、存储、索引更新                     │
-│  - 计算重要性评分、生成遗忘候选                 │
-│  - 提供可验证信号（测试结果、工具返回值）       │
-│  - 维护元数据一致性                             │
-└─────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+  human["人类（帮扶层）<br/>- 澄清模糊意图<br/>- 确认高风险操作（遗忘核心记忆、版本切换）<br/>- 裁决冲突"]
+  llm["LLM（主导层）<br/>- 理解任务意图，选择工作流<br/>- 判断记录时机和内容<br/>- 评估记忆相关性，决定注入<br/>- 审查遗忘候选，可否决或保留<br/>- 请求更多上下文或人类帮助"]
+  tools["程序/工具（辅助层）<br/>- 执行检索、存储、索引更新<br/>- 计算重要性评分、生成遗忘候选<br/>- 提供可验证信号（测试结果、工具返回值）<br/>- 维护元数据一致性"]
+  human -->|"请求确认 / 主动咨询"| llm
+  llm -->|"调用 / 查询"| tools
 ```
 
 **设计原则**：

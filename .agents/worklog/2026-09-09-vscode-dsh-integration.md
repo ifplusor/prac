@@ -75,15 +75,23 @@
 
 > 这是**当时**的快照，不是目标（目标见 `docs/architecture.md`）。
 
-```
-DSH web 页
-├── prac frame（prac-client-ui-layout）：区域树 / sash / 座位 / 视图目录 / recall —— prac 自己的词
-│     ├── dsh:*     视图：DSH 插件注册进槽（对话、导航…）
-│     └── vscode:*  座位：把 VS Code 的 part 挂进某个 region
-├── prac-client-vscode-host（prac 的行）：工作区解析 + view→part 映射 + pracVscode 服务
-│     └── prac-vscode-embed/client（lib，prac-free、DSH-free）：boot 一次 / partHost / 主题类 / 命令面
-│           └── 补丁后的 Code - OSS（vendor/vscode）：EmbeddedWorkbench 把 part 交给外部 host
-└── prac-host-vscode（prac 的行）：/prac-vscode 路由 + /oss-<segment> 代理 → code server :3091
+```mermaid
+flowchart TB
+  web["DSH web 页"]
+  frame["prac frame（prac-client-ui-layout）：区域树 / sash / 座位 / 视图目录 / recall —— prac 自己的词"]
+  dshView["dsh:* 视图：DSH 插件注册进槽（对话、导航…）"]
+  vsSeat["vscode:* 座位：把 VS Code 的 part 挂进某个 region"]
+  host["prac-client-vscode-host（prac 的行）：工作区解析 + view→part 映射 + pracVscode 服务"]
+  embed["prac-vscode-embed/client（lib，prac-free、DSH-free）：boot 一次 / partHost / 主题类 / 命令面"]
+  oss["补丁后的 Code - OSS（vendor/vscode）：EmbeddedWorkbench 把 part 交给外部 host"]
+  hostVscode["prac-host-vscode（prac 的行）：/prac-vscode 路由 + /oss-#lt;segment#gt; 代理 → code server :3091"]
+  web --> frame
+  frame --> dshView
+  frame --> vsSeat
+  web --> host
+  host --> embed
+  embed --> oss
+  web --> hostVscode
 ```
 
 包：`packages/{bundle/web-app, client/{ui-layout, vscode-host, ui-vscode-editor, ui-vscode-explorer}, host/vscode}` + `vendor/{vscode, vscode-embed}`；profile `prac-dev` = 三 bundle（`dsh-base` / `dsh-web-app` / `prac-web-app`）+ 六 link。

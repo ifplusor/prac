@@ -33,10 +33,13 @@ prac 作为软件/产品的定位，以及它自身开发的记忆与工作流�
 
 ### 4. 状态机（4 粗分类 + 终态前缀空间）
 
-```
-proposed → in-progress → resolved:<fine>
-    │           │           │
-    └───────────┴───────────┴──→ abandoned:<fine>
+```mermaid
+flowchart LR
+  proposed["proposed"] --> inProgress["in-progress"]
+  inProgress --> resolved["resolved:#lt;fine#gt;"]
+  proposed --> abandoned["abandoned:#lt;fine#gt;"]
+  inProgress --> abandoned
+  resolved --> abandoned
 ```
 
 | 粗分类             | 平铺/前缀    | 含义                                                        |

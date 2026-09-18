@@ -20,12 +20,16 @@ status: resolved:settled
 
 ### 环境结构（镜像 DSH，已核对）
 
-```
-/Volumes/Dev/prac/           <- bare 中心仓库
-  .git/                      （主配置无 core.bare + worktreeConfig=true；.git/config.worktree 里 core.bare=true）
-  prac-main/   [main]        <- used/stable（冻结）
-  prac-dev/    [dev]         <- development（不稳定在此）
-remote: origin → git@github.com:ifplusor/prac.git（当前为空）
+```mermaid
+flowchart TB
+  root["/Volumes/Dev/prac/<br/>← bare 中心仓库"]
+  git[".git/<br/>（主配置无 core.bare + worktreeConfig=true；.git/config.worktree 里 core.bare=true）"]
+  main["prac-main/ [main]<br/>← used/stable（冻结）"]
+  dev["prac-dev/ [dev]<br/>← development（不稳定在此）"]
+  root --> git
+  root --> main
+  root --> dev
+  remote["remote: origin → git@github.com:ifplusor/prac.git（当前为空）"]
 ```
 
 ### 复现步骤（含 worktreeConfig trick）

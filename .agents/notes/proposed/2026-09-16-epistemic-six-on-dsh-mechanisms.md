@@ -14,15 +14,16 @@ status: proposed
 
 设想的形态（09-08 时写下，**未验证**）：
 
-```
-profile: prac
-  ├── dsh-base                 (共享第一层：模型、工具、持久化、审批、设置、凭据)
-  ├── dsh-web-app              (浏览器应用，观测面)
-  ├── prac-decision            (决策空间工具 + 依据一等公民渲染)   ← 自定义 bundle
-  ├── prac-review              (审查为主界面：候选裁决呈现)        ← 自定义 bundle
-  ├── prac-memory              (架构记忆：活的决策历史文档)        ← 自定义 bundle
-  ├── prac-plan                (活的计划：可被现实证据打击的假设)  ← 自定义 bundle
-  └── cordis.patch.yml         (本项目对行为的调优)
+```mermaid
+flowchart TB
+  profile["profile: prac"]
+  profile --> dshBase["dsh-base<br/>(共享第一层：模型、工具、持久化、审批、设置、凭据)"]
+  profile --> dshWeb["dsh-web-app<br/>(浏览器应用，观测面)"]
+  profile --> decision["prac-decision<br/>(决策空间工具 + 依据一等公民渲染)<br/>← 自定义 bundle"]
+  profile --> review["prac-review<br/>(审查为主界面：候选裁决呈现)<br/>← 自定义 bundle"]
+  profile --> memory["prac-memory<br/>(架构记忆：活的决策历史文档)<br/>← 自定义 bundle"]
+  profile --> plan["prac-plan<br/>(活的计划：可被现实证据打击的假设)<br/>← 自定义 bundle"]
+  profile --> patch["cordis.patch.yml<br/>(本项目对行为的调优)"]
 ```
 
 每个 `prac-*` 是两个东西：一组 **Cordis 配置行** + 它们挂载的**插件代码**。它们只做三件事：**注册工具、注册上下文注入、注册交互/呈现**。这正是 DSH 钦定的扩展缝，几乎不需要碰 agent-loop。
