@@ -188,76 +188,11 @@ flowchart TB
 | **协议**     | remote（host 声明、client 调用）+ 转发事件 + 流复用                                            | 服务调用、状态变化、以及 §3.3 要设计的通信层                          |
 | **服务面**   | 工具（`ctx.tools.register` / `defineTool`）、会话、session 投影、资源（client 侧）、快照 store | agent 面（工具 / 上下文）、frame 的持久化                             |
 
-**渲染架构**：以下 file:line，除写明「本仓」的，都在 DSH checkout 的 `packages/**` 里。`dsh web` 到像素是一条单向链：服务页面 → 注入 boot 图 → 浏览器内核 → 模块系统 → Cordis Loader → 插件 `apply` → 槽注册 → React 渲染。
-
-```mermaid
-flowchart TD
-  A["dsh web：webserver + frontend-static 供 index.html"] --> B["client-modules 产出注入行：__ModuleLoader__ 队列 + 预载 + __DSH_BOOT__"]
-  B --> C["apps/web 入口：AppWebEntry.run()"]
-  C --> D["模块系统：9 词 seed 表 + boot 图"]
-  D --> E["Cordis Loader：逐行 import 与 apply"]
-  E --> F["client.js lazy-CJS envelope 物化"]
-  F --> G["插件 apply：ctx.slots.register / provide"]
-  G --> H["ui-renderer：renderSlot('root')"]
-  H --> I["像素：React 组件树"]
-```
-
-| 环节            | 是什么                                                                                                                                                        | 证据（DSH checkout）                                                                                                                                                                                 |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **服务页面**    | `dsh web` 是 `--profile web` 的别名；web profile 在 `dsh-web-app` 之上叠行                                                                                    | `apps/cli/src/args.ts:175`；`packages/bundle/web-app/cordis.patch.yml:135-161`                                                                                                                       |
-| **页面注入**    | webserver 把 dist 的 `index.html` 过一遍结构化注入表；`frontend-static` 是读 dist 的 fallback                                                                 | `packages/host/webserver/src/index.ts:347-361`；`packages/host/frontend-static/src/index.ts:120-142`                                                                                                 |
-| **boot 图**     | `client-modules` 的 node 半边扫 Loader 行里的 `dsh.client` 包，合成 boot 图并产出注入行（队列、预载、blocking bootstrap、`__DSH_BOOT__`）                     | `packages/client/modules/src/index.ts:474-509`、`:578-580`；声明字段 `packages/util/package-manifest/src/types.ts:43-57`                                                                             |
-| **浏览器入口**  | Vite 入口对 `#root` 跑 `AppWebEntry`                                                                                                                          | `apps/web/src/main.ts:1-6`                                                                                                                                                                           |
-| **boot 内核**   | 等 `__DSH_BOOT_READY__`、取 `window.__ModuleLoader__`、用 seed 表与 boot 图建模块系统；挂 Loader 并 `loader.internal = modules`；逐行 `loader.create`         | `packages/client/web/src/boot.ts:46-85`、`:113-135`                                                                                                                                                  |
-| **seed 表**     | 9 个平台词 → shell 的静态导入                                                                                                                                 | `packages/client/web/src/seed.ts:24-38`；词表 `packages/client/web/src/platform.ts:8-14`                                                                                                             |
-| **loader 产物** | 每个 client bundle 是 `window.__ModuleLoader__.load({id, factory})` 的闭包工厂；加载只注册工厂，物化才跑模块体；`require` 解析顺序 seed → 已物化 → 已注册工厂 | `packages/client/tsdown.client.ts:566-568`；`packages/client/modules/src/client/system.ts:172-192`、`:200-213`                                                                                       |
-| **插件行**      | Loader 按 Cordis 服务依赖定激活顺序，import 后跑 `apply`；未激活的行在 boot 审计里报错                                                                        | `packages/client/web/src/boot.ts:124-135`、`:138-158`                                                                                                                                                |
-| **槽**          | 插件在 `apply` 里 `ctx.slots.register(...)`                                                                                                                   | `packages/client/ui-layout/src/client/index.ts:148-158`；`packages/client/ui-conversation/src/client/apply.ts:388-393`                                                                               |
-| **渲染**        | `ui-renderer` 安装槽渲染器并提供 `ctx.uiRenderer.mount`；boot 用 `inject(['uiRenderer'])` 挂载；React 树从内置 `root` 槽起                                    | `packages/client/ui-renderer/src/client/index.ts:88-96`；`packages/client/web/src/boot.ts:95-101`；`packages/client/ui-renderer/src/client/app.tsx:21`、`registry.ts:43`、`scoped-slots.tsx:895-931` |
-
-**UI 组装原语**：
-
-- `ctx.slots` 是**命名槽注册表**。一次 `register({ name, key?, children?, store?, inject? }, Component)` 同时声明该组件允许渲染的 child 槽（声明即独占授权）。槽有四种形态：`single`（单占用）、`list`（有序列表）、`keyed`（按 key 分派）、`chain`（条目自选）；作用域三种：`root` / `session-maybe` / `session`（`packages/client/ui-slots/src/index.ts:97-101`、`:149-155`；注册入口 `packages/client/ui-renderer/src/client/registry.ts:607-612`）。所以不是只有单值 / 列表两种。
-- `root` 是内置的单值槽，只有 shell 从 ctx 层渲染它（`registry.ts:43`、`:349-356`）。
-- **贡献一个 view / panel**：在 `apply` 里注册。进 `main`（keyed）的一个 key 就是一个中央面板——`ui-conversation` 注册 key `conversation`（`ui-conversation/src/client/apply.ts:388-393`）；进 `sidebar` / `rightbar`（single）就占据整列，进 `shell.overlay`（list）就叠在整帧之上（`ui-layout/src/client/index.ts:61-91`）。父组件在自己的渲染点用 `renderSlot('<key>', ownerProps)` 取出来（`ui-layout/src/client/AppFrame.tsx:40-42`、`:193-227`）。
-- **由什么渲染**：React 18（`packages/client/ui-renderer/package.json:54-55`；锁定 18.3.1）。注册的组件是函数组件——渲染器按 `FC<InjectedProps>` 取用并以 JSX 展开（`scoped-slots.tsx:505`、`:510`、`:548`）。四种形态的分派在 `scoped-slots.tsx:801-812`（single / keyed）与 `:814-834`（chain）。
-- **样式**：CSS Modules 在 bundle 内用 lightningcss 编译，工厂执行时注入带 `data-plugin` / `data-plugin-css` 的 `<style>`，类名是 hash（`packages/client/tsdown.client.ts:33-53`、`:502-525`）；全局 css 走同一注入器（`:542-556`）。主题别名 token 是 `--dsw-*`，由 `ui-layout` 的 presenter 写到 `document.body`（`ui-layout/src/client/index.ts:171-181`）。
-
-| 包              | 负责                                                                                                                       | 形态                     |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| `ui-slots`      | 命名槽的纯核心（声明、注册、四种形态、load 期校验），无 React                                                              | 静态链接库，也是 seed 词 |
-| `ui-primitives` | 共享 React 原子（控件、图标、Markdown / 终端 / diff 等输出卡片），零 Cordis、只用 token                                    | 静态链接库，也是 seed 词 |
-| `ui-dockkit`    | 停靠布局引擎（分割树 + 标签页 + 撤销历史）与组件；右侧栏是它的嵌入者                                                       | 静态链接库，也是 seed 词 |
-| `ui-layout`     | 固定三列 AppFrame、列宽常量、`ctx.layout`、主题 presenter，并声明 `sidebar` / `main` / `rightbar` / `shell.overlay` 四个槽 | 一个 client 插件行       |
-| `ui-renderer`   | 唯一把裸 observable 绑成 React hook、持有 React context、渲染 `root` 的包                                                  | 一个 client 插件行       |
-
-（证据：`packages/client/ui-slots/README.md`、`ui-primitives/README.md`、`ui-dockkit/README.md`；`packages/client/ui-primitives/tsdown.config.ts` 与 `ui-dockkit/tsdown.config.ts` 都调 `staticLinked`；`ui-layout/src/client/columns.ts:11-29`、`service.ts:28-51`。）
-
-**状态与数据**：
-
-- `dsh-client-store` 是 React-free 的快照 store 引擎：`createSnapshotStore`（`getSnapshot` / `subscribe` / 生效方式）、`defineStore`（init + actions 声明表），可按名持久化到 localStorage（`packages/client/store/src/index.ts:103`、`:217`；契约 `packages/client/store/src/contract.ts:3-14`）。渲染侧只有 `ui-renderer` 把它绑成 React hook；业务组件不自己订阅。
-- remote / typert：host 用装饰器声明方法并生成 descriptor；client 在 `apply` 里 `ctx.remote.$mount(contribution)`，得到 `ctx.remote.<namespace>` 的方法与 stream（`packages/api/remotes/src/client/index.ts:143-158`）。**它不直接进 React**：转发事件经 `ctx.remote.$on(...)` 更新 client 数据层（会话 / 工作区模型），模型再经 UI adapter 变成槽的标准 hook 或 store（`packages/api/session-controller/src/client/index.ts:102-107`）。分层与数据路径见 DSH 的 `docs/subsystems/web-client.md`。
-
-**平台模块表（9 个词）**：`react`、`react/jsx-runtime`、`react-dom`、`react-dom/client`、`@deepseek-ai/cordis`、`@deepseek-ai/dsh-client-store`、`@deepseek-ai/dsh-client-ui-slots`、`@deepseek-ai/dsh-client-ui-primitives`、`@deepseek-ai/dsh-client-ui-dockkit`（`platform.ts:8-14`，逐一对应 `seed.ts:28-38` 的静态导入）。
-
-- 为什么是这 9 个：四个 React 入口 + Cordis + 四个静态 client 库。它们是有运行时身份、必须只有一份的东西；其余依赖要么内联进各自的 bundle，要么由 `dsh.client.external` 逐包声明。
-- 保证了什么：seed 的值是 shell 的静态导入，所以每个 bundle 拿到同一实例（`seed.ts:1-8`）；词表是单一真源，seed 表、tsdown externals、Vite alias 都消费它，模块身份不会漂移（`platform.ts:1-5`）。
-- 两侧的强制：构建期把这 9 个（baseline）留成 external，非 baseline 的 workspace value import 被纯度门拒绝（`tsdown.client.ts:406-416`、`:482-500`）；运行期 `require` 先命中 seed，未命中就抛（`client/system.ts:200-213`）。
-
-**prac 替掉了哪一层**：
-
-- 替掉的只是 `ui-layout` 这一行：本仓的 `packages/bundle/web-app/cordis.patch.yml:9-10` 把它 `disabled: true`，`:15-16` insert `prac-client-ui-layout`。
-- DSH 的 `ui-layout` 提供的是一个**固定三列壳**，不是区域树：列宽常量在 `columns.ts:11-29`，`ctx.layout` 的面在 `service.ts:28-51`，四个槽在 `index.ts:148-158`。分割树 / 标签页在 `ui-dockkit`，由右侧栏使用。
-- prac 的 `prac-client-ui-layout` 占同一个内置 `root` 槽，重新声明 `sidebar` / `main` / `rightbar` / `shell.overlay` 四个槽并加一个 `prac.view` 列表座位；视图身份是 `<source>:<name>`，`dsh:` 直接映射 DSH 自己的槽，其它来源由 `prac.view` 声明（本仓 `packages/client/ui-layout/src/client/index.ts:92-106`、`catalogue.ts:23-40`）。`ctx.layout` 保留为 compat shim，按 arrangement 绑定的角色把位置词汇翻译成放置（`index.ts:33-37`；`contract.ts:351` 的 `bindRoles`）。
-- 替掉之后**仍然继承**：`ui-renderer`（React 槽渲染与唯一 ctx 层 `renderSlot('root')`）、`ui-slots`、`dsh-client-store`、`ui-primitives`、`ui-dockkit`、`client-modules` 与 Cordis Loader、服务注册表（`provide` / `inject`，消费方 pending 直到提供方出现）、remote 与转发事件。prac 的 patch 只动了 `ui-layout` 一行，没有替换这条链上的任何其它环。
-
-**未核实**：
-
-- 任务里提到的 `clientPack` 在 DSH checkout 里搜不到（`packages/**` 只有 typert 测试里的局部变量 `clientPackage`）。这里按实际存在的两个名字写：client bundle 的 `__ModuleLoader__.load` 闭包工厂封装，以及 `dsh.client` 声明。
-- prac 自己的 client bundle 由 `vite.config.ts` / `scripts/pack-client.ts` 的 pack 产出（本仓 `packages/client/ui-layout/src/client/index.ts:44-48`），与 DSH 的 `tsdown.client.ts` 不是同一条构建链；两条链产物的 envelope 是否逐字节同形，没有对比。
-- 9 个词里每个词「必须是共享单例」的逐条判据，代码里只有 seed 注释与 baseline external 规则；`ui-primitives` / `ui-dockkit` 是否仅为去重而非身份必需，未核实。
+**prac 替掉了哪一层**：只替 `ui-layout` 这一行——本仓 `packages/bundle/web-app/cordis.patch.yml:9-10` 把它 `disabled: true`、`:15-16` insert `prac-client-ui-layout`。DSH 的它给的是一个**固定三列壳**，不是区域树（列宽常量 `packages/client/ui-layout/src/client/columns.ts:11-29`，`ctx.layout` 的面 `service.ts:28-51`，四个槽 `index.ts:148-158`；分割树与标签页在 `ui-dockkit`，由右侧栏使用）。本仓的 `prac-client-ui-layout` 占同一个内置 `root` 槽，重新声明 `sidebar` / `main` / `rightbar` / `shell.overlay` 四个槽、加一个 `prac.view` 列表座位（视图身份是 `<source>:<name>`，`dsh:` 直接映射 DSH 自己的槽——`packages/client/ui-layout/src/client/index.ts:92-106`、`catalogue.ts:23-40`）；`ctx.layout` 留作 compat shim（`index.ts:33-37`，`contract.ts:351` 的 `bindRoles`）。**替掉之后仍然继承**：`ui-renderer`（React 槽渲染、唯一 ctx 层 `renderSlot('root')`）、`ui-slots`、`dsh-client-store`、`ui-primitives`、`ui-dockkit`、`client-modules` 与 Cordis Loader、服务注册表（`provide` / `inject`，消费方 pending 直到提供方出现）、remote 与转发事件。prac 的 patch 只动了 `ui-layout` 一行。
 
 设计只依赖约定：`dsh` 字段的三个角色（bundle / client / profile）、patch 语义、loader 产物形状、平台词表、`provide` / `inject` 的等待语义、命名槽、快照 store 的持久化。不依赖实现细节：具体行 id、API 包的导出名、快照字段的形状。
+
+> DSH 的内部结构（`dsh web` 到像素的链与图、证据行号、槽的四种形态、5 个 UI 包的分工、9 词平台表、还没核实的地方）见 [dsh.md](dsh.md)。
 
 ### 5.2 VS Code 提供
 
@@ -280,65 +215,11 @@ flowchart TD
 
 因此构建只要**两个目标**：`--target web`（浏览器里的 UI，由 DSH 发）与 `--target server`（code server，扩展宿主在这里）。桌面、`server-web`、`reh*` 一律不构建。
 
-**内部的两半**：VS Code 自己把工作台切成两半——**渲染器**（renderer）跑 workbench 的 UI；**扩展宿主**（extension host）是另一个进程、跑扩展代码，只有 `vscode.*` API，**没有 DOM、没有 UI**。扩展宿主协议的**另一端**叫"**主线程**"（main thread）——**不是线程，是角色名**（`MainContext.MainThreadXxx` ↔ `ExtHostContext.ExtHostXxx`），实现在 workbench 里，替扩展宿主做 UI / 编辑器 / 存储 / 诊断那些事。**两种运行形态下主线程都在渲染器里**，远程形态搬走的只有扩展宿主。
+**内部的两半**：**渲染器**跑 workbench（UI）；**扩展宿主**是另一个进程、跑扩展代码（只有 `vscode.*` API，没有 DOM）；两者之间那套协议的对端叫"**主线程**"——**不是线程，是角色名**，而且**实现在渲染器里**。这决定了 prac 的两件事：**没有页面就没有扩展宿主**（连接由渲染器发起），**上游也没有 server 侧的主线程实现**（实现全在 `api/browser/**`）——所以要让 server 侧拿到 IDE 能力，broker 得自己扮演它。
 
-| 词                             | 是什么                                                                              | 桌面                      | 远程 / 浏览器                       | 上游落点                                                                                                    |
-| ------------------------------ | ----------------------------------------------------------------------------------- | ------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **渲染器（renderer）**         | 跑 **workbench**（UI）的那个进程 / 页面：编辑器、视图、命令面板都在这里             | Electron renderer 进程    | 浏览器页                            | `src/vs/workbench/**`                                                                                       |
-| **扩展宿主（extension host）** | 跑**扩展代码**的独立进程：只有 `vscode.*` API，没有 DOM、没有 UI                    | 主进程拉起的 utility 进程 | **code server 里** `cp.fork` 的进程 | `api/common/extHost*` + `api/node/**`                                                                       |
-| **主线程（main thread）**      | extHost 协议的另一端：在 workbench 里替扩展宿主做 UI / 编辑器 / 存储 / 诊断那套实现 | 渲染器里                  | **渲染器里**（= 今天的页面）        | `api/browser/**` 的 `@extHostNamedCustomer(MainContext.MainThreadXxx)` 实现——**上游没有 server 侧的那一份** |
+设计只依赖：连接按首消息分三型（prac 只用**管理面**与**扩展宿主**两型）、管理面的 channel 由服务端注册、extHost 协议不跨越 prac 的 CS 边界。
 
-```mermaid
-flowchart LR
-  subgraph D["桌面"]
-    direction LR
-    subgraph DR["渲染器（进程）"]
-      direction TB
-      DUI["workbench（UI 层）"]
-      DMT["主线程：MainThread* 的实现"]
-      DPS["平台服务"]
-      DUI --- DMT --- DPS
-    end
-    DEH["扩展宿主（进程）<br/>ExtHost* · 扩展代码 · 无 DOM"]
-    DR <-->|"成对：MainThreadXxx ↔ ExtHostXxx<br/>一侧一个，以宿主发起为主"| DEH
-  end
-  subgraph R["远程（我们的形态）"]
-    direction LR
-    subgraph RR["渲染器 = 浏览器页"]
-      direction TB
-      RUI["workbench（UI 层）"]
-      RMT["主线程：MainThread* 的实现"]
-      RPS["平台服务"]
-      RUI --- RMT --- RPS
-    end
-    subgraph CS["code server 进程"]
-      REH["扩展宿主<br/>ExtHost* · 无 DOM"]
-    end
-    RR <-->|"同一套配对"| REH
-  end
-```
-
-**平台服务**（`src/vs/platform/**`）是 UI 之下的**服务层**：文件、配置、存储、命令、遥测、日志、诊断，每个服务一个目录，下分 `common/` 与 `browser/`（或 `node/`、`electron-main/`）。`src/vs/workbench/**` 是 **UI 层**，主线程的 `MainThread*` 实现也在这一层；依赖单向——workbench 大量 import platform，而 **platform → workbench 的真实 import 是 0 处**。服务先由 `createDecorator<T>('id')` 换出一个服务标识（`instantiation.ts:109`），实现于启动时注册（`workbench.common.main.ts:189`），再由 `IInstantiationService` 注入（接口 `instantiation.ts:52`）；platform 下共 **233 个**服务标识。**主线程的 97 个文件里用到 42 个服务 / 166 处**：
-
-| 服务（import 处数）                                                       | 代表 file:line                                                                               |
-| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `ILogService` (22)                                                        | `api/browser/mainThreadAuthentication.ts:23`                                                 |
-| `IConfigurationService` (14) · `IInstantiationService` (14)               | `mainThreadAuthentication.ts:35` · `mainThreadCLICommands.ts:16`                             |
-| `IUriIdentityService` (13) · `IFileService` (7) · `ITelemetryService` (7) | `mainThreadBulkEdits.ts:11` · `mainThreadDocuments.ts:13` · `mainThreadAuthentication.ts:15` |
-| `IStorageService` (5) · `ICommandService` (5) · `IMarkerService` (1)      | `mainThreadStorage.ts:6` · `mainThreadCommands.ts:8` · `mainThreadDiagnostics.ts:6`          |
-
-扩展宿主的 `$` 调用最终就落到这些服务上。一条完整的链：`ExtHostDiagnostics` 调 `$changeMany`（`api/common/extHostDiagnostics.ts:170`）→ `MainThreadDiagnostics.$changeMany`（`api/browser/mainThreadDiagnostics.ts:69`）→ `IMarkerService.changeOne`（`:51`）/ `changeAll`（`:93`）→ Problems 视图——整条链都在渲染器里，终点是平台服务。
-
-**扩展宿主协议与载体**：`api/common/extHost.protocol.ts`（**4218 行**）——代理标识 **168** 个 = `MainContext` **87** + `ExtHostContext` **81**；`MainThreadXxxShape` **86** 个接口 / **500** 个 `$` 方法；`ExtHostXxxShape` **81** 个接口 / **441** 个 `$` 方法（数法：标识数两个 `…Context` 表的条目，方法数 `interface XxxShape` 体内以 `$` 开头的方法，都能用一条命令复算）。**主线程那 87 个实现全部在渲染器里**：78 个 `@extHostNamedCustomer(MainContext.MainThreadXxx)` + 9 个手工注册（Documents / TextEditors / Webviews / WebviewPanels / WebviewViews / CustomEditors / NotebookDocuments / NotebookEditors / ChatOutputRenderer），全在 `src/vs/workbench/api/browser/**`——**协议之外没有 server 侧实现可复用**。
-
-协议是 `IRPCProtocol`（`proxyIdentifier.ts:8`），实现 `RPCProtocol`（`rpcProtocol.ts:115`），两端各一个实例：一帧一消息的二进制，帧头 `uint8 type` + `uint32 req`（`:518-522`），12 种 type（`:940-953`：请求 1–4 / `Acknowledged` 5 / `Cancel` 6 / 回复 7–12），`$` 方法经 JS `Proxy` 现造函数发出（`:252`/`:461`），对端按 `rpcId` + `method` 在 `_doInvokeHandler` 里落到本地对象（`:449`）。载体被 `IMessagePassingProtocol`（`ipc.ts:99-106`）抽象掉，两端都不知道自己跑在什么上：
-
-- **桌面**：Electron **utility 进程**（不是 `child_process.fork`）+ **MessagePort**（`localProcessExtensionHost.ts:416`，env `VSCODE_WILL_SEND_MESSAGE_PORT`；扩展宿主侧 `api/node/extensionHostProcess.ts:183-203`）；
-- **远程 / web（prac 的形态）**：浏览器 `new WebSocket`（`browserSocketFactory.ts:80`）→ code server `upgradeToISocket`（`remoteExtensionHostAgentServer.ts:237`）→ `cp.fork` 扩展宿主（`extensionHostConnection.ts:290`）→ 把这条 WS 与扩展宿主的管道 / socket 对拷（`:180-183` / `:190-200`，控制消息 `VSCODE_EXTHOST_IPC_SOCKET` / `…_READY`，连接方式由 `VSCODE_EXTHOST_WILL_SEND_SOCKET` / `VSCODE_EXTHOST_IPC_HOOK` 二选一）。
-
-**发起方永远是渲染器**：远程要渲染器发 `desiredConnectionType === ExtensionHost`（`remoteAgentConnection.ts:362`）服务端才 fork，桌面由渲染器 `createExtensionHost()`（`localProcessExtensionHost.ts:225`）让主进程起 utility 进程 ⇒ **没有页面就没有扩展宿主**，也就没有任何扩展能力。
-
-> 行号与数字指 pinned **1.137.0** checkout；协议清单（HTTP / 三型 WS / 握手 / 管理面 channel）与踩坑见[工作记录](../.agents/worklog/2026-09-09-vscode-dsh-integration.md)「code server 的协议」。
+> 角色表与那张图、平台服务层是什么、协议与载体（帧格式、12 种消息、桌面 / 远程两种通道）见 [vscode.md](vscode.md)；协议清单（HTTP / 三型 WS / 握手 / channel）与行号见[工作记录](../.agents/worklog/2026-09-09-vscode-dsh-integration.md)「code server 的协议」。
 
 ---
 

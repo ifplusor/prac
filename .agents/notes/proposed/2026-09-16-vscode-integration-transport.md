@@ -52,7 +52,7 @@ flowchart LR
 
 **对 prac 的意义**：扩展宿主能拿到的（文档、诊断、语言特性、搜索、终端、任务）是 **tier S**；只有主线程能答的（可见编辑器与选择、对话框、quick pick、进度）是 **tier C**——而主线程住在页面，所以今天"页面不在 ⇒ 没有能力"。broker 要做的，就是把主线程这一角色从渲染器搬到 server 侧（形状见「设计」，最小面见「证据」）。
 
-> 角色表与图、`MainThread*` 的实现清单与计数、平台服务层（`src/vs/platform/**` 是什么、DI 怎么来、主线程用到 42 个 / 166 处）、协议与载体（帧格式与 12 种消息、桌面 utility 进程 + MessagePort、远程 WS + fork 桥）都在 [`docs/architecture.md` §5.2](../../../docs/architecture.md)。
+> 角色表与图、`MainThread*` 的实现清单与计数、平台服务层（`src/vs/platform/**` 是什么、DI 怎么来、主线程用到 42 个 / 166 处）、协议与载体（帧格式与 12 种消息、桌面 utility 进程 + MessagePort、远程 WS + fork 桥）都在 [`docs/vscode.md`](../../../docs/vscode.md)。
 
 ### 上游协议（设计只依赖这些）
 
@@ -262,7 +262,8 @@ client 做**乐观回显**（本地先应用，等 `applied` 确认版本）；�
 
 ## Related
 
-- [../../../docs/architecture.md](../../../docs/architecture.md)：§3.1（一组插件切成两半）/ §3.3（通信层，本文就是它）/ §4.2（编辑器缓冲区与模型归 server）/ §4.4 原则 3（能力面五件套）/ §5.2（VS Code 内部的两半、平台服务、协议与载体——本文背景的正文在这里）/ §7 第 1 件（本文是它的设计）。
+- [../../../docs/architecture.md](../../../docs/architecture.md)：§3.1（一组插件切成两半）/ §3.3（通信层，本文就是它）/ §4.2（编辑器缓冲区与模型归 server）/ §4.4 原则 3（能力面五件套）/ §5.2（VS Code 提供什么）/ §7 第 1 件（本文是它的设计）。
+- [../../../docs/vscode.md](../../../docs/vscode.md)：本文背景的正文——VS Code 内部的两半、平台服务层、extHost 协议与载体。
 - [2026-09-15-vscode-capabilities-into-prac.md](2026-09-15-vscode-capabilities-into-prac.md)：能力面 `Capability<T, A>` 的形态。
 - [../in-progress/2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)：主线与需求约束、与目标架构的差距（§4）；总纲是旧编号 `决定 22`（旧编号按[工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)的决定台账解析）。
 - [../../worklog/2026-09-09-vscode-dsh-integration.md](../../worklog/2026-09-09-vscode-dsh-integration.md)：依据——「code server 的协议」（HTTP / 三型 WS / 握手 / 管理面 channel）、踩坑与决定台账。
