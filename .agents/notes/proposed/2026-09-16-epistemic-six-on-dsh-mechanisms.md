@@ -4,7 +4,7 @@ status: proposed
 
 # Agent Note: 六件事在 DSH 机制上的落点（提案，未落地）
 
-> **来源**：这段内容原在 `docs/architecture.md`。2026-09-16 该文档被重写为**现在时的结构参考**（DSH / VS Code / prac 的整合），而这里是**尚未落地的映射规划**——参考文档里混计划正是它上次变陈旧的原因，所以搬到这里，状态 `proposed`。
+> **来源**：这段内容原在 `docs/architecture.md`。那份文档现在只放**目标架构**（prac 要成为什么；两个被依赖系统的结构另行成页：[dsh.md](../../../docs/dsh.md) / [vscode.md](../../../docs/vscode.md)），而这里是**尚未落地的映射规划**——参考文档里混计划正是它上次变陈旧的原因，所以搬到这里，状态 `proposed`。
 
 ## Problem
 
@@ -54,5 +54,5 @@ AGENTS.md 的规则：**「Plugins, not loop changes——新行为走文档化�
 ## Related
 
 - [../../../docs/philosophy.md](../../../docs/philosophy.md)：两个轴 + 认识论循环 + 决策单元。
-- [../../../docs/architecture.md](../../../docs/architecture.md)：现在时的结构参考（本文的原宿主）。
+- [../../../docs/architecture.md](../../../docs/architecture.md)：目标架构（本文的原宿主）；两个系统的结构见 [dsh.md](../../../docs/dsh.md) / [vscode.md](../../../docs/vscode.md)。
 - [2026-09-08-epistemic-loop-decision-unit.md](2026-09-08-epistemic-loop-decision-unit.md)、[2026-09-08-decision-space-presentation.md](2026-09-08-decision-space-presentation.md)：六件事里的两件各自的展开。

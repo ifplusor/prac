@@ -173,10 +173,10 @@ vp run --filter prac-vscode vscode:clean-all
 
 ## 扩展基座（`--target server`）
 
-除 web bundle 外，构建还产出 **标准 `server` 目标**（`out-vscode-reh/`），浏览器连的就是它（WebSocket management + 扩展宿主），也是"哪些扩展算可安装"的判据来源。
+除 web bundle 外，构建还产出 **标准 `server` 目标**（`out-vscode-reh/`），浏览器连的就是它（WebSocket management + 扩展宿主），也是"哪些扩展算可安装"的判据来源。两半与协议的细节见 [`docs/vscode.md`](../../docs/vscode.md)。
 
 - **产物是扁平的**：`out-vscode-reh/` 直接放 `server-main.js` 等（没有 `product.json`/`package.json`/`out/`），运行时按 `<checkout>` 解析 `node_modules` 与 `product.json`。
-- **跑法**（cwd = checkout；状态目录按上面的 XDG 表派生）：
+- **跑法**：DSH rig 里这一步由主干自己做（`prac-host-vscode` spawn 它：端口取空闲、不带 `--folder`、随插件 dispose 收掉）；下面这条是**手动起一份**用于单独调试的用法（cwd = checkout，状态目录按上面的 XDG 表派生）：
   ```bash
   cd .build/vscode
   D=${XDG_DATA_HOME:-$HOME/.local/share}; S=${XDG_STATE_HOME:-$HOME/.local/state}

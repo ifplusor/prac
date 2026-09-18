@@ -83,7 +83,7 @@ grep -rn 'prac\|Prac\|PRAC\|DSH' vendor/vscode/overlay/embedBridge.ts vendor/vsc
 | `.`（`src/host/index.ts`） | `resolveBundleRoot({ from, override })`、`resolveCodeServerSegment({ distRoot, override })`、`createAssetHandler({ root, mountPath })`、`createCodeServerProxy({ host, port })` |
 | `./client`（`src/client/index.ts`） | `createVscodeEmbed({ route, productName, … })` → `{ boot({ workspacePath }), partHost(partId), commands(), host(), error(), page }`；并再导出 `prac-vscode` 的 embed 契约（唯一的家仍在 `overlay/embedBridge.ts`） |
 
-prac 两侧随之变薄：`packages/host/vscode` = 路由 `/prac-vscode` + 端口 `3091` + 两个环境变量（`PRAC_VSCODE_ROOT` / `PRAC_CODE_SERVER_PATH`）+ DSH 路由注册；`packages/client/vscode-host` = 工作区解析 + view→part 映射 + `pracVscode` 服务。约 600 行机制搬进 lib。
+prac 两侧随之变薄：`packages/host/vscode` = 路由 `/prac-vscode` + code server 的起停（空闲端口；工作区不由它定）+ 环境变量逃生口 + DSH 路由注册；`packages/client/vscode-host` = 工作区解析 + view→part 映射 + `pracVscode` 服务。约 600 行机制搬进 lib。
 
 **页面级状态收成一个家（为下一步准备）**：boot 守卫、boot 元素、命令面、失败原因、**part→元素表**全在 `globalThis.__vscodeEmbed`（`VscodeEmbedPage`）。理由不是洁癖：消费方各自的 client bundle 会**各自内联一份** lib，模块作用域状态会分裂。
 

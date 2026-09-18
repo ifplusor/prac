@@ -58,6 +58,8 @@ James（2026-09-15）：**"我们想要的不是自定义 workbench，而是把�
 
 ## 关键结构事实（都在 `.build/vscode` 里，可复读）
 
+> 只列**与本提案有关的那几条缝**；VS Code 自身的总体结构（两半与主线程、平台服务层、extHost 协议与载体）见 [`docs/vscode.md`](../../../docs/vscode.md)。
+
 1. **`createWorkbench` 是上游给"换一个 app"留的缝**（`workbench/browser/web.main.ts:103,271`：`IBrowserMainWorkbench` 只有 `{ startup, onWillShutdown, onDidShutdown }`）。上游自己的第二个 app 用的也是它：`sessions/browser/web.main.ts:33` `SessionsBrowserMain extends BrowserMain` 覆写 `createWorkbench` → `createSessionsWorkbench`，并另覆写 `createWorkspaceConfigAndStorageServices` 换掉工作区/配置服务。**我们的补丁用的正是这道缝**，不是 hack。
 2. **part 不是 app 造的，是服务造的**（这一条改变了备选的判断）：
    - `IPaneCompositePartService` 的实现在**构造函数里就 eager 造** `PanelPart` / `SidebarPart` / `AuxiliaryBarPart`（`browser/parts/paneCompositePartService.ts:37`）；

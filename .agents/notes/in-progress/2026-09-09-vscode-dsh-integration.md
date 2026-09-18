@@ -54,6 +54,7 @@ status: in-progress
 
 - **frame 由 `ui-layout` 拥有，只借 VS Code 的行为**（视图契约、`GridDescriptor` 的树形摆放、收起记宽、maximize、layout policy 的写法）；**不让它的 grid 拥有 prac 的 frame**。
 - **机制与组合分层**：机制（`ui-layout`）/ 编排（`web-app`）/ VS Code 侧（vendor + 两个 prac 行）。**机制层不含任何具体视图名与默认落位**。
+- **code server 的进程归主干**：`prac-host-vscode` 自己 spawn 它（`out-vscode-reh/server-main.js`，不用 `--folder`——工作区由 client 的 boot 决定），端口取空闲、等 `/version` 就绪、随插件 dispose 收掉；环境变量（`PRAC_CODE_SERVER_URL` / `_ENTRY` / `_PORT` / `_PATH`）是逃生口。页面不再拥有它。
 - **两个服务主次分明**：`ctx.layout` 是**兼容 shim**（只服务 `ui-workspace` / `ui-sidebar` / `ui-sidebar-right` 用的 5 个方法，可整体删除）；`ctx.pracLayout` 是 prac 机制（含 `bindRoles`），机制**不知道谁是 sidebar**。
 
 ### 3.4 对上游的姿态
@@ -130,12 +131,11 @@ status: in-progress
 
 | #   | 目标                                                                       | 现状                                                                                                           |
 | --- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| 1   | **主干拥有 VS Code 的进程**（起 / 重启 / 关 / 给端口）                     | `prac-host-vscode/src/index.ts` 里 `CODE_SERVER = { host: "127.0.0.1", port: 3091 }` 写死，且没有任何地方启动它 |
-| 2   | **主干（server）是组装与权威，页面是视图**                                 | 组合确实是主干的（profile / bundle patch / loader 行），但 **UI 组装、能力面的唯一实现**都在页面               |
-| 3   | **VS Code 侧是*一组*插件**（基于 lib 构建，server 侧一族 + client 侧一族） | 只有两个包被当成"客户端机制 + host 策略"，其余座位各自成包，族的结构没有被表述                                 |
-| 4   | **一个主干**                                                               | **两个服务端**（DSH 一个、code server 一个），且 code server 的 `--folder` 与 DSH 活动工作区不是同一个目录     |
-| 5   | **两半之间的通信层基于 DSH 的架构重新设计**                                | 现在是**透传**：`/prac-vscode` 静态服务 + 把 VS Code 自己的 Management/ExtensionHost WS 原样转发到 code server |
-| 6   | **client 侧提供 UI 组件、server 侧（code server）提供 IDE 基础能力**       | client 侧嵌的是**整个 workbench app**（自带完整 service 图、状态与协议），能力面也长在 client 侧               |
+| 1   | **主干（server）是组装与权威，页面是视图**                                 | 组合确实是主干的（profile / bundle patch / loader 行），但 **UI 组装、能力面的唯一实现**都在页面               |
+| 2   | **VS Code 侧是*一组*插件**（基于 lib 构建，server 侧一族 + client 侧一族） | 只有两个包被当成"客户端机制 + host 策略"，其余座位各自成包，族的结构没有被表述                                 |
+| 3   | **一个主干**                                                               | **两个服务端**（DSH 一个、code server 一个；后者已由主干起停，但两者仍是两份进程、两套状态）                   |
+| 4   | **两半之间的通信层基于 DSH 的架构重新设计**                                | 现在是**透传**：`/prac-vscode` 静态服务 + 把 VS Code 自己的 Management/ExtensionHost WS 原样转发到 code server |
+| 5   | **client 侧提供 UI 组件、server 侧（code server）提供 IDE 基础能力**       | client 侧嵌的是**整个 workbench app**（自带完整 service 图、状态与协议），能力面也长在 client 侧               |
 
 ### 需要 James 裁
 
@@ -164,3 +164,4 @@ status: in-progress
 - [2026-09-13-vs-concept-boundary.md](2026-09-13-vs-concept-boundary.md)：概念边界与命名的决定 + 执行（Step A/B、命名收束、lib 抽出）。
 - [../proposed/2026-09-15-vscode-capabilities-into-prac.md](../proposed/2026-09-15-vscode-capabilities-into-prac.md)：把能力拆散带入 prac 的理想形态与第一步方案。
 - [../resolved/2026-09-08-prac-positioning-and-dev-workflow-model.md](../resolved/2026-09-08-prac-positioning-and-dev-workflow-model.md)：prac 的定位与开发工作流模型。
+- [../../../docs/vscode.md](../../../docs/vscode.md)：VS Code 自身的结构（两半与主线程、平台服务层、extHost 协议与载体）；DSH 那半在 [../../../docs/dsh.md](../../../docs/dsh.md)。
