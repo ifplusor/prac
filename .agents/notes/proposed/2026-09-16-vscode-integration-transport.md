@@ -24,26 +24,22 @@ prac 的目标（`docs/architecture.md` §1.2）要求：**IDE 能力在 server 
 | **扩展宿主（extension host）** | 跑**扩展代码**的独立进程：只有 `vscode.*` API，**没有 DOM、没有 UI** | 本地 fork 的进程 | **code server 里** fork 的进程 | `api/common/extHost*` + `api/node/**` |
 | **主线程（main thread）** | 扩展宿主协议的**另一端**：在 workbench 里替扩展宿主做 UI / 编辑器 / 存储 / 诊断那些事的那套实现 | 渲染器里 | **渲染器里**（= 今天的页面） | `api/browser/**` 的 `@extHostNamedCustomer(MainContext.MainThreadXxx)`，**77 个不同的 MainThread / 78 个文件**（如 `mainThreadDiagnostics.ts:14`） |
 
-```
- 桌面（渲染器与扩展宿主是两个进程）                         远程（我们的形态：主线程在页面里）
- ┌───────────────────────────┐      命名管道        ┌───────────────────────────┐
- │ 渲染器进程                 │   / MessagePort      │ 浏览器页（渲染器）         │
- │ ┌───────────────────────┐ │◄────────────────────►│ ┌───────────────────────┐ │
- │ │ workbench（UI）        │ │                      │ │ workbench（UI）        │ │
- │ │  └ 主线程：MainThread* │ │                      │ │  └ 主线程：MainThread* │ │
- │ │     的实现（77 个）    │ │                      │ │     的实现（77 个）    │ │
- │ └───────────────────────┘ │                      │ └───────────────────────┘ │
- └───────────────────────────┘                      └──────────────▲────────────┘
- ┌───────────────────────────┐                                     │ WS（把 extHost
- │ 扩展宿主进程               │                      ┌──────────────┴────────────┐
- │  ExtHost* 的实现           │                      │ code server 进程           │
- │  扩展代码 · 无 DOM         │                      │  Management / ExtensionHost│
- └───────────────────────────┘                      └──────────────▲────────────┘
-                                                                   │ 管道 / socket
-                                                    ┌──────────────┴────────────┐
-                                                    │ 扩展宿主进程               │
-                                                    │  扩展代码 · 无 DOM         │
-                                                    └───────────────────────────┘
+```mermaid
+flowchart LR
+  subgraph Desktop["桌面：渲染器与扩展宿主是两个进程"]
+    direction LR
+    DR["渲染器进程<br/>workbench（UI）<br/>主线程 = MainThread* 的实现"]
+    DE["扩展宿主进程<br/>ExtHost* 的实现<br/>扩展代码 · 无 DOM"]
+    DR <-->|"命名管道 / MessagePort"| DE
+  end
+  subgraph Remote["远程（我们的形态）：主线程留在页面里"]
+    direction LR
+    RW["浏览器页 = 渲染器<br/>workbench（UI）<br/>主线程 = MainThread* 的实现（77 个）"]
+    RC["code server 进程<br/>Management · ExtensionHost · Tunnel"]
+    RE["扩展宿主进程<br/>扩展代码 · 无 DOM"]
+    RW <-->|"WS"| RC
+    RC <-->|"管道 / socket"| RE
+  end
 ```
 
 **对 prac 的意义**：三条能力边界的划分就是从这张图来的——扩展宿主能拿到的东西（文档、诊断、语言特性、搜索、终端、任务）是 **tier S**；只有主线程能答的（可见编辑器与选择、对话框、quick pick、进度）是 **tier C**；而在今天的形态里主线程**住在页面**，所以"页面不在 ⇒ 没有能力"。broker 要做的，就是把主线程这一角色从渲染器搬到 server 侧（最小面 18 个代理，见「证据」）。
@@ -76,14 +72,19 @@ prac 的目标（`docs/architecture.md` §1.2）要求：**IDE 能力在 server 
 
 ### 形状
 
-```
-client（prac 的 client 半边）
-   VS Code UI 组件  ←→  DSH remote（能力面快照/调用）· 转发事件（含 waterfall + `$events/result`）
-                                    ↑↓
-server：VS Code 插件的 server 半边 = broker
-   ① 与 code server 的 Management 连接（拿 remotefilesystem / search / scm / debug / task / terminal 等 channel）
-   ② 与扩展宿主的 ExtensionHost 连接（**扮演主线程**）
-   ③ 把两侧合成"能力"，同时给：client 的 UI 组件（经 DSH）与 agent 的工具（进程内直调，无额外协议）
+```mermaid
+flowchart TB
+  UI["VS Code UI 组件"]
+  subgraph SV["server：VS Code 插件的 server 半边 = broker"]
+    B["broker"]
+    CS["code server（Management 面）"]
+    EH["扩展宿主（ExtensionHost 连接）"]
+    AG["agent 的工具（进程内直调，无额外协议）"]
+    B -->|"① 拿它注册的 channel"| CS
+    B -->|"② 扮演主线程"| EH
+    B -->|"③ 把两侧合成能力"| AG
+  end
+  UI <-->|"DSH remote：能力面快照 / 调用 · 转发事件 waterfall + $events/result"| B
 ```
 
 ### prac 版对照（框位对着官方图；**这是我们的整理，不是上游原图**）
@@ -92,33 +93,28 @@ server：VS Code 插件的 server 半边 = broker
 
 图例：**[已落地]** 今天就是这样 · **[要搬]** 目标里换到 server 侧 · **[要建]** 目标里才有的框
 
-```
-   浏览器（client 端）                                DSH host（server 端，主干）
- ┌──────────────────────────────┐               ┌───────────────────────────────────────────┐
- │ prac frame / 编排 / 注意力    │               │ prac-host-vscode               [已落地]    │
- │                       [已落地]│               │   路由 · 同源代理 · 起停 code server       │
- │ ┌──────────────────────────┐ │               │ ┌───────────────────────────────────────┐ │
- │ │ VS Code UI 组件           │ │               │ │ code server 进程（1 个 · 动态端口）    │ │
- │ │  今天 = 整个 workbench app│ │               │ │   Management · ExtensionHost · Tunnel │ │
- │ │  ├ 编辑器控件 / 视图      │ │               │ └─────────────┬─────────────────────────┘ │
- │ │  └ 对话框 / quick pick    │ │               │               │ ①Management（server 连它）│
- │ │                    [要搬] │ │               │ ┌─────────────▼─────────────────────────┐ │
- │ └──────────────────────────┘ │               │ │ broker：扮演主线程            [要建]   │ │
- │ ┌──────────────────────────┐ │               │ │   18 代理 / 82 方法（最小面）          │ │
- │ │ client 半边插件           │ │               │ │   tier S 文档·诊断·fs·搜索·终端·任务   │ │
- │ │  prac-client-vscode-host  │ │               │ │   tier C 转 client（下）               │ │
- │ │  今天还兼主线程    [要搬] │ │               │ │   tier X 明确报错                      │ │
- │ └──────────────────────────┘ │               │ └─────────────┬─────────────────────────┘ │
- │                              │               │ ┌─────────────▼─────────────────────────┐ │
- │  ┌────────────────────────┐  │               │ │ 扩展宿主（Remote Extension Host）      │ │
- │  │ 能力面快照 / 调用       │◄─┼───────────────┼─┤   工作区扩展 · 文档权威       [要建]   │ │
- │  │ （editors / diagnostics）│  │               │ └───────────────────────────────────────┘ │
- │  └────────────────────────┘  │               │ ┌───────────────────────────────────────┐ │
- └──────────────────────────────┘               │ │ agent 的工具：进程内直调同一批能力     │ │
-              ▲                                 │ │ （无额外协议）                [要建]   │ │
-              │  线：今天 = 把 VS Code 自己的 WS/HTTP 原样透传            [要换]                │
-              └───── 目标 = DSH remote（能力面快照/调用）+ 转发事件 + waterfall `$events/result` │
-                                                └───────────────────────────────────────────┘
+```mermaid
+flowchart LR
+  subgraph CL["浏览器（client 端）"]
+    direction TB
+    F["prac frame / 编排 / 注意力<br/>[已落地]"]
+    U["VS Code UI 组件<br/>今天 = 整个 workbench app<br/>[要搬]"]
+    P["client 半边插件 prac-client-vscode-host<br/>今天兼主线程 [要搬]"]
+    CAP["能力面快照 / 调用<br/>editors · diagnostics"]
+    F --> U --> P
+    P --- CAP
+  end
+  subgraph SV["DSH host（server 端，主干）"]
+    direction TB
+    H["prac-host-vscode<br/>路由 · 同源代理 · 起停 code server [已落地]"]
+    CS["code server 进程（1 个 · 动态端口）<br/>Management · ExtensionHost · Tunnel"]
+    B["broker：扮演主线程 [要建]<br/>18 代理 / 82 方法 · tier S / C / X"]
+    EH["扩展宿主 Remote Extension Host<br/>工作区扩展 · 文档权威 [要建]"]
+    AG["agent 的工具：进程内直调 [要建]"]
+    H --> CS --> B --> EH
+    B --> AG
+  end
+  CAP <-->|"今天：VS Code 自己的 WS / HTTP 透传 [要换]<br/>目标：DSH remote + 转发事件 + waterfall $events/result"| B
 ```
 
 对照表（官方图的每一块，在 prac 里对应什么）：
