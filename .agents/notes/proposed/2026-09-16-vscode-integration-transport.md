@@ -89,6 +89,40 @@ server：VS Code 插件的 server 半边 = broker
 - 页面（重）连时：`hello` → 拉能力面 `snapshot` → 订阅事件 → 按需重建 UI 组件。**权威状态全在 server，页面只是视图**。
 - agent 侧同一时刻直调同一批能力对象，**不需要协议**——这是"能力在 server"的兑现方式。
 
+### 三个词：渲染器 / 扩展宿主 / 主线程
+
+**名字最容易误会的是"主线程"：它不是线程概念，是那套 RPC 的*角色名***。`extHost.protocol.ts`（`api/common/`，168 个代理）里成对出现：`MainContext.MainThreadXxx` ↔ `MainContext.ExtHostXxx`——一侧是扩展宿主，另一侧就是"主线程"。调用以扩展宿主发起为主，主线程另有 `$accept*` 一类推送。
+
+| 词 | 是什么 | 住在哪（桌面） | 住在哪（远程 / 浏览器） | 上游落点 |
+| --- | --- | --- | --- | --- |
+| **渲染器（renderer）** | 跑 **workbench**（UI）的那个进程/页面：编辑器、视图、命令面板都在这里 | Electron renderer 进程 | 浏览器页 | `src/vs/workbench/**` |
+| **扩展宿主（extension host）** | 跑**扩展代码**的独立进程：只有 `vscode.*` API，**没有 DOM、没有 UI** | 本地 fork 的进程 | **code server 里** fork 的进程 | `api/common/extHost*` + `api/node/**` |
+| **主线程（main thread）** | 扩展宿主协议的**另一端**：在 workbench 里替扩展宿主做 UI / 编辑器 / 存储 / 诊断那些事的那套实现 | 渲染器里 | **渲染器里**（= 今天的页面） | `api/browser/**` 的 `@extHostNamedCustomer(MainContext.MainThreadXxx)`，**77 个不同的 MainThread / 78 个文件**（如 `mainThreadDiagnostics.ts:14`） |
+
+```
+ 桌面（渲染器与扩展宿主是两个进程）                         远程（我们的形态：主线程在页面里）
+ ┌───────────────────────────┐      命名管道        ┌───────────────────────────┐
+ │ 渲染器进程                 │   / MessagePort      │ 浏览器页（渲染器）         │
+ │ ┌───────────────────────┐ │◄────────────────────►│ ┌───────────────────────┐ │
+ │ │ workbench（UI）        │ │                      │ │ workbench（UI）        │ │
+ │ │  └ 主线程：MainThread* │ │                      │ │  └ 主线程：MainThread* │ │
+ │ │     的实现（77 个）    │ │                      │ │     的实现（77 个）    │ │
+ │ └───────────────────────┘ │                      │ └───────────────────────┘ │
+ └───────────────────────────┘                      └──────────────▲────────────┘
+ ┌───────────────────────────┐                                     │ WS（把 extHost
+ │ 扩展宿主进程               │                      ┌──────────────┴────────────┐
+ │  ExtHost* 的实现           │                      │ code server 进程           │
+ │  扩展代码 · 无 DOM         │                      │  Management / ExtensionHost│
+ └───────────────────────────┘                      └──────────────▲────────────┘
+                                                                   │ 管道 / socket
+                                                    ┌──────────────┴────────────┐
+                                                    │ 扩展宿主进程               │
+                                                    │  扩展代码 · 无 DOM         │
+                                                    └───────────────────────────┘
+```
+
+**对 prac 的意义**：三条能力边界的划分就是从这张图来的——扩展宿主能拿到的东西（文档、诊断、语言特性、搜索、终端、任务）是 **tier S**；只有主线程能答的（可见编辑器与选择、对话框、quick pick、进度）是 **tier C**；而在今天的形态里主线程**住在页面**，所以"页面不在 ⇒ 没有能力"。broker 要做的，就是把主线程这一角色从渲染器搬到 server 侧（最小面 18 个代理，见下节）。
+
 ### prac 版对照（框位对着官方图；**这是我们的整理，不是上游原图**）
 
 官方图：[Supporting Remote Development](https://code.visualstudio.com/api/advanced-topics/remote-extensions#architecture-and-extension-kinds) 的 architecture.png（本地 Extension Host / VS Code Server / Remote Extension Host 三块）。
