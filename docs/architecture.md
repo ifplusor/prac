@@ -119,8 +119,12 @@ flowchart TB
 设计约束：
 
 - 主干的 remote 面是"**host 声明方法、client 调用**"，反向只有**转发事件**（其中 waterfall 类事件可携带回答），**没有通用双向 RPC**；
-- 现成的双向载体是**流复用**（`/api/remote.mux`）：要承载双工有状态协议，得由插件注册端点并自己定帧；
+- **流复用 `/api/remote.mux` 是单向推送**：开流之后 client 只有 `open` / `cancel`，host 只有 `item` / `error` / `end` ⇒ 它承载不了"host 问 client"；
+- host→client 的**请求 / 响应**现成只有一条路：转发事件里的 `waterfall`（带 `eventId`）+ client 用一元调用 `$events/result` 回答；它的事件白名单是 `api-remotes` 里的静态数组 ⇒ 要塞新事件就得改 DSH；
+- 要做**通用双工**，只能改 gateway 的传输核心（新帧 + 客户端 API）——代价最高的一档；
 - **VS Code 的 extHost 协议不应跨越 prac 的 CS 边界**——它属于 server 侧内部（code server ↔ 扩展宿主）。
+
+设计形状、四个待裁项与各自的代价见 [proposed/2026-09-16-vscode-integration-transport.md](../.agents/notes/proposed/2026-09-16-vscode-integration-transport.md)。
 
 ### 3.4 UI 组件的边界
 
@@ -276,6 +280,66 @@ flowchart TD
 
 因此构建只要**两个目标**：`--target web`（浏览器里的 UI，由 DSH 发）与 `--target server`（code server，扩展宿主在这里）。桌面、`server-web`、`reh*` 一律不构建。
 
+**内部的两半**：VS Code 自己把工作台切成两半——**渲染器**（renderer）跑 workbench 的 UI；**扩展宿主**（extension host）是另一个进程、跑扩展代码，只有 `vscode.*` API，**没有 DOM、没有 UI**。扩展宿主协议的**另一端**叫"**主线程**"（main thread）——**不是线程，是角色名**（`MainContext.MainThreadXxx` ↔ `ExtHostContext.ExtHostXxx`），实现在 workbench 里，替扩展宿主做 UI / 编辑器 / 存储 / 诊断那些事。**两种运行形态下主线程都在渲染器里**，远程形态搬走的只有扩展宿主。
+
+| 词                             | 是什么                                                                              | 桌面                      | 远程 / 浏览器                       | 上游落点                                                                                                    |
+| ------------------------------ | ----------------------------------------------------------------------------------- | ------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **渲染器（renderer）**         | 跑 **workbench**（UI）的那个进程 / 页面：编辑器、视图、命令面板都在这里             | Electron renderer 进程    | 浏览器页                            | `src/vs/workbench/**`                                                                                       |
+| **扩展宿主（extension host）** | 跑**扩展代码**的独立进程：只有 `vscode.*` API，没有 DOM、没有 UI                    | 主进程拉起的 utility 进程 | **code server 里** `cp.fork` 的进程 | `api/common/extHost*` + `api/node/**`                                                                       |
+| **主线程（main thread）**      | extHost 协议的另一端：在 workbench 里替扩展宿主做 UI / 编辑器 / 存储 / 诊断那套实现 | 渲染器里                  | **渲染器里**（= 今天的页面）        | `api/browser/**` 的 `@extHostNamedCustomer(MainContext.MainThreadXxx)` 实现——**上游没有 server 侧的那一份** |
+
+```mermaid
+flowchart LR
+  subgraph D["桌面"]
+    direction LR
+    subgraph DR["渲染器（进程）"]
+      direction TB
+      DUI["workbench（UI 层）"]
+      DMT["主线程：MainThread* 的实现"]
+      DPS["平台服务"]
+      DUI --- DMT --- DPS
+    end
+    DEH["扩展宿主（进程）<br/>ExtHost* · 扩展代码 · 无 DOM"]
+    DR <-->|"成对：MainThreadXxx ↔ ExtHostXxx<br/>一侧一个，以宿主发起为主"| DEH
+  end
+  subgraph R["远程（我们的形态）"]
+    direction LR
+    subgraph RR["渲染器 = 浏览器页"]
+      direction TB
+      RUI["workbench（UI 层）"]
+      RMT["主线程：MainThread* 的实现"]
+      RPS["平台服务"]
+      RUI --- RMT --- RPS
+    end
+    subgraph CS["code server 进程"]
+      REH["扩展宿主<br/>ExtHost* · 无 DOM"]
+    end
+    RR <-->|"同一套配对"| REH
+  end
+```
+
+**平台服务**（`src/vs/platform/**`）是 UI 之下的**服务层**：文件、配置、存储、命令、遥测、日志、诊断，每个服务一个目录，下分 `common/` 与 `browser/`（或 `node/`、`electron-main/`）。`src/vs/workbench/**` 是 **UI 层**，主线程的 `MainThread*` 实现也在这一层；依赖单向——workbench 大量 import platform，而 **platform → workbench 的真实 import 是 0 处**。服务先由 `createDecorator<T>('id')` 换出一个服务标识（`instantiation.ts:109`），实现于启动时注册（`workbench.common.main.ts:189`），再由 `IInstantiationService` 注入（接口 `instantiation.ts:52`）；platform 下共 **233 个**服务标识。**主线程的 97 个文件里用到 42 个服务 / 166 处**：
+
+| 服务（import 处数）                                                       | 代表 file:line                                                                               |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `ILogService` (22)                                                        | `api/browser/mainThreadAuthentication.ts:23`                                                 |
+| `IConfigurationService` (14) · `IInstantiationService` (14)               | `mainThreadAuthentication.ts:35` · `mainThreadCLICommands.ts:16`                             |
+| `IUriIdentityService` (13) · `IFileService` (7) · `ITelemetryService` (7) | `mainThreadBulkEdits.ts:11` · `mainThreadDocuments.ts:13` · `mainThreadAuthentication.ts:15` |
+| `IStorageService` (5) · `ICommandService` (5) · `IMarkerService` (1)      | `mainThreadStorage.ts:6` · `mainThreadCommands.ts:8` · `mainThreadDiagnostics.ts:6`          |
+
+扩展宿主的 `$` 调用最终就落到这些服务上。一条完整的链：`ExtHostDiagnostics` 调 `$changeMany`（`api/common/extHostDiagnostics.ts:170`）→ `MainThreadDiagnostics.$changeMany`（`api/browser/mainThreadDiagnostics.ts:69`）→ `IMarkerService.changeOne`（`:51`）/ `changeAll`（`:93`）→ Problems 视图——整条链都在渲染器里，终点是平台服务。
+
+**扩展宿主协议与载体**：`api/common/extHost.protocol.ts`（**4218 行**）——代理标识 **168** 个 = `MainContext` **87** + `ExtHostContext` **81**；`MainThreadXxxShape` **86** 个接口 / **500** 个 `$` 方法；`ExtHostXxxShape` **81** 个接口 / **441** 个 `$` 方法（数法：标识数两个 `…Context` 表的条目，方法数 `interface XxxShape` 体内以 `$` 开头的方法，都能用一条命令复算）。**主线程那 87 个实现全部在渲染器里**：78 个 `@extHostNamedCustomer(MainContext.MainThreadXxx)` + 9 个手工注册（Documents / TextEditors / Webviews / WebviewPanels / WebviewViews / CustomEditors / NotebookDocuments / NotebookEditors / ChatOutputRenderer），全在 `src/vs/workbench/api/browser/**`——**协议之外没有 server 侧实现可复用**。
+
+协议是 `IRPCProtocol`（`proxyIdentifier.ts:8`），实现 `RPCProtocol`（`rpcProtocol.ts:115`），两端各一个实例：一帧一消息的二进制，帧头 `uint8 type` + `uint32 req`（`:518-522`），12 种 type（`:940-953`：请求 1–4 / `Acknowledged` 5 / `Cancel` 6 / 回复 7–12），`$` 方法经 JS `Proxy` 现造函数发出（`:252`/`:461`），对端按 `rpcId` + `method` 在 `_doInvokeHandler` 里落到本地对象（`:449`）。载体被 `IMessagePassingProtocol`（`ipc.ts:99-106`）抽象掉，两端都不知道自己跑在什么上：
+
+- **桌面**：Electron **utility 进程**（不是 `child_process.fork`）+ **MessagePort**（`localProcessExtensionHost.ts:416`，env `VSCODE_WILL_SEND_MESSAGE_PORT`；扩展宿主侧 `api/node/extensionHostProcess.ts:183-203`）；
+- **远程 / web（prac 的形态）**：浏览器 `new WebSocket`（`browserSocketFactory.ts:80`）→ code server `upgradeToISocket`（`remoteExtensionHostAgentServer.ts:237`）→ `cp.fork` 扩展宿主（`extensionHostConnection.ts:290`）→ 把这条 WS 与扩展宿主的管道 / socket 对拷（`:180-183` / `:190-200`，控制消息 `VSCODE_EXTHOST_IPC_SOCKET` / `…_READY`，连接方式由 `VSCODE_EXTHOST_WILL_SEND_SOCKET` / `VSCODE_EXTHOST_IPC_HOOK` 二选一）。
+
+**发起方永远是渲染器**：远程要渲染器发 `desiredConnectionType === ExtensionHost`（`remoteAgentConnection.ts:362`）服务端才 fork，桌面由渲染器 `createExtensionHost()`（`localProcessExtensionHost.ts:225`）让主进程起 utility 进程 ⇒ **没有页面就没有扩展宿主**，也就没有任何扩展能力。
+
+> 行号与数字指 pinned **1.137.0** checkout；协议清单（HTTP / 三型 WS / 握手 / 管理面 channel）与踩坑见[工作记录](../.agents/worklog/2026-09-09-vscode-dsh-integration.md)「code server 的协议」。
+
 ---
 
 ## 6. prac 自己的机制
@@ -320,7 +384,8 @@ flowchart TD
 
 - [philosophy.md](philosophy.md)：两个轴 + 认识论循环 + 决策单元（§1 的出发点）。
 - [.agents/notes/](../.agents/notes/)：决策记忆——每个「为什么 + 放弃了什么」，以及**实现进度、差距与踩坑**。
-- [in-progress/2026-09-09-vscode-dsh-integration.md](../.agents/notes/in-progress/2026-09-09-vscode-dsh-integration.md)：本文件 §1–§4 的设计出自它的决定 22。
+- [in-progress/2026-09-09-vscode-dsh-integration.md](../.agents/notes/in-progress/2026-09-09-vscode-dsh-integration.md)：本文件 §1–§4 的设计出自它的架构总纲（旧编号 `决定 22`；旧编号按同项工作的[工作记录](../.agents/worklog/2026-09-09-vscode-dsh-integration.md)台账解析）。
 - [proposed/2026-09-15-vscode-capabilities-into-prac.md](../.agents/notes/proposed/2026-09-15-vscode-capabilities-into-prac.md)：能力面的形态与三步。
+- [proposed/2026-09-16-vscode-integration-transport.md](../.agents/notes/proposed/2026-09-16-vscode-integration-transport.md)：§3.3 通信层的设计（形状、四个待裁项与代价）。
 - [proposed/2026-09-16-epistemic-six-on-dsh-mechanisms.md](../.agents/notes/proposed/2026-09-16-epistemic-six-on-dsh-mechanisms.md)：六件事的落点（§6.4）。
 - `vendor/vscode/README.md`：上游 pin、补丁集、overlay、构建与验证的细节。
