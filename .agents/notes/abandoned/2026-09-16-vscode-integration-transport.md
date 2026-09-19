@@ -1,9 +1,11 @@
 ---
-status: proposed
+status: abandoned:superseded
 ---
 
 # Agent Note: VS Code 集成进 prac 的通信协议
 
+> **状态：作为计划已被取代**（2026-09-19「从需求出发重做架构」，见 [../proposed/2026-09-19-architecture.md](../proposed/2026-09-19-architecture.md)）。这份 broker 设计现在是那条架构里的 **P1**（主干自己当主线程），内容不作废；协议事实已归入 [`docs/vscode.md`](../../../docs/vscode.md)。
+>
 > 下面的数字与行号都指 pinned VS Code **1.137.0** checkout 与 DSH checkout（事实核实于 2026-09-16 / 09-17）；更细的依据（协议清单、踩坑、决定台账）在[工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)。
 
 ## 问题

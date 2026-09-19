@@ -1,5 +1,8 @@
 # Prac 的目标架构
 
+> **本文件的设计已被取代**（2026-09-19 James：「放弃当前的架构设计，从需求出发，从头设计架构」）。
+> 现在的设计在 [proposed/2026-09-19-architecture.md](../.agents/notes/proposed/2026-09-19-architecture.md)；本文保留为**旧设计的记录**，那篇定案后整体重写——其中大部分结构（主干是 DSH、两端、frame 与「view 是单位」）仍然有效，被扔掉的部分见那篇 §4。
+
 > 面向目标的设计。实现进度、差距与踩坑见 [.agents/notes/](../.agents/notes/)；理念见 [philosophy.md](philosophy.md)。
 
 ---
@@ -124,7 +127,7 @@ flowchart TB
 - 要做**通用双工**，只能改 gateway 的传输核心（新帧 + 客户端 API）——代价最高的一档；
 - **VS Code 的 extHost 协议不应跨越 prac 的 CS 边界**——它属于 server 侧内部（code server ↔ 扩展宿主）。
 
-设计形状、四个待裁项与各自的代价见 [proposed/2026-09-16-vscode-integration-transport.md](../.agents/notes/proposed/2026-09-16-vscode-integration-transport.md)。
+设计形状、四个待裁项与各自的代价见 [abandoned/2026-09-16-vscode-integration-transport.md](../.agents/notes/abandoned/2026-09-16-vscode-integration-transport.md)（**已作为计划被取代**；现为 [架构重做](../.agents/notes/proposed/2026-09-19-architecture.md) 里的 P1）。
 
 ### 3.4 UI 组件的边界
 
@@ -267,7 +270,8 @@ flowchart TB
 - [philosophy.md](philosophy.md)：两个轴 + 认识论循环 + 决策单元（§1 的出发点）。
 - [.agents/notes/](../.agents/notes/)：决策记忆——每个「为什么 + 放弃了什么」，以及**实现进度、差距与踩坑**。
 - [in-progress/2026-09-09-vscode-dsh-integration.md](../.agents/notes/in-progress/2026-09-09-vscode-dsh-integration.md)：本文件 §1–§4 的设计出自它的架构总纲（旧编号 `决定 22`；旧编号按同项工作的[工作记录](../.agents/worklog/2026-09-09-vscode-dsh-integration.md)台账解析）。
-- [proposed/2026-09-15-vscode-capabilities-into-prac.md](../.agents/notes/proposed/2026-09-15-vscode-capabilities-into-prac.md)：能力面的形态与三步。
-- [proposed/2026-09-16-vscode-integration-transport.md](../.agents/notes/proposed/2026-09-16-vscode-integration-transport.md)：§3.3 通信层的设计（形状、四个待裁项与代价）。
+- [abandoned/2026-09-15-vscode-capabilities-into-prac.md](../.agents/notes/abandoned/2026-09-15-vscode-capabilities-into-prac.md)：能力面的形态与三步（**已作为主线被取代**）。
+- [abandoned/2026-09-16-vscode-integration-transport.md](../.agents/notes/abandoned/2026-09-16-vscode-integration-transport.md)：§3.3 通信层的设计（**已作为计划被取代**）。
 - [proposed/2026-09-16-epistemic-six-on-dsh-mechanisms.md](../.agents/notes/proposed/2026-09-16-epistemic-six-on-dsh-mechanisms.md)：六件事的落点（§6.4）。
+- [proposed/2026-09-19-architecture.md](../.agents/notes/proposed/2026-09-19-architecture.md)：**现在的设计**（从需求出发重做，本文待它定案后重写）。
 - `vendor/vscode/README.md`：上游 pin、补丁集、overlay、构建与验证的细节。

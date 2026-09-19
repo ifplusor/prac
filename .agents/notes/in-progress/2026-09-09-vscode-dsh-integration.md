@@ -6,13 +6,14 @@ status: in-progress
 
 > 这是这项工作的 **umbrella**：主线定义、需求约束、决定（含被否决的路线）、开放问题。
 > **依据**（里程碑与工作记录、现在的形态快照、已核实事实、踩坑、验证元教训）在 [工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)——2026-09-17 从本 note 拆出，那时 5.7 万字符里 79% 是依据、决定只占 16%。**它不是 note**（没有状态轴、不签字）。
-> 步骤 note：[2026-09-13-vs-concept-boundary.md](2026-09-13-vs-concept-boundary.md)（概念边界与命名，实现已完成，待签字）；[../proposed/2026-09-15-vscode-capabilities-into-prac.md](../proposed/2026-09-15-vscode-capabilities-into-prac.md)（把能力拆散带入 prac，方案待裁）；[../proposed/2026-09-16-vscode-integration-transport.md](../proposed/2026-09-16-vscode-integration-transport.md)（两半之间的通信层，设计待裁——四项）；[../proposed/2026-09-19-integration-replan.md](../proposed/2026-09-19-integration-replan.md)（**假设变了之后的重新规划**：五条轴 + 两个探针，待裁）。
+> 步骤 note：[2026-09-13-vs-concept-boundary.md](2026-09-13-vs-concept-boundary.md)（概念边界与命名，实现已完成，待签字）；[../abandoned/2026-09-15-vscode-capabilities-into-prac.md](../abandoned/2026-09-15-vscode-capabilities-into-prac.md)（把能力拆散带入 prac，方案待裁）；[../abandoned/2026-09-16-vscode-integration-transport.md](../abandoned/2026-09-16-vscode-integration-transport.md)（两半之间的通信层，设计待裁——四项）；[../proposed/2026-09-19-architecture.md](../proposed/2026-09-19-architecture.md)（**从需求出发重做架构**：需求清单 + 推导 + 能力路由表 + 待裁，取代了旧设计）。
 > 口径（**§3.8 的断言分层之后**）：**vendor 侧集成门**写作 **14/14 · 28/28 · 9/9 · 6/6 · 7/7 · 33/33**（layout · views · focus · regions · view · file）；第六门 `verify-extension` 是**条件门**（装了扩展才跑 5 项，没装时明确 `SKIPPED`——SKIP 不是通过）；**prac 侧活体门**写作 `verify:stack 6/6 · verify:bottom 6/6 · verify:persistence 6/6 · verify:split 11/11`；所有 part 计数一律 **8/8**；**单测**写作 `pnpm test`。
 
 ## 1. 这个工作是什么（主线定义）
 
 1. **（2026-09-09）** 把 VS Code 与 DSH 结合成**一个**形态：prac 的界面 = agent 与 IDE **深融进一套 UI**，不是两套并列。保留**完整 IDE 能力与扩展生态**（Tier 2：语言包、GitLens 等 UI 扩展），**不要 VS Code 的布局**；以 agent 为中心，**IDE 是可按需下潜的重工具**。
 2. **（2026-09-15）** **不是自定义 workbench，而是把基础能力拆散后带入 prac**：把 VS Code 的 **UI 层拆散**渲染进 DSH；**能力层**（如诊断）也要**暴露给 agent**；prac 同时利用 **VS Code 与 DSH 两方生态**。
+   ⚠️ **（2026-09-19）这一条的三个前提都被重做**：见 [重新规划](../proposed/2026-09-19-architecture.md)——"能力面驱动 UI 组件"不再作为主轴、"UI 层拆散成组件"降为可选手段、诊断不是 agent 的一等能力（详见那篇 §4）。**下面 §3/§4 的内容按它的结论重读**，定案后重写。
 
 **阶段切换**：此前在讨论 prac 的目标/理念，并以具体任务体验工作流（C1、C2）；进行到 C2 时 James 叫停，转入融合形态本身。叫停理由原文只有「我发现我们不应该再继续了」，推断是优先级——**待确认**。本工作**不欠**阶段二的那些机制（决策空间 / 以审决策为主界面）；它们要重新进入主线，需 James 重新裁决。
 
@@ -34,7 +35,8 @@ status: in-progress
 ## 3. 决定（现在的设计为什么长这样）
 
 > 这一节只写**当下的立场**：决定了什么、为什么、放弃了什么。**不记编年**——哪天裁的、当时先想到什么、被纠正过什么、落地时验了多少，都在[工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)：那里**原样保留着旧的决定台账**，历史引用 `决定 N` 按它解析（编号不再新增）。
-> `docs/architecture.md` 是**面向目标**的设计（要建成什么）；这一节是**已经定下的**那些（为什么是现在这个形状），差距与待裁项在 §4。
+> ⚠️ **2026-09-19：「放弃当前的架构设计，从需求出发，从头设计架构」**（James）。**重做中**的设计见 [proposed/2026-09-19-architecture.md](../proposed/2026-09-19-architecture.md)；它列了哪几条旧决定仍有效、哪几条被扔（§4）。定案后这一节与 §4 按它重写。
+> `docs/architecture.md` 是**面向目标**的设计（要建成什么，**现已加"被取代"横幅**）；这一节是**已经定下的**那些（为什么是现在这个形状），差距与待裁项在 §4。
 
 ### 3.1 总纲：两端结构与主干
 
@@ -168,6 +170,6 @@ status: in-progress
 ## Related
 
 - [2026-09-13-vs-concept-boundary.md](2026-09-13-vs-concept-boundary.md)：概念边界与命名的决定 + 执行（Step A/B、命名收束、lib 抽出）。
-- [../proposed/2026-09-15-vscode-capabilities-into-prac.md](../proposed/2026-09-15-vscode-capabilities-into-prac.md)：把能力拆散带入 prac 的理想形态与第一步方案。
+- [../abandoned/2026-09-15-vscode-capabilities-into-prac.md](../abandoned/2026-09-15-vscode-capabilities-into-prac.md)：把能力拆散带入 prac 的理想形态与第一步方案。
 - [../resolved/2026-09-08-prac-positioning-and-dev-workflow-model.md](../resolved/2026-09-08-prac-positioning-and-dev-workflow-model.md)：prac 的定位与开发工作流模型。
 - [../../../docs/vscode.md](../../../docs/vscode.md)：VS Code 自身的结构（两半与主线程、平台服务层、extHost 协议与载体）；DSH 那半在 [../../../docs/dsh.md](../../../docs/dsh.md)。
