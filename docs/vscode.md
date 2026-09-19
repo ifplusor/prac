@@ -81,3 +81,21 @@ flowchart LR
 - **载体也是先决条件**：`extensionHostProcess.ts` 先等 MessagePort 或 socket——MessagePort 那条是 `process.parentPort.on('message')`（没人发就永不 resolve，`:190-203`，且该分支要求 Electron 的 parent），socket 那条有 60 s 超时后 `onTerminate('VSCODE_EXTHOST_IPC_SOCKET timeout')`（`:208-212`）。
 - 启动之后，**远程形态的激活不等 renderer 确认**：`$onWillActivateExtension` 在 `isRemote` 时发了不等，只有本地（桌面）扩展宿主才 await（`extHostExtensionService.ts:445-455`）⇒ 没有页面，扩展也能激活、也能自己 `set()` 诊断。
 - 但 **UI-kind 的扩展**由扩展宿主把激活**交给主线程**（`extHostExtensionService.ts:193`）：判定是 `isHostExtension`——不在本宿主的 `myRegistry` 里、却在全局注册表里、有 main/browser 代码且 `api === 'none'`（`services/extensions/common/extensionDescriptionRegistry.ts:31-45`）⇒ 没人答，激活**永久挂住**。
+
+## agent / MCP / tool / skill / prompt 在哪一层
+
+分五层，**越靠前的越"文件与声明"，越靠后的越"进程与循环"**；扩展能填前四层，替换不了第五层。
+
+**① 文件即定制**（仓库里，core 解析）：`promptSyntax/` 认四种文件——`*.prompt.md`、`*.instructions.md`、`*.chatmode.md`（agent）、**`SKILL.md`**（skill），语言 id 分别是 `prompt` / `instructions` / `chatagent` / `skill`（`promptTypes.ts:22-40`）；默认目录 `.github/prompts`、`.github/instructions`、`.github/skills`（`promptFileLocations.ts:97`/`:102`/`:174`），另外认 `AGENTS.md`（`:52`）；加载是自动的（`computeAutomaticInstructions.ts`）。
+
+**② 声明式贡献点**（扩展 `package.json`；点注册在 core）：`chatParticipants`（agents）、`languageModelTools` + `languageModelToolSets`、`languageModelChatProviders`、`chatSessions`、`chatPromptFiles` / `chatInstructions` / `chatAgents` / `chatSkills`、`chatPlugins`、`chatContext`、`chatOutputRenderer`、`chatViewsWelcome`、`mcpServerDefinitionProviders`。
+注册点：`browser/chatParticipant.contribution.ts`、`common/tools/languageModelToolsContribution.ts`、`common/languageModels.ts`、`browser/chatSessions/chatSessions.contribution.ts`、`common/promptSyntax/chatPromptFilesContribution.ts`（enum `ChatContributionPoint`）、`common/plugins/agentPluginServiceImpl.ts`、`browser/contextContrib/chatContext.contribution.ts`、`browser/chatOutputItemRenderer.ts`、`common/discovery/extensionMcpDiscovery.ts`。
+
+**③ 运行时 API**（扩展 activate 里注册）：`chat.createChatParticipant`（`vscode.d.ts:20124`）、`lm.registerTool`（`:20777`）、`lm.registerMcpServerDefinitionProvider`（`:20841`）、模型选择（`lm.selectChatModels`）。**session provider 仍是 proposed**（`vscode.proposed.chatSessionsProvider.d.ts`）。
+
+**④ core 的 harness**（扩展只能填表）：chat 服务与循环（`common/chatService/`）、participants 管理（`common/participants/chatAgents.ts`）、工具注册与确认（`common/tools/languageModelToolsService.ts`、`languageModelToolsConfirmationService.ts`）、**内建工具**（`common/tools/builtinTools/`：`askQuestionsTool` / `editFileTool` / `manageTodoListTool` / `reviewPlanTool` / `runSubagentTool` / `setArtifactsTool` / `taskCompleteTool` / `confirmationTool`…）、MCP 客户端（`contrib/mcp/**`：registry / server / connection / gateway / sandbox / sampling，工具经 `mcpLanguageModelToolContribution.ts` 变成 LM 工具）、会话模型（`chatSessionsService.ts`）、插件与技能模型（`common/plugins/agentPluginService.ts`：插件目录含 `commands/`、`skills/`（`SKILL.md`）、`agents/`、`hooks/`、MCP 定义，见同目录 `AGENTS_PLUGINS.md`）。
+**工具调用的方向**：主线程发起、扩展宿主回答（`ExtHostLanguageModelToolsShape.$invokeTool`，`extHost.protocol.ts:1887`；反向的 `MainThreadLanguageModelToolsShape.$invokeTool` 供宿主侧调主线程）。两个代理标识的历史名叫 `MainThreadChatSkills` / `ExtHostChatSkills`（`:4053`/`:4193`）。
+
+**⑤ agent host**（`platform/agentHost/**`）：把**外部 agent** 当被托管进程跑起来——`node/copilot`、`node/claude`、`node/codex`、`node/localCommands`，并给它们一整套宿主设施：changeset（`agentHostChangesetService.ts`）、checkpoint（`agentHostCheckpointService.ts`）、plan review（`agentHostPlanReview.ts`）、git 与独立 worktree（`agentHostGitService.ts`；协议方法如 `vscode/createAgentHostDetachedWorktree`，`agentHostExtensionProtocol.ts`）、文件系统 provider、customization、BYOK 模型（`agentHostByokLm.ts`）、managed rules / settings、OTel。
+
+**与扩展生态的关系**：以上每一项**都有对应的扩展贡献点或 API**——Copilot 扩展就是最大的消费者（同时声明 `chatParticipants` / `languageModelTools` / `languageModelToolSets` / `languageModelChatProviders` / `mcpServerDefinitionProviders` / `chatSessions` / `chatAgents` / `chatPromptFiles` / `chatSkills`）。⇒ **在 VS Code 里，"agent 支持"本身就是一个扩展面**：core 拿循环与注册表，扩展拿 agent / 工具 / 模型 / 会话 / 定制。MCP 还多一条：VS Code 会从**别的工具**那里导入服务器定义（`ExternalDiscoverySource`：Claude Desktop / Copilot / Windsurf / Cursor 全局与工作区，`mcpConfiguration.ts:54-55`），并 discovery 工作区的 mcp 配置（`discovery/workspaceDotMcpDiscovery.ts`）。
