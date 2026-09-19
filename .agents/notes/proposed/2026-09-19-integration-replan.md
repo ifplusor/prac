@@ -63,12 +63,39 @@ status: proposed
 - **MCP 客户端归谁**：DSH 自己起（推荐）／用 VS Code 的 `contrib/mcp`（等于取它一部分 agent 面）／两边各起。
 - **文件定制是否共源**：`SKILL.md` / `*.instructions.md` / `AGENTS.md` 是纯文件——共源（一个真实源，跟随上游格式）／只共 `AGENTS.md` 这类仓库事实／各用各的。
 
-## 两个先做的探针（验证优先于表态）
+## 轴 1 的具体化：LSP 优先（James 2026-09-19）
 
-1. **探针 A（半天，验轴 1b）**：写一个最小扩展（在 code server 的扩展宿主里），做两件事：`commands.executeCommand('vscode.executeHoverProvider', …)` 与 `languages.getDiagnostics()`，把结果写进日志/回给 DSH；再关掉页面重复一次。**看**：能不能拿到；没页面时是断连、超时还是报错。
+James：**VS Code 里最有价值的能力是 LSP**，希望接进 DSH；可能的更简单路径 = **agent 运行时建立一条与扩展宿主的连接**。核实后的判断：
+
+**两个前提先摆正**：
+
+1. **连的不是页面那条扩展宿主**。扩展宿主与主线程 1:1（连接由渲染器发起、每连接一个）⇒ 要"连扩展宿主"，只能让 code server **为 agent 新 fork 一个扩展宿主**（`extensionConnection.ts:290`），那是第二份激活上下文（两份 cSpell / 语言服务器）。合法、但代价明确；装哪些扩展由我们定（`myExtensions`）。
+2. **连上 ≠ 能问**。语言特性**由主线程发起**（注册表在主线程、触发也在主线程）⇒ 我们要扮演的是"主线程那半边"：收 provider 注册 + 主动调 `$provide*`。最小面因此不是 18 个代理，而是**按我们要的能力挑 N 个 `$provide*`**（hover / definition / references / documentSymbol / codeAction / completion…），外加三条初始化推送、`ExtensionService` + `Errors`、**Documents**。
+
+**硬前提（2026-09-19 核实）**：**文档模型必须由我们喂**。`HoverAdapter.provideHover` 里 `const doc = this._documents.getDocument(resource)` **没有 undefined 守卫**，末尾还会 `doc.getWordRangeAtPosition(pos)` ⇒ 扩展宿主手里没这份文档，语言特性要么把 `undefined` 交给 provider，要么直接抛。⇒ broker 必须持有文本模型（`$acceptDocumentsAndEditorsDelta` + `$acceptModelChanged`，或应答 `MainThreadDocuments.$tryOpenDocument`）。这也给 transport note 里"broker 自带文本模型"补上了真正的理由：**不是为了编辑，而是每次语言特性都要一份活的 document + version**。
+
+- 附带：provider 的选择匹配不必重写，`score()` 在 `editor/common/languageSelector.ts:29` 是纯函数，可复用。
+- 激活多半会自己发生（`onLanguage:*` 由文档 / 工作区状态驱动；远程形态下激活不等 renderer，`extHostExtensionService.ts:445-455`）。
+
+**三条实现路径**：
+
+| 路径 | 是什么 | 代价 | 拿得到什么 |
+| --- | --- | --- | --- |
+| **P1 我们当主线程**（新扩展宿主） | broker 连一条新的 ExtensionHost 连接，实现上面那份最小面 | 最小面 + 第二份服务器进程 + 跟随上游漂移 | 全生态：扩展自带的服务器、配置、版本 |
+| **P2 页面扩展宿主 + 我们写扩展** | 扩展里 `vscode.execute*Provider`（24 个）+ `commands`，经 MCP 回 DSH | **要页面在**；约百行扩展，零协议 | 同上（页面开着时） |
+| **P3 不用 VS Code，自己起语言服务器** | DSH 直接 spawn 服务器（LSP over stdio） | 自己维护"哪个语言用哪个服务器 + 初始化参数 + 版本"；拿不到扩展独有的服务器 | 标准化那部分（css / html / json / markdown / cspell / pylance / rust-analyzer / gopls…） |
+
+**一个要记住的分叉**：内置的 TypeScript 支持**不是 LSP**——`extensions/typescript-language-features` 不依赖 `vscode-languageclient`，它自带 `tsserver` 与自己的协议（deps 只有 `@vscode/ts-package-manager` / `jsonc-parser` / `vscode-uri` 这些）。⇒ P3 对 TS 要么直接讲 tsserver 协议，要么套一层 `typescript-language-server`。
+
+**建议的验证顺序**（先证伪最便宜的）：**先跑 P3 探针**——DSH 起一个语言服务器、问一次 hover/definition；够用 ⇒ LSP 目标即达成，P1 从"必需"降为"为了覆盖扩展独有的服务器才做"；不够（比如要的就是人在用的那套配置与版本）⇒ 再做 P2（若页面依赖可接受）或 P1。
+
+## 三个先做的探针（验证优先于表态）
+
+0. **探针 C（半天，验 P3）**：DSH 直接起一个语言服务器（LSP over stdio），问一次 hover / definition / documentSymbol。**看**：够不够用在意的语言；配置与版本的差距有多大（这是"要不要 P1/P2"的判据）。
+1. **探针 A（半天，验 P2）**：写一个最小扩展（在 code server 的扩展宿主里），做两件事：`commands.executeCommand('vscode.executeHoverProvider', …)` 与 `languages.getDiagnostics()`，把结果写进日志/回给 DSH；再关掉页面重复一次。**看**：能不能拿到；没页面时是断连、超时还是报错。
 2. **探针 B（1–2 天，验轴 1c）**：主干起一个 ExtensionHost 连接（不经页面），按已有证据发三条初始化推送，实现 `ExtensionService` + `Errors` + `Documents` + `Diagnostics` 最小面，装 cSpell 看它是否激活并推诊断。**看**：无页面扩展宿主能不能真跑起来；人那份扩展宿主是否受影响（重复激活/端口/状态）。
 
-两个探针都是"能不能"的问题，做完再选轴，比现在争论便宜。
+三个探针都是"能不能"的问题，做完再选轴，比现在争论便宜。
 
 ## 现有 note/docs 会跟着动（等裁后执行）
 
@@ -84,7 +111,7 @@ status: proposed
 3. **轴 3**：能力面撤掉、缩到"agent 侧"、还是保留？（现在是"没有任何实体"，撤掉是零成本）
 4. **轴 4**：工作区真源归谁；冲突怎么判。
 5. **轴 5**：MCP 客户端归谁；文件定制是否共源。
-6. **探针先做哪个**（还是两个都做）。
+6. **探针先做哪个**（建议 C → A → B，按便宜到贵）。
 
 ## Related
 
