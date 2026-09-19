@@ -196,13 +196,14 @@ flowchart TB
 
 ### 5.2 VS Code 提供
 
-| 能力                 | 形态                                                                                            | 设计怎么用                                      |
-| -------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| **完整的 IDE 能力**  | code server（remote）：编辑、语言特性、搜索、源码管理、调试、任务、测试、终端、扩展             | server 侧 remote（§3.1）                        |
-| **扩展生态**         | 扩展宿主进程 + extHost 协议 + 贡献点 + 市场                                                     | 能力来源；也是"能力层暴露给 agent"的接入点      |
-| **UI 组件**          | web bundle 里的编辑器控件、工作台部件与视图（`CodeEditorWidget`、part / view container / view） | client 侧的组件（§3.4）                         |
-| **可组合的缝**       | `create()` 的构造选项、可覆写的 workbench 组合、`IWorkbenchLayoutService`、模块级命令面         | 让 prac 拥有布局与编排，而不是被 workbench 拥有 |
-| **pin + patch 形式** | 源码树 + 我们的 delta（patches）                                                                | 改动可审计（不变量 2）                          |
+| 能力                 | 形态                                                                                                                                                                                                     | 设计怎么用                                                                                                                                                                       |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **完整的 IDE 能力**  | code server（remote）：编辑、语言特性、搜索、源码管理、调试、任务、测试、终端、扩展                                                                                                                      | server 侧 remote（§3.1）                                                                                                                                                         |
+| **扩展生态**         | 扩展宿主进程 + extHost 协议 + 贡献点 + 市场                                                                                                                                                              | 能力来源；也是"能力层暴露给 agent"的接入点                                                                                                                                       |
+| **UI 组件**          | web bundle 里的编辑器控件、工作台部件与视图（`CodeEditorWidget`、part / view container / view）                                                                                                          | client 侧的组件（§3.4）                                                                                                                                                          |
+| **可组合的缝**       | `create()` 的构造选项、可覆写的 workbench 组合、`IWorkbenchLayoutService`、模块级命令面                                                                                                                  | 让 prac 拥有布局与编排，而不是被 workbench 拥有                                                                                                                                  |
+| **pin + patch 形式** | 源码树 + 我们的 delta（patches）                                                                                                                                                                         | 改动可审计（不变量 2）                                                                                                                                                           |
+| **（不取）**         | **VS Code 自带的 agent / chat 面**：`contrib/chat/**`（chat 循环、participants、会话、工具注册表与内置工具）、`contrib/mcp` 的客户端、`platform/agentHost/**`（copilot / claude / codex 作为被托管进程） | **agent 面归 DSH**（§2.2、§4.1）：循环、工具、会话、模型、规划与评审都在 DSH；生态里对 agent 开放的接口只剩 **MCP 与文件定制**（`SKILL.md` / `*.instructions.md` / `AGENTS.md`） |
 
 **采用哪种运行形态**：VS Code 有四种形态，prac 只用**第三种**——[_"UI in the browser, extensions run in code server"_](https://github.com/microsoft/vscode/wiki/How-to-Contribute)：
 

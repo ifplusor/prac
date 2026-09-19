@@ -82,6 +82,9 @@ status: in-progress
 
 ### 3.7 生态与能力
 
+- **agent / chat 面归 DSH**（James 2026-09-18）：VS Code 自带的这一层**不作为 prac 的 agent 面**——`contrib/chat/**`（chat 循环、participants/"agents"、会话、工具注册表与内置工具如 `reviewPlanTool` / `runSubagentTool` / `setArtifactsTool`）、`contrib/mcp` 的客户端、`platform/agentHost/**`（把 copilot / claude / codex 当被托管进程）都不进；**agent 的循环、工具、会话、模型、规划与评审都在 DSH**，我们从 VS Code 取的是 **IDE 能力**（编辑、语言特性、诊断、终端、任务、调试、扩展生态）与 **UI 组件**。
+  - 直接代价：**扩展注册的 LM tools**（`contributes.languageModelTools` / `lm.registerTool`）我们拿不到——要用就得再实现一遍它的工具注册表与 `$invokeTool` 通道，等于把 agent 面搬过来。⇒ 生态里对 agent 真正开放的接口收窄成两条：**MCP**（工具协议）与**文件定制**（`SKILL.md` / `*.instructions.md` / `AGENTS.md`）。
+  - 但"不用"不等于"不存在"：Copilot 是**内建扩展**（它声明 `chatParticipants` / `languageModelTools` / `mcpServerDefinitionProviders` / `chatSessions` / `chatPromptFiles` / `chatSkills`），会随扩展宿主一起活（见 §4）。
 - **扩展基座 = 完整 `server` 目标**（`--target server`，**必须带 `--nls`**），host 与 code server 都指向它。验收判据 = **一个 Tier 2 扩展真的激活，且它的 UI 贡献出现在 prac 的 view 目录 / 区域里**。
 - **terminal 用 VS Code 的**（`server` 目标自带 PTY + shell integration + 扩展 API），它只是底栏里的一个 view；**agent 执行命令走 DSH 自己的 exec**，不与人那条终端共用。
   - 代价：agent 看不到人终端的输出，除非日后做桥。
@@ -144,6 +147,9 @@ status: in-progress
 3. **阶段二**（决策空间 / 以审决策为主界面）：保持 `proposed`，不表态；当时叫停的理由也仍待确认。
 4. **高级形态（container / part）什么时候真的需要**：逐个 view 组合，还是"把整块 sidebar 原样搬来"。
 5. **异步通道**：已定"先不做"，**形态未裁**（选项：最小标记 + 双向服务 / 完整异步线程 / 复用 chat 的留言模式）。
+6. **VS Code 自带的 agent 面在 prac 里怎么处理**（§3.7 已定 agent/chat 归 DSH，这一条问的是它**在我们树里的去处**）：Copilot 是内建扩展、会激活。选项：① 明确禁掉（`disabled`，不给它 `myExtensions`）；② 留着但界面不暴露（人想用时它还在）；③ 当"别人家的 agent"共存——这条与"chat 归 DSH"冲突（界面上会出现两个对话），除非只在某些座位里允许。
+7. **MCP 的客户端归谁**：agent 归 DSH ⇒ 工具接入理应由 DSH 自己的 MCP 客户端承担（VS Code 侧那套有 registry / gateway / sandbox / sampling，还会从 Claude Desktop / Cursor / Windsurf 的配置导入定义）。选项：① DSH 起客户端，只**复用** VS Code 侧的 server 定义来源（扩展贡献点 + 工作区配置）；② 用 VS Code 的 MCP 客户端，把它当能力面暴露给 DSH；③ 两边各起一条。代价与重复连接的问题要验。
+8. **文件定制是否共源**：`SKILL.md` / `*.instructions.md` / `AGENTS.md` 是纯文件，DSH 的 skill / 上下文机制可以读同一份。选项：① 共源（一个真实源，代价是跟随上游格式漂移）；② 只共 `AGENTS.md` 这类"仓库事实"，DSH 自己的 skill 格式独立；③ 各用各的。
 
 ### 已定方向、尚未做
 
