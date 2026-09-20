@@ -66,7 +66,7 @@ status: proposed
 1. **和 agent 打交道这件事是 prac 的中心**（R1）：界面在给人那一侧，数据和运行在 DSH。chat 视图、工具调用与审批、计划与审阅都由 prac 编排。**VS Code 的 chat 面不出现在 prac 的界面里**——那是另一个 agent 的界面。
 2. **chat 就是那个通道**（R2 的 09-19 澄清）：它天然异步、松耦合——谁不在都不阻塞，回来看会话记录就行。所以不另做"留言"机制，也不做模式机。
 3. **白板就是文件**（R2）：notes 是工作区里的 markdown，人用 DSH 的文档视图看，agent 用文件工具读写。不需要第二套文档系统。
-4. **树里住着"别人家的 agent"**：Copilot 是 VS Code 的内建扩展（它声明了 `chatParticipants`、`languageModelTools`、`mcpServerDefinitionProviders`、`chatSessions`、`chatPromptFiles`、`chatSkills`），会随扩展宿主激活——**在我们 rig 里到底有没有激活，还没测**。它在我们树里的去处要明确（§5.7）。
+4. **树里住着"别人家的 agent"**：Copilot 是 VS Code 的内建扩展（它声明了 `chatParticipants`、`languageModelTools`、`mcpServerDefinitionProviders`、`chatSessions`、`chatPromptFiles`、`chatSkills`），会随扩展宿主激活——**在我们 rig 里到底有没有激活，还没测**。**先留着、不显示**（James 2026-09-19）：不禁掉，也不在 prac 的界面里露出它的 chat。好处是它声明的 MCP server 定义还在池子里（§2.6 要读的那些）；坏处是树里确实多一个 agent 在跑，先接受。
 
 ### 2.5 IDE 能力分三类
 
@@ -80,8 +80,8 @@ status: proposed
 
 ### 2.6 扩展生态里 agent 能用什么
 
-1. **MCP**：扩展声明的 server 定义（`contributes.mcpServerDefinitionProviders`）、工作区配置、甚至别的工具（Claude Desktop / Cursor / Windsurf）的配置。由 **DSH 当客户端**去连（归属待定，§5.4）。
-2. **文件定制**：`SKILL.md`、`*.instructions.md`、`AGENTS.md` 都是纯文件，DSH 的 skill 和上下文机制可以直接读（要不要和 VS Code 共用同一份，待定，§5.5）。
+1. **MCP**：扩展声明的 server 定义（`contributes.mcpServerDefinitionProviders`）、工作区配置、甚至别的工具（Claude Desktop / Cursor / Windsurf）的配置。由 **DSH 当客户端**去连（归属待定，§5.2）。
+2. **文件定制**：`SKILL.md`、`*.instructions.md`、`AGENTS.md` 都是纯文件，DSH 的 skill 和上下文机制可以直接读（要不要和 VS Code 共用同一份，待定，§5.3）。
 3. **扩展贡献的界面**（视图、编辑器、状态栏）——给人用。
 
 ### 2.7 界面：布局由 prac 拥有
@@ -89,17 +89,16 @@ status: proposed
 - frame 是 prac 自己的：区域树、分割、堆叠、折叠、底栏、视图目录、持久化。**机制层不认识任何具体视图名。**
 - **哪些 view 归谁，看它注册进哪儿**：`dsh:*`（对话、计划、审阅、笔记）和 `vscode:*`（编辑器、问题、终端、SCM、搜索、资源）都注册进同一个 `prac.view`，frame 一视同仁地摆。
 - **注意力与返回栈是 frame 的能力**（R2）——它们是交互的机制，不属于任何单个视图。
+- **编排单位是一个视图**（James 2026-09-19）：不是整块区域。编辑器那个面上的视图就是"一个文件的编辑面"（umbrella §3.5 已定），tab 与分栏由 frame 的 stage 提供，不用 VS Code 的 editor group。
 - **`prac.view` 用单数**（跟 DSH 的 `root` / `sidebar` / `main` / `shell.overlay` 一致）：槽名说的是"装哪一类东西"，**装几个由槽的 `kind` 决定**（`single` / `list` / `keyed` / `chain`），单个 view 的身份是注册时的 `key`。所以不叫 `prac.views`。
 
-### 2.8 人和 agent 看到的是不是同一份工作区
+### 2.8 人和 agent 看到的是同一份工作区：磁盘为准
 
-结对、以及"人能接手"，都要求人和 agent 对着同一份工作区。这里现在有个洞：**人没保存的编辑只活在页面里**，而 agent 的文件工具读的是磁盘。所以要选一种做法：
+**磁盘为准**（James 2026-09-19）：打开自动保存（切焦点或延时写盘）。人和 agent 读写的是同一份文件，页面里不再有"只有我看得到"的内容。
 
-- **磁盘为准**：自动保存（切焦点或延时写盘）。简单便宜，代价是没有"未保存"这个状态了，写盘也频繁。（注意：我们现在的验证门为了别的原因**故意关掉了自动保存**，真实 rig 要另定。）
-- **同步缓冲区**：页面和主干之间同步文档内容。能力最强，成本最高。
-- **混合**：默认自动保存，另外给几个明确的落盘点（交付前、暂停前、让 agent 读之前）。
-
-反过来那条也要定：agent 改了文件，人的编辑器怎么办。VS Code 对磁盘上的外部改动有自己的行为（没脏就重载，脏了就提示冲突）——要么接受它，要么让 agent 的写入走编辑器（那就回到同步缓冲区）。
+- 代价（接受）：没有"未保存"这个状态了，写盘也更频繁。注意我们现在的验证门为了别的原因**故意关掉了自动保存**，真实 rig 要打开。
+- 反向那条（agent 改了文件 → 人的编辑器）：**接受 VS Code 既有的行为**——没脏就重载，脏了就提示冲突；不另做文档同步。
+- 所以**不做**"把页面里未保存的缓冲区同步到主干"那条路（成本最高，现在也不需要）。
 
 ### 2.9 状态放在哪
 
@@ -108,7 +107,7 @@ status: proposed
 | 工作区文件                                       | 磁盘（见 §2.8）        | 这是人和 agent 天然共享的一份                                   |
 | DSH 会话、工具、审批、计划、注意力               | DSH host               | agent 的事归 DSH（R6）                                          |
 | code server 进程、扩展宿主、语言服务器、终端 PTY | server（主干起停）     | R5                                                              |
-| 编辑器视图状态（打开的文件、布局、选择、折叠）   | client                 | 纯显示；但**打开的文件集合**如果要给 agent 看，得显式同步（§5.3） |
+| 编辑器视图状态（打开的文件、布局、选择、折叠）   | client                 | 纯显示，**而且不给 agent**（James 2026-09-19）：agent 要知道人在看什么，靠人自己说，或者自己去看工作区和 git |
 | 诊断、装饰、状态栏                               | server 算、client 显示 | 给 agent 的是语义服务，不是这份显示用的缓存（§2.5）             |
 
 ### 2.10 谁起谁关
@@ -157,12 +156,8 @@ code server 归主干起停：空闲端口、等就绪、随插件 dispose 收�
    - **P3 DSH 自己起语言服务器**：直接 spawn（LSP over stdio）。完全不依赖 VS Code；代价是自己维护"哪个语言用哪个服务器、初始化参数、版本"，拿不到扩展独有的那些服务器。**注意 TS 内置支持不是 LSP**——它自带 `tsserver` 和自己的协议。
    - **建议先做探针 C（半天）**：让 DSH 起一个语言服务器，问一次 hover / definition。够用的话，P1 就降成"为了覆盖扩展独有的服务器才做"；不够再在 P2 / P1 之间选。
    - 一个硬前提（09-19 核实）：**文档必须由我们喂给扩展宿主**——`HoverAdapter` 取文档时没有判空，末尾还会用 `doc.getWordRangeAtPosition()`。所以走 P1 就得自己持有文本模型（这不是为了编辑，而是每次问语言特性都要有一份活着的文档和版本号）。
-2. **人和 agent 怎么共用一份工作区**（§2.8 的三个做法选一个）。
-3. **打开的文件集合要不要给 agent**（这是"人在看什么"最短的路径，但要显式同步）。
-4. **MCP 客户端归谁**（DSH 自己起 / 复用 VS Code 的 / 两边各起）。
-5. **文件定制要不要共源**（DSH 的 skill 和 VS Code 的 `SKILL.md` 是不是同一份）。
-6. **每一块 IDE 面以什么为单位**：整块区域、一个视图、还是一个文件——**按 R3 的布局规格逐条定**（编辑器要能被拿到中间、terminal 要能随时调出、每个视图要能单独显隐）。单位越细，prac 接手的东西越多（数据、可见性、生命周期），所以要一条一条地定，不为统一而统一。
-7. **VS Code 的 chat 面在 prac 里的去处**：禁掉 / 留着不显示 / 共存。
+2. **MCP 客户端归谁**（DSH 自己起 / 复用 VS Code 的 / 两边各起）。
+3. **文件定制要不要共源**（DSH 的 skill 和 VS Code 的 `SKILL.md` 是不是同一份）。
 
 ## 6. 这次合并了什么、放弃了什么
 

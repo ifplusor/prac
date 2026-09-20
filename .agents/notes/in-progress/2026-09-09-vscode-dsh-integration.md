@@ -53,6 +53,7 @@ status: in-progress
 - **部件永远是被容纳的一方**：经 host 挂进来，**不是搬过来**。
 - **容纳单位 = `view`**：`prac.view` 目录里同时住着 `dsh:*` 与 `vscode:*` 两方 view，它们已经是同一种东西；**container 是可选分组**、**part 是可选的高级形态**（整块标准 IDE 区域），都不是 prac 组合的单位。
   - 为什么：用 part 当单位等于让 prac 说 workbench 的编排词汇，并继承它"单实例 / 只能搬"的约束。
+  - **（2026-09-19 James 再确认）编排单位就是一个视图**，不是整块区域；编辑器那个面上的视图 = 一个文件的编辑面（§3.5），tab 与分栏由 stage 提供。
 
 ### 3.3 框架归属与分层
 
@@ -84,12 +85,15 @@ status: in-progress
   - **编排的默认放置只填空缺**——否则每次激活都把视图拖回出厂位，"持久化"自我撤销。
   - 边界：localStorage 是 per-origin ⇒ 同源两个 tab 共用一份状态；**per-workspace 那半仍未做**。
 - **通道就是 chat**（James 2026-09-19）：不单独做"异步留言"的机制或视图。人和 agent 通过 chat 说话，**chat 本身是松耦合的**——谁不在都不阻塞，回来看会话记录即可。⇒ §4 里"异步通道"那组选项作废。
+- **工作区以磁盘为准**（James 2026-09-19）：打开自动保存（切焦点或延时写盘），人和 agent 读写同一份文件；**不做**缓冲区级同步；反向那条（agent 改文件 → 人的编辑器）接受 VS Code 既有行为（没脏就重载，脏了就提示冲突）。代价是没有"未保存"这个状态、写盘更频繁。
+- **打开的文件集合不给 agent**（James 2026-09-19）：agent 要知道人在看什么，靠人自己说，或者自己去看工作区和 git；不做"把人的视图状态同步给 agent"这条路。
 
 ### 3.7 生态与能力
 
 - **agent / chat 面归 DSH**（James 2026-09-18）：VS Code 自带的这一层**不作为 prac 的 agent 面**——`contrib/chat/**`（chat 循环、participants/"agents"、会话、工具注册表与内置工具如 `reviewPlanTool` / `runSubagentTool` / `setArtifactsTool`）、`contrib/mcp` 的客户端、`platform/agentHost/**`（把 copilot / claude / codex 当被托管进程）都不进；**agent 的循环、工具、会话、模型、规划与评审都在 DSH**，我们从 VS Code 取的是 **IDE 能力**（编辑、语言特性、诊断、终端、任务、调试、扩展生态）与 **UI 组件**。
   - 直接代价：**扩展注册的 LM tools**（`contributes.languageModelTools` / `lm.registerTool`）我们拿不到——要用就得再实现一遍它的工具注册表与 `$invokeTool` 通道，等于把 agent 面搬过来。⇒ 生态里对 agent 真正开放的接口收窄成两条：**MCP**（工具协议）与**文件定制**（`SKILL.md` / `*.instructions.md` / `AGENTS.md`）。
   - 但"不用"不等于"不存在"：Copilot 是**内建扩展**（它声明 `chatParticipants` / `languageModelTools` / `mcpServerDefinitionProviders` / `chatSessions` / `chatPromptFiles` / `chatSkills`），会随扩展宿主一起活（见 §4）。
+- **VS Code 的 chat 面先留着不显示**（James 2026-09-19）：不禁掉它，也不在 prac 的界面里露出它的 chat；它声明的 MCP server 定义仍然在池子里（R13 要读的那些）。代价是树里确实多一个 agent 在跑。
 - **扩展基座 = 完整 `server` 目标**（`--target server`，**必须带 `--nls`**），host 与 code server 都指向它。验收判据 = **一个 Tier 2 扩展真的激活，且它的 UI 贡献出现在 prac 的 view 目录 / 区域里**。
 - **terminal 用 VS Code 的**（`server` 目标自带 PTY + shell integration + 扩展 API），它只是底栏里的一个 view；**agent 执行命令走 DSH 自己的 exec**，不与人那条终端共用。
   - 代价：agent 看不到人终端的输出，除非日后做桥。
