@@ -61,11 +61,12 @@ status: proposed
 
 `vendor/vscode`（上游 + patch）→ `vendor/vscode-embed`（lib：启动、资产、宿主元素、命令面）→ 插件族：**server 半边**管 code server 这个进程和政策（谁放哪、什么时候起、能力怎么给 agent），**client 半边**把编辑器和 IDE 面板贡献成 prac 的 view。**不让 VS Code 的布局主导 prac 的 frame**（R4）。
 
-### 2.4 agent 的事都归 DSH，连带三件
+### 2.4 agent 的事都归 DSH
 
-1. **和 agent 打交道这件事是 prac 的中心**（R1）：界面在给人那一侧，数据和运行在 DSH。chat 视图、工具调用与审批、计划与审阅都由 prac 编排。**chat 就是人和 agent 之间的通道**：它天然异步、松耦合——谁不在都不阻塞，回来看会话记录就行。所以不另做"留言"机制，也不做模式机。**VS Code 的 chat 面不出现在 prac 的界面里**——那是另一个 agent 的界面。
-2. **白板就是文件**（R2）：notes 是工作区里的 markdown，人用 DSH 的文档视图看，agent 用文件工具读写。不需要第二套文档系统。
-3. **树里住着"别人家的 agent"**：Copilot 是 VS Code 的内建扩展（它声明了 `chatParticipants`、`languageModelTools`、`mcpServerDefinitionProviders`、`chatSessions`、`chatPromptFiles`、`chatSkills`），会随扩展宿主激活——**在我们 rig 里到底有没有激活，还没测**。它在我们树里的去处要明确（§5.7）。
+1. **和 agent 打交道这件事是 prac 的中心**（R1）：界面在给人那一侧，数据和运行在 DSH。chat 视图、工具调用与审批、计划与审阅都由 prac 编排。**VS Code 的 chat 面不出现在 prac 的界面里**——那是另一个 agent 的界面。
+2. **chat 就是那个通道**（R2 的 09-19 澄清）：它天然异步、松耦合——谁不在都不阻塞，回来看会话记录就行。所以不另做"留言"机制，也不做模式机。
+3. **白板就是文件**（R2）：notes 是工作区里的 markdown，人用 DSH 的文档视图看，agent 用文件工具读写。不需要第二套文档系统。
+4. **树里住着"别人家的 agent"**：Copilot 是 VS Code 的内建扩展（它声明了 `chatParticipants`、`languageModelTools`、`mcpServerDefinitionProviders`、`chatSessions`、`chatPromptFiles`、`chatSkills`），会随扩展宿主激活——**在我们 rig 里到底有没有激活，还没测**。它在我们树里的去处要明确（§5.7）。
 
 ### 2.5 IDE 能力分三类
 
@@ -75,9 +76,9 @@ status: proposed
 | **工作区动作** | 文件、搜索、git、任务、调试、终端                           | code server（VS Code 的 API 和进程）      | 人用界面；agent 走 DSH 自己的 exec 和文件工具，**不和人那条终端共用** |
 | **显示**       | 编辑器控件、面板、装饰、状态栏、视图                       | VS Code 的 client 半边                    | 人                                                                 |
 
-**第三类不等于"扩展必须搬到 client"**：上游把"在哪算"和"在哪显示"分开了（装饰、状态栏、命令都由主线程代理），所以只要有一个主线程在，扩展可以在 server 侧跑、画面落到页面。**这推翻了旧设计里"UI 组件必须在 client 侧"的强读法**（§4）。
+**第三类不等于"扩展必须搬到 client"**：只要有一个主线程在，扩展可以在 server 侧跑、画面落到页面（为什么，见 §1 的第 3 条）。所以旧设计里"UI 组件必须在 client 侧"的读法不成立。
 
-### 2.6 扩展生态里 agent 能用的只有三样
+### 2.6 扩展生态里 agent 能用什么
 
 1. **MCP**：扩展声明的 server 定义（`contributes.mcpServerDefinitionProviders`）、工作区配置、甚至别的工具（Claude Desktop / Cursor / Windsurf）的配置。由 **DSH 当客户端**去连（归属待定，§5.4）。
 2. **文件定制**：`SKILL.md`、`*.instructions.md`、`AGENTS.md` 都是纯文件，DSH 的 skill 和上下文机制可以直接读（要不要和 VS Code 共用同一份，待定，§5.5）。
@@ -86,11 +87,11 @@ status: proposed
 ### 2.7 界面：布局由 prac 拥有
 
 - frame 是 prac 自己的：区域树、分割、堆叠、折叠、底栏、视图目录、持久化。**机制层不认识任何具体视图名。**
-- **座位按来源分**：`dsh:*`（对话、计划、审阅、笔记）和 `vscode:*`（编辑器、问题、终端、SCM、搜索、资源）住在同一个 `prac.view` 目录里。
+- **哪些 view 归谁，看它注册进哪儿**：`dsh:*`（对话、计划、审阅、笔记）和 `vscode:*`（编辑器、问题、终端、SCM、搜索、资源）都注册进同一个 `prac.view`，frame 一视同仁地摆。
 - **注意力与返回栈是 frame 的能力**（R2）——它们是交互的机制，不属于任何单个视图。
 - **`prac.view` 用单数**（跟 DSH 的 `root` / `sidebar` / `main` / `shell.overlay` 一致）：槽名说的是"装哪一类东西"，**装几个由槽的 `kind` 决定**（`single` / `list` / `keyed` / `chain`），单个 view 的身份是注册时的 `key`。所以不叫 `prac.views`。
 
-### 2.8 人和 agent 看到的是不是同一份工作区（重要）
+### 2.8 人和 agent 看到的是不是同一份工作区
 
 结对、以及"人能接手"，都要求人和 agent 对着同一份工作区。这里现在有个洞：**人没保存的编辑只活在页面里**，而 agent 的文件工具读的是磁盘。所以要选一种做法：
 
@@ -118,7 +119,7 @@ code server 归主干起停：空闲端口、等就绪、随插件 dispose 收�
 
 - `vendor/vscode`：上游 + 我们的 patch；`vendor/vscode-embed`：lib（只给机制，不背政策）。
 - **server 半边**：路由、code server 起停、（如果走 P1）agent 侧的扩展宿主连接和主线程那一面。
-- **client 半边**：frame 与编排、`vscode:*` 座位、DSH 自己的视图（对话、计划、审阅、笔记）。
+- **client 半边**：frame 与编排、`vscode:*` 的 view、DSH 自己的视图（对话、计划、审阅、笔记）。
 - 从 DSH 直接继承的能力族（tools、skill、goal、plan-mode、subagent、workflow）不动。
 
 ## 3. 每件事从哪来、给谁用
@@ -130,7 +131,7 @@ code server 归主干起停：空闲端口、等就绪、随插件 dispose 收�
 | **语义服务（LSP）**                 | code server 的扩展宿主（语言服务器） | **待定：P1 / P2 / P3（§5.1）**                 | **agent 优先**；人的编辑器复用               |
 | 文件、搜索、git、任务、调试、终端   | code server                          | 页面内 UI；agent 走 DSH 自己的 exec 和文件工具 | 人（界面）+ agent（能力）                    |
 | 诊断与 Problems                     | 扩展宿主 + 渲染器侧的生产者          | extHost 协议（server 侧内部）                  | **人**（agent 要的是语义服务，不是这份缓存） |
-| 扩展贡献的视图                      | 扩展宿主                             | 主线程 → prac 的桥 → 页面的 view               | **人**                                       |
+| 扩展贡献的视图                      | 扩展宿主                             | 主线程 → prac 的 view 目录 → 页面             | **人**                                       |
 | **工具接入**                        | 扩展声明的 MCP server / 工作区配置   | **MCP**（DSH 当客户端，归属待定）              | **agent**（运行时）                          |
 | **知识与定制**                      | `SKILL.md` / `*.instructions.md` / `AGENTS.md` | 文件（要不要共源待定）                | **agent**（运行时装载）；人也可以读          |
 | 编辑器与 IDE 面板                   | `vendor/vscode-embed` + client 半边  | 页面内                                         | **人**                                       |
@@ -139,12 +140,12 @@ code server 归主干起停：空闲端口、等就绪、随插件 dispose 收�
 
 **留着**：主干是 DSH；两端；VS Code 一族插件按端切两半；三层（vendor / lib / 插件族）；布局由 frame 拥有、**view 是单位**；code server 归主干起停；XDG；不 fork 上游；"agent 执行命令走 DSH 自己的 exec，不和人那条终端共用"。
 
-**作废**（前提已经不成立）：
+**作废或改正**（前提已经不成立，或者只是说法错了）：
 
-1. **把"能力面（capabilities）驱动 UI 组件"当主轴**——它原来服务两拨人（UI 组件和 agent），现在两拨都不需要它了（§2.4、§2.5）；
-2. **把"拆散 UI 层"和"能力面驱动"捆在一起的那套说辞**——能力面没了（第 1 条），但**"拆散"本身是设计要求**，不能跟着一起扔：R2（界面跟着注意力走、要能换焦点）、R3（主操作台 + 四周面板 + 分栏 + terminal 随时调出 + 视图按需显隐）、R4（不要 VS Code 的布局）三条合起来要求——**prac 的编排单位是 view，IDE 的每一块都要能作为 view 被 prac 摆**（umbrella §3.2 已经定了"容纳单位 = view"）。跟 09-15 相比，变的只是**动机**：不是为了"把能力暴露给 agent"，而是**人看到的界面由 prac 编排**。
+1. **把"能力面（capabilities）驱动 UI 组件"当主轴**——它原来服务两拨人（UI 组件和 agent），现在两拨都不需要它了（§2.1）；
+2. **把"拆散 UI 层"和"能力面驱动"捆在一起的那套说辞**——能力面没了（第 1 条），但**"拆散"本身是设计要求**：R2（界面跟着注意力走）、R3（布局规格）、R4（不要 VS Code 的布局）合起来要求 **prac 的编排单位是 view，IDE 的每一块都要能作为 view 被 prac 摆**（umbrella §3.2 已定"容纳单位 = view"）。跟 09-15 相比，变的只是**动机**——不是把能力带给 agent，而是**人看到的界面由 prac 编排**。
 3. **把"broker 扮主线程"当默认路径**——降成 LSP 三条路里的一条（P1）；
-4. **把诊断这类"已经跑完的结果"当 agent 能力**——它是给人看的显示，而且是缓存；
+4. **把诊断这类"已经跑完的结果"当 agent 能力**（§1 第 1 条）——它是给人看的显示，而且是缓存；
 5. **VS Code 的 chat、participants、LM tools、会话、agentHost**（R6）；
 6. **把 VS Code 的传输透传到页面**（R8；早就否了，这里记成终态）。
 
@@ -160,7 +161,7 @@ code server 归主干起停：空闲端口、等就绪、随插件 dispose 收�
 3. **打开的文件集合要不要给 agent**（这是"人在看什么"最短的路径，但要显式同步）。
 4. **MCP 客户端归谁**（DSH 自己起 / 复用 VS Code 的 / 两边各起）。
 5. **文件定制要不要共源**（DSH 的 skill 和 VS Code 的 `SKILL.md` 是不是同一份）。
-6. **每个座位以什么为单位**：整块区域、一个视图、还是一个文件——**按 R3 的布局规格逐条定**（编辑器要能被拿到中间、terminal 要能随时调出、每个视图要能单独显隐）。单位越细，prac 接手的东西越多（数据、可见性、生命周期），所以要一条一条地定，不为统一而统一。
+6. **每一块 IDE 面以什么为单位**：整块区域、一个视图、还是一个文件——**按 R3 的布局规格逐条定**（编辑器要能被拿到中间、terminal 要能随时调出、每个视图要能单独显隐）。单位越细，prac 接手的东西越多（数据、可见性、生命周期），所以要一条一条地定，不为统一而统一。
 7. **VS Code 的 chat 面在 prac 里的去处**：禁掉 / 留着不显示 / 共存。
 
 ## 6. 这次合并了什么、放弃了什么
