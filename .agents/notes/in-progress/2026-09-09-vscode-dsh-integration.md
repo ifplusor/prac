@@ -60,6 +60,7 @@ status: in-progress
 - **frame 由 `ui-layout` 拥有，只借 VS Code 的行为**（视图契约、`GridDescriptor` 的树形摆放、收起记宽、maximize、layout policy 的写法）；**不让它的 grid 拥有 prac 的 frame**。
 - **机制与组合分层**：机制（`ui-layout`）/ 编排（`web-app`）/ VS Code 侧（vendor + 两个 prac 行）。**机制层不含任何具体视图名与默认落位**。
 - **code server 的进程归主干**：`prac-host-vscode` 自己 spawn 它（`out-vscode-reh/server-main.js`，不用 `--folder`——工作区由 client 的 boot 决定），端口取空闲、等 `/version` 就绪、随插件 dispose 收掉；环境变量（`PRAC_CODE_SERVER_URL` / `_ENTRY` / `_PORT` / `_PATH`）是逃生口。页面不再拥有它。
+- **扩展宿主也归主干（P1）**（James 2026-09-19）：主干自己连一条 ExtensionHost 连接，**不依赖页面**（页面关着语言服务照样在）。按需实现主线程那一面：三条初始化推送 + `ExtensionService` + `Errors` + **文档** + 挑出来的那几个 `$provide*`。代价：多一份激活上下文（两份 cSpell / 语言服务器），并跟着上游漂移。**硬前提**：文档必须由我们喂给扩展宿主（取文档时没有判空）。
 - **两个服务主次分明**：`ctx.layout` 是**兼容 shim**（只服务 `ui-workspace` / `ui-sidebar` / `ui-sidebar-right` 用的 5 个方法，可整体删除）；`ctx.pracLayout` 是 prac 机制（含 `bindRoles`），机制**不知道谁是 sidebar**。
 
 ### 3.4 对上游的姿态
@@ -93,6 +94,8 @@ status: in-progress
 - **agent / chat 面归 DSH**（James 2026-09-18）：VS Code 自带的这一层**不作为 prac 的 agent 面**——`contrib/chat/**`（chat 循环、participants/"agents"、会话、工具注册表与内置工具如 `reviewPlanTool` / `runSubagentTool` / `setArtifactsTool`）、`contrib/mcp` 的客户端、`platform/agentHost/**`（把 copilot / claude / codex 当被托管进程）都不进；**agent 的循环、工具、会话、模型、规划与评审都在 DSH**，我们从 VS Code 取的是 **IDE 能力**（编辑、语言特性、诊断、终端、任务、调试、扩展生态）与 **UI 组件**。
   - 直接代价：**扩展注册的 LM tools**（`contributes.languageModelTools` / `lm.registerTool`）我们拿不到——要用就得再实现一遍它的工具注册表与 `$invokeTool` 通道，等于把 agent 面搬过来。⇒ 生态里对 agent 真正开放的接口收窄成两条：**MCP**（工具协议）与**文件定制**（`SKILL.md` / `*.instructions.md` / `AGENTS.md`）。
   - 但"不用"不等于"不存在"：Copilot 是**内建扩展**（它声明 `chatParticipants` / `languageModelTools` / `mcpServerDefinitionProviders` / `chatSessions` / `chatPromptFiles` / `chatSkills`），会随扩展宿主一起活（见 §4）。
+- **MCP 客户端 DSH 自己起**（James 2026-09-19）：只复用 VS Code 这边的 **server 定义来源**（扩展声明点 + 工作区配置），不复用它的 `contrib/mcp` 客户端。
+- **文件定制不共源**（James 2026-09-19）：DSH 用自己的 skill / 上下文格式，不去读 VS Code 的 `SKILL.md` / `*.instructions.md` / `AGENTS.md`。
 - **VS Code 的 chat 面先留着不显示**（James 2026-09-19）：不禁掉它，也不在 prac 的界面里露出它的 chat；它声明的 MCP server 定义仍然在池子里（R13 要读的那些）。代价是树里确实多一个 agent 在跑。
 - **扩展基座 = 完整 `server` 目标**（`--target server`，**必须带 `--nls`**），host 与 code server 都指向它。验收判据 = **一个 Tier 2 扩展真的激活，且它的 UI 贡献出现在 prac 的 view 目录 / 区域里**。
 - **terminal 用 VS Code 的**（`server` 目标自带 PTY + shell integration + 扩展 API），它只是底栏里的一个 view；**agent 执行命令走 DSH 自己的 exec**，不与人那条终端共用。

@@ -1,277 +1,179 @@
 # Prac 的目标架构
 
-> **本文件的设计已被取代**（2026-09-19 James：「放弃当前的架构设计，从需求出发，从头设计架构」）。
-> 现在的设计在 [proposed/2026-09-19-architecture.md](../.agents/notes/proposed/2026-09-19-architecture.md)；本文保留为**旧设计的记录**，那篇定案后整体重写——其中大部分结构（主干是 DSH、两端、frame 与「view 是单位」）仍然有效，被扔掉的部分见那篇 §4。
-
-> 面向目标的设计。实现进度、差距与踩坑见 [.agents/notes/](../.agents/notes/)；理念见 [philosophy.md](philosophy.md)。
-
----
+> 面向目标的设计：prac 要成为什么、每部分为哪个目标而存在。实现进度、差距与踩坑在 [.agents/notes/](../.agents/notes/)；理念见 [philosophy.md](philosophy.md)；两个被依赖系统的内部结构见 [dsh.md](dsh.md) / [vscode.md](vscode.md)。
+> 设计取舍的讨论与依据在 [proposed/2026-09-19-architecture.md](../.agents/notes/proposed/2026-09-19-architecture.md)（从需求重做的那一版）。
 
 ## 1. 目标
 
-### 1.1 为什么做 prac（设计的出发点）
+### 1.1 prac 是什么
 
-1. **责任要放对地方**：AI 只做**有界认知**（感知当下、生成、局部转换——短单元、可验证）；人负责意图、高杠杆处的判断与真实校验；harness 负责**账本**（外部、持久、可核实的事实，不信任模型的自我报告）。责任永远在人，harness 的价值是让责任**可行使**（暴露推理、可验证、可回滚），而不是**可甩脱**。
-2. **能力边界要分清真伪**：区分**真天花板**（模型确实做不到）与**假天花板**（rig 没给够工具、上下文、权限）。假天花板是要修的机会，不是结论。这要求 harness 能把"手上的事实"和"可能的动作"都摊在台面上。
-3. **组织方式是认识论循环**：`决定 → 验证 → 重审`，不是 `计划 → 执行 → 交付`。计划是活的假设，会被现实证据击打后重修。
-4. **两个生态都要用上**：harness 侧要 DSH 的**成熟骨架与生态**，IDE 侧要 VS Code 的**完整能力与生态**——而且不是"用一个包另一个"，是**把两边都拆散、按 prac 的目标重新组装**。
+- **界面是给人用的**，两部分：① **和 agent 打交道**——对话、讨论、计划与审阅、接手与打断；② **帮他干活的 IDE**——编辑器、问题、终端、SCM、搜索、资源。
+- **另一头，prac 是 agent 的运行时**：循环、工具、上下文、审批、沙箱、会话和持久化都在这里。
+- **中心是人和 agent 的交互**。界面跟着注意力走（谁在中心、谁在侧边随手换，有返回栈）；**chat 就是通道**（天然异步、松耦合：谁不在都不阻塞）；**白板就是工作区里的文件**（notes 是 markdown，人和 agent 读写同一份）。
+- **保留完整的 IDE 能力与扩展生态**（包括语言包、GitLens 这类扩展），**但不要 VS Code 的布局**。
 
-### 1.2 目标
+### 1.2 出发点
 
-prac 要做的是**一个供人和 agent 共用的工作台**：DSH 提供 harness（模型、工具、会话、审批、沙箱），VS Code 提供**完整的 IDE** 能力与生态（编辑、语言特性、搜索、源码管理、调试、任务、测试、终端、扩展），两者合成一个系统。
+1. **责任放对地方**：AI 做有界认知，人负责意图与高杠杆判断，harness 负责可核实的事实账户——让责任**可行使**（暴露推理、可验证、可回滚），不是可甩脱。
+2. **区分真假天花板**：模型确实做不到 vs rig 没给够东西；后者是机会。
+3. **按认识论循环工作**：决定 → 验证 → 重审，不是计划 → 执行 → 交付。
+4. **两个生态都用上**：DSH 的成熟骨架与生态、VS Code 的完整 IDE 能力与生态——把两边拆散，按 prac 的目标重新组装。
 
-这个合成是**两端**的：**server 侧跑着 agent 与 harness，并且拥有完整的 IDE 能力**——所以 agent 能直接使用它们；**client 侧是人的界面**，由 prac 自己编排，VS Code 的 UI 在其中只是组件。**主干是 DSH**，prac 自己的部分与 VS Code 都以插件的形式挂在它上面。
+### 1.3 三条不变量
 
-### 1.3 三条不变量（架构变更的判据）
-
-1. **不 fork DSH**：改变行为走它自己的组装层（bundle / profile / patch）。
-2. **不 fork VS Code 源码树**：只 pin + patch + overlay，源码不进本仓，改动要小到可审计。
-3. **不引第三方改造**（`monaco-vscode-api` / Theia 之类）：直接对官方 Code - OSS 下手。
-
----
+1. **不 fork DSH**：改变行为走它的组装层（bundle / profile / patch）。
+2. **不 fork VS Code**：只 pin + patch + overlay，源码不进本仓，改动小到可审计。
+3. **不引第三方改造**（`monaco-vscode-api`、Theia 这类）。
 
 ## 2. 总体形态
 
-### 2.1 两端：client 与 server
+### 2.1 一条主干，两端
 
-架构按两端看：**client** 与 **server**。DSH 与 VS Code 各自都同时有这两侧的部分，所以不能按系统来切分（§4）。
+- **两端**：client（页面）与 server（Node）。DSH 在两端都提供骨架——client 侧是页面的壳（loader、模块表、槽、服务注册表），server 侧是组装、进程和 agent 循环。prac 自己的插件和 VS Code 的插件按所属的一端挂上去。
+- **主干只有一个**：组合、状态、进程、生命周期归 DSH。**code server 是主干起停的子进程**，不是第二个主干。
+- **扩展宿主也归主干**：主干自己连一条 ExtensionHost 连接，**不依赖页面**（见 §4.2）。
 
-DSH 在两端都提供骨架：client 侧是页面的壳（loader、模块表、槽、服务注册表），server 侧是 harness 与进程（§2.2）。
+### 2.2 VS Code 的位置
 
-### 2.2 主干是 DSH
+`vendor/vscode`（上游源码 + 我们的 patch）→ `vendor/vscode-embed`（在其上封装的 lib：启动、资产、宿主元素、命令面；**只给机制，不背政策**）→ 基于这个 lib 的 DSH 插件族：
 
-组合、状态、进程、生命周期都归主干。DSH 在两端都提供骨架，prac 与 VS Code 的插件按各自所属的一端挂上去：
+- **server 半边**：管 code server 这个进程和政策（谁放哪、什么时候起、能力怎么给 agent），以及主干那条扩展宿主连接。
+- **client 半边**：把编辑器和 IDE 面板贡献成 prac 的 view。
 
-| 端         | DSH 作为主干的具体形态                                                                                      |
-| ---------- | ----------------------------------------------------------------------------------------------------------- |
-| **client** | **页面的壳**：loader 与模块表、`ctx.slots`、服务注册表、boot 注入——prac 的 frame 与座位挂在它的壳上         |
-| **server** | **harness 与进程**：Cordis 插件树（host 插件）、profile / bundle / patch 组装、服务、agent loop、子进程管理 |
+**不让 VS Code 的布局主导 prac 的 frame**。
 
-**DSH 的扩展方式就是插件**：Cordis 插件树（加上运行时的动态包）——host 半边在 Node、client 半边在页面，同一地址空间，耦合是 in-process 的 `inject`。
+### 2.3 agent 的事都归 DSH
 
-给 agent 的能力：DSH 侧是写一个插件挂进主干（工具 / 上下文 / 呈现三类）；VS Code 侧必须经过它的扩展宿主（唯一能调 `vscode.*` 的地方）。
+- **和 agent 打交道是 prac 的中心**：界面在给人这一侧，会话、工具调用与审批、计划与审阅的数据与运行在 DSH。**VS Code 的 chat 面不出现在 prac 的界面里**（它是另一个 agent 的界面）——先留着不显示；它声明的 MCP server 定义仍然可用。
+- **白板就是文件**：不做第二套文档系统。
+- **对话以外没有第二个通道**：不另做"异步留言"的机制或视图。
 
-主干的组装机制（profile → bundle → patch，按行 id 定位、可 insert / 可 disabled）就是 prac 的定制方式：定制表现为组装，不是改内核。
+### 2.4 端之间只有三条线
 
-### 2.3 prac 自己写什么，继承什么
+| 线             | 载体                                          | 内容                               |
+| -------------- | --------------------------------------------- | ---------------------------------- |
+| 页面上屏与产物 | 同源 HTTP（静态 + 启动注入）                  | HTML、`client.js` 产物、boot 图    |
+| 服务调用       | DSH 的 remote 面（client 调 host 声明的方法） | 会话、工作区、工具结果             |
+| 事件与流       | 转发事件（host → client）+ 流复用             | 状态变化、流式输出、受限的反向回答 |
 
-| 组成                  | 是什么                                                                                                                            | 目标                                                |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| **主干（DSH）**       | harness 本身：agent loop、会话与 session log、工具运行时、上下文、审批与沙箱、设置、凭据、持久化                                  | **直接继承**，不重写                                |
-| **prac 自己写的插件** | ① **frame**：一个通用多区域容器（区域树 / 分割 / 堆叠 / 折叠 / 底栏 / 视图目录 / 持久化）② **编排与角色**：谁放哪、注意力、快捷键 | 界面形态由 prac 拥有，不被任何一方绑定              |
-| **agent 面**          | 六件事的落点：决策空间、依据一等公民、可逆检查点、审查主界面、架构记忆、活的计划                                                  | **立身之本**；先以纯消费者身份塞进 DSH 的扩展点     |
-| **VS Code 集成族**    | 一组插件 + 它依赖的 lib 与 vendor（§3）                                                                                           | 引入**完整的 IDE** 能力与生态——**重要，只是一部分** |
+**VS Code 的 extHost 协议不跨这条线**：它是 server 侧内部的事。
 
-### 2.4 一张图
+## 3. 界面
 
-```mermaid
----
-title: 主干 = DSH，两端各一半。
----
-flowchart TB
-  subgraph client["client（浏览器里的一页）"]
-    dshClient["DSH 的 client 半边：web shell（loader / 模块表 / ctx.slots / 服务注册表）"]
-    pracClient["prac 的 client 插件：frame（区域树 / 分割 / 折叠 / 目录 / 持久化）· 编排与角色 · 能力面的消费端"]
-    vsClient["VS Code 插件的 client 半边：VS Code 的 UI 组件"]
-    dshClient --> pracClient
-    dshClient --> vsClient
-  end
-  subgraph server["server（Node）"]
-    dshHost["DSH 的 host 半边：agent loop · 会话 · 工具 · 上下文 · 审批 · webserver"]
-    pracHost["prac 的 host 插件：服务与策略 · 能力面的提供端 · 进程生命周期"]
-    vsServer["VS Code 插件的 server 半边：拥有 code server"]
-    codeServer["code server 进程：完整的 IDE（编辑 / 语言特性 / 搜索 / 源码管理 / 调试 / 任务 / 测试 / 终端 / 扩展）"]
-    extHost["扩展宿主进程（VS Code 的扩展跑在这里）"]
-    ptyHost["PTY host 进程"]
-    dshHost --> pracHost
-    dshHost --> vsServer
-    vsServer --> codeServer
-    codeServer --> extHost
-    codeServer --> ptyHost
-  end
-  client <-->|"DSH 的通信层：页面上屏与产物 · 服务调用 · 事件与流"| server
-```
+### 3.1 布局由 prac 拥有
 
----
+- **frame** 是 prac 自己的：区域树、分割（任意方向）、堆叠、折叠（记尺寸）、常驻底栏、视图目录、持久化。**机制层不认识任何具体视图名。**
+- **编排单位是一个视图**：不是整块区域。`dsh:*`（对话、计划、审阅、笔记）和 `vscode:*`（编辑器、问题、终端、SCM、搜索、资源）都注册进**同一个 DSH 槽 `prac.view`**，frame 一视同仁地摆。
+  - `prac.view` 用单数：槽名说的是"装哪一类东西"，**装几个由槽的 `kind` 决定**（`single` / `list` / `keyed` / `chain`），单个 view 的身份是注册时的 `key`。
+- **注意力与返回栈是 frame 的能力**，不属于任何单个视图。
+- 视图契约、树形摆放、收起记宽这类做法借鉴上游，frame 由 prac 拥有。
 
-## 3. VS Code 的集成
+### 3.2 IDE 那一半怎么进来
 
-### 3.1 一组插件，按同一条轴切成两半
+- **编辑器** = **一个文件的编辑面**（一个视图），不是 editor part / editor group；**tab 与分栏由 frame 的 stage 提供**。
+- 扩展贡献的视图（tree view 等）也按视图进来；容器与 part 是可选的高级形态（整块标准 IDE 区域），不是组合的单位。
+- 现在的落点是「编辑器 / 侧栏」这类面，其余 IDE 面按同一套规矩逐步接。
+- 已知的坑：视图要进 VS Code 自己的可见性模型，否则 body 会是 "no data provider registered"。
 
-**不是"一个插件"，是"一组插件"**——我们基于 `vendor/vscode-embed` 开发**一组插件**（它们住在 `packages/*`，与 prac 自己的插件并列）。**VS Code 自己也按 prac 的两端切成两半**：
+### 3.3 状态住在哪
 
-| VS Code 的那一半      | 在 prac 里是什么        | 提供什么                                                                       |
-| --------------------- | ----------------------- | ------------------------------------------------------------------------------ |
-| **code server**       | **server 侧的 remote**  | **完整的 IDE**（编辑、语言特性、搜索、源码管理、调试、任务、测试、终端、扩展） |
-| **web**（web bundle） | **client 侧的 UI 组件** | **UI**                                                                         |
+| 状态                                             | 放哪                   | 为什么                                                     |
+| ------------------------------------------------ | ---------------------- | ---------------------------------------------------------- |
+| 工作区文件                                       | **磁盘**（见 §5.1）    | 人和 agent 天然共享的一份                                  |
+| DSH 会话、工具、审批、计划、注意力               | DSH host               | agent 的事归 DSH                                           |
+| code server 进程、扩展宿主、语言服务器、终端 PTY | server（主干起停）     | 进程与生命周期归主干                                       |
+| 编辑器视图状态（打开的文件、布局、选择、折叠）   | client                 | 纯呈现，**而且不给 agent**：agent 要知道人在看什么，靠人说 |
+| 诊断、装饰、状态栏                               | server 算、client 显示 | 给 agent 的是语义服务，不是这份显示用的缓存（§4.1）        |
 
-### 3.2 三层
+### 3.4 持久化
 
-| 层                                      | 是什么                                                                   |
-| --------------------------------------- | ------------------------------------------------------------------------ |
-| `vendor/vscode`                         | 引入的 VS Code 源码树 + 我们的 patch（pin / patch / overlay / 构建配方） |
-| `vendor/vscode-embed`                   | 在它之上封装的可复用 lib：把 VS Code 变成可被程序驱动的部件，不绑定 prac |
-| **VS Code 插件族**（住在 `packages/*`） | 基于这个 lib 构建的一组插件——把 VS Code 的能力与生态带入 prac 的地方     |
+区域尺寸、每个 view 的折叠状态、堆叠顺序、哪些 view 在屏上。两份 key：**per-window**（布局）与 **per-workspace**（展开项）；key 带版本，恢复时不校验形状。**默认放置只填空缺**——否则每次激活都把视图拖回出厂位。边界：localStorage 是 per-origin，同源两个 tab 共用一份。
 
-**lib 与插件的分工**：lib 只提供机制（资产服务、启动、宿主元素工厂、能力面的骨架）；政策在插件层（谁放在哪、何时启动、哪个 view 用哪个 part、能力怎么给 agent、进程生命周期）。
+## 4. 能力
 
-### 3.3 通信层：基于 DSH 的架构设计（§7 的待设计项）
+### 4.1 IDE 能力分三类
 
-**两半之间的通信层要基于 DSH 的架构重新设计**——**不是**把 VS Code 自己的传输（管理连接、扩展宿主连接、资源 HTTP）从浏览器透传到 code server。
+| 类别           | 是什么                                                     | 从哪来                                                             | 给谁                                                                  |
+| -------------- | ---------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| **语义服务**   | hover、定义、引用、符号、code action、语义 token、按需诊断 | 语言服务器；插件里它们住在扩展宿主，**主干自己连那个宿主**（§4.2） | **agent 优先**；人的编辑器复用                                        |
+| **工作区动作** | 文件、搜索、git、任务、调试、终端                          | code server（VS Code 的 API 和进程）                               | 人用界面；agent 走 DSH 自己的 exec 与文件工具，**不和人那条终端共用** |
+| **显示**       | 编辑器控件、面板、装饰、状态栏、视图                       | VS Code 的 client 半边                                             | 人                                                                    |
 
-设计约束：
+第三类不等于"扩展必须搬到 client"：上游把"在哪算"和"在哪显示"分开（装饰、状态栏、命令都由主线程代理），所以只要有一个主线程在，扩展可以在 server 侧跑、画面落到页面。
 
-- 主干的 remote 面是"**host 声明方法、client 调用**"，反向只有**转发事件**（其中 waterfall 类事件可携带回答），**没有通用双向 RPC**；
-- **流复用 `/api/remote.mux` 是单向推送**：开流之后 client 只有 `open` / `cancel`，host 只有 `item` / `error` / `end` ⇒ 它承载不了"host 问 client"；
-- host→client 的**请求 / 响应**现成只有一条路：转发事件里的 `waterfall`（带 `eventId`）+ client 用一元调用 `$events/result` 回答；它的事件白名单是 `api-remotes` 里的静态数组 ⇒ 要塞新事件就得改 DSH；
-- 要做**通用双工**，只能改 gateway 的传输核心（新帧 + 客户端 API）——代价最高的一档；
-- **VS Code 的 extHost 协议不应跨越 prac 的 CS 边界**——它属于 server 侧内部（code server ↔ 扩展宿主）。
+### 4.2 语义服务（LSP）：主干当主线程
 
-设计形状、四个待裁项与各自的代价见 [abandoned/2026-09-16-vscode-integration-transport.md](../.agents/notes/abandoned/2026-09-16-vscode-integration-transport.md)（**已作为计划被取代**；现为 [架构重做](../.agents/notes/proposed/2026-09-19-architecture.md) 里的 P1）。
+**主干自己连一条 ExtensionHost 连接**，扮演主线程，按需实现：
 
-### 3.4 UI 组件的边界
+- 三条初始化推送（配置 / 工作区 / 遥测级别）；
+- `ExtensionService` + `Errors`（激活本身与错误上报）；
+- **文档**——把扩展宿主需要的文档喂给它；
+- 我们挑出来的那几个 `$provide*`（先挑 hover / definition，其余按需要加）。
 
-"client 侧提供 UI 组件"要落到**组件**这一级，不是把整个 workbench 搬进页面。
+**为什么这样**：agent 不该依赖页面（页面关着也要能用语言服务），而语言特性的调用方向是"主线程发起"，所以这一面必须有人当。
 
-组件的边界（编辑器控件到哪、tree / 终端 / 面板这些整块 UI 怎么办、哪些必须由 server 侧数据驱动）是 §7 的待设计项。
+**代价**：多一份激活上下文（两份 cSpell / 语言服务器）；要跟着上游漂移。
 
----
+**硬前提**：**文档必须由我们喂**。扩展宿主取文档时没有判空、末尾还会用 `doc.getWordRangeAtPosition()`——这不是为了编辑，而是每次问语言特性都要有一份活着的文档和版本号。
 
-## 4. 两端的设计
+### 4.3 扩展生态里 agent 能用什么
 
-### 4.1 每端有什么
+- **MCP**（工具接入）：**DSH 自己起 MCP 客户端**，只复用 VS Code 这边的 **server 定义来源**（扩展的声明点 + 工作区配置），不复用它的 `contrib/mcp`。
+- **文件定制**：**不共源**——DSH 用自己的 skill / 上下文格式，不去读 VS Code 的 `SKILL.md` / `*.instructions.md` / `AGENTS.md`。
+- **扩展贡献的界面**（视图、编辑器、状态栏）——给人用。
 
-|                   | **client（浏览器里的那一页）**                                    | **server（Node 进程）**                                              |
-| ----------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------- |
-| **DSH**           | web shell（loader / 模块表 / `ctx.slots`）+ prac 自己的客户端插件 | host 插件（工具 / 上下文 / 会话）+ webserver                         |
-| **VS Code**       | **UI 组件**（VS Code 插件的 client 半边）                         | **code server = remote**（完整的 IDE）+ 扩展宿主进程 + PTY host 进程 |
-| **prac 自己写的** | frame、编排与角色、注意力、能力面的消费端                         | 路由、服务策略、能力面的提供端、进程生命周期                         |
+拿不到的：扩展用 `contributes.languageModelTools` / `lm.registerTool` 注册的工具（那要重实现它的工具注册表与 `$invokeTool`，等于把 agent 面搬过来）。
 
-### 4.2 状态住在哪一端
+### 4.4 agent 怎么用这些
 
-| 状态                              | 归     | 理由                            |
-| --------------------------------- | ------ | ------------------------------- |
-| 工作区注册表 / 会话 / session log | server | agent 要用；跨窗口共享          |
-| 工具与 agent loop                 | server | agent 住在 server               |
-| 扩展与其激活状态                  | server | 扩展宿主是 VS Code 生态的落点   |
-| 终端（PTY、scrollback）           | server | 跨断线保活；人机两侧都可附着    |
-| **IDE 能力（诊断、语言特性…）**   | server | agent 要直接取用                |
-| **编辑器缓冲区与模型**            | server | 同上；client 只持有渲染用的视图 |
-| **打开的文件集合**                | server | 工作区里正在发生什么            |
-| frame 布局                        | client | 纯呈现状态，per-origin 即可     |
-| VS Code 自己的 UI 状态            | client | 纯呈现状态，按工作区 id 隔离    |
+循环、工具、上下文、审批、会话都在 DSH：语言智能经 §4.2 的那条连接，外部工具经 §4.3 的 MCP 客户端，文件与命令走 DSH 自己的 exec 与文件工具。
 
-### 4.3 端之间的线
+**agent 面（六件事）** 是 prac 的立身之本：决策优先、依据是一等公民、可逆带检查点、审查是主界面、架构记忆、活的计划——**优先以纯消费者身份**塞进 DSH 现有循环的扩展点（工具 + 上下文 + 呈现），只有确需驱动轮次结构本身才更深介入，并且要显式记录。
 
-| 线                   | 载体                                          | 内容                                            |
-| -------------------- | --------------------------------------------- | ----------------------------------------------- |
-| **页面上屏与产物**   | HTTP（同源静态 + 启动注入）                   | HTML、`client.js` 产物、boot 图                 |
-| **服务调用**         | DSH 的 remote 面（client 调 host 声明的方法） | 能力面、会话、工作区、工具结果                  |
-| **事件与流**         | 转发事件（host→client）+ 流复用               | 状态变化、流式输出、受限的反向回答（waterfall） |
-| **VS Code 两半之间** | **基于 DSH 的架构设计**（§3.3、§7）           | IDE 能力 ↔ UI 组件                              |
+## 5. 工作区与进程
 
-### 4.4 设计原则
+### 5.1 磁盘为准
 
-1. **IDE 能力必须能在 server 侧取到**：agent 在 server 侧；能力只存在于 client 侧时，agent 只能拿到被页面把关的、有损的视图。
-2. **同一条状态不在两端各存一份**：跨窗口共享的状态放 server；服务端的共享单元是**连接**，不是页面。逐条所在地见 §4.2。
-3. **UI 与 agent 读同一份能力数据**（`snapshot` / `subscribe` / `settled` / `version` / `actions`），不是各自问一份；没有 view 挂载也能回答；不开 `executeCommand` 后门。
+**人和 agent 读写同一份文件**：打开自动保存（切焦点或延时写盘），**不做**缓冲区级同步。反向那条（agent 改文件 → 人的编辑器）接受 VS Code 既有行为：没脏就重载，脏了就提示冲突。
 
----
+代价（接受）：没有"未保存"这个状态，写盘更频繁。注意：验证门为了别的原因**故意关掉了自动保存**，那里要重新看（见 §7）。
 
-## 5. 依赖的两个系统提供什么
+### 5.2 谁起谁关
 
-### 5.1 DSH 提供
-
-| 能力         | 形态                                                                                           | 设计怎么用                                                            |
-| ------------ | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| **插件**     | Cordis 插件（`apply(ctx)`、`inject` / `provide` / `effect`，卸载可逆）                         | prac 的每一行（**这是 DSH 自己的扩展方式，不是 VS Code 的扩展宿主**） |
-| **组装**     | profile → bundle → patch（按行 id 定位、insert / disabled、`--dump-config`）                   | 把 prac 与 VS Code 插件装进主干；不动内核                             |
-| **双平面**   | host 半边（Node ESM）与 client 半边（loader 产物）                                             | 能力在 host、UI 在 client（§3.1）                                     |
-| **页面外壳** | `ctx.slots` 命名槽 + 服务注册表（消费方 pending 直到提供方出现）                               | prac 的 frame 与座位；跨插件传面                                      |
-| **协议**     | remote（host 声明、client 调用）+ 转发事件 + 流复用                                            | 服务调用、状态变化、以及 §3.3 要设计的通信层                          |
-| **服务面**   | 工具（`ctx.tools.register` / `defineTool`）、会话、session 投影、资源（client 侧）、快照 store | agent 面（工具 / 上下文）、frame 的持久化                             |
-
-**prac 替掉了哪一层**：只替 `ui-layout` 这一行——本仓 `packages/bundle/web-app/cordis.patch.yml:9-10` 把它 `disabled: true`、`:15-16` insert `prac-client-ui-layout`。DSH 的它给的是一个**固定三列壳**，不是区域树（列宽常量 `packages/client/ui-layout/src/client/columns.ts:11-29`，`ctx.layout` 的面 `service.ts:28-51`，四个槽 `index.ts:148-158`；分割树与标签页在 `ui-dockkit`，由右侧栏使用）。本仓的 `prac-client-ui-layout` 占同一个内置 `root` 槽，重新声明 `sidebar` / `main` / `rightbar` / `shell.overlay` 四个槽、加一个 `prac.view` 列表座位（视图身份是 `<source>:<name>`，`dsh:` 直接映射 DSH 自己的槽——`packages/client/ui-layout/src/client/index.ts:92-106`、`catalogue.ts:23-40`）；`ctx.layout` 留作 compat shim（`index.ts:33-37`，`contract.ts:351` 的 `bindRoles`）。**替掉之后仍然继承**：`ui-renderer`（React 槽渲染、唯一 ctx 层 `renderSlot('root')`）、`ui-slots`、`dsh-client-store`、`ui-primitives`、`ui-dockkit`、`client-modules` 与 Cordis Loader、服务注册表（`provide` / `inject`，消费方 pending 直到提供方出现）、remote 与转发事件。prac 的 patch 只动了 `ui-layout` 一行。
-
-设计只依赖约定：`dsh` 字段的三个角色（bundle / client / profile）、patch 语义、loader 产物形状、平台词表、`provide` / `inject` 的等待语义、命名槽、快照 store 的持久化。不依赖实现细节：具体行 id、API 包的导出名、快照字段的形状。
-
-> DSH 的内部结构（`dsh web` 到像素的链与图、证据行号、槽的四种形态、5 个 UI 包的分工、9 词平台表、还没核实的地方）见 [dsh.md](dsh.md)。
-
-### 5.2 VS Code 提供
-
-| 能力                 | 形态                                                                                                                                                                                                     | 设计怎么用                                                                                                                                                                       |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **完整的 IDE 能力**  | code server（remote）：编辑、语言特性、搜索、源码管理、调试、任务、测试、终端、扩展                                                                                                                      | server 侧 remote（§3.1）                                                                                                                                                         |
-| **扩展生态**         | 扩展宿主进程 + extHost 协议 + 贡献点 + 市场                                                                                                                                                              | 能力来源；也是"能力层暴露给 agent"的接入点                                                                                                                                       |
-| **UI 组件**          | web bundle 里的编辑器控件、工作台部件与视图（`CodeEditorWidget`、part / view container / view）                                                                                                          | client 侧的组件（§3.4）                                                                                                                                                          |
-| **可组合的缝**       | `create()` 的构造选项、可覆写的 workbench 组合、`IWorkbenchLayoutService`、模块级命令面                                                                                                                  | 让 prac 拥有布局与编排，而不是被 workbench 拥有                                                                                                                                  |
-| **pin + patch 形式** | 源码树 + 我们的 delta（patches）                                                                                                                                                                         | 改动可审计（不变量 2）                                                                                                                                                           |
-| **（不取）**         | **VS Code 自带的 agent / chat 面**：`contrib/chat/**`（chat 循环、participants、会话、工具注册表与内置工具）、`contrib/mcp` 的客户端、`platform/agentHost/**`（copilot / claude / codex 作为被托管进程） | **agent 面归 DSH**（§2.2、§4.1）：循环、工具、会话、模型、规划与评审都在 DSH；生态里对 agent 开放的接口只剩 **MCP 与文件定制**（`SKILL.md` / `*.instructions.md` / `AGENTS.md`） |
-
-**采用哪种运行形态**：VS Code 有四种形态，prac 只用**第三种**——[_"UI in the browser, extensions run in code server"_](https://github.com/microsoft/vscode/wiki/How-to-Contribute)：
-
-| 形态                                             | UI 在哪 | 扩展在哪               | prac                                                                    |
-| ------------------------------------------------ | ------- | ---------------------- | ----------------------------------------------------------------------- |
-| `code-web`（`--target web` 单独跑）              | 浏览器  | 浏览器的 web worker    | ✗ 只有 web 扩展：终端 / 调试 / 任务 / 源码管理都不可用                  |
-| **code server（`--target server` + 浏览器 UI）** | 浏览器  | **服务端的 Node 进程** | ✓ **就是它**：完整扩展生态，且能力天然在 server 侧                      |
-| `server-web` / `reh-web`（server 自带客户端）    | 浏览器  | 服务端 Node            | ✗ 与"DSH 发前端"重合；它的 product 还被 `tweakProductForServerWeb` 改过 |
-| `desktop` / `reh`（Electron / 远程开发包）       | 桌面    | 本地或远端 Node        | ✗ 不做桌面应用，也不给桌面 VS Code 当 remote                            |
-
-因此构建只要**两个目标**：`--target web`（浏览器里的 UI，由 DSH 发）与 `--target server`（code server，扩展宿主在这里）。桌面、`server-web`、`reh*` 一律不构建。
-
-**内部的两半**：**渲染器**跑 workbench（UI）；**扩展宿主**是另一个进程、跑扩展代码（只有 `vscode.*` API，没有 DOM）；两者之间那套协议的对端叫"**主线程**"——**不是线程，是角色名**，而且**实现在渲染器里**。这决定了 prac 的两件事：**没有页面就没有扩展宿主**（连接由渲染器发起），**上游也没有 server 侧的主线程实现**（实现全在 `api/browser/**`）——所以要让 server 侧拿到 IDE 能力，broker 得自己扮演它。
-
-设计只依赖：连接按首消息分三型（prac 只用**管理面**与**扩展宿主**两型）、管理面的 channel 由服务端注册、extHost 协议不跨越 prac 的 CS 边界。
-
-> 角色表与那张图、平台服务层是什么、协议与载体（帧格式、12 种消息、桌面 / 远程两种通道）见 [vscode.md](vscode.md)；协议清单（HTTP / 三型 WS / 握手 / channel）与行号见[工作记录](../.agents/worklog/2026-09-09-vscode-dsh-integration.md)「code server 的协议」。
-
----
+code server 归主干起停（空闲端口、等 `/version` 就绪、随插件 dispose 收掉）；扩展宿主同样是主干那条连接的产物。工作区不由 code server 的启动参数决定——它来自 DSH 绑定的会话工作区。
 
 ## 6. prac 自己的机制
 
 ### 6.1 frame
 
-一个**通用多区域容器**，不认识任何具体视图：区域树 + 分割（任意方向，**以 view 为主语**，因此任何方向都造不出空区域）+ 堆叠 + 折叠（记尺寸）+ 常驻底栏 + 视图目录（`prac.view` 槽）+ 持久化。
-
-视图契约、树形摆放、收起记宽这类做法借鉴上游，frame 由 prac 拥有（[umbrella note](../.agents/notes/in-progress/2026-09-09-vscode-dsh-integration.md) §3.3）。
+见 §3.1。
 
 ### 6.2 编排与角色
 
-默认视图与默认落位、角色绑定、注意力（调出面 / 快捷键）、**只填空缺**的默认放置语义（默认放置不能覆盖已恢复的状态）。
+默认视图与默认落位、角色绑定、注意力（调出面 / 快捷键）、"只填空缺"的默认放置语义。**机制不知道谁是 sidebar**——角色由编排绑定。
 
-### 6.3 能力面
+### 6.3 怎么知道设计成立了
 
-一套 `Capability<T, A>` 同时服务 UI 与工具（§4.4 原则 3）。
+| 检查                      | 断言什么                                                                                      |
+| ------------------------- | --------------------------------------------------------------------------------------------- |
+| **单元测试**（`vp test`） | 机制：纯函数与纯算术（区域树重写、尺寸分配、折叠与缓存、子序、clamp、编排语义、持久化往返）   |
+| **浏览器里跑真页面**      | 真页面才能证明的事：产物过真 loader、视图挂进搬出 prac 区域并画出像素、扩展真的激活、契约成立 |
+| **每条能力一条渲染断言**  | 拦住"模型对了、渲染器没跟上"这类单元测试看不见的假绿                                          |
 
-### 6.4 agent 面（立身之本）
+## 7. 还没定的
 
-六件事各自的落点与优先级见 [proposed/2026-09-16-…](../.agents/notes/proposed/2026-09-16-epistemic-six-on-dsh-mechanisms.md)：**优先以纯消费者身份**把它们塞进 DSH 现有循环的扩展点（工具 + 上下文 + 呈现）；只有确需驱动轮次结构本身，才考虑更深的介入，且要显式记录。
-
-### 6.5 怎么知道设计成立了
-
-| 检查                         | 断言什么                                                                                             |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------- |
-| **单元测试**（`vp test`）    | 机制：纯函数与纯算术（区域树重写、尺寸分配、折叠与缓存、子序、clamp、编排语义、持久化往返）          |
-| **在浏览器里跑真页面的检查** | 真页面才能证明的事：产物过真 loader、部件/视图挂进搬出 prac 区域并画出像素、扩展真的激活、能力面契约 |
-| **每条能力一条渲染断言**     | 拦住"模型对了、渲染器没跟上"这类单元测试看不见的假绿                                                 |
-
----
-
-## 7. 尚未定的设计（下一件工作）
-
-1. **通信层的具体设计**（§3.3）：能力以什么形状暴露（服务 / remote / 工具）、谁定帧、双工协议怎么承载、状态归谁。
-2. **UI 组件的边界**（§3.4）：编辑器控件算到哪里；tree / 终端 / 面板这类整块 UI 是"组件"还是"部件"；它们的数据从哪来。
-3. **插件族的划分**：server 侧一族与 client 侧一族各有哪些插件、边界划在哪（什么算一个插件）。
-4. **code server 的生命周期**：谁起、谁重启、谁关、端口怎么给（主干拥有的具体形态）。
-5. **能力面的清单与演进**：除 `editors` / `diagnostics` 之外要哪些（`documents` 一类），以及"给 agent 用"与"给 UI 用"是否需要不同的形状。
+1. **P1 的最小面清单与验收**：先做通一条链（三条初始化推送 + `ExtensionService` + `Errors` + 文档 + 一个 `$provide*`），验收 = **页面关着，扩展能激活并对工作区里的文件回答一次 hover**。
+2. **自动保存打开之后，验证门怎么调**：现在那几条"文件保持不动"的断言是靠故意关掉 autoSave 才稳的。
+3. **Copilot 在我们 rig 里到底有没有激活**（实测）——它决定"树里多一个 agent"是理论问题还是已经在发生。
+4. **插件族的划分**：server 侧一族与 client 侧一族各有哪些插件、什么算一个插件。
+5. **container / part 这类高级形态什么时候真的需要**（现在是按视图组合就够）。
+6. **阶段二**（决策空间 / 以审决策为主界面）：保持搁置，重新进入主线需要重新裁决。
 
 ## 8. 相关
 
-- [philosophy.md](philosophy.md)：两个轴 + 认识论循环 + 决策单元（§1 的出发点）。
-- [.agents/notes/](../.agents/notes/)：决策记忆——每个「为什么 + 放弃了什么」，以及**实现进度、差距与踩坑**。
-- [in-progress/2026-09-09-vscode-dsh-integration.md](../.agents/notes/in-progress/2026-09-09-vscode-dsh-integration.md)：本文件 §1–§4 的设计出自它的架构总纲（旧编号 `决定 22`；旧编号按同项工作的[工作记录](../.agents/worklog/2026-09-09-vscode-dsh-integration.md)台账解析）。
-- [abandoned/2026-09-15-vscode-capabilities-into-prac.md](../.agents/notes/abandoned/2026-09-15-vscode-capabilities-into-prac.md)：能力面的形态与三步（**已作为主线被取代**）。
-- [abandoned/2026-09-16-vscode-integration-transport.md](../.agents/notes/abandoned/2026-09-16-vscode-integration-transport.md)：§3.3 通信层的设计（**已作为计划被取代**）。
-- [proposed/2026-09-16-epistemic-six-on-dsh-mechanisms.md](../.agents/notes/proposed/2026-09-16-epistemic-six-on-dsh-mechanisms.md)：六件事的落点（§6.4）。
-- [proposed/2026-09-19-architecture.md](../.agents/notes/proposed/2026-09-19-architecture.md)：**现在的设计**（从需求出发重做，本文待它定案后重写）。
-- `vendor/vscode/README.md`：上游 pin、补丁集、overlay、构建与验证的细节。
+- [philosophy.md](philosophy.md)：两个轴 + 认识论循环 + 决策单元（§1.2 的出发点）。
+- [dsh.md](dsh.md) / [vscode.md](vscode.md)：两个被依赖系统的内部结构（事实参考）。
+- [.agents/notes/](../.agents/notes/)：决策记忆（每个「为什么 + 放弃了什么」）与实现进度、差距、踩坑。
+- [proposed/2026-09-19-architecture.md](../.agents/notes/proposed/2026-09-19-architecture.md)：这一版设计是怎么从需求推出来的（含旧设计哪些留着、哪些作废）。
+- [in-progress/2026-09-09-vscode-dsh-integration.md](../.agents/notes/in-progress/2026-09-09-vscode-dsh-integration.md)：umbrella（主线、需求约束、已经定下的决定、与目标的差距）。
+- [.agents/worklog/2026-09-09-vscode-dsh-integration.md](../.agents/worklog/2026-09-09-vscode-dsh-integration.md)：依据（协议清单、核实过的事实、踩坑、决定台账）。
