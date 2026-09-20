@@ -88,6 +88,7 @@ status: proposed
 - frame 是 prac 自己的：区域树、分割、堆叠、折叠、底栏、视图目录、持久化。**机制层不认识任何具体视图名。**
 - **座位按来源分**：`dsh:*`（对话、计划、审阅、笔记）和 `vscode:*`（编辑器、问题、终端、SCM、搜索、资源）住在同一个 `prac.view` 目录里。
 - **注意力与返回栈是 frame 的能力**（R2）——它们是交互的机制，不属于任何单个视图。
+- **`prac.view` 用单数**（跟 DSH 的 `root` / `sidebar` / `main` / `shell.overlay` 一致）：槽名说的是"装哪一类东西"，**装几个由槽的 `kind` 决定**（`single` / `list` / `keyed` / `chain`），单个 view 的身份是注册时的 `key`。所以不叫 `prac.views`。
 
 ### 2.8 人和 agent 看到的是不是同一份工作区（重要）
 
