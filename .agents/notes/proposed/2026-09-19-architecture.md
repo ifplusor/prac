@@ -141,7 +141,7 @@ code server 归主干起停：空闲端口、等就绪、随插件 dispose 收�
 **作废**（前提已经不成立）：
 
 1. **把"能力面（capabilities）驱动 UI 组件"当主轴**——它原来服务两拨人（UI 组件和 agent），现在两拨都不需要它了（§2.4、§2.5）；
-2. **把"VS Code 的 UI 层拆散成组件"说成一次性的目标形态**——**这条没有作废，它就是现在在用的机制**（part / view / file 三个粒度都能挂进 prac 的 frame：`PART_OF_VIEW` / `VSCODE_VIEW_OF_SEAT` / `fileViews()`，见 `packages/client/vscode-host/src/client/index.ts:48-62`）。作废的只是"必须整体拆散"这个说法，以及它原来那半动机（由能力面驱动）。**拆到哪一级按座位定**，判据是 R3 的布局规格。
+2. **把"拆散 UI 层"和"能力面驱动"捆在一起的那套说辞**——能力面没了（第 1 条），但**"拆散"本身是设计要求**，不能跟着一起扔：R2（界面跟着注意力走、要能换焦点）、R3（主操作台 + 四周面板 + 分栏 + terminal 随时调出 + 视图按需显隐）、R4（不要 VS Code 的布局）三条合起来要求——**prac 的编排单位是 view，IDE 的每一块都要能作为 view 被 prac 摆**（umbrella §3.2 已经定了"容纳单位 = view"）。跟 09-15 相比，变的只是**动机**：不是为了"把能力暴露给 agent"，而是**人看到的界面由 prac 编排**。
 3. **把"broker 扮主线程"当默认路径**——降成 LSP 三条路里的一条（P1）；
 4. **把诊断这类"已经跑完的结果"当 agent 能力**——它是给人看的显示，而且是缓存；
 5. **VS Code 的 chat、participants、LM tools、会话、agentHost**（R6）；
@@ -159,7 +159,7 @@ code server 归主干起停：空闲端口、等就绪、随插件 dispose 收�
 3. **打开的文件集合要不要给 agent**（这是"人在看什么"最短的路径，但要显式同步）。
 4. **MCP 客户端归谁**（DSH 自己起 / 复用 VS Code 的 / 两边各起）。
 5. **文件定制要不要共源**（DSH 的 skill 和 VS Code 的 `SKILL.md` 是不是同一份）。
-6. **IDE 界面拆到哪一级**：现在是**按座位选粒度**——粗的是 part（整个编辑器 / 侧栏），细的是 view（如 `workbench.explorer.fileView`），再细的是一个文件一个 view（`packages/client/vscode-host/src/client/index.ts:48-62`、`:174-180`）。要不要继续拆、拆哪个座位，用 R3 的布局规格逐条验收来定；已知的坑：挂上去的 view 如果没进 VS Code 自己的可见性模型，body 会是 `no data provider registered`（见 umbrella §4 第 8 条）。
+6. **每个座位以什么为单位**：整块区域、一个视图、还是一个文件——**按 R3 的布局规格逐条定**（编辑器要能被拿到中间、terminal 要能随时调出、每个视图要能单独显隐）。单位越细，prac 接手的东西越多（数据、可见性、生命周期），所以要一条一条地定，不为统一而统一。
 7. **VS Code 的 chat 面在 prac 里的去处**：禁掉 / 留着不显示 / 共存。
 
 ## 6. 这次合并了什么、放弃了什么
