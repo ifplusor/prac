@@ -118,6 +118,8 @@ code server 归主干起停：空闲端口、等就绪、随插件 dispose 收�
 
 **硬前提**（09-19 核实）：**文档必须由我们喂给扩展宿主**——`HoverAdapter` 取文档时没有判空，末尾还会用 `doc.getWordRangeAtPosition()`。这不是为了编辑，而是每次问语言特性都要有一份活着的文档和版本号。
 
+**P1 的独有收益**（09-19 又核实：DSH 自己就有 LSP 栈——`packages/lsp/`：`ctx.lsp` + 通用 stdio 提供方 + `lsp` 工具，但只有 4 个操作、不带服务器、不在任何 bundle 里）：① 扩展带来的**服务器与配置**（人在用的那套，含 VS Code 内置 TS 的 `tsserver` 与初始化参数）；② **那 4 个之外的操作**（诊断、符号、code action…）。所以"能问一次 hover"不该当 P1 的验收。
+
 ### 2.11 插件怎么分
 
 - `vendor/vscode`：上游 + 我们的 patch；`vendor/vscode-embed`：lib（只给机制，不背政策）。
@@ -156,7 +158,7 @@ code server 归主干起停：空闲端口、等就绪、随插件 dispose 收�
 
 七条待定都定了（P1 / DSH 自己起 MCP 客户端 / 不共源 / 磁盘为准 / 视图为单位 / 文件集合不给 agent / chat 面留着不显示）。接下来是把 P1 做出来，验收很具体：
 
-1. **P1 最小面**：主干连一条 ExtensionHost 连接，先做通一条链——三条初始化推送 + `ExtensionService` + `Errors` + **文档** + 一个 `$provide*`（先挑 hover 或 definition）。**验收**：页面关着，那个扩展能激活，并且对工作区里的一个文件回答一次 hover。
+1. **P1 最小面**：主干连一条 ExtensionHost 连接，先做通一条链——三条初始化推送 + `ExtensionService` + `Errors` + **文档** + 一个 `$provide*`（先挑 hover 或 definition）。**验收**：页面对着 P1 独有的两样（§2.10）——拿到的服务器/配置与人在用的一致，以及能拿到 DSH 那 4 个操作之外的查询。
 2. **文档必须先喂**：这是上一条里最容易低估的部分（见 §2.10 的硬前提）。
 3. **自动保存打开之后，验证门要重新看**：现在那几条"文件保持不动"的断言是靠**故意关掉 autoSave** 才稳的（§2.8）。
 
