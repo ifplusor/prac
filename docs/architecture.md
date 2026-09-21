@@ -102,16 +102,16 @@
 
 **运行期状态一律跟随 XDG、放在仓库外，并且按 XDG 的类别分家**（James 2026-09-21：**prac 走 XDG 的 config 和 state**）：
 
-| 内容                                                       | 落点                                         | 类别   |
-| ---------------------------------------------------------- | -------------------------------------------- | ------ |
-| code server 的日志、工作区缓存                             | `$XDG_STATE_HOME/prac/code-server`           | state  |
-| 已安装的 VS Code 扩展                                      | `$XDG_DATA_HOME/prac/code-server/extensions` | data   |
-| user-data（设置、快捷键、界面状态）                        | `$XDG_CONFIG_HOME/prac/code-server`          | config |
-| 扩展宿主的 `globalStorage` / `workspaceStorage`            | code server 的 state 下 `data/User/…`        | state  |
-| agent 侧那份工作区级记录（禁用 / 另启用哪些 VS Code 扩展） | `$XDG_CONFIG_HOME/prac`                      | config |
+| 内容                                                 | 落点                                         | 类别   |
+| ---------------------------------------------------- | -------------------------------------------- | ------ |
+| code server 的日志、工作区缓存                       | `$XDG_STATE_HOME/prac/code-server`           | state  |
+| 已安装的 VS Code 扩展                                | `$XDG_DATA_HOME/prac/code-server/extensions` | data   |
+| user-data（设置、快捷键、界面状态）                  | `$XDG_CONFIG_HOME/prac/code-server`          | config |
+| 扩展宿主的 `globalStorage` / `workspaceStorage`      | code server 的 state 下 `data/User/…`        | state  |
+| agent 侧的启用策略（禁用 / 另启用哪些 VS Code 扩展） | `$XDG_CONFIG_HOME/prac/extensions.json`      | config |
 
 - 扩展宿主的 `globalStorage` / `workspaceStorage` 是**状态**、不是配置 ⇒ 落在 state 下；并且**用 code server 自己那份 storage**（`--server-data-dir` 下的 `data/User/…`），**不另开一个根**。
-- **agent 侧那份记录是配置、不是状态**（James 2026-09-21 定）：它写的是**这个工作区要禁用 / 另启用什么**——一份人和 agent 都能改、能看、能审的**工作区级覆盖**（同上游的工作区那层），不是机器维护的"上次实际装了什么" ⇒ `$XDG_CONFIG_HOME/prac`。**没有这条记录时就按全局那份**（装着、且没被全局禁用），见 §7 #4。
+- **agent 侧的启用策略是配置、不是状态**（James 2026-09-21 定）：文件在 `$XDG_CONFIG_HOME/prac/extensions.json`，**两层照上游的两个 scope 来**——`disabled` 是**全局层**（上游 `IGlobalExtensionEnablementService` 读的那份），`workspaces[root]` 是**工作区层**（可 `disabled` 收窄、也可以 `enabled` **翻过**全局禁用）。判定顺序就是上游那条：**工作区 `enabled` → 工作区 `disabled` → 全局 `disabled` → 否则启用**（`extensionEnablementService.ts:634-661`）。⇒ **文件不在 = 什么都不禁用 = 装着的那份全上**（上游那架梯子落到 `EnabledGlobally` 的位置），见 §7 #4。
 - **同一个工作区上两个扩展宿主并存不用我们操心**：上游自己在 `<workspaceStorageHome>/<hash>` 上抢 `vscode.lock`，抢不到就退到 `<hash>-1`、`-2`…（`extHostStoragePaths.ts:26-62`）⇒ UI 宿主与 agent 宿主**各用各的一份**，这正是"两边状态各归各家"。
 - **DSH 自己的家不按 XDG 分**：`resolveDshHome` 是**单一根**（默认 `~/.dsh`，只有 `$DSH_HOME` 能覆盖，`packages/util/home-paths/src/index.ts:98`）⇒ **prac 的运行期状态不走 `$DSH_HOME/storages`**，只走上面那张表。
 
@@ -232,7 +232,7 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随 DSH 插
    **要接受的一处不一致**：**UI 里禁用的扩展，agent 那边仍会加载**——这是 web 形态的必然，不是缺陷（桌面/远程形态相反：那边渲染器存储本来就在服务端）。
    **"对齐 remote 形态"买不到服务端那份状态（已核实）**：remote 形态里渲染器的存储走 `'storage'` 通道，而那个通道是 **main process（客户端机器）** 的——`NativeWorkbenchStorageService` 把 `mainProcessService` 当 remote service 传进去（`electron-browser/storageService.ts:16`），`RemoteStorageService` 用它取 `getChannel('storage')`（`platform/storage/common/storageService.ts:53,109`）；**code server 注册的通道里没有 `'storage'`**（只有 extensions / logger / userDataProfiles / remoteextensionsenvironment / request / telemetry / remoteFileSystem / remoteTerminal / remoteExtensionsScanner / mcp…）。⇒ **每种形态下"按工作区启停"都是客户端状态**（桌面 → 本机 main process 的 SQLite；web → IndexedDB）。而且 remote 形态里**服务端那个扩展宿主也不自己决定装什么**：`allExtensions` / `myExtensions` 由渲染器算好交给它（`extensionHostManager.ts:425-431`）。
    ⇒ 所以 agent 侧没有"对齐 remote 就拿到服务端状态"这条路。**James 定（2026-09-21）：agent 在 prac 里就是 client 那个角色，它像 client 一样有自己的状态，存储放在 prac 里。** ⇒ **落点跟 XDG，不跟 DSH 的家**（James 2026-09-21 纠正我：DSH 自己的存储是 `~/.dsh` 这**一个单一根**，`resolveDshHome` 只认 `$DSH_HOME`、不分 XDG，`packages/util/home-paths/src/index.ts:98` ⇒ **prac 的状态不往 `$DSH_HOME/storages` 放**）：**按 XDG 的类别分 config 与 state**（§3.3 的表）。这份"装哪些 VS Code 扩展"的记录**已定（James 2026-09-21）：算 config**——它是一份"应该装什么"的决定、人和 agent 可改可审 ⇒ `$XDG_CONFIG_HOME/prac/…`（不是"上次实际装了什么"那种机器维护的既成事实）。**`ctx.storageDomain` 现成但根在 DSH 家**（`storage` + `storage-json`（`root: !!js dshHomePath('storages')`）+ `storage-domain` 三行已在本 composition 里）：要用它就必须**在我们的 patch 里把那个根改到 prac 的 XDG 目录**——那是改我们自己 composition 的一行配置、**不动 DSH**，而且它只能落**一类**（要么 config 要么 state），做不了分家。**记录已定落 config**；要不要用 `ctx.storageDomain` 存它（那就得改根）还是自己写在 `$XDG_CONFIG_HOME/prac` 下，随实现定——两者都只是"我们的文件放哪"，不改 DSH。
-   **默认不是选项，是 VS Code 自己的语义（James 2026-09-21 纠正我：我一度把它讲成"全上 / 只上内建 / 一个都不上"三选一，那是自造的选择题）**：上游算启用状态是有序的（`workbench/services/extensionManagement/browser/extensionEnablementService.ts:634-661`）——**工作区 `enabled`**（可翻过全局禁用）→ **工作区 `disabled`**（收窄）→ **全局 `disabled`** → **否则 `EnabledGlobally`**；工作区那两条只在**有工作区**时读（`hasWorkspace` 为假时读出来是空），而全局那份是 global scope 的。⇒ **我们没有工作区记录时 = 按全局那份**，也就是**装着、且没被全局禁用**；今天落成"目录里装着的全部"，只因为我们读不到全局禁用那份（web 形态里它在客户端）。⇒ 我们要加的那份记录是**工作区这一层**（等于上游的"工作区覆盖"），不是"要不要全给"的开关。**还剩一个小决定**：**谁写**这条记录（agent 自己一个工具、还是一个文件/界面）。**按 agent 仍卡在 seam**（查询入参没有会话标识，`packages/lsp/lsp/src/types.ts:38-57`）。
+   **默认不是选项，是 VS Code 自己的语义（James 2026-09-21 纠正我：我一度把它讲成"全上 / 只上内建 / 一个都不上"三选一，那是自造的选择题）**：上游算启用状态是有序的（`workbench/services/extensionManagement/browser/extensionEnablementService.ts:634-661`）——**工作区 `enabled`**（可翻过全局禁用）→ **工作区 `disabled`**（收窄）→ **全局 `disabled`** → **否则 `EnabledGlobally`**；工作区那两条只在**有工作区**时读（`hasWorkspace` 为假时读出来是空），而全局那份是 global scope 的。⇒ **我们没有工作区记录时 = 按全局那份**，也就是**装着、且没被全局禁用**；今天落成"目录里装着的全部"，只因为我们读不到全局禁用那份（web 形态里它在客户端）。⇒ 我们要加的那份记录是**工作区这一层**（等于上游的"工作区覆盖"），不是"要不要全给"的开关。**James 2026-09-21 定了"我们自己维护一份全局名单"**（在我给的"让页面告诉它 / 我们自己维护一份 / 不管"三条路里选中间那条）。**已实现**：策略文件 `$XDG_CONFIG_HOME/prac/extensions.json`（**config**），两层 + 上游那架梯子，见 §3.3；落法是挂在**上游自己的接缝**上——扩展宿主 init data 里的 `myExtensions`（启用集）由我们算好给它（`policy.isEnabled`，`vendor/vscode-embed`），**没有另造启用机制**：禁用的扩展仍在 `allExtensions` 里，只是永远不进 `myExtensions`。**配置在宿主启动时读一次**（运行中的宿主保持它开始时的集合，改配置下次启动生效）。**还剩一个小决定**：**谁写**这个文件（agent 自己一个工具、还是就手改）。**按 agent 仍卡在 seam**（查询入参没有会话标识，`packages/lsp/lsp/src/types.ts:38-57`）。
 5. **VS Code 扩展贡献的 view 要能"出数据"**：现在 `mountViewInto` 能让扩展视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——要让它进 VS Code 自己的可见性 / 容器模型，树的数据才会来。这是"支持 VS Code 扩展贡献的 view"的实事。
 6. **container / part 这类高级形态什么时候真的需要**（现在是按视图组合就够）。
 7. **多窗口 / 多标签页**：**搁置**（James 2026-09-21：先保持简单，以后再说）。已核实的底子：多标签页在 DSH 身份层就是**一个 client**（浏览器会话 cookie）；VS Code 自己的多窗口机制是 **auxiliary window**（`window.open` 出来的窗口 attach 到同一个 workbench 实例，**不新增扩展宿主**），但它绕开 prac 的 frame（内容由 workbench 自己搬），要用得先在 prac 侧设计"窗口"这个概念。今天两个标签各 boot 一个实例 ⇒ 两个宿主。

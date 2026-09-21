@@ -112,11 +112,24 @@ export interface ExtensionDescriptionDelta {
  * counts as removed + added, which is what an updated package on disk is.
  * `undefined` for "nothing changed" is deliberate: a caller that re-scans
  * cheaply can then skip the round trip entirely.
+ *
+ * `isEnabled` is the consumer's policy for the *enabled* half of the wire: a
+ * disabled extension still belongs to `allExtensions`, it just never becomes
+ * "mine". The policy is fixed for a host's lifetime (our config is read when
+ * the host starts), so it only has to filter what arrives — an extension that
+ * stops being enabled is a new host, not a delta.
+ *
+ * @param previous - the scan the host already knows.
+ * @param next - the scan to move it to.
+ * @param versionId - the version the host should end up at.
+ * @param isEnabled - whether an extension id is enabled, case-insensitively.
+ * @returns the delta, or `undefined` when nothing differs.
  */
 export function extensionsDelta(
   previous: readonly ExtensionDescription[],
   next: readonly ExtensionDescription[],
   versionId: number,
+  isEnabled: (extensionId: string) => boolean,
 ): ExtensionDescriptionDelta | undefined {
   const before = new Map(previous.map((extension) => [extension.identifier._lower, extension]));
   const after = new Map(next.map((extension) => [extension.identifier._lower, extension]));
@@ -141,8 +154,12 @@ export function extensionsDelta(
     toRemove,
     toAdd,
     addActivationEvents,
+    // An extension that left the disk leaves the enabled half too; one that
+    // arrived only joins it when the policy says so.
     myToRemove: toRemove,
-    myToAdd: toAdd.map((extension) => extension.identifier),
+    myToAdd: toAdd
+      .filter((extension) => isEnabled(extension.identifier.value))
+      .map((extension) => extension.identifier),
   };
 }
 

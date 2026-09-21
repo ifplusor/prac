@@ -118,8 +118,16 @@ export interface MainThreadPolicy {
   readonly environment: MainThreadEnvironment;
   /** The scanned extension list — see `scanExtensions`. */
   readonly extensions: readonly ExtensionDescription[];
-  /** Which extensions belong to this host; all of them by default. */
-  readonly myExtensions?: readonly string[];
+  /**
+   * Which extensions are **enabled**, i.e. belong to this host's `myExtensions`
+   * half; all of them when left out.
+   *
+   * It is a predicate rather than a list because it is applied on every scan,
+   * not once: an extension installed while a host is running has to be judged by
+   * the same policy as the ones already there. Ids arrive as the extension's own
+   * spelling (`publisher.name`); a policy that cares about case should fold it.
+   */
+  readonly isEnabled?: (extensionId: string) => boolean;
   readonly workspace?: MainThreadWorkspace | null;
   /**
    * Flat configuration defaults. Left out, they are expanded from the
@@ -307,6 +315,12 @@ export async function startMainThread(options: {
   readonly onOutput?: (stream: "stdout" | "stderr", chunk: string) => void;
 }): Promise<MainThreadHandle> {
   const { policy } = options;
+  /**
+   * The policy on which extensions are enabled. The neutral default — none of
+   * them filtered — keeps the mechanism usable on its own (a test, or an
+   * embedder with no opinion), while an embedder that has a policy states it.
+   */
+  const enabled = policy.isEnabled ?? (() => true);
   const registrations: LanguageFeatureRegistration[] = [];
   const unhandled: { actor: string; method: string }[] = [];
   const markers = new Map<string, unknown>();
@@ -342,9 +356,9 @@ export async function startMainThread(options: {
             extension.activationEvents ?? [],
           ]),
         ),
-        myExtensions: (
-          policy.myExtensions ?? policy.extensions.map((extension) => extension.identifier.value)
-        ).map((value) => ({ value, _lower: value.toLowerCase() })),
+        myExtensions: policy.extensions
+          .filter((extension) => enabled(extension.identifier.value))
+          .map((extension) => extension.identifier),
       },
       telemetryInfo: policy.environment.telemetry,
       logLevel: policy.logLevel ?? 3,
@@ -389,7 +403,7 @@ export async function startMainThread(options: {
     activateByEvent: (event) => proxies.extensionService.$activateByEvent(event, 0),
     setExtensions: async (next) => {
       registryVersion += 1;
-      const delta = extensionsDelta(known, next, registryVersion);
+      const delta = extensionsDelta(known, next, registryVersion, enabled);
       if (delta === undefined) return false;
       await proxies.extensionService.$deltaExtensions(delta);
       known.splice(0, known.length, ...next);

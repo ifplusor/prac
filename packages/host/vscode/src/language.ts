@@ -28,6 +28,11 @@ import type { LspProvider, LspProviderQuery, LspQueryResult } from "@deepseek-ai
 import { watch, type FSWatcher } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import {
+  isExtensionEnabled,
+  readExtensionPolicy,
+  type ExtensionPolicy,
+} from "./extension-policy.js";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   resolveExtensionHost,
@@ -103,6 +108,15 @@ export interface LanguageFeaturesOptions {
    */
   readonly globalStorageHome: string;
   readonly workspaceStorageHome: string;
+  /**
+   * prac's own enablement policy for the agent side — a **config** file
+   * (`$XDG_CONFIG_HOME/prac/extensions.json`), because which extensions a
+   * workspace should have is a decision, not a record of what happened.
+   *
+   * Read when a host starts, so a running host keeps the set it began with and
+   * an edit lands on the next start. See `./extension-policy.ts`.
+   */
+  readonly extensionsConfigPath: string;
 }
 
 /**
@@ -135,10 +149,11 @@ function createProvider(hosts: ExtensionHosts): LspProvider {
   };
 }
 
-/** A host for one workspace, and the extension set it was started with. */
+/** A host for one workspace, the extension set it knows, and its policy. */
 interface Running {
   host: Promise<MainThreadHandle>;
   extensions: ExtensionDescription[];
+  policy: ExtensionPolicy;
 }
 
 /**
@@ -167,7 +182,12 @@ class ExtensionHosts {
     const existing = this.running.get(workspaceRoot);
     if (existing) return existing.host;
     const extensions = this.scan();
-    const entry: Running = { host: this.start(workspaceRoot, extensions), extensions };
+    const policy = readExtensionPolicy(this.options.extensionsConfigPath);
+    const entry: Running = {
+      host: this.start(workspaceRoot, extensions, policy),
+      extensions,
+      policy,
+    };
     // A host that dies — a crash, an OOM kill, someone killing the process —
     // must not be remembered as if it were alive: sharing one host between the
     // agents of a workspace is only safe when the next question starts a fresh
@@ -226,9 +246,15 @@ class ExtensionHosts {
    * for this language.
    */
   candidatesFor(workspaceRoot: string, languageId: string): readonly string[] {
-    const extensions = this.running.get(workspaceRoot)?.extensions ?? [];
+    const entry = this.running.get(workspaceRoot);
+    const extensions = entry?.extensions ?? [];
     return extensions
       .filter((extension) => {
+        // A disabled extension never activates, so waiting for it would turn
+        // "no one provides this" into a timeout.
+        if (entry && !isExtensionEnabled(entry.policy, workspaceRoot, extension.identifier.value)) {
+          return false;
+        }
         const events = extension.activationEvents ?? [];
         return events.some(
           (event) =>
@@ -295,10 +321,15 @@ class ExtensionHosts {
   private async start(
     workspaceRoot: string,
     extensions: readonly ExtensionDescription[],
+    policy: ExtensionPolicy,
   ): Promise<MainThreadHandle> {
     const location = this.location();
+    const enabled = extensions.filter((extension) =>
+      isExtensionEnabled(policy, workspaceRoot, extension.identifier.value),
+    );
     console.log(
-      `${name}: starting the extension host for ${workspaceRoot} with ${extensions.length} extension(s)`,
+      `${name}: starting the extension host for ${workspaceRoot} with ` +
+        `${enabled.length} of ${extensions.length} extension(s) enabled`,
     );
     return startMainThread({
       location,
@@ -327,6 +358,7 @@ class ExtensionHosts {
           },
         },
         extensions,
+        isEnabled: (id) => isExtensionEnabled(policy, workspaceRoot, id),
         workspace: await singleFolderWorkspace(location, workspaceRoot),
         onLog: (message) => console.log(`${name}: extension host | ${message}`),
         onUnhandledCall: ({ actor, method }) =>

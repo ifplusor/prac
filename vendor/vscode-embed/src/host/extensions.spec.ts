@@ -113,6 +113,8 @@ describe("scanExtensions", () => {
 });
 
 describe("extensionsDelta", () => {
+  /** The policy most of these cases do not care about: nothing filtered. */
+  const all = () => true;
   const description = (value: string, version = "1.0.0", path = `/ext/${value}`) =>
     ({
       ...CSS,
@@ -123,11 +125,11 @@ describe("extensionsDelta", () => {
 
   it("says nothing when nothing changed", () => {
     const one = description("a.one");
-    expect(extensionsDelta([one], [description("a.one")], 2)).toBeUndefined();
+    expect(extensionsDelta([one], [description("a.one")], 2, all)).toBeUndefined();
   });
 
   it("adds what appeared, with its activation events", () => {
-    const delta = extensionsDelta([], [description("a.one")], 2);
+    const delta = extensionsDelta([], [description("a.one")], 2, all);
     expect(delta?.toAdd.map((extension) => extension.identifier.value)).toEqual(["a.one"]);
     expect(delta?.addActivationEvents).toEqual({ "a.one": ["onLanguage:css"] });
     expect(delta?.myToAdd).toEqual([{ value: "a.one", _lower: "a.one" }]);
@@ -135,7 +137,7 @@ describe("extensionsDelta", () => {
   });
 
   it("removes what disappeared", () => {
-    const delta = extensionsDelta([description("a.one")], [], 2);
+    const delta = extensionsDelta([description("a.one")], [], 2, all);
     expect(delta?.toRemove).toEqual([{ value: "a.one", _lower: "a.one" }]);
     expect(delta?.myToRemove).toEqual([{ value: "a.one", _lower: "a.one" }]);
     expect(delta?.toAdd).toEqual([]);
@@ -146,6 +148,7 @@ describe("extensionsDelta", () => {
       [description("a.one", "1.0.0")],
       [description("a.one", "2.0.0")],
       2,
+      all,
     );
     expect(replaced?.toRemove.map((id) => id.value)).toEqual(["a.one"]);
     expect(replaced?.toAdd.map((extension) => extension.version)).toEqual(["2.0.0"]);
@@ -154,8 +157,17 @@ describe("extensionsDelta", () => {
       [description("a.one", "1.0.0", "/ext/old")],
       [description("a.one", "1.0.0", "/ext/new")],
       2,
+      all,
     );
     expect(moved?.toRemove.map((id) => id.value)).toEqual(["a.one"]);
+  });
+
+  it("leaves a disabled extension out of the enabled half", () => {
+    // It is still part of `allExtensions` — the host knows it exists — but it
+    // must never enter the host's `myExtensions`.
+    const delta = extensionsDelta([], [description("a.one")], 2, () => false);
+    expect(delta?.toAdd.map((extension) => extension.identifier.value)).toEqual(["a.one"]);
+    expect(delta?.myToAdd).toEqual([]);
   });
 });
 

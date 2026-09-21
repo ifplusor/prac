@@ -84,7 +84,10 @@ async function startCssHost(files: Record<string, string>): Promise<CssHost> {
         },
       },
       extensions: scanExtensions({ builtinDir: join(location.checkoutRoot, "extensions") }),
-      myExtensions: ["vscode.css-language-features"],
+      // Only what these tests need is enabled: the other 97 built-ins must not
+      // activate (cSpell pulls dictionaries the moment it is asked to), and the
+      // runtime-added extension has to stay enabled for its own test.
+      isEnabled: (id) => id === "vscode.css-language-features" || id === "prac.runtime",
       workspace: {
         id: "prac-css-test",
         name: "css-test",
