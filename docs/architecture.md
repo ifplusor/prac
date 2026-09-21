@@ -116,11 +116,23 @@
 
 **硬前提**：**文档必须由我们喂**。扩展宿主取文档时没有判空、末尾还会用 `doc.getWordRangeAtPosition()`——这不是为了编辑，而是每次问语言特性都要有一份活着的文档和版本号。
 
-**DSH 自己也有一套 LSP**（`packages/lsp/`：`ctx.lsp` 能力 + 通用 stdio 提供方 + 面向模型的 `lsp` 工具），所以要分清 P1 的独有收益：
+**为什么接 VS Code 的服务器，而不是自己起**（James 2026-09-19：从生态看，VS Code 对 LSP 的支持更好更全面）：那一边有的东西是别处给不了的——
 
-- DSH 那套**只有 4 个操作**（转到定义 / 查引用 / 查实现 / 悬停），而且**不带服务器**（部署自己配 `command` / `args` / 扩展名映射）、**不在任何 bundle 里**（可选能力，没配提供方时工具返回 `LSP_UNAVAILABLE`）。所以短期的代码导航，配一个服务器 + 组装一行就能有。
-- **P1 独有的两样**：① 扩展带来的**服务器与它的配置**（人在用的那套：装好的 pyright / gopls / rust-analyzer，以及 VS Code 内置 TS 那份 `tsserver` 与初始化参数）；② **那 4 个之外的操作**（诊断、符号、code action…）——DSH 的 seam 是封闭联合，走 P1 才拿得到扩展语言特性的全集。
-- 因此 P1 的验收看这两样，而不是"能不能拿到 hover"。
+- **哪个语言用哪个服务器、谁优先、多个提供方怎么合并**（同一个语言可以挂多个，结果会被并起来）；
+- **服务器的安装与版本**由扩展生态管：内置的 css / html / json / markdown 语言服务器就在 checkout 里，不用装市场扩展；TypeScript 那份是扩展自带的 `tsserver`（注意它**不是 LSP**）；
+- **初始化参数与配置**（服务器会问 `workspace/configuration`，得由我们把配置喂进扩展宿主）；
+- **能力面是全集**：`vscode.execute*Provider` 有 24 个（hover / definition / references / implementation / symbols / code actions / completion / semantic tokens / inlay hints / call hierarchy / formatting / rename…），而不是四个闭合操作。
+
+DSH 自己那套（`packages/lsp/`：`ctx.lsp` + stdio 提供方 + `lsp` 工具）只有四个操作、不带服务器、不在任何 bundle 里，是**可选能力**——这里不作为路线。
+
+**P1 的前置条件**（都在代码里核实过）：
+
+1. **配置必须喂**：扩展里的 `workspace.getConfiguration()` 会等 `$initializeConfiguration` 开 barrier（`extHostConfiguration.ts:107-131`；主线程在 `mainThreadConfiguration.ts:29` 推，变化时 `:31` 推 `$acceptConfigurationChanged`）——不喂，扩展就挂在配置上。
+2. **文档必须喂**（含版本），见下面的硬前提。
+3. **激活**：三条初始化推送 + `ExtensionService` + `Errors`。
+4. 然后才是我们挑的 `$provide*`。
+
+**第一条端到端验收最省的素材**：用 checkout 里自带的 **css / html / json / markdown** 语言服务器（它们是真 `vscode-languageclient`），不用装市场扩展。
 
 ### 4.3 扩展生态里 agent 能用什么
 
@@ -168,7 +180,7 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随插件 d
 
 ## 7. 还没定的
 
-1. **P1 的最小面清单与验收**：先做通一条链（三条初始化推送 + `ExtensionService` + `Errors` + 文档 + 一个 `$provide*`）。验收针对 P1 独有的两样（§4.2）：**拿到的服务器/配置与人在用的一致**，以及**能拿到 DSH 那 4 个操作之外的查询**；"能问一次 hover"不是 P1 的验收——DSH 自己那套配上服务器就能做。**顺带**：先把 DSH 那套组装起来（配一个服务器），是立刻能给 agent 代码导航的最便宜一步。
+1. **P1 的第一条链**：用 checkout 自带的语言服务器（css / html / json / markdown 之一）做通——扩展激活 → 我们喂配置与文档 → 它注册 provider → 我们就工作区里的文件问一次查询。**验收**：用的是**扩展带来的服务器与它的配置**（不是手配的），而且能力面**不止那四个操作**。前置两条（配置、文档）见 §4.2。
 2. **自动保存打开之后，验证门怎么调**：现在那几条"文件保持不动"的断言是靠故意关掉 autoSave 才稳的。
 3. **Copilot 在我们 rig 里到底有没有激活**（实测）——它决定"树里多一个 agent"是理论问题还是已经在发生。
 4. **插件族的划分**：server 侧一族与 client 侧一族各有哪些插件、什么算一个插件。
@@ -181,5 +193,6 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随插件 d
 - [dsh.md](dsh.md) / [vscode.md](vscode.md)：两个被依赖系统的内部结构（事实参考）。
 - [.agents/notes/](../.agents/notes/)：决策记忆（每个「为什么 + 放弃了什么」）与实现进度、差距、踩坑。
 - [proposed/2026-09-19-architecture.md](../.agents/notes/proposed/2026-09-19-architecture.md)：这一版设计是怎么从需求推出来的（含旧设计哪些留着、哪些作废）。
+- DSH 自己的 LSP 栈：`packages/lsp/`（`ctx.lsp` / stdio 提供方 / `lsp` 工具）——可选能力，只有四个操作、不带服务器；见 [dsh.md](dsh.md)。
 - [in-progress/2026-09-09-vscode-dsh-integration.md](../.agents/notes/in-progress/2026-09-09-vscode-dsh-integration.md)：umbrella（主线、需求约束、已经定下的决定、与目标的差距）。
 - [.agents/worklog/2026-09-09-vscode-dsh-integration.md](../.agents/worklog/2026-09-09-vscode-dsh-integration.md)：依据（协议清单、核实过的事实、踩坑、决定台账）。
