@@ -111,29 +111,7 @@
 | agent 侧的启用策略（禁用 / 另启用哪些 VS Code 扩展） | 全局层 `$XDG_CONFIG_HOME/prac/settings.json`；工作区层 `<workspace>/.agent/prac/settings.json` | config / 工作区文件 |
 
 - 扩展宿主的 `globalStorage` / `workspaceStorage` 是**状态**、不是配置 ⇒ 落在 state 下；并且**用 code server 自己那份 storage**（`--server-data-dir` 下的 `data/User/…`），**不另开一个根**。
-- **agent 侧的启用策略：文件是我们自己的，但模型与 UI 同构**（James 2026-09-21：**继续分离，但 agent 的配置模式要和 UI 同构**）。同构 = 四件事都照 VS Code 的来：**作用域**（全局层 + 工作区层）、**格式**（JSONC 的 `settings.json`，注释与尾逗号合法——用**构建自己的解析器**读，`readSettingsJson`）、**key**（用**上游自己的标识符**：`extensionsIdentifiers/disabled` / `extensionsIdentifiers/enabled`——VS Code 里没有"启用"这个设置，只有这对存储键，`extensionManagement.ts:645-646`；值的形状我们简化为裸 id，上游存的是 `{ id, uuid }` 对象）、**优先级**（工作区 `enabled` → 工作区 `disabled` → 全局 `disabled` → 否则启用，`extensionEnablementService.ts:634-661`）。分离 = **不写进 VS Code 的 `settings.json`**：UI 自己的启停是客户端状态，我们看不到也不镜像（§7 #4）。**但这两个文件是桥进 VS Code 的**（James 2026-09-21：**「不能桥接进 vscode，让 vscode 直接读吗？只是区分 agent 和 UI 使用不同的配置源」**）：扩展宿主 init data 里的配置模型本来就有分层（`defaults / policy / application / userLocal / userRemote / workspace / folders`，`platform/configuration/common/configuration.ts:222-230`），我们那两个文件正填进 **`userRemote`**（服务端那份 user settings——上游在 remote 形态下正是拿它装 `Machine/settings.json` 的）与 **`workspace`** 两层，`userLocal` 留空（那是浏览器那份）。⇒ **宿主里的 VS Code 用自己的 `workspace.getConfiguration` 读我们的文件**，作用域与优先级全走它的机制；我们这边只额外算「装不装」。落点：全局层 `$XDG_CONFIG_HOME/prac/settings.json`（**config**），工作区层 `<workspace>/.agent/prac/settings.json`（**在工作区里**，`.vscode/settings.json` 的对位——所以不必在我们自己的配置里维护"工作区路径 → 设置"那张表）。**两个文件都不在 = 装着的那份全上**。
-  **agent 侧的启用策略现在就是手改这两个文件**（James 2026-09-21：**先手工维护**）：
-
-```jsonc
-// ~/.config/prac/settings.json —— 全局层（config）
-{
-  // 只写 id；VS Code 自己在这两个键下存的是 { id, uuid } 对象，我们收裸 id
-  "extensionsIdentifiers/disabled": ["streetsidesoftware.code-spell-checker"],
-}
-```
-
-```jsonc
-// <workspace>/.agent/prac/settings.json —— 工作区层（随仓库走）
-{
-  "extensionsIdentifiers/enabled": ["streetsidesoftware.code-spell-checker"],
-}
-```
-
-- **键就是 VS Code 自己用的那两个**（`extensionsIdentifiers/disabled` / `enabled`，`platform/extensionManagement/common/extensionManagement.ts:645-646`）；`disabled` 是全局层、`enabled` 是工作区层，工作区那层可以**翻过**全局禁用。
-- **VS Code 自己不读这两个文件**（它那份状态在 storage 里；UI 走 web 时是浏览器 IndexedDB）——读它们的是我们的策略代码，以及**桥**（§7 #4）之后宿主里的 VS Code 配置系统。
-- **两个文件都不在 = 什么都不禁用 = 装着的那份全上**。
-- 改配置是低频动作，手工维护够用；要让 agent 自己写（走 `$updateConfigurationOption` 或一个工具）是以后的事。
-
+- **agent 侧的启用策略**：文件是我们的（全局层 `$XDG_CONFIG_HOME/prac/settings.json` + 工作区层 `<workspace>/.agent/prac/settings.json`），但**模型与 VS Code 同构**——作用域两层、JSONC 的 `settings.json`、键就是 VS Code 自己那对 `extensionsIdentifiers/{disabled,enabled}`、优先级照它那架梯子（工作区 `enabled` → 工作区 `disabled` → 全局 `disabled` → 否则启用）。**并且桥进宿主**：两个文件按配置模型自己的层（`userRemote` / `workspace`）喂进去，宿主里的 VS Code 用 `workspace.getConfiguration` 直接读；`userLocal` 留空，因为 web 形态下那一层是浏览器的。**两个文件都不在 = 装着的那份全上**。分离的是**配置源**（UI 的启停在客户端 storage 里，我们看不到也不镜像），不是机制。怎么改、怎么确认生效：见 [packages/host/vscode/README.md](../packages/host/vscode/README.md)。
 - **同一个工作区上两个扩展宿主并存不用我们操心**：上游自己在 `<workspaceStorageHome>/<hash>` 上抢 `vscode.lock`，抢不到就退到 `<hash>-1`、`-2`…（`extHostStoragePaths.ts:26-62`）⇒ UI 宿主与 agent 宿主**各用各的一份**，这正是"两边状态各归各家"。
 - **DSH 自己的家不按 XDG 分**：`resolveDshHome` 是**单一根**（默认 `~/.dsh`，只有 `$DSH_HOME` 能覆盖，`packages/util/home-paths/src/index.ts:98`）⇒ **prac 的运行期状态不走 `$DSH_HOME/storages`**，只走上面那张表。
 
@@ -251,12 +229,10 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随 DSH 插
 1. **第一条链已经通了**（css VS Code 内建扩展；四道门见工作记录）。**两组后续都搁置**（James 2026-09-21）：把 **json / html / markdown** 也编译进来（同一套手续、成本小），以及 **MCP 定义接线**（把 VS Code 那边的 server 定义来源接给 DSH 现有的 MCP 客户端）。
 2. **自动保存打开之后，验证门怎么调**：现在那几条"文件保持不动"的断言是靠故意关掉 autoSave 才稳的；`verify-file` 最近一次是 33/33 直接绿的，与旧注意不一致，待查。
 3. **Copilot 在我们 rig 里到底有没有激活**（实测）——它决定"树里多一个 agent"是理论问题还是已经在发生。**已知一条相关事实**：打开页面时 code server 会拉起一个 `--type=agentHost` 进程（VS Code 自己的 agent 层的服务端形态）。
-4. **按工作区 / 按 agent 配置装哪些 VS Code 扩展**（James 2026-09-21）。**"插件族的划分"这个问题撤销了**——不需要区分哪个 DSH 插件算 server 侧、哪个算 client 侧；要的是**VS Code 扩展贡献的 view 能上屏**（数据那一半见下条）。**James 定**：**用 VS Code 自己的按工作区启用/禁用，不另造配置机制**。
-   **两个消费者在两种形态里，状态各归各家**（James 2026-09-21）：**UI 走 web**（它的按工作区启停是浏览器里的状态——`BrowserStorageService` 用 IndexedDB 存所有域含 workspace，`web.main.ts:613-614` 构造它时无 remote 分支），**由 VS Code 自己管它的宿主，我们什么都不用做**；**agent 不是 web、是服务端消费者**，所以它的"装什么"要由**服务端的事实**决定。⇒ 两边**不需要互相镜像**，也不该为一个统一机制去发明东西。
-   **要接受的一处不一致**：**UI 里禁用的扩展，agent 那边仍会加载**——这是 web 形态的必然，不是缺陷（桌面/远程形态相反：那边渲染器存储本来就在服务端）。
-   **"对齐 remote 形态"买不到服务端那份状态（已核实）**：remote 形态里渲染器的存储走 `'storage'` 通道，而那个通道是 **main process（客户端机器）** 的——`NativeWorkbenchStorageService` 把 `mainProcessService` 当 remote service 传进去（`electron-browser/storageService.ts:16`），`RemoteStorageService` 用它取 `getChannel('storage')`（`platform/storage/common/storageService.ts:53,109`）；**code server 注册的通道里没有 `'storage'`**（只有 extensions / logger / userDataProfiles / remoteextensionsenvironment / request / telemetry / remoteFileSystem / remoteTerminal / remoteExtensionsScanner / mcp…）。⇒ **每种形态下"按工作区启停"都是客户端状态**（桌面 → 本机 main process 的 SQLite；web → IndexedDB）。而且 remote 形态里**服务端那个扩展宿主也不自己决定装什么**：`allExtensions` / `myExtensions` 由渲染器算好交给它（`extensionHostManager.ts:425-431`）。
-   ⇒ 所以 agent 侧没有"对齐 remote 就拿到服务端状态"这条路。**James 定（2026-09-21）：agent 在 prac 里就是 client 那个角色，它像 client 一样有自己的状态，存储放在 prac 里。** ⇒ **落点跟 XDG，不跟 DSH 的家**（James 2026-09-21 纠正我：DSH 自己的存储是 `~/.dsh` 这**一个单一根**，`resolveDshHome` 只认 `$DSH_HOME`、不分 XDG，`packages/util/home-paths/src/index.ts:98` ⇒ **prac 的状态不往 `$DSH_HOME/storages` 放**）：**按 XDG 的类别分 config 与 state**（§3.3 的表）。这份"装哪些 VS Code 扩展"的记录**已定（James 2026-09-21）：算 config**——它是一份"应该装什么"的决定、人和 agent 可改可审 ⇒ `$XDG_CONFIG_HOME/prac/…`（不是"上次实际装了什么"那种机器维护的既成事实）。**`ctx.storageDomain` 现成但根在 DSH 家**（`storage` + `storage-json`（`root: !!js dshHomePath('storages')`）+ `storage-domain` 三行已在本 composition 里）：要用它就必须**在我们的 patch 里把那个根改到 prac 的 XDG 目录**——那是改我们自己 composition 的一行配置、**不动 DSH**，而且它只能落**一类**（要么 config 要么 state），做不了分家。**记录已定落 config**；要不要用 `ctx.storageDomain` 存它（那就得改根）还是自己写在 `$XDG_CONFIG_HOME/prac` 下，随实现定——两者都只是"我们的文件放哪"，不改 DSH。
-   **默认不是选项，是 VS Code 自己的语义（James 2026-09-21 纠正我：我一度把它讲成"全上 / 只上内建 / 一个都不上"三选一，那是自造的选择题）**：上游算启用状态是有序的（`workbench/services/extensionManagement/browser/extensionEnablementService.ts:634-661`）——**工作区 `enabled`**（可翻过全局禁用）→ **工作区 `disabled`**（收窄）→ **全局 `disabled`** → **否则 `EnabledGlobally`**；工作区那两条只在**有工作区**时读（`hasWorkspace` 为假时读出来是空），而全局那份是 global scope 的。⇒ **我们没有工作区记录时 = 按全局那份**，也就是**装着、且没被全局禁用**；今天落成"目录里装着的全部"，只因为我们读不到全局禁用那份（web 形态里它在客户端）。⇒ 我们要加的那份记录是**工作区这一层**（等于上游的"工作区覆盖"），不是"要不要全给"的开关。**James 2026-09-21 定了两件事**：① 启用名单**由 prac 自己维护**（在我给的"让页面告诉它 / 我们自己维护一份 / 不管"里选中间那条）；② 追问"agent 配置和 UI 配置是分离的吗"之后定：**继续分离，但 agent 的配置模式要和 UI 同构**——文件是我们的，作用域 / 格式 / key（上游标识符）/ 优先级照 VS Code 的模型（见 §3.3），**不写进 VS Code 自己的 settings.json**，因为 UI 的启停是客户端状态、我们看不到也不该镜像。**已实现**，两条都挂在上游自己的接缝上：① 扩展宿主 init data 里的 `myExtensions`（启用集）由我们算好给它（`policy.isEnabled`，`vendor/vscode-embed`）——禁用的扩展仍在 `allExtensions` 里，只是永远不进 `myExtensions`；② **两个文件桥进宿主的配置模型**（`userRemote` + `workspace` 两层，`policy.configurationLayers`），所以宿主里的 VS Code 用 `workspace.getConfiguration` 直接读我们的文件。**没有另造启用机制，也没有另造配置机制。****配置在宿主启动时读一次**（运行中的宿主保持它开始时的集合，改配置下次启动生效）。**谁写：已定（James 2026-09-21）——先手工维护**（agent 自己一个工具以后再说）。**按 agent 仍卡在 seam**（查询入参没有会话标识，`packages/lsp/lsp/src/types.ts:38-57`）。
+4. **按工作区 / 按 agent 配置装哪些 VS Code 扩展**（James 2026-09-21）。**不另造配置机制，也不另造启用机制**：agent 侧的名单由 prac 自己维护，两层（全局 + 工作区）与 VS Code 的模型同构，并**桥进宿主的配置模型**——设计见 §3.3，怎么改见 [packages/host/vscode/README.md](../packages/host/vscode/README.md)；**先手工维护**。
+   **两个消费者，状态各归各家**：**UI 走 web**——它的按工作区启停是浏览器里的状态（`BrowserStorageService` 用 IndexedDB 存所有域含 workspace，`web.main.ts:613-614` 无 remote 分支），**由 VS Code 自己管它的宿主，我们什么都不做**；**agent 不是 web、是服务端消费者**，所以它的「装什么」由服务端的事实决定。⇒ 两边不互相镜像、也不为统一去发明东西。
+   **要接受的一处不一致**：**UI 里禁用的扩展，agent 那边仍会加载**——这是 web 形态的必然，不是缺陷（桌面/远程形态相反：那边渲染器存储本来就在服务端）。**「对齐 remote 形态」买不到那份状态**：remote 形态里渲染器的存储走 `'storage'` 通道，而那个通道是 **main process（客户端机器）** 的，code server 根本没注册它（只有 extensions / logger / userDataProfiles / remoteextensionsenvironment / request / telemetry / remoteFileSystem / remoteTerminal / remoteExtensionsScanner / mcp…）。
+   **按 agent 仍卡在 seam**：查询入参没有会话标识（`packages/lsp/lsp/src/types.ts:38-57`）。逐条核实与来往见[工作记录](../.agents/worklog/2026-09-09-vscode-dsh-integration.md)。
 5. **VS Code 扩展贡献的 view 要能"出数据"**：现在 `mountViewInto` 能让扩展视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——要让它进 VS Code 自己的可见性 / 容器模型，树的数据才会来。这是"支持 VS Code 扩展贡献的 view"的实事。
 6. **container / part 这类高级形态什么时候真的需要**（现在是按视图组合就够）。
 7. **多窗口 / 多标签页**：**搁置**（James 2026-09-21：先保持简单，以后再说）。已核实的底子：多标签页在 DSH 身份层就是**一个 client**（浏览器会话 cookie）；VS Code 自己的多窗口机制是 **auxiliary window**（`window.open` 出来的窗口 attach 到同一个 workbench 实例，**不新增扩展宿主**），但它绕开 prac 的 frame（内容由 workbench 自己搬），要用得先在 prac 侧设计"窗口"这个概念。今天两个标签各 boot 一个实例 ⇒ 两个宿主。
