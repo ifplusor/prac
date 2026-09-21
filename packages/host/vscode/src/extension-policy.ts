@@ -13,8 +13,8 @@
  *   `.vscode/settings.json`).
  * - **Format.** A JSONC `settings.json`: comments and trailing commas are legal,
  *   parsed by VS Code's own parser (`readSettingsJson` in `prac-vscode-embed`).
- * - **Keys.** Dotted setting ids, read from a flat object —
- *   `prac.extensions.disabled` and `prac.extensions.enabled`.
+ * - **Keys.** VS Code's own identifiers for this state, read from a flat
+ *   object — `extensionsIdentifiers/disabled` and `extensionsIdentifiers/enabled`.
  * - **Precedence.** Upstream's ladder, unchanged: workspace `enabled` →
  *   workspace `disabled` → global `disabled` → otherwise enabled
  *   (`workbench/services/extensionManagement/browser/extensionEnablementService.ts:634-661`).
@@ -32,10 +32,24 @@
 
 import type { SettingsRead } from "prac-vscode-embed";
 
-/** The setting ids we read, named as a VS Code setting would be. */
-export const EXTENSION_SETTINGS = {
-  disabled: "prac.extensions.disabled",
-  enabled: "prac.extensions.enabled",
+/**
+ * The keys we read, **named exactly as VS Code names this state**.
+ *
+ * Upstream has no *setting* for extension enablement: `extensions.*` holds
+ * `extensions.autoUpdate` and friends, and nothing for on/off. What it has is
+ * this pair of storage keys (`platform/extensionManagement/common/
+ * extensionManagement.ts:645-646`), read and written by the enablement service.
+ * Using those identifiers verbatim — rather than a dotted key of our own
+ * invention — is the whole point of the isomorphic model: a reader of our file
+ * can look the name up in VS Code.
+ *
+ * One deliberate simplification: upstream stores `{ id, uuid }` objects there
+ * (the uuid disambiguates marketplace installs of the same id); a file a person
+ * edits wants bare ids, so that is what we read.
+ */
+export const EXTENSION_KEYS = {
+  disabled: "extensionsIdentifiers/disabled",
+  enabled: "extensionsIdentifiers/enabled",
 } as const;
 
 /** One settings file's worth of enablement, both directions. */
@@ -124,18 +138,8 @@ function layerFrom(
   report: (message: string) => void,
 ): ExtensionLayer {
   return {
-    disabled: identifiers(
-      settings[EXTENSION_SETTINGS.disabled],
-      path,
-      EXTENSION_SETTINGS.disabled,
-      report,
-    ),
-    enabled: identifiers(
-      settings[EXTENSION_SETTINGS.enabled],
-      path,
-      EXTENSION_SETTINGS.enabled,
-      report,
-    ),
+    disabled: identifiers(settings[EXTENSION_KEYS.disabled], path, EXTENSION_KEYS.disabled, report),
+    enabled: identifiers(settings[EXTENSION_KEYS.enabled], path, EXTENSION_KEYS.enabled, report),
   };
 }
 

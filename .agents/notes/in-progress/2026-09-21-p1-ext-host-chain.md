@@ -144,7 +144,7 @@ status: in-progress
 4. **VS Code 扩展扫描**：第一条链手写扩展清单；要变成"用户装什么就能用什么"，得有一个扫描器（上游 `out-build` 里有没有可直接用的，未查）或走 code server 的 HTTP 面。
 5. **多提供方并存时的扩展名冲突**：`lsp-stdio` 与我们若都声明 `.ts`，后注册者抛 `LSP_CONFLICT`，要在 patch 层二选一或分扩展名。
 6. **两条链要不要合成一条** —— **已定（James 2026-09-21）：不合并**。agent 侧一个工作区一个宿主（同工作区的 agent 共用），UI 按上游每个页面一个宿主，两者不共用。想把 UI 也接到同一条链上，得先解决"谁是唯一主线程 + UI 的 VS Code 扩展界面贡献怎么呈现"，那是另一个决定。
-7. **agent 侧的启用策略已经有落点**（2026-09-21 后补，不在这条链的验收里）：全局层 `$XDG_CONFIG_HOME/prac/settings.json` + 工作区层 `<workspace>/.agent/prac/settings.json`（与 UI 分离、模型同构：作用域 / JSONC / 点号 key / 优先级都照 VS Code），挂在宿主 init data 的 `myExtensions` 上 ⇒ 以后不必再发明「给 agent 装什么」的机制。见 `docs/architecture.md` §3.3/§7 #4 与工作记录。
+7. **agent 侧的启用策略已经有落点**（2026-09-21 后补，不在这条链的验收里）：全局层 `$XDG_CONFIG_HOME/prac/settings.json` + 工作区层 `<workspace>/.agent/prac/settings.json`（与 UI 分离、模型同构：作用域 / JSONC / key 用上游标识符 / 优先级都照 VS Code），挂在宿主 init data 的 `myExtensions` 上 ⇒ 以后不必再发明「给 agent 装什么」的机制。见 `docs/architecture.md` §3.3/§7 #4 与工作记录。
 8. **工作区级的 memento 现在不可用（已发现，未定要不要补）**：`workspaceStorage/<hash>/` 下**只有 `vscode.lock`、没有 `meta.json`**（连 UI code server 自己建的目录也没有），而那份 `meta.json` 是上游在**目录首次创建时**写的（`api/common/extHostStoragePaths.ts:57-76`）⇒ 扩展宿主的文件系统消费方（`vscode.workspace.fs` 那一半）在我们这个最小主线程里没落地：我们只实现了语言功能要的 actor，其余由兜底 actor 答 `undefined`。**后果**：`workspaceState` 这类工作区级存储对扩展静默失效（`globalStorage` 不受影响，那是纯 node 文件写）。**不影响语言功能**；要不要为"扩展能正常工作"补上，待 James。
 
 ## Related
