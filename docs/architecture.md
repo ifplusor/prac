@@ -36,6 +36,8 @@
 | MCP 客户端（`packages/mcp/mcp-client`）                                                                                                                                               | 扩展贡献的界面（视图、编辑器、状态栏）                             |
 | LSP seam（`ctx.lsp`）与 `lsp` 工具（四个操作）                                                                                                                                        | `execute*Provider` 那 24 个查询                                    |
 
+一句话：**本次 = 把 VS Code 现有的东西，接到 DSH 现有的接口上；接口不够用时，不扩接口，只记录。**
+
 **本次要接的点**：① VS Code 的语言服务器 → `ctx.lsp` 的一个 provider（§4.2）；② VS Code 的 MCP server 定义 → DSH 现有的 MCP 客户端（§4.3）；③ VS Code 的界面 → prac 的 view，由 frame 摆（§3）；④ 人和 agent 对着同一份工作区文件（磁盘为准，§5.1）。
 
 ## 2. 总体形态
