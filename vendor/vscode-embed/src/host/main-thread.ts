@@ -168,6 +168,15 @@ export interface MainThreadHandle {
   readonly child: ChildProcess;
   /** Providers the host has registered so far. */
   readonly registrations: readonly LanguageFeatureRegistration[];
+  /**
+   * Extensions whose activation has finished, successfully or not.
+   *
+   * What this is for: once an extension is in here and a provider it was
+   * expected to register is absent, waiting longer cannot help — the answer is
+   * that it does not provide that operation, and saying so immediately beats
+   * holding a caller for a timeout.
+   */
+  readonly activated: ReadonlySet<string>;
   /** Calls that hit the fallback actor, in order. */
   readonly unhandled: readonly { readonly actor: string; readonly method: string }[];
   /** Ask the host to activate whatever wants this event. */
@@ -291,6 +300,8 @@ export async function startMainThread(options: {
   const markers = new Map<string, unknown>();
   /** What the host has been told about each document, so we never re-add one. */
   const mirror = new Map<string, MirrorEntry>();
+  /** Extensions whose activation has finished — see `MainThreadHandle.activated`. */
+  const activated = new Set<string>();
   const defaults = policy.configuration ?? configurationDefaults(policy.extensions);
   const log = policy.onLog ?? (() => undefined);
 
@@ -334,6 +345,7 @@ export async function startMainThread(options: {
         unhandled,
         markers,
         mirror,
+        activated,
         extensions: policy.extensions,
         onUnhandledCall: policy.onUnhandledCall,
         onLog: log,
@@ -357,6 +369,7 @@ export async function startMainThread(options: {
     initData: host.initData,
     child: host.child,
     registrations,
+    activated,
     unhandled,
     activateByEvent: (event) => proxies.extensionService.$activateByEvent(event, 0),
     activate: (extensionId) => {
@@ -645,6 +658,7 @@ function registerActors(context: {
   unhandled: { actor: string; method: string }[];
   markers: Map<string, unknown>;
   mirror: Map<string, MirrorEntry>;
+  activated: Set<string>;
   extensions: readonly ExtensionDescription[];
   onUnhandledCall?: (call: { actor: string; method: string }) => void;
   onLog: (message: string) => void;
@@ -715,9 +729,13 @@ function registerActors(context: {
       context.onLog(`activating ${extensionId?.value ?? "?"}`);
       return Promise.resolve();
     },
-    $onDidActivateExtension: (extensionId: { value?: string }) =>
-      context.onLog(`activated ${extensionId?.value ?? "?"}`),
+    $onDidActivateExtension: (extensionId: { value?: string }) => {
+      if (extensionId?.value) context.activated.add(extensionId.value);
+      return context.onLog(`activated ${extensionId?.value ?? "?"}`);
+    },
     $onExtensionActivationError: (extensionId: { value?: string }, error: unknown) => {
+      // Activation is over either way: what it registered is all there will be.
+      if (extensionId?.value) context.activated.add(extensionId.value);
       context.onLog(`activation failed (${extensionId?.value ?? "?"}): ${describeError(error)}`);
       return Promise.resolve();
     },

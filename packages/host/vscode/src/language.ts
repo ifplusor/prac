@@ -32,6 +32,7 @@ import {
   resolveExtensionHost,
   scanExtensions,
   startMainThread,
+  type ExtensionDescription,
   type ExtensionHostLocation,
   type LanguageFeatureKind,
   type LanguageFeatureRegistration,
@@ -132,8 +133,24 @@ function createProvider(hosts: ExtensionHosts): LspProvider {
  */
 class ExtensionHosts {
   private current: { readonly root: string; readonly host: Promise<MainThreadHandle> } | undefined;
+  private extensions: readonly ExtensionDescription[] = [];
 
   constructor(private readonly options: LanguageFeaturesOptions) {}
+
+  /**
+   * The extensions that say they activate for a language.
+   *
+   * Used to tell "the provider is on its way" apart from "no one provides
+   * this": once all of these have finished activating and the provider is still
+   * absent, more waiting cannot change the answer.
+   */
+  candidatesFor(languageId: string): readonly string[] {
+    return this.extensions
+      .filter((extension) =>
+        (extension.activationEvents ?? []).includes(`onLanguage:${languageId}`),
+      )
+      .map((extension) => extension.identifier.value);
+  }
 
   async for(workspaceRoot: string): Promise<MainThreadHandle> {
     if (this.current?.root === workspaceRoot) return this.current.host;
@@ -165,6 +182,7 @@ class ExtensionHosts {
       builtinDir: join(this.options.checkoutRoot, "extensions"),
       userDir: this.options.userExtensionsDir,
     });
+    this.extensions = extensions;
     console.log(
       `${name}: starting the extension host for ${workspaceRoot} with ${extensions.length} extension(s)`,
     );
@@ -242,7 +260,13 @@ async function query(
   const text = await readFile(request.filePath, "utf8");
   host.openDocument({ uri, languageId: request.languageId, text });
   await host.activateByEvent(`onLanguage:${request.languageId}`);
-  const registration = await registrationFor(host, kind, request.languageId, request.filePath);
+  const registration = await registrationFor(
+    host,
+    kind,
+    request.languageId,
+    request.filePath,
+    hosts.candidatesFor(request.languageId),
+  );
   const position: ProviderPosition = {
     line: request.position.line,
     character: request.position.character,
@@ -280,6 +304,7 @@ async function registrationFor(
   kind: LanguageFeatureKind,
   languageId: string,
   filePath: string,
+  candidates: readonly string[],
 ): Promise<LanguageFeatureRegistration> {
   const deadline = Date.now() + REGISTRATION_TIMEOUT_MS;
   for (;;) {
@@ -288,6 +313,14 @@ async function registrationFor(
         registration.kind === kind && matches(registration.selector, languageId, filePath),
     );
     if (match) return match;
+    // Every extension that could have provided this has finished activating, so
+    // the provider is not coming: say so now rather than at the timeout.
+    if (candidates.length > 0 && candidates.every((id) => host.activated.has(id))) {
+      throw new LspFailure(
+        `the extension(s) for ${languageId} do not provide ${kind}`,
+        "LSP_UNSUPPORTED_OPERATION",
+      );
+    }
     if (Date.now() > deadline) {
       throw new LspFailure(
         `no ${kind} provider for ${languageId} in ${filePath} after ${REGISTRATION_TIMEOUT_MS}ms`,

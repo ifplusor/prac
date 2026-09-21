@@ -119,6 +119,13 @@ describe.skipIf(!built)("main thread: the built-in css extension", () => {
     await css.registration("hover");
     // The language client registers a whole family, not just the one we ask for.
     expect(css.host.registrations.length).toBeGreaterThan(1);
+    // Activation is reported as finished, which is what lets a caller stop
+    // waiting for a provider that is never coming.
+    await until(
+      () => css.host.activated.has("vscode.css-language-features"),
+      "the activation to be reported as finished",
+      () => css.log.join("\n"),
+    );
     expect(css.host.child.exitCode).toBeNull();
     await css.host.dispose();
   }, 120_000);
