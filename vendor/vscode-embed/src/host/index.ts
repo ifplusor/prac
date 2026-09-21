@@ -328,3 +328,23 @@ export type {
   StartCodeServerOptions,
   WaitForReadyOptions,
 } from "./code-server.js";
+
+export {
+  BOOTSTRAP_RELATIVE_PATH,
+  EXTENSION_HOST_ENTRYPOINT,
+  extensionHostEnv,
+  extensionHostInitData,
+  resolveExtensionHost,
+  startExtensionHost,
+} from "./extension-host.js";
+export type {
+  ExtensionHostHandle,
+  ExtensionHostInitDataInput,
+  ExtensionHostLocation,
+  ExtensionHostLocationOptions,
+  ExtensionHostProtocol,
+  RpcProtocol,
+  RpcProxyIdentifier,
+  StartExtensionHostOptions,
+  UriLike,
+} from "./extension-host.js";

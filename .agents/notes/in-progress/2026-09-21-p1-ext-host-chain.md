@@ -118,7 +118,7 @@ status: in-progress
 
 ## 4. 实施步骤（按 2026-09-21 的三个裁决）
 
-> **进度（2026-09-21）**：第 1 步的 **css 一份已完成**（client / server 两半都编译出来、依赖可解析）；第 2 步的**载体与握手已用探针跑通**（自己 fork 扩展宿主 + IPC 管道；`Ready` → initData → `Initialized`，之后 ext host 就开始发 RPC 请求）。细节与两个只有做了才知道的坑（`VSCODE_NLS_CONFIG`、`NodeSocket` 在 node 那份 ipc.net 里）见[工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)。**lib 模块本身还没写。**
+> **进度（2026-09-21）**：第 1 步的 **css 一份已完成**（client / server 两半都编译出来、依赖可解析）；**第 2 步已完成**——机制落进 `vendor/vscode-embed/src/host/extension-host.ts`（找 build / 环境 / initData 组装 / 管道 + fork + 握手 / RPC 装配），配一条**对真构建**的集成测试：握手完成、协议表 87+81、**真的收到扩展宿主的启动期 RPC 调用**、停机干净。细节与几个只有做了才知道的坑（`VSCODE_NLS_CONFIG`、`NodeSocket` 在 node 那份 ipc.net 里、**早到的帧必须在顾客注册之后才放行**）见[工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)。下一步是第 3 步（主线程最小面）。
 
 1. **让内建扩展变成可加载的**（独立可验，不碰协议）：给 `extensions/css-language-features` 与它的 `server/` 各装依赖，再编译 client 与 server 两半。**验收**：`client/out/node/cssClientMain.js` 与 `server/out/node/cssServerMain.js` 存在，且 `vscode-languageclient` 从扩展目录能解析。
 2. **连接与协议写进 `vendor/vscode-embed`**（机制，不带政策）：建载体（`VSCODE_EXTHOST_IPC_HOOK` 管道）→ `cp.fork(bootstrap-fork.js, …)` → 固定顺序握手（`Ready` → initData → `Initialized`）→ import `out-build` 的 `RPCProtocol` 与 id 表，落成一个可复用的入口；host 插件只决定"何时起、给谁用"。
