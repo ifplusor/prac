@@ -316,6 +316,12 @@ export function apply(ctx: Context): void {
   manageLanguageFeatures(ctx, {
     checkoutRoot: dirname(bundleRoot()),
     userExtensionsDir: codeServerDirs().extensionsDir,
-    storageRoot: join(codeServerDirs().userDataDir, "prac-extension-host"),
+    // The extension host's own storage (mementos, `globalStorage` /
+    // `workspaceStorage`) is **state**, not configuration: it follows XDG like
+    // everything else prac keeps at runtime, and sits beside the code server's
+    // state rather than inside the user-data (config) tree. VS Code puts the
+    // same kind of data under the *state* directory when it runs with
+    // `--server-data-dir` — this is the same category, for our own host.
+    storageRoot: join(xdg("XDG_STATE_HOME", ".local/state"), "prac/extension-host"),
   });
 }

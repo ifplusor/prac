@@ -100,6 +100,8 @@
 | 编辑器视图状态（打开的文件、布局、选择、折叠）   | client                 | 纯呈现，**而且不给 agent**：agent 要知道人在看什么，靠人说 |
 | 诊断、装饰、状态栏                               | server 算、client 显示 | 给 agent 的是语义服务，不是这份显示用的缓存（§4.1）        |
 
+**运行期状态一律跟随 XDG、放在仓库外**：code server 的三份在 `$XDG_{STATE,DATA,CONFIG}_HOME/prac/code-server`（state / extensions / user-data），**扩展宿主的 storage 在 `$XDG_STATE_HOME/prac/extension-host`**（`globalStorage` / `workspaceStorage`——那是**状态**，不是配置，所以不放进 `XDG_CONFIG_HOME`；VS Code 自己在 `--server-data-dir` 下也是这么分的）。**agent 侧自己的状态**（比如"这个工作区装哪些 VS Code 扩展"）走 **DSH 的 `ctx.storageDomain`**（根在 `$DSH_HOME/storages`），见 §7 #4。
+
 ### 3.4 持久化
 
 区域尺寸、每个 view 的折叠状态、堆叠顺序、哪些 view 在屏上。两份 key：**per-window**（布局）与 **per-workspace**（展开项）；key 带版本，恢复时不校验形状。**默认放置只填空缺**——否则每次激活都把视图拖回出厂位。边界：localStorage 是 per-origin，同源两个 tab 共用一份。
