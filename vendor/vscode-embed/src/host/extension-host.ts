@@ -454,6 +454,18 @@ export async function startExtensionHost(
   try {
     socket = await acceptConnection(server, child);
     const connection = await handshake(socket, location, options.initData);
+    // The host is up, so nothing here should keep the embedding process alive
+    // any more: the consumer's fiber owns this lifetime, and a process that has
+    // finished its work (a one-shot task, say) has to be able to exit. A forked
+    // child with an IPC channel and a listening socket both hold the event loop
+    // otherwise — measured: the same task that exits in seconds without an
+    // extension host hung until it was killed with one.
+    child.unref();
+    child.channel?.unref();
+    server.unref();
+    // …including the socket the host is talking to: an unref'd connection still
+    // carries traffic, it just stops counting as work that must finish.
+    socket.unref();
     const rpc = new modules.RPCProtocol(connection);
     const protocol: ExtensionHostProtocol = {
       MainContext: modules.MainContext,
@@ -489,8 +501,31 @@ export async function startExtensionHost(
   }
 }
 
-/** Wait for the host to connect to the pipe, or for it to die trying. */
-async function acceptConnection(server: Server, child: ChildProcess): Promise<Socket> {
+/**
+ * A load estimator that does not hold the process open.
+ *
+ * Upstream's `LoadEstimator` is a singleton whose interval never stops —
+ * invisible in a long-lived renderer, fatal for a one-shot embedding process
+ * that then cannot exit. The meaning is kept (an interval that drifts means a
+ * busy event loop, which suppresses socket timeouts); only the timer is
+ * unref'd, so it stops counting as work that must finish.
+ */
+function unrefLoadEstimator(): { hasHighLoad(): boolean } {
+  let last = Date.now();
+  let drift = 0;
+  const timer = setInterval(() => {
+    const now = Date.now();
+    drift = now - last - 1_000;
+    last = now;
+  }, 1_000);
+  timer.unref();
+  return { hasHighLoad: () => drift > 500 };
+}
+
+/** Wait for the host to connect to the pipe, or for it to die trying. */ async function acceptConnection(
+  server: Server,
+  child: ChildProcess,
+): Promise<Socket> {
   return new Promise<Socket>((resolveConnection, rejectConnection) => {
     const timer = setTimeout(
       () => rejectConnection(new Error("extension host did not connect in time")),
@@ -533,6 +568,13 @@ async function handshake(
 
   const raw = new PersistentProtocol({
     socket: new NodeSocket(socket, "renderer-extHost"),
+    // No keep-alive interval: a local pipe to a host the consumer owns does not
+    // need liveness probing, and upstream's interval (5s) would hold the
+    // embedding process's event loop open.
+    sendKeepAlive: false,
+    // …and a load estimator whose own interval is unref'd, rather than
+    // upstream's singleton that starts a timer nothing ever stops.
+    loadEstimator: unrefLoadEstimator(),
   }) as MessagePassingProtocol;
   const connection = new ConnectionProtocol(raw);
   raw.sendResume();
