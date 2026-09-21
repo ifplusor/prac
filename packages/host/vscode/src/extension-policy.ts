@@ -1,179 +1,158 @@
 /**
- * Which VS Code extensions the agent side enables — prac's own policy, in a
- * file we own.
+ * Which VS Code extensions the agent side enables — prac's own policy, in files
+ * of our own that are **isomorphic to VS Code's configuration model** (James
+ * 2026-09-21: keep the agent's configuration separate from the UI's, but give it
+ * the same shape).
  *
- * Why we keep a list at all: the agent is a **server-side** consumer, and the
- * enablement VS Code itself computes is client-side in every form we ship
- * (`docs/architecture.md` §7 #4) — so there is nothing to read on this side.
- * Rather than mirror the interface the browser happens to have, prac states its
- * own policy, and the shapes mirror upstream's two scopes so the semantics stay
- * expressible:
+ * Isomorphic means all four of these, so that the model is one a VS Code user
+ * already knows:
  *
- * - `disabled` is the **global** layer, which is what upstream's
- *   `IGlobalExtensionEnablementService` reads (`extensionsIdentifiers/disabled`
- *   in global storage);
- * - `workspaces[root]` is the **workspace** layer, which upstream reads from
- *   workspace storage when the window has a workspace, and which may also
- *   `enable` an extension that the global layer disabled.
+ * - **Scopes.** VS Code has a global layer and a workspace layer; so do we —
+ *   `globalPath` (our user settings) and `workspacePath` (`<workspace>/.prac/
+ *   settings.json`, the counterpart of `.vscode/settings.json`).
+ * - **Format.** A JSONC `settings.json`: comments and trailing commas are legal,
+ *   parsed by VS Code's own parser (`readSettingsJson` in `prac-vscode-embed`).
+ * - **Keys.** Dotted setting ids, read from a flat object —
+ *   `prac.extensions.disabled` and `prac.extensions.enabled`.
+ * - **Precedence.** Upstream's ladder, unchanged: workspace `enabled` →
+ *   workspace `disabled` → global `disabled` → otherwise enabled
+ *   (`workbench/services/extensionManagement/browser/extensionEnablementService.ts:634-661`).
  *
- * Selection follows upstream's own order
- * (`workbench/services/extensionManagement/browser/extensionEnablementService.ts:634-661`):
- * workspace `enabled`, then workspace `disabled`, then global `disabled`, and
- * otherwise **enabled**. So an absent file, an empty file, or a workspace with
- * no entry all mean "whatever is installed" — the same place upstream's ladder
- * lands when nothing says otherwise.
+ * Separate means the files are **ours**: we do not write into VS Code's
+ * `settings.json`, because the UI's own enablement is client-side state that we
+ * cannot see and do not mirror (`docs/architecture.md` §7 #4).
  *
- * The file is **configuration** (`$XDG_CONFIG_HOME/prac/extensions.json`): a
- * decision a human or an agent can read and edit, not a record of what happened
- * last time.
+ * There is still no "which extensions exist" list here, and no allowlist: an
+ * absent file, an empty file, or a workspace with no file all mean "whatever is
+ * installed", the same place upstream's ladder lands when nothing says otherwise.
  *
  * @module prac-host-vscode/extension-policy
  */
 
-import { readFileSync } from "node:fs";
+import type { SettingsRead } from "prac-vscode-embed";
 
-/** One workspace's override, mirroring upstream's workspace scope. */
-export interface WorkspaceExtensionOverride {
-  /** Extension ids this workspace turns off (`publisher.name`). */
+/** The setting ids we read, named as a VS Code setting would be. */
+export const EXTENSION_SETTINGS = {
+  disabled: "prac.extensions.disabled",
+  enabled: "prac.extensions.enabled",
+} as const;
+
+/** One settings file's worth of enablement, both directions. */
+export interface ExtensionLayer {
+  /** Extension ids this layer turns off (`publisher.name`). */
   readonly disabled: readonly string[];
-  /** Extension ids this workspace turns on, overriding the global layer. */
+  /** Extension ids this layer turns on, which may override a disable below. */
   readonly enabled: readonly string[];
 }
 
-/** prac's enablement policy for the agent side. */
+/** The policy in force for one workspace. */
 export interface ExtensionPolicy {
-  /** Extension ids off everywhere on the agent side. */
-  readonly disabled: readonly string[];
-  /** Overrides per workspace root, keyed by absolute path. */
-  readonly workspaces: Readonly<Record<string, WorkspaceExtensionOverride>>;
+  /** The global layer: our user-level settings file. */
+  readonly global: ExtensionLayer;
+  /** The workspace layer: the workspace's own settings file. */
+  readonly workspace: ExtensionLayer;
+  /** The files the two layers were read from, for logs and messages. */
+  readonly files: { readonly global: string; readonly workspace: string };
 }
 
-/** The policy that disables nothing: what an absent or unusable file means. */
-export const NO_EXTENSION_POLICY: ExtensionPolicy = { disabled: [], workspaces: {} };
+/** The policy that disables nothing: what absent or unusable files mean. */
+export const NO_EXTENSION_POLICY: ExtensionLayer = { disabled: [], enabled: [] };
+
+/** Reads one settings file; `readSettingsJson` satisfies this. */
+export type SettingsReader = (path: string) => Promise<SettingsRead>;
 
 /**
- * Read the policy file.
+ * Read both layers of the policy.
  *
- * A missing file is not a problem — it is the normal state of a fresh install,
- * and it means "nothing is disabled". A file that cannot be read or parsed is
- * reported and then treated as missing: a typo in configuration must not be
- * able to switch a workspace's extensions off silently, which is the direction
- * a "fail closed" reading would go.
+ * A file that cannot be read or parsed is reported and then treated as absent,
+ * so a typo cannot switch a workspace's extensions off silently — that is the
+ * direction a "fail closed" reading would go, and it is the worse failure.
  *
- * @param path - absolute path of the policy file.
+ * @param read - how to read a settings file (VS Code's own parser, injected so
+ * this module stays testable without a build).
+ * @param files - absolute paths of the global and workspace settings files.
  * @param report - where problems go; defaults to `console.warn`.
- * @returns the policy, with unknown shapes dropped rather than guessed at.
+ * @returns the policy in force for that workspace.
  */
-export function readExtensionPolicy(
-  path: string,
+export async function readExtensionPolicy(
+  read: SettingsReader,
+  files: { readonly global: string; readonly workspace: string },
   report: (message: string) => void = console.warn,
-): ExtensionPolicy {
-  let text: string;
-  try {
-    text = readFileSync(path, "utf8");
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code !== "ENOENT") report(`${path}: ${message(error)} — enabling everything`);
-    return NO_EXTENSION_POLICY;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch (error) {
-    report(`${path}: not JSON (${message(error)}) — enabling everything`);
-    return NO_EXTENSION_POLICY;
-  }
-  if (!isRecord(parsed)) {
-    report(`${path}: expected an object — enabling everything`);
-    return NO_EXTENSION_POLICY;
-  }
-
-  const workspaces: Record<string, WorkspaceExtensionOverride> = {};
-  const rawWorkspaces = parsed.workspaces;
-  if (rawWorkspaces !== undefined && isRecord(rawWorkspaces)) {
-    for (const [root, override] of Object.entries(rawWorkspaces)) {
-      if (!isRecord(override)) {
-        report(`${path}: workspaces["${root}"] is not an object — ignoring it`);
-        continue;
-      }
-      workspaces[root] = {
-        disabled: identifiers(path, `workspaces["${root}"].disabled`, override.disabled, report),
-        enabled: identifiers(path, `workspaces["${root}"].enabled`, override.enabled, report),
-      };
-    }
-  } else if (rawWorkspaces !== undefined) {
-    report(`${path}: "workspaces" is not an object — ignoring it`);
-  }
-
+): Promise<ExtensionPolicy> {
+  const [global, workspace] = await Promise.all([read(files.global), read(files.workspace)]);
+  for (const problem of [...global.problems, ...workspace.problems]) report(problem);
   return {
-    disabled: identifiers(path, "disabled", parsed.disabled, report),
-    workspaces,
+    global: layerFrom(global.settings, files.global, report),
+    workspace: layerFrom(workspace.settings, files.workspace, report),
+    files,
   };
 }
 
 /**
- * Whether the agent side enables one extension in one workspace.
+ * Whether one extension is enabled for the workspace this policy describes.
  *
  * The order is upstream's: the workspace layer may turn an extension on over a
  * global disable, and otherwise the global list decides.
  *
  * @param policy - the policy as read.
- * @param workspaceRoot - absolute path of the workspace the host serves.
  * @param id - extension id (`publisher.name`), matched case-insensitively as
  * upstream's own comparison does.
  * @returns whether the host should be told this extension is enabled.
  */
-export function isExtensionEnabled(
-  policy: ExtensionPolicy,
-  workspaceRoot: string,
-  id: string,
-): boolean {
+export function isExtensionEnabled(policy: ExtensionPolicy, id: string): boolean {
   const wanted = id.toLowerCase();
   const includes = (list: readonly string[]): boolean =>
     list.some((entry) => entry.toLowerCase() === wanted);
-  const override = policy.workspaces[workspaceRoot];
-  if (override !== undefined) {
-    if (includes(override.enabled)) return true;
-    if (includes(override.disabled)) return false;
-  }
-  return !includes(policy.disabled);
+  if (includes(policy.workspace.enabled)) return true;
+  if (includes(policy.workspace.disabled)) return false;
+  return !includes(policy.global.disabled);
 }
 
 /** The enabled subset of a scan, in the scan's own order. */
 export function enabledExtensionIds(
   policy: ExtensionPolicy,
-  workspaceRoot: string,
   ids: readonly string[],
 ): readonly string[] {
-  return ids.filter((id) => isExtensionEnabled(policy, workspaceRoot, id));
+  return ids.filter((id) => isExtensionEnabled(policy, id));
+}
+
+/** Read one layer's two lists out of a settings object. */
+function layerFrom(
+  settings: Record<string, unknown>,
+  path: string,
+  report: (message: string) => void,
+): ExtensionLayer {
+  return {
+    disabled: identifiers(
+      settings[EXTENSION_SETTINGS.disabled],
+      path,
+      EXTENSION_SETTINGS.disabled,
+      report,
+    ),
+    enabled: identifiers(
+      settings[EXTENSION_SETTINGS.enabled],
+      path,
+      EXTENSION_SETTINGS.enabled,
+      report,
+    ),
+  };
 }
 
 /** Read a list of extension ids, keeping only the strings. */
 function identifiers(
-  path: string,
-  field: string,
   value: unknown,
+  path: string,
+  key: string,
   report: (message: string) => void,
 ): readonly string[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) {
-    report(`${path}: "${field}" is not an array — ignoring it`);
+    report(`${path}: "${key}" is not an array — ignoring it`);
     return [];
   }
   const ids = value.filter((entry): entry is string => typeof entry === "string");
   if (ids.length !== value.length) {
-    report(`${path}: "${field}" has entries that are not strings — dropping them`);
+    report(`${path}: "${key}" has entries that are not ids — dropping them`);
   }
   return ids;
-}
-
-/** Whether a parsed value is a plain object. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/** An error's message, for a report line. */
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

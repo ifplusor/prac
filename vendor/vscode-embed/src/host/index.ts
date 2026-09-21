@@ -352,6 +352,8 @@ export type {
 } from "./extension-host.js";
 
 export { configurationDefaults, readExtensionDescription, scanExtensions } from "./extensions.js";
+export { readSettingsJson } from "./settings.js";
+export type { SettingsRead } from "./settings.js";
 export type {
   ExtensionDescription,
   ExtensionLocation,

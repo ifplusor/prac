@@ -323,8 +323,9 @@ export function apply(ctx: Context): void {
     // would be inventing a store for the same thing.
     globalStorageHome: join(codeServer.serverDataDir, "data/User/globalStorage"),
     workspaceStorageHome: join(codeServer.serverDataDir, "data/User/workspaceStorage"),
-    // The agent side's enablement policy: **configuration**, so it lives under
-    // XDG's config next to prac's other settings, not with runtime state.
-    extensionsConfigPath: join(xdg("XDG_CONFIG_HOME", ".config"), "prac/extensions.json"),
+    // The global layer of the agent side's enablement policy: **configuration**,
+    // under XDG's config next to prac's other settings, named and shaped like a
+    // VS Code settings file. The workspace layer is `<workspace>/.prac/settings.json`.
+    extensionsSettingsPath: join(xdg("XDG_CONFIG_HOME", ".config"), "prac/settings.json"),
   });
 }

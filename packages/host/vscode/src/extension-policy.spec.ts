@@ -1,149 +1,147 @@
 /**
- * The agent side's enablement policy: reading it, and the order it decides in.
+ * The agent side's enablement policy: the two layers, and the order they decide in.
  *
  * The interesting cases are all about *not* disabling things by accident — an
- * absent file, a typo, a half-written edit — because the failure mode of a
- * stricter reading is a workspace that quietly loses capabilities.
+ * absent file, a typo, a value of the wrong shape — because the failure mode of
+ * a stricter reading is a workspace that quietly loses capabilities.
  */
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 import {
   enabledExtensionIds,
   isExtensionEnabled,
-  NO_EXTENSION_POLICY,
   readExtensionPolicy,
+  type ExtensionPolicy,
+  type SettingsReader,
 } from "./extension-policy.js";
 
-const cleanups: (() => void)[] = [];
-afterEach(() => {
-  for (const cleanup of cleanups.splice(0)) cleanup();
-});
+const GLOBAL = "/home/user/.config/prac/settings.json";
+const WORKSPACE = "/work/one/.prac/settings.json";
+const OTHER_WORKSPACE = "/work/two/.prac/settings.json";
 
-/** Write a policy file into a scratch directory and return its path. */
-function policyFile(content: string): string {
-  const root = mkdtempSync(join(tmpdir(), "prac-extensions-"));
-  cleanups.push(() => rmSync(root, { recursive: true, force: true }));
-  const path = join(root, "extensions.json");
-  writeFileSync(path, content);
-  return path;
+/** A reader over an in-memory settings file set. */
+function reader(
+  files: Record<string, Record<string, unknown>>,
+  problems: Record<string, readonly string[]> = {},
+): SettingsReader {
+  return async (path) => ({ settings: files[path] ?? {}, problems: problems[path] ?? [] });
 }
 
-/** Read a policy, collecting what it reported instead of printing it. */
-function read(path: string): {
-  policy: ReturnType<typeof readExtensionPolicy>;
-  problems: string[];
-} {
-  const problems: string[] = [];
-  const policy = readExtensionPolicy(path, (message) => problems.push(message));
-  return { policy, problems };
+/** Read a policy from a global file and a workspace file. */
+async function policyWith(
+  global: Record<string, unknown>,
+  workspace: Record<string, unknown> = {},
+  report: (message: string) => void = () => undefined,
+): Promise<ExtensionPolicy> {
+  return readExtensionPolicy(
+    reader({ [GLOBAL]: global, [WORKSPACE]: workspace }),
+    { global: GLOBAL, workspace: WORKSPACE },
+    report,
+  );
 }
 
 describe("readExtensionPolicy", () => {
-  it("treats a missing file as 'nothing is disabled'", () => {
-    const root = mkdtempSync(join(tmpdir(), "prac-extensions-"));
-    cleanups.push(() => rmSync(root, { recursive: true, force: true }));
-    const { policy, problems } = read(join(root, "extensions.json"));
-    expect(policy).toEqual(NO_EXTENSION_POLICY);
-    expect(problems).toEqual([]);
+  it("disables nothing when neither file exists", async () => {
+    const policy = await readExtensionPolicy(reader({}), { global: GLOBAL, workspace: WORKSPACE });
+    expect(policy.global).toEqual({ disabled: [], enabled: [] });
+    expect(policy.workspace).toEqual({ disabled: [], enabled: [] });
+    expect(isExtensionEnabled(policy, "publisher.any")).toBe(true);
   });
 
-  it("reads a global disable list and a per-workspace override", () => {
-    const path = policyFile(
-      JSON.stringify({
-        disabled: ["publisher.global"],
-        workspaces: {
-          "/work/one": { disabled: ["publisher.here"], enabled: ["publisher.back"] },
-        },
-      }),
+  it("reads the global and the workspace layer from their own files", async () => {
+    const policy = await policyWith(
+      { "prac.extensions.disabled": ["publisher.global"] },
+      {
+        "prac.extensions.disabled": ["publisher.here"],
+        "prac.extensions.enabled": ["publisher.back"],
+      },
     );
-    const { policy, problems } = read(path);
-    expect(problems).toEqual([]);
-    expect(policy.disabled).toEqual(["publisher.global"]);
-    expect(policy.workspaces["/work/one"]).toEqual({
-      disabled: ["publisher.here"],
-      enabled: ["publisher.back"],
-    });
+    expect(policy.global).toEqual({ disabled: ["publisher.global"], enabled: [] });
+    expect(policy.workspace).toEqual({ disabled: ["publisher.here"], enabled: ["publisher.back"] });
+    expect(policy.files).toEqual({ global: GLOBAL, workspace: WORKSPACE });
   });
 
-  it("treats an empty object as an empty policy", () => {
-    const { policy, problems } = read(policyFile("{}"));
-    expect(policy).toEqual(NO_EXTENSION_POLICY);
-    expect(problems).toEqual([]);
-  });
-
-  it("enables everything when the file cannot be parsed, and says so", () => {
-    const { policy, problems } = read(policyFile("{ this is not json"));
-    expect(policy).toEqual(NO_EXTENSION_POLICY);
-    expect(problems).toHaveLength(1);
-    expect(problems[0]).toContain("not JSON");
-  });
-
-  it("enables everything when the file is not an object, and says so", () => {
-    const { policy, problems } = read(policyFile('["publisher.ext"]'));
-    expect(policy).toEqual(NO_EXTENSION_POLICY);
-    expect(problems).toHaveLength(1);
-    expect(problems[0]).toContain("expected an object");
-  });
-
-  it("drops entries that are not ids, and reports the field", () => {
-    const { policy, problems } = read(
-      policyFile(JSON.stringify({ disabled: ["publisher.ok", 42, null] })),
+  it("reports what the reader found wrong with a file, and keeps going", async () => {
+    const seen: string[] = [];
+    const policy = await readExtensionPolicy(
+      reader(
+        { [GLOBAL]: { "prac.extensions.disabled": ["publisher.global"] } },
+        { [GLOBAL]: ["/path/settings.json: not valid JSONC"] },
+      ),
+      { global: GLOBAL, workspace: WORKSPACE },
+      (message) => seen.push(message),
     );
-    expect(policy.disabled).toEqual(["publisher.ok"]);
-    expect(problems).toHaveLength(1);
-    expect(problems[0]).toContain('"disabled"');
+    // The layer still holds what was readable, and the problem was passed on.
+    expect(policy.global.disabled).toEqual(["publisher.global"]);
+    expect(seen).toEqual(["/path/settings.json: not valid JSONC"]);
   });
 
-  it("ignores a workspace entry that is not an object, and reports it", () => {
-    const { policy, problems } = read(
-      policyFile(JSON.stringify({ workspaces: { "/work/one": "all", "/work/two": {} } })),
+  it("ignores a value that is not an array, and says which key", async () => {
+    const seen: string[] = [];
+    const policy = await policyWith(
+      { "prac.extensions.disabled": "publisher.one" },
+      {},
+      (message) => seen.push(message),
     );
-    expect(Object.keys(policy.workspaces)).toEqual(["/work/two"]);
-    expect(problems).toHaveLength(1);
-    expect(problems[0]).toContain('workspaces["/work/one"]');
+    expect(policy.global.disabled).toEqual([]);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toContain(GLOBAL);
+    expect(seen[0]).toContain("prac.extensions.disabled");
+  });
+
+  it("drops entries that are not ids, and reports the key", async () => {
+    const seen: string[] = [];
+    const policy = await policyWith(
+      { "prac.extensions.disabled": ["publisher.ok", 42, null] },
+      {},
+      (message) => seen.push(message),
+    );
+    expect(policy.global.disabled).toEqual(["publisher.ok"]);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toContain("prac.extensions.disabled");
   });
 });
 
 describe("isExtensionEnabled", () => {
-  const policy = {
-    disabled: ["publisher.off"],
-    workspaces: {
-      "/work/one": { disabled: ["publisher.here"], enabled: ["publisher.off", "publisher.back"] },
-    },
-  };
-
-  it("uses upstream's order: workspace enabled, workspace disabled, global, else on", () => {
-    // Enabled by the workspace even though the global list disables it.
-    expect(isExtensionEnabled(policy, "/work/one", "publisher.off")).toBe(true);
-    expect(isExtensionEnabled(policy, "/work/one", "publisher.back")).toBe(true);
-    expect(isExtensionEnabled(policy, "/work/one", "publisher.here")).toBe(false);
-    // Globally off, and this workspace says nothing about it.
-    expect(isExtensionEnabled(policy, "/work/two", "publisher.off")).toBe(false);
-    // Nothing anywhere says a word about it.
-    expect(isExtensionEnabled(policy, "/work/two", "publisher.whatever")).toBe(true);
+  it("uses upstream's order: workspace enabled, workspace disabled, global, else on", async () => {
+    const policy = await policyWith(
+      { "prac.extensions.disabled": ["publisher.off"] },
+      {
+        "prac.extensions.disabled": ["publisher.here"],
+        "prac.extensions.enabled": ["publisher.off", "publisher.back"],
+      },
+    );
+    // Enabled by the workspace even though the global layer disables it.
+    expect(isExtensionEnabled(policy, "publisher.off")).toBe(true);
+    expect(isExtensionEnabled(policy, "publisher.back")).toBe(true);
+    expect(isExtensionEnabled(policy, "publisher.here")).toBe(false);
+    expect(isExtensionEnabled(policy, "publisher.whatever")).toBe(true);
   });
 
-  it("matches ids case-insensitively, as upstream's own comparison does", () => {
-    expect(isExtensionEnabled(policy, "/work/two", "Publisher.OFF")).toBe(false);
-    expect(isExtensionEnabled(policy, "/work/one", "PUBLISHER.HERE")).toBe(false);
+  it("matches ids case-insensitively, as upstream's own comparison does", async () => {
+    const policy = await policyWith(
+      { "prac.extensions.disabled": ["publisher.off"] },
+      { "prac.extensions.disabled": ["publisher.here"] },
+    );
+    expect(isExtensionEnabled(policy, "Publisher.OFF")).toBe(false);
+    expect(isExtensionEnabled(policy, "PUBLISHER.HERE")).toBe(false);
+    expect(isExtensionEnabled(policy, "publisher.OTHER")).toBe(true);
   });
 
-  it("keeps one workspace's override out of another", () => {
-    expect(isExtensionEnabled(policy, "/work/one", "publisher.here")).toBe(false);
-    expect(isExtensionEnabled(policy, "/work/two", "publisher.here")).toBe(true);
-  });
-
-  it("disables nothing when there is no policy", () => {
-    expect(isExtensionEnabled(NO_EXTENSION_POLICY, "/work/one", "publisher.any")).toBe(true);
+  it("keeps one workspace's layer out of another's", async () => {
+    const one = await policyWith({}, { "prac.extensions.disabled": ["publisher.here"] });
+    const two = await readExtensionPolicy(reader({ [OTHER_WORKSPACE]: {} }), {
+      global: GLOBAL,
+      workspace: OTHER_WORKSPACE,
+    });
+    expect(isExtensionEnabled(one, "publisher.here")).toBe(false);
+    expect(isExtensionEnabled(two, "publisher.here")).toBe(true);
   });
 });
 
 describe("enabledExtensionIds", () => {
-  it("keeps the scan's own order and drops what the policy turns off", () => {
-    const policy = { disabled: ["b.two"], workspaces: {} };
-    expect(enabledExtensionIds(policy, "/work/one", ["a.one", "b.two", "c.three"])).toEqual([
+  it("keeps the scan's own order and drops what the policy turns off", async () => {
+    const policy = await policyWith({ "prac.extensions.disabled": ["b.two"] });
+    expect(enabledExtensionIds(policy, ["a.one", "b.two", "c.three"])).toEqual([
       "a.one",
       "c.three",
     ]);

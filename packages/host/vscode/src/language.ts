@@ -35,6 +35,7 @@ import {
 } from "./extension-policy.js";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
+  readSettingsJson,
   resolveExtensionHost,
   scanExtensions,
   singleFolderWorkspace,
@@ -50,6 +51,14 @@ import {
 
 /** The plugin name used by loader diagnostics. */
 const name = "prac-host-vscode";
+
+/**
+ * The workspace layer of the enablement policy, in the workspace itself — the
+ * counterpart of `.vscode/settings.json`, and the reason we do not keep a map of
+ * workspace paths in our own config: the setting belongs with the thing it is
+ * about, where the same model puts it in VS Code.
+ */
+const WORKSPACE_SETTINGS = ".prac/settings.json";
 
 /**
  * The provider id this package registers. Unique across providers, since a
@@ -109,14 +118,15 @@ export interface LanguageFeaturesOptions {
   readonly globalStorageHome: string;
   readonly workspaceStorageHome: string;
   /**
-   * prac's own enablement policy for the agent side — a **config** file
-   * (`$XDG_CONFIG_HOME/prac/extensions.json`), because which extensions a
-   * workspace should have is a decision, not a record of what happened.
+   * The **global** layer of prac's enablement policy for the agent side — our
+   * user-level settings file (`$XDG_CONFIG_HOME/prac/settings.json`), the
+   * counterpart of VS Code's user settings. The workspace layer is the
+   * workspace's own `.prac/settings.json`, found from the workspace root.
    *
-   * Read when a host starts, so a running host keeps the set it began with and
-   * an edit lands on the next start. See `./extension-policy.ts`.
+   * Both are read when a host starts, so a running host keeps the set it began
+   * with and an edit lands on the next start. See `./extension-policy.ts`.
    */
-  readonly extensionsConfigPath: string;
+  readonly extensionsSettingsPath: string;
 }
 
 /**
@@ -182,7 +192,15 @@ class ExtensionHosts {
     const existing = this.running.get(workspaceRoot);
     if (existing) return existing.host;
     const extensions = this.scan();
-    const policy = readExtensionPolicy(this.options.extensionsConfigPath);
+    const location = this.location();
+    const policy = await readExtensionPolicy(
+      (path) => readSettingsJson(location, path),
+      {
+        global: this.options.extensionsSettingsPath,
+        workspace: join(workspaceRoot, WORKSPACE_SETTINGS),
+      },
+      (problem) => console.warn(`${name}: ${problem}`),
+    );
     const entry: Running = {
       host: this.start(workspaceRoot, extensions, policy),
       extensions,
@@ -252,7 +270,7 @@ class ExtensionHosts {
       .filter((extension) => {
         // A disabled extension never activates, so waiting for it would turn
         // "no one provides this" into a timeout.
-        if (entry && !isExtensionEnabled(entry.policy, workspaceRoot, extension.identifier.value)) {
+        if (entry && !isExtensionEnabled(entry.policy, extension.identifier.value)) {
           return false;
         }
         const events = extension.activationEvents ?? [];
@@ -325,12 +343,17 @@ class ExtensionHosts {
   ): Promise<MainThreadHandle> {
     const location = this.location();
     const enabled = extensions.filter((extension) =>
-      isExtensionEnabled(policy, workspaceRoot, extension.identifier.value),
+      isExtensionEnabled(policy, extension.identifier.value),
     );
     console.log(
       `${name}: starting the extension host for ${workspaceRoot} with ` +
         `${enabled.length} of ${extensions.length} extension(s) enabled`,
     );
+    for (const layer of [policy.global, policy.workspace]) {
+      if (layer.disabled.length > 0) {
+        console.log(`${name}: disabled by policy: ${layer.disabled.join(", ")}`);
+      }
+    }
     return startMainThread({
       location,
       policy: {
@@ -358,7 +381,7 @@ class ExtensionHosts {
           },
         },
         extensions,
-        isEnabled: (id) => isExtensionEnabled(policy, workspaceRoot, id),
+        isEnabled: (id) => isExtensionEnabled(policy, id),
         workspace: await singleFolderWorkspace(location, workspaceRoot),
         onLog: (message) => console.log(`${name}: extension host | ${message}`),
         onUnhandledCall: ({ actor, method }) =>
