@@ -25,6 +25,19 @@
 2. **不 fork VS Code**：只 pin + patch + overlay，源码不进本仓，改动小到可审计。
 3. **不引第三方改造**（`monaco-vscode-api`、Theia 这类）。
 
+### 1.4 本次范围：只做结合，不往 DSH 里加能力
+
+**把两边现有的东西接起来**，就这一件事。**VS Code 有而 DSH 缺的，不立刻加到 DSH 里**——先记下来，等真的需要再说。
+
+| DSH 现有的（直接用）                                                                                                                                                                  | VS Code 现有的（接进来）                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| agent 循环、会话与 session log、审批与沙箱、持久化                                                                                                                                    | 语言服务器（扩展生态带来的 + 内置的 css / html / json / markdown） |
+| 工具族：`fs` / `fs-search` / `bash` / `terminal` / `str-replace-editor` / `todo` / `skill` / `subagent` / `goal` / `ask-user` / `web` / `jobs` / `session-query` / `workflow` / `lsp` | IDE 能力：编辑、搜索、git、任务、调试、终端                        |
+| MCP 客户端（`packages/mcp/mcp-client`）                                                                                                                                               | 扩展贡献的界面（视图、编辑器、状态栏）                             |
+| LSP seam（`ctx.lsp`）与 `lsp` 工具（四个操作）                                                                                                                                        | `execute*Provider` 那 24 个查询                                    |
+
+**本次要接的点**：① VS Code 的语言服务器 → `ctx.lsp` 的一个 provider（§4.2）；② VS Code 的 MCP server 定义 → DSH 现有的 MCP 客户端（§4.3）；③ VS Code 的界面 → prac 的 view，由 frame 摆（§3）；④ 人和 agent 对着同一份工作区文件（磁盘为准，§5.1）。
+
 ## 2. 总体形态
 
 ### 2.1 一条主干，两端
@@ -133,7 +146,7 @@
 
 **为什么值得把 VS Code 这一边接进来**：那边有的东西别处给不了——哪个语言用哪个服务器、谁优先、多个提供方怎么合并；服务器的安装与版本由扩展生态管（内置的 css / html / json / markdown 就在 checkout 里，不用装市场扩展；TypeScript 那份是扩展自带的 `tsserver`，**不是 LSP**）；初始化参数与配置；以及**全集的查询**（`vscode.execute*Provider` 24 个：hover / definition / references / implementation / symbols / code actions / completion / semantic tokens / inlay hints / call hierarchy / formatting / rename…）。
 
-**要那四个操作之外的查询怎么办**：按 seam 的规矩**扩操作联合**——seam / 提供方 / 工具三处一起改（编译会强制），VS Code 那边只是多实现几个 `$provide*`。**接口仍然在 DSH 侧。**
+**那四个操作之外的查询（符号、code action、诊断…）不在本次范围**：DSH 的 seam 只有四个操作，要更多就等于**给 DSH 加能力**（§1.4）。先记下来，不做；真要做时按 seam 的规矩扩操作联合（seam / 提供方 / 工具三处同改，编译强制）。
 
 **P1 的前置条件**（都在代码里核实过）：
 
@@ -146,8 +159,8 @@
 
 ### 4.3 扩展生态里 agent 能用什么
 
-- **MCP**（工具接入）：**DSH 自己起 MCP 客户端**（接口在 DSH），只复用 VS Code 这边的 **server 定义来源**（扩展的声明点 + 工作区配置）；server 本身可以是任何来源。这是 §4.0 那条原则的另一个例子。
-- **文件定制**：**不共源**——DSH 用自己的 skill / 上下文格式，不去读 VS Code 的 `SKILL.md` / `*.instructions.md` / `AGENTS.md`。
+- **MCP**（工具接入）：**DSH 已经有 MCP 客户端（`packages/mcp/mcp-client`）**，用它；只把 VS Code 这边的 **server 定义来源**（扩展的声明点 + 工作区配置）接过去，server 本身可以是任何来源。这是 §4.0 那条原则的另一个例子，也是"只用现有的"的另一个例子。
+- **文件定制**：**不共源**——DSH 用自己的 skill / 上下文格式（它已经有 `skill` 那一族），不去读 VS Code 的 `SKILL.md` / `*.instructions.md` / `AGENTS.md`。
 - **扩展贡献的界面**（视图、编辑器、状态栏）——给人用。
 
 拿不到的：扩展用 `contributes.languageModelTools` / `lm.registerTool` 注册的工具（那要重实现它的工具注册表与 `$invokeTool`，等于把 agent 面搬过来）。
@@ -190,7 +203,7 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随插件 d
 
 ## 7. 还没定的
 
-1. **第一条链**：用 checkout 自带的语言服务器（css / html / json / markdown 之一）做通——扩展激活 → 我们喂配置与文档 → 它注册 provider → 我们就工作区里的文件问一次查询。**验收**：它作为 `ctx.lsp` 的**一个 provider** 被 agent 用上（**模型侧接口不变**），用的是**扩展带来的服务器与它的配置**（不是手配的）。前置两条（配置、文档）见 §4.2。
+1. **第一条链**：用 checkout 自带的语言服务器（css / html / json / markdown 之一）做通——扩展激活 → 我们喂配置与文档 → 它注册 provider → 我们就工作区里的文件问一次查询。**验收**：它作为 `ctx.lsp` 的**一个 provider** 被 agent 用上（**模型侧接口不变、DSH 不加新能力**），用的是**扩展带来的服务器与它的配置**（不是手配的）。前置两条（配置、文档）见 §4.2。
 2. **自动保存打开之后，验证门怎么调**：现在那几条"文件保持不动"的断言是靠故意关掉 autoSave 才稳的。
 3. **Copilot 在我们 rig 里到底有没有激活**（实测）——它决定"树里多一个 agent"是理论问题还是已经在发生。
 4. **插件族的划分**：server 侧一族与 client 侧一族各有哪些插件、什么算一个插件。

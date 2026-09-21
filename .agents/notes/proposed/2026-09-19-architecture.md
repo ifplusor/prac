@@ -118,7 +118,9 @@ code server 归主干起停：空闲端口、等就绪、随插件 dispose 收�
 
 **硬前提**（09-19 核实）：**文档必须由我们喂给扩展宿主**——`HoverAdapter` 取文档时没有判空，末尾还会用 `doc.getWordRangeAtPosition()`。这不是为了编辑，而是每次问语言特性都要有一份活着的文档和版本号。
 
-**两边怎么结合**（James 2026-09-19：目标是更好地结合两边的生态与能力）：**DSH 出接口，VS Code 出实现与配置**。接口是 `ctx.lsp`（提供方注册表：`id` + `extensionToLanguage` + `query()`；按扩展名每次查询选一个）加面向模型的 `lsp` 工具（四个操作）；VS Code 那边做成**一个 `LspProvider`**——我们当主线程连扩展宿主（P1）、喂配置与文档、把结果翻译成 seam 的归一化形状。于是 DSH 自配的 stdio 服务器和 VS Code 扩展带来的服务器**都是提供方，可以并存**，而模型侧形状不变。要用四个操作之外的查询，就按 seam 的规矩扩操作联合（seam / 提供方 / 工具三处同改，编译强制）——**接口仍在 DSH**。
+**本次范围**（James 2026-09-19）：**只把两边现有的东西结合起来，不往 DSH 里加能力**——VS Code 有而 DSH 缺的，先记下来，不立刻加。DSH 已经有 MCP 客户端（`packages/mcp/mcp-client`）、LSP seam、以及 fs / bash / terminal / todo / skill / subagent 这些工具族，够用。
+
+**两边怎么结合**（James 2026-09-19：目标是更好地结合两边的生态与能力）：**DSH 出接口，VS Code 出实现与配置**。接口是 `ctx.lsp`（提供方注册表：`id` + `extensionToLanguage` + `query()`；按扩展名每次查询选一个）加面向模型的 `lsp` 工具（四个操作）；VS Code 那边做成**一个 `LspProvider`**——我们当主线程连扩展宿主（P1）、喂配置与文档、把结果翻译成 seam 的归一化形状。于是 DSH 自配的 stdio 服务器和 VS Code 扩展带来的服务器**都是提供方，可以并存**，而模型侧形状不变。四个操作之外的查询（符号、code action、诊断…）**不在本次范围**：那等于给 DSH 加能力，按 seam 的规矩扩（三处同改、编译强制），真要做时再说。
 
 **P1 的前置条件**（核实过）：① **配置要喂**——扩展里的 `workspace.getConfiguration()` 等 `$initializeConfiguration` 开 barrier（`extHostConfiguration.ts:107-131`），不喂就挂；② **文档要喂**（含版本）；③ 激活（三条初始化推送 + `ExtensionService` + `Errors`）；④ 再是我们挑的 `$provide*`。第一条链用 checkout 自带的 css / html / json / markdown 语言服务器最省（真 `vscode-languageclient`，不用装市场扩展）。
 
