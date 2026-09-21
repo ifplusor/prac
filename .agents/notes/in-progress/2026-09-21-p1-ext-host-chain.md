@@ -1,11 +1,11 @@
 ---
-status: proposed
+status: in-progress
 ---
 
 # Agent Note: P1 第一条链 —— 让主干接上 VS Code 的扩展宿主（实现计划）
 
 > **这是哪件工作**：umbrella [2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md) 的第一步。设计与理由见 [2026-09-19-architecture.md](../in-progress/2026-09-19-architecture.md)（§2.10 / §4.2 / §5）与 [`docs/architecture.md`](../../../docs/architecture.md)（§4.2 / §5.2 / §7.1）。
-> **状态**：这是**计划**，不是实现记录。§3 有三个点要 James 裁；裁完这份转 `in-progress` 并开始做。
+> **状态**：三个点**已裁**（James，2026-09-21，见 §3）；工作在进行中——第一步是"让内建扩展变成可加载的"。
 > **本次范围**：只把两边现有的东西接起来（`docs/architecture.md` §1.4）——不往 DSH 加能力、不改上游 VS Code。
 
 ## 1. 做什么、验收是什么
@@ -76,9 +76,17 @@ status: proposed
 - 已装的 cSpell **不能用来验"问一次查询"**：它 server 声明的 capabilities 只有 `openClose` 文档同步 ＋ `quick fix` 代码动作——seam 那四个操作一个都没有。
 - 网络是通的（registry 200），所以"`npm install` 再编译"这条路在环境上可行（prac 仓自己被 `devEngines` 限制用 pnpm，跟 `.build/vscode` 无关）。
 
-## 3. 三个待裁点
+## 3. 三个裁决（James，2026-09-21）
 
-### 裁点 1：第一条链用哪个扩展做素材
+> 原话：① **A**；② **vscode 生态应依托扩展宿主**；③ **利用 vscode-embed**。下面是它们各自否掉了什么、推出什么。
+
+**① 素材 = A（内建 css / json / html）。** 不走"自写最小扩展先把协议验掉"那条——直接用真扩展。代价照认：得先把扩展编译出来，而且它的 provider 是 `vscode-languageclient` 在 `start()` 里注册的（12 个），主线程面要一次到位。
+
+**② 生态依托扩展宿主。** 能力要从**扩展宿主里跑着的真扩展**来，不复刻、不旁路；扩展清单要来自**真实扫描**（内建目录 + 用户扩展目录），不是手写一两条。主干自己持有这条连接（下面 2A）。
+
+**③ 机制落在 `vendor/vscode-embed`。** 扩展宿主这条连接是**机制**，和 `startCodeServer`、资产路由、同源代理一样进 lib；host 插件只留政策（什么时候起、给谁用）。
+
+### 裁点 1：素材 —— **已裁：A（内建 css / json / html）**
 
 | 选项                                       | 代价                                                                     | 能验什么                     |
 | ------------------------------------------ | ------------------------------------------------------------------------ | ---------------------------- |
@@ -89,7 +97,7 @@ status: proposed
 
 **建议**：**先 C 再 A**。C 把"协议实现"和"构建前置"两个风险分开；B1 也独立指出直接用 css-language-features 风险高得多。
 
-### 裁点 2：扩展宿主从哪来
+### 裁点 2：扩展宿主从哪来 —— **已裁：主干自己持有这条连接（2A），扩展清单来自真实扫描**
 
 | 路线 | 做法 | 代价 | 依赖 |
 | ---- | ---- | ---- | ---- |
@@ -98,7 +106,7 @@ status: proposed
 
 **建议 2A**：未知更少、不依赖服务端内部；两条路的协议层完全一样，以后要换只换载体。
 
-### 裁点 3：协议层怎么来
+### 裁点 3：协议层怎么来 —— **已裁：机制落进 `vendor/vscode-embed`**
 
 | 选项 | 代价 |
 | ---- | ---- |
@@ -108,13 +116,15 @@ status: proposed
 
 **建议 3A**，踩坑再退 3B。
 
-## 4. 按推荐路线（C → A、2A、3A）的实施步骤
+## 4. 实施步骤（按 2026-09-21 的三个裁决）
 
-1. **把连接跑通**（不涉及任何语言特性）：写一个最小扩展（`registerHoverProvider` 返回固定文本）放进扩展目录；主干侧建 unix socket、`cp.fork` 出 ext host、按固定顺序握手（`Ready` → initData → `Initialized`）、import `out-build` 的 `RPCProtocol` 与 id 表、注册 §2.2 那批最小 id（含 `MainThreadStorage`）。**验收**：扩展真的激活、`$registerHoverProvider` 真的到达主线程。
-2. **喂数据**：`$initializeWorkspace` + `$initializeConfiguration`（含扩展自己的配置默认值）+ 文档（打开工作区里的文件、同步版本）+ `$activateByEvent`。**验收**：反例成立——不推工作区就挂在 barrier 上。
-3. **问一次查询**：主线程调 `$provideHover`，把结果翻成 seam 的 `{kind:'hover'}`。**验收**：拿到那个最小扩展返回的固定文本。
-4. **接进 agent 面**：写 provider（`extensionToLanguage` 先只声明实际做的那几个扩展名）、在 prac 的 bundle patch 里插 `@deepseek-ai/dsh-lsp` 与插件行，用 `lsp` 工具问一次。**验收**：工具返回真实结果，且不出现 `LSP_UNAVAILABLE`。
-5. **换上真扩展**（裁点 1 的 A）：编译内建扩展，重复 2–4，验证"用的是扩展带来的服务器与它的配置"。**验收**：把 cSpell 也接上（它验诊断/文档同步那条路），确认多提供方并存。
+1. **让内建扩展变成可加载的**（独立可验，不碰协议）：给 `extensions/css-language-features` 与它的 `server/` 各装依赖，再编译 client 与 server 两半。**验收**：`client/out/node/cssClientMain.js` 与 `server/out/node/cssServerMain.js` 存在，且 `vscode-languageclient` 从扩展目录能解析。
+2. **连接与协议写进 `vendor/vscode-embed`**（机制，不带政策）：建载体（`VSCODE_EXTHOST_IPC_HOOK` 管道）→ `cp.fork(bootstrap-fork.js, …)` → 固定顺序握手（`Ready` → initData → `Initialized`）→ import `out-build` 的 `RPCProtocol` 与 id 表，落成一个可复用的入口；host 插件只决定"何时起、给谁用"。
+3. **主线程最小面**（同在 lib 里）：§2.3 那批必需顾客（含 `MainThreadStorage`、`MainThreadOutputService`，以及 §2.4 那 12 个 `$registerXxx`）＋ 初始化推送 ＋ 文档推送。**验收**：css 扩展真的激活、`$registerHoverProvider` 到达主线程。
+4. **扩展清单来自真实扫描**：扫内建扩展目录与用户扩展目录，构造 initData 的 `extensions` 快照（第一条链可以让只有 css 进 `myExtensions`，但清单本身必须是扫出来的）。
+5. **问一次查询**：主线程调 `$provideHover`（VS Code 侧 1-based → seam 的 0-based），翻成 `{kind:'hover'}`。**验收**：拿到 CSS 属性的真实文档。
+6. **接进 agent 面**：写 provider、在 prac 的 bundle patch 里插 `@deepseek-ai/dsh-lsp` 与插件行，用 `lsp` 工具问一次。
+7. **生态验证**：把 cSpell 也走通（诊断 / 文档同步那条），确认多个扩展、多个提供方并存。
 
 ## 5. 怎么验证
 

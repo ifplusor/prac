@@ -6,7 +6,7 @@ status: in-progress
 
 > 这是这项工作的 **umbrella**：主线定义、需求约束、决定（含被否决的路线）、开放问题。
 > **依据**（里程碑与工作记录、现在的形态快照、已核实事实、踩坑、验证元教训）在 [工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)——2026-09-17 从本 note 拆出，那时 5.7 万字符里 79% 是依据、决定只占 16%。**它不是 note**（没有状态轴、不签字）。
-> 步骤 note：[2026-09-13-vs-concept-boundary.md](2026-09-13-vs-concept-boundary.md)（概念边界与命名，实现已完成，待签字）；[../abandoned/2026-09-15-vscode-capabilities-into-prac.md](../abandoned/2026-09-15-vscode-capabilities-into-prac.md)（把能力拆散带入 prac，方案待裁）；[../abandoned/2026-09-16-vscode-integration-transport.md](../abandoned/2026-09-16-vscode-integration-transport.md)（两半之间的通信层，设计待裁——四项）；[../in-progress/2026-09-19-architecture.md](../in-progress/2026-09-19-architecture.md)（**从需求出发重做架构**：需求清单 + 推导 + 待裁，取代了旧设计）；[../proposed/2026-09-21-p1-ext-host-chain.md](../proposed/2026-09-21-p1-ext-host-chain.md)（**P1 第一条链的实现计划**：已核实的事实 + 三个待裁点 + 步骤 + 验证）。
+> 步骤 note：[2026-09-13-vs-concept-boundary.md](2026-09-13-vs-concept-boundary.md)（概念边界与命名，实现已完成，待签字）；[../abandoned/2026-09-15-vscode-capabilities-into-prac.md](../abandoned/2026-09-15-vscode-capabilities-into-prac.md)（把能力拆散带入 prac，方案待裁）；[../abandoned/2026-09-16-vscode-integration-transport.md](../abandoned/2026-09-16-vscode-integration-transport.md)（两半之间的通信层，设计待裁——四项）；[../in-progress/2026-09-19-architecture.md](../in-progress/2026-09-19-architecture.md)（**从需求出发重做架构**：需求清单 + 推导 + 待裁，取代了旧设计）；[../in-progress/2026-09-21-p1-ext-host-chain.md](../in-progress/2026-09-21-p1-ext-host-chain.md)（**P1 第一条链的实现计划**：已核实的事实 + 三条裁决 + 步骤 + 验证）。
 > 口径（**§3.8 的断言分层之后**）：**vendor 侧集成门**写作 **14/14 · 28/28 · 9/9 · 6/6 · 7/7 · 33/33**（layout · views · focus · regions · view · file）；第六门 `verify-extension` 是**条件门**（装了扩展才跑 5 项，没装时明确 `SKIPPED`——SKIP 不是通过）；**prac 侧活体门**写作 `verify:stack 6/6 · verify:bottom 6/6 · verify:persistence 6/6 · verify:split 11/11`；所有 part 计数一律 **8/8**；**单测**写作 `pnpm test`。
 
 ## 1. 这个工作是什么（主线定义）
@@ -162,7 +162,7 @@ status: in-progress
 
 ### 已定方向、尚未做
 
-3. **P1 第一条链**：主干连 ExtensionHost 连接、喂配置与文档，把 checkout 自带的语言服务器（css / html / json / markdown 之一）接成 `ctx.lsp` 的一个 provider。**验收**：模型侧接口不变、**DSH 不加新能力**，用的是扩展带来的服务器与它的配置。计划（已核实的事实 / 三个待裁点 / 步骤 / 验证）见 [2026-09-21-p1-ext-host-chain.md](../proposed/2026-09-21-p1-ext-host-chain.md)。
+3. **P1 第一条链**：主干连 ExtensionHost 连接、喂配置与文档，把 checkout 自带的语言服务器（css / html / json / markdown 之一）接成 `ctx.lsp` 的一个 provider。**验收**：模型侧接口不变、**DSH 不加新能力**，用的是扩展带来的服务器与它的配置。计划（已核实的事实 / 三条裁决 / 步骤 / 验证）见 [2026-09-21-p1-ext-host-chain.md](../in-progress/2026-09-21-p1-ext-host-chain.md)。
 4. **MCP 定义接线**：把 VS Code 那边的 server 定义来源（扩展声明点 + 工作区配置）接给 DSH 现有的 MCP 客户端。
 5. **frame 批次**：还差 `stage` 的 tab（需要 VS Code 侧的 `editor(file)`）；持久化的 **per-workspace 那半**未做。堆叠与底栏还缺：拖拽排序、view 间 sash 调尺寸、底栏开合入口。
 6. **扩展视图的"数据"**：`mountViewInto` 能让视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——要让视图进 VS Code 自己的可见性 / 容器模型。
