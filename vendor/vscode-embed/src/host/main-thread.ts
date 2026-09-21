@@ -215,6 +215,10 @@ interface ExtHostProxies {
   readonly configuration: { $initializeConfiguration(data: unknown): void };
   readonly workspace: { $initializeWorkspace(workspace: unknown, trusted: boolean): void };
   readonly documentsAndEditors: { $acceptDocumentsAndEditorsDelta(delta: unknown): void };
+  readonly documents: {
+    $acceptModelChanged(uri: UriLike, event: unknown, isDirty: boolean): void;
+    $acceptModelLanguageChanged(uri: UriLike, languageId: string): void;
+  };
   readonly extensionService: {
     $activateByEvent(event: string, kind: number): Promise<void>;
     $activate(extensionId: unknown, reason: unknown): Promise<boolean>;
@@ -285,6 +289,8 @@ export async function startMainThread(options: {
   const registrations: LanguageFeatureRegistration[] = [];
   const unhandled: { actor: string; method: string }[] = [];
   const markers = new Map<string, unknown>();
+  /** What the host has been told about each document, so we never re-add one. */
+  const mirror = new Map<string, MirrorEntry>();
   const defaults = policy.configuration ?? configurationDefaults(policy.extensions);
   const log = policy.onLog ?? (() => undefined);
 
@@ -327,6 +333,7 @@ export async function startMainThread(options: {
         registrations,
         unhandled,
         markers,
+        mirror,
         extensions: policy.extensions,
         onUnhandledCall: policy.onUnhandledCall,
         onLog: log,
@@ -342,7 +349,7 @@ export async function startMainThread(options: {
   );
   proxies.telemetry.$initializeTelemetryLevel(policy.logLevel ?? 3, false);
   proxies.languages.$acceptLanguageIds([]);
-  for (const document of policy.documents ?? []) openDocument(proxies, document);
+  for (const document of policy.documents ?? []) openDocument(proxies, mirror, document);
 
   return {
     rpc: host.rpc,
@@ -360,9 +367,11 @@ export async function startMainThread(options: {
         activationEvent: undefined,
       });
     },
-    openDocument: (document) => openDocument(proxies, document),
-    closeDocument: (uri) =>
-      proxies.documentsAndEditors.$acceptDocumentsAndEditorsDelta({ removedDocuments: [uri] }),
+    openDocument: (document) => openDocument(proxies, mirror, document),
+    closeDocument: (uri) => {
+      mirror.delete(uriKey(uri));
+      proxies.documentsAndEditors.$acceptDocumentsAndEditorsDelta({ removedDocuments: [uri] });
+    },
     provideHover: async (handle, uri, position, signal) => {
       const hover = await proxies.languageFeatures.$provideHover(
         handle,
@@ -454,22 +463,91 @@ async function tokenFor(location: ExtensionHostLocation, signal?: AbortSignal): 
   return source.token;
 }
 
-function openDocument(proxies: ExtHostProxies, document: MainThreadDocument): void {
-  proxies.documentsAndEditors.$acceptDocumentsAndEditorsDelta({
-    addedDocuments: [
+/** What we have already pushed for a document; the host keeps no other copy. */
+interface MirrorEntry {
+  readonly versionId: number;
+  readonly text: string;
+  readonly languageId: string;
+}
+
+function openDocument(
+  proxies: ExtHostProxies,
+  mirror: Map<string, MirrorEntry>,
+  document: MainThreadDocument,
+): void {
+  const key = uriKey(document.uri);
+  const current = mirror.get(key);
+  if (!current) {
+    const versionId = document.versionId ?? 1;
+    proxies.documentsAndEditors.$acceptDocumentsAndEditorsDelta({
+      addedDocuments: [
+        {
+          uri: document.uri,
+          versionId,
+          // The whole text: the host builds its mirror from this and never asks
+          // us for content again.
+          lines: document.text.split(/\r\n|\n/),
+          EOL: document.text.includes("\r\n") ? "\r\n" : "\n",
+          languageId: document.languageId,
+          isDirty: false,
+          encoding: "utf8",
+        },
+      ],
+    });
+    mirror.set(key, { versionId, text: document.text, languageId: document.languageId });
+    return;
+  }
+
+  // Adding a document the host already holds throws *inside the host*, and the
+  // throw takes the host process with it — so everything after the first push
+  // has to be a change, even when the answer is "the same as before".
+  if (current.text !== document.text) {
+    const versionId = current.versionId + 1;
+    proxies.documents.$acceptModelChanged(
+      document.uri,
       {
-        uri: document.uri,
-        versionId: document.versionId ?? 1,
-        // The whole text: the host builds its mirror from this and never asks
-        // us for content again.
-        lines: document.text.split(/\r\n|\n/),
-        EOL: document.text.includes("\r\n") ? "\r\n" : "\n",
-        languageId: document.languageId,
-        isDirty: false,
-        encoding: "utf8",
+        // A whole-document replacement expressed as one change: the host
+        // applies ranges, so the range has to describe exactly what it holds.
+        changes: [
+          {
+            range: {
+              startLineNumber: 1,
+              startColumn: 1,
+              endLineNumber: lineCount(current.text),
+              endColumn: lastColumn(current.text),
+            },
+            rangeLength: current.text.length,
+            text: document.text,
+          },
+        ],
+        eol: document.text.includes("\r\n") ? "\r\n" : "\n",
+        versionId,
       },
-    ],
-  });
+      false,
+    );
+    mirror.set(key, { ...current, versionId, text: document.text });
+  }
+  if (current.languageId !== document.languageId) {
+    proxies.documents.$acceptModelLanguageChanged(document.uri, document.languageId);
+    mirror.set(key, { ...mirror.get(key)!, languageId: document.languageId });
+  }
+}
+
+/** How many lines a text consists of, counting the trailing empty one. */
+function lineCount(text: string): number {
+  return text.split(/\r\n|\n/).length;
+}
+
+/** One past the last character of the last line, one-based. */
+function lastColumn(text: string): number {
+  const lines = text.split(/\r\n|\n/);
+  return (lines[lines.length - 1]?.length ?? 0) + 1;
+}
+
+/** A map key for a URI in the protocol's shape. */
+function uriKey(uri: UriLike): string {
+  const withAuthority = uri as UriLike & { readonly authority?: string };
+  return `${uri.scheme}://${withAuthority.authority ?? ""}${uri.path}`;
 }
 
 function workspaceData(workspace: MainThreadWorkspace): Record<string, unknown> {
@@ -518,6 +596,7 @@ function extHostProxies(rpc: RpcProtocol, protocol: ExtensionHostProtocol): ExtH
     documentsAndEditors: proxy(
       "ExtHostDocumentsAndEditors",
     ) as ExtHostProxies["documentsAndEditors"],
+    documents: proxy("ExtHostDocuments") as ExtHostProxies["documents"],
     extensionService: proxy("ExtHostExtensionService") as ExtHostProxies["extensionService"],
     telemetry: proxy("ExtHostTelemetry") as ExtHostProxies["telemetry"],
     languages: proxy("ExtHostLanguages") as ExtHostProxies["languages"],
@@ -565,6 +644,7 @@ function registerActors(context: {
   registrations: LanguageFeatureRegistration[];
   unhandled: { actor: string; method: string }[];
   markers: Map<string, unknown>;
+  mirror: Map<string, MirrorEntry>;
   extensions: readonly ExtensionDescription[];
   onUnhandledCall?: (call: { actor: string; method: string }) => void;
   onLog: (message: string) => void;
@@ -699,7 +779,11 @@ function registerActors(context: {
   set("MainThreadDocuments", {
     $tryOpenDocument: async (uri: UriLike) => {
       const text = await readFile(uri.path, "utf8");
-      openDocument(context.proxies, { uri, languageId: languageIdFor(uri), text });
+      openDocument(context.proxies, context.mirror, {
+        uri,
+        languageId: languageIdFor(uri),
+        text,
+      });
       return uri;
     },
     $tryCreateDocument: () => Promise.reject(new Error("creating documents is not supported")),
