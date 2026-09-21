@@ -124,6 +124,12 @@ function createProvider(hosts: ExtensionHosts): LspProvider {
   };
 }
 
+/** A host for one workspace, and the extension set it was started with. */
+interface Running {
+  host: Promise<MainThreadHandle>;
+  extensions: ExtensionDescription[];
+}
+
 /**
  * One extension host per workspace, all of them alive at once.
  *
@@ -139,10 +145,7 @@ function createProvider(hosts: ExtensionHosts): LspProvider {
  * running host is never restarted because the set changed.
  */
 class ExtensionHosts {
-  private readonly running = new Map<
-    string,
-    { host: Promise<MainThreadHandle>; extensions: ExtensionDescription[] }
-  >();
+  private readonly running = new Map<string, Running>();
   private readonly watchers: FSWatcher[] = [];
   private reloadTimer: NodeJS.Timeout | undefined;
 
@@ -153,15 +156,33 @@ class ExtensionHosts {
     const existing = this.running.get(workspaceRoot);
     if (existing) return existing.host;
     const extensions = this.scan();
-    const host = this.start(workspaceRoot, extensions).catch((error: unknown) => {
-      // A failed start must not be remembered: the next query retries, which is
-      // what a build that appears later needs.
-      this.running.delete(workspaceRoot);
-      throw error;
-    });
-    this.running.set(workspaceRoot, { host, extensions });
+    const entry: Running = { host: this.start(workspaceRoot, extensions), extensions };
+    // A host that dies — a crash, an OOM kill, someone killing the process —
+    // must not be remembered as if it were alive: sharing one host between the
+    // agents of a workspace is only safe when the next question starts a fresh
+    // one instead of talking to a corpse.
+    entry.host = entry.host
+      .then((started) => {
+        started.child.once("exit", (code, signal) => {
+          if (this.running.get(workspaceRoot) !== entry) return;
+          this.running.delete(workspaceRoot);
+          console.warn(
+            `${name}: the extension host for ${workspaceRoot} exited ` +
+              `(code ${code ?? "none"}, signal ${signal ?? "none"}); ` +
+              `the next question starts a new one`,
+          );
+        });
+        return started;
+      })
+      .catch((error: unknown) => {
+        // A failed start must not be remembered either: the next query retries,
+        // which is what a build that appears later needs.
+        if (this.running.get(workspaceRoot) === entry) this.running.delete(workspaceRoot);
+        throw error;
+      });
+    this.running.set(workspaceRoot, entry);
     this.watch();
-    return host;
+    return entry.host;
   }
 
   /**
