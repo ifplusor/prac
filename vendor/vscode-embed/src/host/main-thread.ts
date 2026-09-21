@@ -26,7 +26,7 @@ import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/p
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { ChildProcess } from "node:child_process";
-import { configurationDefaults, type ExtensionDescription } from "./extensions.js";
+import { configurationDefaults, extensionsDelta, type ExtensionDescription } from "./extensions.js";
 import {
   startExtensionHost,
   type ExtensionHostHandle,
@@ -183,6 +183,17 @@ export interface MainThreadHandle {
   activateByEvent(event: string): Promise<void>;
   /** Ask the host to activate one extension by id. */
   activate(extensionId: string): Promise<boolean>;
+  /**
+   * Tell a running host which extensions exist now.
+   *
+   * The host's registry is built from the init data it was started with; this is
+   * how it learns about one that appeared (or vanished) since — installing an
+   * extension does not require restarting the host, and so does not throw away
+   * the language servers it already started.
+   */
+  setExtensions(extensions: readonly ExtensionDescription[]): Promise<void>;
+  /** The extension set the host currently knows about. */
+  readonly extensions: readonly ExtensionDescription[];
   /** Feed a document, or update one already fed. */
   openDocument(document: MainThreadDocument): void;
   /** Drop a document from the host's mirror. */
@@ -231,6 +242,7 @@ interface ExtHostProxies {
   readonly extensionService: {
     $activateByEvent(event: string, kind: number): Promise<void>;
     $activate(extensionId: unknown, reason: unknown): Promise<boolean>;
+    $deltaExtensions(delta: unknown): Promise<void>;
   };
   readonly telemetry: { $initializeTelemetryLevel(level: number, supported: boolean): void };
   readonly languages: { $acceptLanguageIds(ids: readonly string[]): void };
@@ -302,6 +314,9 @@ export async function startMainThread(options: {
   const mirror = new Map<string, MirrorEntry>();
   /** Extensions whose activation has finished — see `MainThreadHandle.activated`. */
   const activated = new Set<string>();
+  /** The extension set the host knows, kept live because it can change. */
+  const known: ExtensionDescription[] = [...policy.extensions];
+  let registryVersion = 1;
   const defaults = policy.configuration ?? configurationDefaults(policy.extensions);
   const log = policy.onLog ?? (() => undefined);
 
@@ -346,7 +361,7 @@ export async function startMainThread(options: {
         markers,
         mirror,
         activated,
-        extensions: policy.extensions,
+        extensions: known,
         onUnhandledCall: policy.onUnhandledCall,
         onLog: log,
       });
@@ -372,6 +387,14 @@ export async function startMainThread(options: {
     activated,
     unhandled,
     activateByEvent: (event) => proxies.extensionService.$activateByEvent(event, 0),
+    setExtensions: async (next) => {
+      registryVersion += 1;
+      const delta = extensionsDelta(known, next, registryVersion);
+      if (delta === undefined) return;
+      await proxies.extensionService.$deltaExtensions(delta);
+      known.splice(0, known.length, ...next);
+    },
+    extensions: known,
     activate: (extensionId) => {
       const identifier = { value: extensionId, _lower: extensionId.toLowerCase() };
       return proxies.extensionService.$activate(identifier, {

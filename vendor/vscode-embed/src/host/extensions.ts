@@ -83,6 +83,74 @@ export function configurationDefaults(
   return flat;
 }
 
+/** An extension identifier in the shape that travels on the wire. */
+export interface ExtensionIdentifierLike {
+  readonly value: string;
+  readonly _lower: string;
+}
+
+/**
+ * What changed between two scans, in the shape the host applies.
+ *
+ * Mirrors `IExtensionDescriptionDelta`: the host rebuilds its registries from
+ * it, so a caller that notices a new extension on disk can hand it to a host
+ * that is already running instead of restarting that host.
+ */
+export interface ExtensionDescriptionDelta {
+  readonly versionId: number;
+  readonly toRemove: readonly ExtensionIdentifierLike[];
+  readonly toAdd: readonly ExtensionDescription[];
+  readonly addActivationEvents: Readonly<Record<string, readonly string[]>>;
+  readonly myToRemove: readonly ExtensionIdentifierLike[];
+  readonly myToAdd: readonly ExtensionIdentifierLike[];
+}
+
+/**
+ * The difference between two scans, or `undefined` when there is none.
+ *
+ * Identity is the extension id; a known id whose `version` or location changed
+ * counts as removed + added, which is what an updated package on disk is.
+ * `undefined` for "nothing changed" is deliberate: a caller that re-scans
+ * cheaply can then skip the round trip entirely.
+ */
+export function extensionsDelta(
+  previous: readonly ExtensionDescription[],
+  next: readonly ExtensionDescription[],
+  versionId: number,
+): ExtensionDescriptionDelta | undefined {
+  const before = new Map(previous.map((extension) => [extension.identifier._lower, extension]));
+  const after = new Map(next.map((extension) => [extension.identifier._lower, extension]));
+  const toRemove: ExtensionIdentifierLike[] = [];
+  const toAdd: ExtensionDescription[] = [];
+  const addActivationEvents: Record<string, readonly string[]> = {};
+
+  for (const [key, extension] of before) {
+    const replacement = after.get(key);
+    if (replacement && samePackage(extension, replacement)) continue;
+    toRemove.push(extension.identifier);
+  }
+  for (const [key, extension] of after) {
+    const existing = before.get(key);
+    if (existing && samePackage(existing, extension)) continue;
+    toAdd.push(extension);
+    addActivationEvents[extension.identifier.value] = extension.activationEvents ?? [];
+  }
+  if (toRemove.length === 0 && toAdd.length === 0) return undefined;
+  return {
+    versionId,
+    toRemove,
+    toAdd,
+    addActivationEvents,
+    myToRemove: toRemove,
+    myToAdd: toAdd.map((extension) => extension.identifier),
+  };
+}
+
+/** Whether two descriptions are the same package as far as the host cares. */
+function samePackage(a: ExtensionDescription, b: ExtensionDescription): boolean {
+  return a.version === b.version && a.extensionLocation.path === b.extensionLocation.path;
+}
+
 export interface ScanExtensionsOptions {
   /** Built-in extensions (`<checkout>/extensions`). */
   readonly builtinDir: string;

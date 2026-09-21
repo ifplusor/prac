@@ -134,21 +134,61 @@ function createProvider(hosts: ExtensionHosts): LspProvider {
 class ExtensionHosts {
   private current: { readonly root: string; readonly host: Promise<MainThreadHandle> } | undefined;
   private extensions: readonly ExtensionDescription[] = [];
+  private scannedAt = 0;
+
+  /** How long a scan is trusted before the directories are read again. */
+  private static readonly RESCAN_AFTER_MS = 2_000;
 
   constructor(private readonly options: LanguageFeaturesOptions) {}
+
+  /**
+   * Re-read the extension directories and tell a running host what changed.
+   *
+   * Extensions appear while the host is up — that is the normal case for a
+   * user-installed extension — and VS Code's answer is a registry delta rather
+   * than a restart, because a restart would throw away the language servers the
+   * running extensions already started. Throttled: a scan reads a manifest per
+   * directory, so it is not worth doing on every question.
+   */
+  async refresh(): Promise<void> {
+    if (Date.now() - this.scannedAt < ExtensionHosts.RESCAN_AFTER_MS) return;
+    const scanned = this.scan();
+    this.scannedAt = Date.now();
+    const current = this.current;
+    if (!current) {
+      this.extensions = scanned;
+      return;
+    }
+    const host = await current.host;
+    await host.setExtensions(scanned);
+    this.extensions = scanned;
+  }
+
+  private scan(): ExtensionDescription[] {
+    return scanExtensions({
+      builtinDir: join(this.options.checkoutRoot, "extensions"),
+      userDir: this.options.userExtensionsDir,
+    });
+  }
 
   /**
    * The extensions that say they activate for a language.
    *
    * Used to tell "the provider is on its way" apart from "no one provides
    * this": once all of these have finished activating and the provider is still
-   * absent, more waiting cannot change the answer.
+   * absent, more waiting cannot change the answer. The generic `onLanguage`
+   * event counts, because an extension that activates on it may well provide
+   * for this language.
    */
   candidatesFor(languageId: string): readonly string[] {
     return this.extensions
-      .filter((extension) =>
-        (extension.activationEvents ?? []).includes(`onLanguage:${languageId}`),
-      )
+      .filter((extension) => {
+        const events = extension.activationEvents ?? [];
+        return events.some(
+          (event) =>
+            event === `onLanguage:${languageId}` || event === "onLanguage" || event === "*",
+        );
+      })
       .map((extension) => extension.identifier.value);
   }
 
@@ -178,11 +218,9 @@ class ExtensionHosts {
 
   private async start(workspaceRoot: string): Promise<MainThreadHandle> {
     const location = this.location();
-    const extensions = scanExtensions({
-      builtinDir: join(this.options.checkoutRoot, "extensions"),
-      userDir: this.options.userExtensionsDir,
-    });
+    const extensions = this.scan();
     this.extensions = extensions;
+    this.scannedAt = Date.now();
     console.log(
       `${name}: starting the extension host for ${workspaceRoot} with ${extensions.length} extension(s)`,
     );
@@ -253,13 +291,19 @@ async function query(
       "LSP_UNSUPPORTED_OPERATION",
     );
   }
+  // An extension may have appeared since the last look, so the directories are
+  // re-read (throttled) before we ask the host to activate anything.
+  await hosts.refresh();
   const host = await hosts.for(request.workspaceRoot);
   const uri: UriLike = { scheme: "file", path: request.filePath };
   // Disk is the truth (the workspace contract): the host gets what is on disk
   // now, not a buffer we would have to keep in sync.
   const text = await readFile(request.filePath, "utf8");
   host.openDocument({ uri, languageId: request.languageId, text });
+  // The same pair VS Code's own language service fires when a document needs
+  // rich features: the specific event, and the generic one.
   await host.activateByEvent(`onLanguage:${request.languageId}`);
+  await host.activateByEvent("onLanguage");
   const registration = await registrationFor(
     host,
     kind,

@@ -9,7 +9,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { configurationDefaults, readExtensionDescription, scanExtensions } from "./extensions.js";
+import {
+  configurationDefaults,
+  extensionsDelta,
+  readExtensionDescription,
+  scanExtensions,
+} from "./extensions.js";
 
 const cleanups: (() => void)[] = [];
 afterEach(() => {
@@ -104,6 +109,53 @@ describe("scanExtensions", () => {
     const builtin = scratch();
     extension(builtin, "css-language-features", CSS);
     expect(scanExtensions({ builtinDir: builtin, userDir: join(builtin, "nope") })).toHaveLength(1);
+  });
+});
+
+describe("extensionsDelta", () => {
+  const description = (value: string, version = "1.0.0", path = `/ext/${value}`) =>
+    ({
+      ...CSS,
+      identifier: { value, _lower: value },
+      version,
+      extensionLocation: { scheme: "file", path },
+    }) as unknown as Parameters<typeof extensionsDelta>[0][number];
+
+  it("says nothing when nothing changed", () => {
+    const one = description("a.one");
+    expect(extensionsDelta([one], [description("a.one")], 2)).toBeUndefined();
+  });
+
+  it("adds what appeared, with its activation events", () => {
+    const delta = extensionsDelta([], [description("a.one")], 2);
+    expect(delta?.toAdd.map((extension) => extension.identifier.value)).toEqual(["a.one"]);
+    expect(delta?.addActivationEvents).toEqual({ "a.one": ["onLanguage:css"] });
+    expect(delta?.myToAdd).toEqual([{ value: "a.one", _lower: "a.one" }]);
+    expect(delta?.versionId).toBe(2);
+  });
+
+  it("removes what disappeared", () => {
+    const delta = extensionsDelta([description("a.one")], [], 2);
+    expect(delta?.toRemove).toEqual([{ value: "a.one", _lower: "a.one" }]);
+    expect(delta?.myToRemove).toEqual([{ value: "a.one", _lower: "a.one" }]);
+    expect(delta?.toAdd).toEqual([]);
+  });
+
+  it("treats a new version or a new location as a replacement", () => {
+    const replaced = extensionsDelta(
+      [description("a.one", "1.0.0")],
+      [description("a.one", "2.0.0")],
+      2,
+    );
+    expect(replaced?.toRemove.map((id) => id.value)).toEqual(["a.one"]);
+    expect(replaced?.toAdd.map((extension) => extension.version)).toEqual(["2.0.0"]);
+
+    const moved = extensionsDelta(
+      [description("a.one", "1.0.0", "/ext/old")],
+      [description("a.one", "1.0.0", "/ext/new")],
+      2,
+    );
+    expect(moved?.toRemove.map((id) => id.value)).toEqual(["a.one"]);
   });
 });
 

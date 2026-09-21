@@ -191,6 +191,50 @@ describe.skipIf(!built)("main thread: the built-in css extension", () => {
     await css.host.dispose();
   }, 120_000);
 
+  it("picks up an extension that appears while it is running", async () => {
+    const css = await startCssHost({ "runtime.css": "body {\n  color: red;\n}\n" });
+    const hover = await css.registration("hover");
+
+    // A description for an extension that appeared after the host started. It
+    // has no code on disk, so activating it *fails* — and that failure is the
+    // proof: the host only tries to load what its registry knows about.
+    const added = {
+      identifier: { value: "prac.runtime", _lower: "prac.runtime" },
+      name: "runtime",
+      publisher: "prac",
+      version: "0.0.0",
+      engines: { vscode: "^1.0.0" },
+      activationEvents: ["onLanguage:prac-runtime"],
+      extensionLocation: { scheme: "file", path: join(css.workspaceRoot, "runtime-ext") },
+      isBuiltin: false,
+      isUserBuiltin: false,
+      isUnderDevelopment: false,
+      targetPlatform: "undefined",
+      preRelease: false,
+    };
+    await css.host.setExtensions([...css.host.extensions, added]);
+    expect(css.host.extensions.some((entry) => entry.identifier.value === "prac.runtime")).toBe(
+      true,
+    );
+    await css.host.activateByEvent("onLanguage:prac-runtime");
+    await until(
+      () => css.host.activated.has("prac.runtime"),
+      "the host to try activating the extension it just learned about",
+      () => css.log.join("\n"),
+    );
+
+    // And the extension that was already running was not restarted: its
+    // providers still answer, on the same host process.
+    const answer = await css.host.provideHover(
+      hover,
+      { scheme: "file", path: css.path("runtime.css") },
+      { line: 1, character: 3 },
+    );
+    expect((answer?.contents ?? "").toLowerCase()).toContain("color");
+    expect(css.host.child.exitCode).toBeNull();
+    await css.host.dispose();
+  }, 120_000);
+
   it("answers a second question about a document it already holds", async () => {
     // Regression: pushing the same document twice used to throw *inside* the
     // host ("document … already exists!") and take the host process with it, so
