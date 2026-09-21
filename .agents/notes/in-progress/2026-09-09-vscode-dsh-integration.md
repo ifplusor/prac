@@ -61,7 +61,7 @@ status: in-progress
 - **frame 由 `ui-layout` 拥有，只借 VS Code 的行为**（视图契约、`GridDescriptor` 的树形摆放、收起记宽、maximize、layout policy 的写法）；**不让它的 grid 拥有 prac 的 frame**。
 - **机制与组合分层**：机制（`ui-layout`）/ 编排（`web-app`）/ VS Code 侧（vendor + 两个 prac 行）。**机制层不含任何具体视图名与默认落位**。
 - **code server 的进程归主干**：`prac-host-vscode` 自己 spawn 它（`out-vscode-reh/server-main.js`，不用 `--folder`——工作区由 client 的 boot 决定），端口取空闲、等 `/version` 就绪、随插件 dispose 收掉；环境变量（`PRAC_CODE_SERVER_URL` / `_ENTRY` / `_PORT` / `_PATH`）是逃生口。页面不再拥有它。
-- **扩展宿主也归主干（P1）**（James 2026-09-19）：主干自己连一条 ExtensionHost 连接，**不依赖页面**（页面关着语言服务照样在）。按需实现主线程那一面：三条初始化推送 + `ExtensionService` + `Errors` + **文档** + 挑出来的那几个 `$provide*`。代价：多一份激活上下文（两份 cSpell / 语言服务器），并跟着上游漂移。**硬前提**：文档必须由我们喂给扩展宿主（取文档时没有判空）。
+- **扩展宿主也归主干（P1）**（James 2026-09-19）：主干自己连一条 ExtensionHost 连接，**不依赖页面**（页面关着语言服务照样在）。按需实现主线程那一面：三条初始化推送 + `ExtensionService` + `Errors` + **文档** + 挑出来的那几个 `$provide*`。**宿主几个**（James 2026-09-21 定）：**agent 侧一个工作区一个宿主**（同工作区的多个 agent 共用；理由与 seam 的限制见 [`docs/architecture.md`](../../../docs/architecture.md) §4.2），**UI 不与 agent 共用**（UI 仍按上游：每个页面一个宿主）。代价：agent 那份激活上下文仍是额外的一份（上游的 UI 宿主照旧），并跟着上游漂移；宿主死了要能自己起回来。**硬前提**：文档必须由我们喂给扩展宿主（取文档时没有判空）。
 - **两个服务主次分明**：`ctx.layout` 是**兼容 shim**（只服务 `ui-workspace` / `ui-sidebar` / `ui-sidebar-right` 用的 5 个方法，可整体删除）；`ctx.pracLayout` 是 prac 机制（含 `bindRoles`），机制**不知道谁是 sidebar**。
 
 ### 3.4 对上游的姿态
