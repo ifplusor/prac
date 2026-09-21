@@ -68,6 +68,16 @@ export interface ExtensionPolicy {
   readonly workspace: ExtensionLayer;
   /** The files the two layers were read from, for logs and messages. */
   readonly files: { readonly global: string; readonly workspace: string };
+  /**
+   * What the two files say, verbatim — the enablement lists above are read out
+   * of it, and the host is given it as configuration (`userRemote` /
+   * `workspace`), so an extension inside the agent's host reads prac's settings
+   * through VS Code's own API instead of a mechanism of ours.
+   */
+  readonly settings: {
+    readonly global: Readonly<Record<string, unknown>>;
+    readonly workspace: Readonly<Record<string, unknown>>;
+  };
 }
 
 /** The policy that disables nothing: what absent or unusable files mean. */
@@ -100,6 +110,7 @@ export async function readExtensionPolicy(
     global: layerFrom(global.settings, files.global, report),
     workspace: layerFrom(workspace.settings, files.workspace, report),
     files,
+    settings: { global: global.settings, workspace: workspace.settings },
   };
 }
 

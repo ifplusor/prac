@@ -130,6 +130,24 @@ export interface MainThreadPolicy {
   readonly isEnabled?: (extensionId: string) => boolean;
   readonly workspace?: MainThreadWorkspace | null;
   /**
+   * Configuration the **consumer's own sources** provide, in the configuration
+   * model's own layers.
+   *
+   * These are upstream's layer names, not ours: `userRemote` is the server-side
+   * user layer — what a remote extension host is normally given, filled there
+   * from the remote's settings file — and `workspace` is the workspace's. An
+   * embedder with settings of its own therefore does not invent a mechanism: it
+   * puts them where VS Code already keeps settings of that scope, and the host's
+   * `getConfiguration` reads them like any other.
+   *
+   * `userLocal` is deliberately absent: in a browser workbench that layer lives
+   * in the browser, so a server-side host has nothing truthful to put there.
+   */
+  readonly configurationLayers?: {
+    readonly userRemote?: Readonly<Record<string, unknown>>;
+    readonly workspace?: Readonly<Record<string, unknown>>;
+  };
+  /**
    * Flat configuration defaults. Left out, they are expanded from the
    * extensions' own `contributes.configuration` — which is what makes an
    * extension's declared defaults visible to the extension itself.
@@ -383,7 +401,9 @@ export async function startMainThread(options: {
   });
 
   const proxies = extHostProxies(host.rpc, host.protocol);
-  proxies.configuration.$initializeConfiguration(configurationData(defaults));
+  proxies.configuration.$initializeConfiguration(
+    await configurationData(options.location, defaults, policy.configurationLayers, log),
+  );
   proxies.workspace.$initializeWorkspace(
     policy.workspace ? workspaceData(policy.workspace) : null,
     true,
@@ -614,22 +634,72 @@ function workspaceData(workspace: MainThreadWorkspace): Record<string, unknown> 
 }
 
 /** An empty configuration layer, the shape `IConfigurationModel` uses. */
-function configurationModel(
-  contents: Readonly<Record<string, unknown>> = {},
-): Record<string, unknown> {
-  return { contents, keys: Object.keys(contents), overrides: [] };
+function emptyConfigurationModel(): Record<string, unknown> {
+  return { contents: {}, keys: [], overrides: [] };
 }
 
-function configurationData(defaults: Readonly<Record<string, unknown>>): unknown {
-  // Every scope is present but empty: the host parses this once and reads it
-  // locally, so an empty layer is an empty layer rather than an error.
+/**
+ * One configuration layer, built from a **flat** settings map the way VS Code
+ * builds one from a settings file.
+ *
+ * The model's `contents` is a **tree** (`getConfigurationValue` walks it one dot
+ * at a time, `platform/configuration/common/configuration.ts:319-332`), so a flat
+ * map handed over as-is would simply never be found — which is why this uses the
+ * build's own `toValuesTree` rather than a hand-rolled nesting, and the build's
+ * own override parsing for `[language]` keys, whose block belongs in the model's
+ * `overrides` rather than in `contents`.
+ */
+async function settingsModel(
+  location: ExtensionHostLocation,
+  flat: Readonly<Record<string, unknown>> | undefined,
+  report: (message: string) => void,
+): Promise<Record<string, unknown>> {
+  if (flat === undefined || Object.keys(flat).length === 0) return emptyConfigurationModel();
+  const { toValuesTree } = await import(
+    pathToFileURL(join(location.outBuild, "vs/platform/configuration/common/configuration.js")).href
+  );
+  const { OVERRIDE_PROPERTY_REGEX, overrideIdentifiersFromKey } = await import(
+    pathToFileURL(
+      join(location.outBuild, "vs/platform/configuration/common/configurationRegistry.js"),
+    ).href
+  );
+  const overrides: Record<string, unknown>[] = [];
+  for (const key of Object.keys(flat)) {
+    if (!OVERRIDE_PROPERTY_REGEX.test(key)) continue;
+    const block = (flat[key] ?? {}) as Record<string, unknown>;
+    overrides.push({
+      identifiers: overrideIdentifiersFromKey(key),
+      keys: Object.keys(block),
+      contents: toValuesTree(block, report),
+    });
+  }
   return {
-    defaults: configurationModel(defaults),
-    policy: configurationModel(),
-    application: configurationModel(),
-    userLocal: configurationModel(),
-    userRemote: configurationModel(),
-    workspace: configurationModel(),
+    contents: toValuesTree(flat as Record<string, unknown>, report),
+    keys: Object.keys(flat),
+    overrides,
+  };
+}
+
+async function configurationData(
+  location: ExtensionHostLocation,
+  defaults: Readonly<Record<string, unknown>>,
+  layers: {
+    readonly userRemote?: Readonly<Record<string, unknown>>;
+    readonly workspace?: Readonly<Record<string, unknown>>;
+  } = {},
+  report: (message: string) => void = () => undefined,
+): Promise<unknown> {
+  // Every scope is present but empty: the host parses this once and reads it
+  // locally, so an empty layer is an empty layer rather than an error. The
+  // layers the consumer fills are the same slots upstream fills, and `userLocal`
+  // stays empty because in a browser workbench that layer is the browser's.
+  return {
+    defaults: await settingsModel(location, defaults, report),
+    policy: emptyConfigurationModel(),
+    application: emptyConfigurationModel(),
+    userLocal: emptyConfigurationModel(),
+    userRemote: await settingsModel(location, layers.userRemote, report),
+    workspace: await settingsModel(location, layers.workspace, report),
     folders: [],
     configurationScopes: [],
   };

@@ -58,6 +58,15 @@ describe("readExtensionPolicy", () => {
     expect(policy.global).toEqual({ disabled: ["publisher.global"], enabled: [] });
     expect(policy.workspace).toEqual({ disabled: ["publisher.here"], enabled: ["publisher.back"] });
     expect(policy.files).toEqual({ global: GLOBAL, workspace: WORKSPACE });
+    // The raw contents travel with the policy: the host is given them as
+    // configuration, the enablement lists are only read out of them.
+    expect(policy.settings.global).toEqual({
+      "extensionsIdentifiers/disabled": ["publisher.global"],
+    });
+    expect(policy.settings.workspace).toEqual({
+      "extensionsIdentifiers/disabled": ["publisher.here"],
+      "extensionsIdentifiers/enabled": ["publisher.back"],
+    });
   });
 
   it("reports what the reader found wrong with a file, and keeps going", async () => {

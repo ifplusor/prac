@@ -386,6 +386,16 @@ class ExtensionHosts {
         },
         extensions,
         isEnabled: (id) => isExtensionEnabled(policy, id),
+        // The same two files, given to the host as configuration: our user-level
+        // settings go in the model's server-side user layer and our workspace
+        // settings in its workspace layer — upstream's own slots, so the host
+        // reads them with `workspace.getConfiguration` and nothing about this
+        // is a mechanism of ours. `userLocal` stays empty because that layer
+        // belongs to the browser.
+        configurationLayers: {
+          userRemote: policy.settings.global,
+          workspace: policy.settings.workspace,
+        },
         workspace: await singleFolderWorkspace(location, workspaceRoot),
         onLog: (message) => console.log(`${name}: extension host | ${message}`),
         onUnhandledCall: ({ actor, method }) =>

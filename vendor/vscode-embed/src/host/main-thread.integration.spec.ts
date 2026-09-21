@@ -56,8 +56,14 @@ interface CssHost {
   registration(kind: LanguageFeatureKind): Promise<number>;
 }
 
+/** A consumer's own configuration, in the model's own layers. */
+interface Layers {
+  readonly userRemote?: Readonly<Record<string, unknown>>;
+  readonly workspace?: Readonly<Record<string, unknown>>;
+}
+
 /** Start a host over a scratch workspace holding `files`, documents included. */
-async function startCssHost(files: Record<string, string>): Promise<CssHost> {
+async function startCssHost(files: Record<string, string>, layers?: Layers): Promise<CssHost> {
   const workspaceRoot = mkdtempSync(join(tmpdir(), "prac-css-"));
   cleanups.push(() => rmSync(workspaceRoot, { recursive: true, force: true }));
   const documents = Object.entries(files).map(([name, text]) => {
@@ -88,6 +94,7 @@ async function startCssHost(files: Record<string, string>): Promise<CssHost> {
       // activate (cSpell pulls dictionaries the moment it is asked to), and the
       // runtime-added extension has to stay enabled for its own test.
       isEnabled: (id) => id === "vscode.css-language-features" || id === "prac.runtime",
+      configurationLayers: layers,
       workspace: {
         id: "prac-css-test",
         name: "css-test",
@@ -306,6 +313,34 @@ describe.skipIf(!built)("main thread: the built-in css extension", () => {
     expect((hover?.contents ?? "").toLowerCase()).toContain("display");
     expect(css.host.child.exitCode).toBeNull();
     await css.host.dispose();
+  }, 120_000);
+
+  it("serves the consumer's own settings to the extension, per layer", async () => {
+    const text = "body {\n  color: red;\n}\n";
+    const ask = async (layers?: Layers): Promise<string> => {
+      const css = await startCssHost({ "settings.css": text }, layers);
+      const handle = await css.registration("hover");
+      const hover = await css.host.provideHover(
+        handle,
+        { scheme: "file", path: css.path("settings.css") },
+        { line: 1, character: 3 },
+      );
+      await css.host.dispose();
+      return String(hover?.contents ?? "");
+    };
+
+    // The property's documentation, which upstream's own default keeps on.
+    expect(await ask()).toContain("Sets the color");
+
+    // `userRemote` is the server-side user layer and `workspace` the workspace
+    // layer: either one reaches the extension, through nothing but
+    // `workspace.getConfiguration` on its side.
+    expect(await ask({ userRemote: { "css.hover.documentation": false } })).not.toContain(
+      "Sets the color",
+    );
+    expect(await ask({ workspace: { "css.hover.documentation": false } })).not.toContain(
+      "Sets the color",
+    );
   }, 120_000);
 });
 
