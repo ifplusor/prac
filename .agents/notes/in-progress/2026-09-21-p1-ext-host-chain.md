@@ -118,7 +118,7 @@ status: in-progress
 
 ## 4. 实施步骤（按 2026-09-21 的三个裁决）
 
-> **进度（2026-09-21）**：**第 1–6 步做完并在真 rig 里验过**——① css 扩展编译出来；② 连接机制落进 `vendor/vscode-embed`；③ 最小主线程让**真 css 扩展激活、注册 provider、答出 hover**；④ 扩展清单由 `scanExtensions` 真扫（内建目录 + 用户扩展目录）；⑤ 插件的 provider 把 seam 的四个操作翻成 `$provide*`；⑥ composition 里插了 `lsp` 与 `tool-lsp` 两行。**无页面端到端**（`pnpm dsh --profile prac-dev --patch <探针> --no-open`，一次性探针直接调 `ctx.lsp.query`）：provider 注册成功、`lsp` 工具已注册、hover 返回 CSS 扩展语言服务的真实文档（"Sets the color of an element's text"）。**还没做**：门 3 的"模型真的调 `lsp` 工具"（要一次真会话）、门 4 的现有门禁回归跑。坑与证据见[工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)。
+> **进度（2026-09-21）**：**第 1–6 步做完，四道门里的三道已验**——① css 扩展编译出来；② 连接机制落进 `vendor/vscode-embed`；③ 最小主线程让真 css 扩展激活、注册 provider、答出 hover；④ 清单由 `scanExtensions` 真扫；⑤ 插件的 provider 把四个操作翻成 `$provide*`；⑥ composition 里插了 `lsp` 与 `tool-lsp`。**门 1（无页面）+ 门 2（答案来自扩展、无 stdio 配置）**：无页面、无模型，探针直接调 `ctx.lsp.query` 拿到 CSS 扩展语言服务的真实 hover。**门 4（不回归）**：七道 vendor 门（14/28/9/6/7/33/5）+ 四道 prac 门（6/6/11）+ 单测全绿。**只剩门 3**：模型真的调 `lsp` 工具（需要一次真会话，且 `~/.dsh/profiles/prac-headless-dev` 已过期要修）。坑与证据见[工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)。
 
 1. **让内建扩展变成可加载的**（独立可验，不碰协议）：给 `extensions/css-language-features` 与它的 `server/` 各装依赖，再编译 client 与 server 两半。**验收**：`client/out/node/cssClientMain.js` 与 `server/out/node/cssServerMain.js` 存在，且 `vscode-languageclient` 从扩展目录能解析。
 2. **连接与协议写进 `vendor/vscode-embed`**（机制，不带政策）：建载体（`VSCODE_EXTHOST_IPC_HOOK` 管道）→ `cp.fork(bootstrap-fork.js, …)` → 固定顺序握手（`Ready` → initData → `Initialized`）→ import `out-build` 的 `RPCProtocol` 与 id 表，落成一个可复用的入口；host 插件只决定"何时起、给谁用"。
