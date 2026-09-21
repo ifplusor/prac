@@ -100,7 +100,19 @@
 | 编辑器视图状态（打开的文件、布局、选择、折叠）   | client                 | 纯呈现，**而且不给 agent**：agent 要知道人在看什么，靠人说 |
 | 诊断、装饰、状态栏                               | server 算、client 显示 | 给 agent 的是语义服务，不是这份显示用的缓存（§4.1）        |
 
-**运行期状态一律跟随 XDG、放在仓库外**：code server 的三份在 `$XDG_{STATE,DATA,CONFIG}_HOME/prac/code-server`（state / extensions / user-data），**扩展宿主的 storage 在 `$XDG_STATE_HOME/prac/extension-host`**（`globalStorage` / `workspaceStorage`——那是**状态**，不是配置，所以不放进 `XDG_CONFIG_HOME`；VS Code 自己在 `--server-data-dir` 下也是这么分的）。**agent 侧自己的状态**（比如"这个工作区装哪些 VS Code 扩展"）走 **DSH 的 `ctx.storageDomain`**（根在 `$DSH_HOME/storages`），见 §7 #4。
+**运行期状态一律跟随 XDG、放在仓库外，并且按 XDG 的类别分家**（James 2026-09-21：**prac 走 XDG 的 config 和 state**）：
+
+| 内容                                                        | 落点                                              | 类别               |
+| ----------------------------------------------------------- | ------------------------------------------------- | ------------------ |
+| code server 的日志、工作区缓存                              | `$XDG_STATE_HOME/prac/code-server`                | state              |
+| 已安装的 VS Code 扩展                                       | `$XDG_DATA_HOME/prac/code-server/extensions`      | data               |
+| user-data（设置、快捷键、界面状态）                         | `$XDG_CONFIG_HOME/prac/code-server`               | config             |
+| 扩展宿主的 `globalStorage` / `workspaceStorage`             | code server 的 state 下 `data/User/…`             | state              |
+| agent 侧自己那份记录（比如"这个工作区装哪些 VS Code 扩展"） | `$XDG_CONFIG_HOME/prac` 或 `$XDG_STATE_HOME/prac` | **待定**，见 §7 #4 |
+
+- 扩展宿主的 `globalStorage` / `workspaceStorage` 是**状态**、不是配置 ⇒ 落在 state 下；并且**用 code server 自己那份 storage**（`--server-data-dir` 下的 `data/User/…`），**不另开一个根**。
+- **同一个工作区上两个扩展宿主并存不用我们操心**：上游自己在 `<workspaceStorageHome>/<hash>` 上抢 `vscode.lock`，抢不到就退到 `<hash>-1`、`-2`…（`extHostStoragePaths.ts:26-62`）⇒ UI 宿主与 agent 宿主**各用各的一份**，这正是"两边状态各归各家"。
+- **DSH 自己的家不按 XDG 分**：`resolveDshHome` 是**单一根**（默认 `~/.dsh`，只有 `$DSH_HOME` 能覆盖，`packages/util/home-paths/src/index.ts:98`）⇒ **prac 的运行期状态不走 `$DSH_HOME/storages`**，只走上面那张表。
 
 ### 3.4 持久化
 
@@ -218,7 +230,7 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随 DSH 插
    **两个消费者在两种形态里，状态各归各家**（James 2026-09-21）：**UI 走 web**（它的按工作区启停是浏览器里的状态——`BrowserStorageService` 用 IndexedDB 存所有域含 workspace，`web.main.ts:613-614` 构造它时无 remote 分支），**由 VS Code 自己管它的宿主，我们什么都不用做**；**agent 不是 web、是服务端消费者**，所以它的"装什么"要由**服务端的事实**决定。⇒ 两边**不需要互相镜像**，也不该为一个统一机制去发明东西。
    **要接受的一处不一致**：**UI 里禁用的扩展，agent 那边仍会加载**——这是 web 形态的必然，不是缺陷（桌面/远程形态相反：那边渲染器存储本来就在服务端）。
    **"对齐 remote 形态"买不到服务端那份状态（已核实）**：remote 形态里渲染器的存储走 `'storage'` 通道，而那个通道是 **main process（客户端机器）** 的——`NativeWorkbenchStorageService` 把 `mainProcessService` 当 remote service 传进去（`electron-browser/storageService.ts:16`），`RemoteStorageService` 用它取 `getChannel('storage')`（`platform/storage/common/storageService.ts:53,109`）；**code server 注册的通道里没有 `'storage'`**（只有 extensions / logger / userDataProfiles / remoteextensionsenvironment / request / telemetry / remoteFileSystem / remoteTerminal / remoteExtensionsScanner / mcp…）。⇒ **每种形态下"按工作区启停"都是客户端状态**（桌面 → 本机 main process 的 SQLite；web → IndexedDB）。而且 remote 形态里**服务端那个扩展宿主也不自己决定装什么**：`allExtensions` / `myExtensions` 由渲染器算好交给它（`extensionHostManager.ts:425-431`）。
-   ⇒ 所以 agent 侧没有"对齐 remote 就拿到服务端状态"这条路。**James 定（2026-09-21）：agent 在 prac 里就是 client 那个角色，它像 client 一样有自己的状态，存储放在 prac 里。** ⇒ 用 **DSH 自己的存储**（`ctx.storageDomain`：host 侧、持久、非会话；`storage` + `storage-json`（根在 `$DSH_HOME/storages`）+ `storage-domain` **已经在本 composition 里**，见 base bundle 的那三行）——**不加行、不改 DSH**。**agent 侧的"装哪些 VS Code 扩展"就存在这里**，按工作区根键一条记录。
+   ⇒ 所以 agent 侧没有"对齐 remote 就拿到服务端状态"这条路。**James 定（2026-09-21）：agent 在 prac 里就是 client 那个角色，它像 client 一样有自己的状态，存储放在 prac 里。** ⇒ **落点跟 XDG，不跟 DSH 的家**（James 2026-09-21 纠正我：DSH 自己的存储是 `~/.dsh` 这**一个单一根**，`resolveDshHome` 只认 `$DSH_HOME`、不分 XDG，`packages/util/home-paths/src/index.ts:98` ⇒ **prac 的状态不往 `$DSH_HOME/storages` 放**）：**按 XDG 的类别分 config 与 state**（§3.3 的表）。这份"装哪些 VS Code 扩展"的记录**算 config 还是 state 是一个待定的小决定**：当成**用户/agent 可编辑的策略** ⇒ `$XDG_CONFIG_HOME/prac/…`；当成**系统自己维护的既成事实** ⇒ `$XDG_STATE_HOME/prac/…`。**`ctx.storageDomain` 现成但根在 DSH 家**（`storage` + `storage-json`（`root: !!js dshHomePath('storages')`）+ `storage-domain` 三行已在本 composition 里）：要用它就必须**在我们的 patch 里把那个根改到 prac 的 XDG 目录**——那是改我们自己 composition 的一行配置、**不动 DSH**，而且它只能落**一类**（要么 config 要么 state），做不了分家。**要不要用、记录算哪一类，待 James 定。**
    **还剩两个小决定**：① 没有记录时的**默认**（全上 = 现状 / 只上内建 / 一个都不上）；② **谁写**这条记录（agent 自己一个工具、还是一个文件/界面）。**按 agent 仍卡在 seam**（查询入参没有会话标识，`packages/lsp/lsp/src/types.ts:38-57`）。
 5. **VS Code 扩展贡献的 view 要能"出数据"**：现在 `mountViewInto` 能让扩展视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——要让它进 VS Code 自己的可见性 / 容器模型，树的数据才会来。这是"支持 VS Code 扩展贡献的 view"的实事。
 6. **container / part 这类高级形态什么时候真的需要**（现在是按视图组合就够）。

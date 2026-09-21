@@ -313,15 +313,15 @@ export function apply(ctx: Context): void {
   // The other half of the VS Code side: the extensions themselves. Injected on
   // `lsp` rather than declared, so a profile without the seam composes exactly
   // as before — and nothing is forked until a language question is asked.
+  const codeServer = codeServerDirs();
   manageLanguageFeatures(ctx, {
     checkoutRoot: dirname(bundleRoot()),
-    userExtensionsDir: codeServerDirs().extensionsDir,
-    // The extension host's own storage (mementos, `globalStorage` /
-    // `workspaceStorage`) is **state**, not configuration: it follows XDG like
-    // everything else prac keeps at runtime, and sits beside the code server's
-    // state rather than inside the user-data (config) tree. VS Code puts the
-    // same kind of data under the *state* directory when it runs with
-    // `--server-data-dir` — this is the same category, for our own host.
-    storageRoot: join(xdg("XDG_STATE_HOME", ".local/state"), "prac/extension-host"),
+    userExtensionsDir: codeServer.extensionsDir,
+    // The code server's own storage, which is what an extension host is given:
+    // it sits under `--server-data-dir` (therefore under XDG's *state*, which is
+    // where VS Code keeps this kind of data) — not a second root of ours, which
+    // would be inventing a store for the same thing.
+    globalStorageHome: join(codeServer.serverDataDir, "data/User/globalStorage"),
+    workspaceStorageHome: join(codeServer.serverDataDir, "data/User/workspaceStorage"),
   });
 }

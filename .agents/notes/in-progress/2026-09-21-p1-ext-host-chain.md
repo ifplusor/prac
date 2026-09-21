@@ -118,7 +118,7 @@ status: in-progress
 
 ## 4. 实施步骤（按 2026-09-21 的三个裁决）
 
-> **进度（2026-09-21）**：**四道门全部通过，第一条链做通了**——① css 扩展编译出来；② 连接机制落进 `vendor/vscode-embed`；③ 最小主线程让真 css 扩展激活、注册 provider；④ 清单由 `scanExtensions` 真扫（同一次运行里 cSpell 也一并激活）；⑤ 插件把四个操作翻成 `$provide*`；⑥ composition 里插了 `lsp` 与 `tool-lsp`。**门 1/2**：无页面、无模型，四个操作各问一次（hover/definition/references 真结果，implementation 以 `LSP_UNSUPPORTED_OPERATION` 失败）。**门 3**：headless 任务里**模型自己调用了 `lsp` 工具**并贴回真实 hover。**门 4**：七道 vendor 门 + 四道 prac 门 + 单测全绿。**动态激活**（2026-09-21 补）：**一个工作区一个宿主、多工作区并存**（并行工作互不干扰），VS Code 扩展按事件**按需激活**（`onLanguage:<lang>` + `onLanguage`），扩展目录用 **`fs.watch` 事件驱动**（查询路径上不扫描），运行中出现的 VS Code 扩展通过 `$deltaExtensions` 交给**在跑的**宿主而不是重启它——见工作记录。坑（都只有放进真 rig 才看得见）与证据见[工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)：`execArgv` 继承、同文档二次推送杀死宿主、headless 不退出（上游 `LoadEstimator` 的单例 interval 等）、以及 DSH 侧 `dsh_plugin_packages` 在 headless composition 上准备失败（**未查明，本次只记录**）。
+> **进度（2026-09-21）**：**四道门全部通过，第一条链做通了**——① css 扩展编译出来；② 连接机制落进 `vendor/vscode-embed`；③ 最小主线程让真 css 扩展激活、注册 provider；④ 清单由 `scanExtensions` 真扫（同一次运行里 cSpell 也一并激活）；⑤ 插件把四个操作翻成 `$provide*`；⑥ composition 里插了 `lsp` 与 `tool-lsp`。**门 1/2**：无页面、无模型，四个操作各问一次（hover/definition/references 真结果，implementation 以 `LSP_UNSUPPORTED_OPERATION` 失败）。**门 3**：headless 任务里**模型自己调用了 `lsp` 工具**并贴回真实 hover。**门 4**：七道 vendor 门 + 四道 prac 门 + 单测全绿。**动态激活**（2026-09-21 补）：**一个工作区一个宿主、多工作区并存**（并行工作互不干扰），VS Code 扩展按事件**按需激活**（`onLanguage:<lang>` + `onLanguage`），扩展目录用 **`fs.watch` 事件驱动**（查询路径上不扫描），运行中出现的 VS Code 扩展通过 `$deltaExtensions` 交给**在跑的**宿主而不是重启它——见工作记录。坑（都只有放进真 rig 才看得见）与证据见[工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)：`execArgv` 继承、同文档二次推送杀死宿主、headless 不退出（上游 `LoadEstimator` 的单例 interval 等）、以及 DSH 侧 `dsh_plugin_packages` 在 headless composition 上准备失败（**未查明，本次只记录**）。另一类坑是**协议形状不能由消费者自己拼**：`workspace.id` 上游用的是 `hash(uri).toString(16)`、不是路径，填错会让 `workspaceStorage` 下**长出一棵按绝对路径命名的目录树**（2026-09-21 抓到并修，见工作记录）。
 
 1. **让VS Code 内建扩展变成可加载的**（独立可验，不碰协议）：给 `extensions/css-language-features` 与它的 `server/` 各装依赖，再编译 client 与 server 两半。**验收**：`client/out/node/cssClientMain.js` 与 `server/out/node/cssServerMain.js` 存在，且 `vscode-languageclient` 从扩展目录能解析。
 2. **连接与协议写进 `vendor/vscode-embed`**（机制，不带政策）：建载体（`VSCODE_EXTHOST_IPC_HOOK` 管道）→ `cp.fork(bootstrap-fork.js, …)` → 固定顺序握手（`Ready` → initData → `Initialized`）→ import `out-build` 的 `RPCProtocol` 与 id 表，落成一个可复用的入口；host 插件只决定"何时起、给谁用"。
@@ -144,6 +144,7 @@ status: in-progress
 4. **VS Code 扩展扫描**：第一条链手写扩展清单；要变成"用户装什么就能用什么"，得有一个扫描器（上游 `out-build` 里有没有可直接用的，未查）或走 code server 的 HTTP 面。
 5. **多提供方并存时的扩展名冲突**：`lsp-stdio` 与我们若都声明 `.ts`，后注册者抛 `LSP_CONFLICT`，要在 patch 层二选一或分扩展名。
 6. **两条链要不要合成一条** —— **已定（James 2026-09-21）：不合并**。agent 侧一个工作区一个宿主（同工作区的 agent 共用），UI 按上游每个页面一个宿主，两者不共用。想把 UI 也接到同一条链上，得先解决"谁是唯一主线程 + UI 的 VS Code 扩展界面贡献怎么呈现"，那是另一个决定。
+7. **工作区级的 memento 现在不可用（已发现，未定要不要补）**：`workspaceStorage/<hash>/` 下**只有 `vscode.lock`、没有 `meta.json`**（连 UI code server 自己建的目录也没有），而那份 `meta.json` 是上游在**目录首次创建时**写的（`api/common/extHostStoragePaths.ts:57-76`）⇒ 扩展宿主的文件系统消费方（`vscode.workspace.fs` 那一半）在我们这个最小主线程里没落地：我们只实现了语言功能要的 actor，其余由兜底 actor 答 `undefined`。**后果**：`workspaceState` 这类工作区级存储对扩展静默失效（`globalStorage` 不受影响，那是纯 node 文件写）。**不影响语言功能**；要不要为"扩展能正常工作"补上，待 James。
 
 ## Related
 

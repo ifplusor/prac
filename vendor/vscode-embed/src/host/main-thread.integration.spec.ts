@@ -11,10 +11,10 @@
  */
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, basename } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { resolveExtensionHost } from "./extension-host.js";
+import { resolveExtensionHost, singleFolderWorkspace } from "./extension-host.js";
 import { scanExtensions } from "./extensions.js";
 import { startMainThread, type LanguageFeatureKind, type MainThreadHandle } from "./main-thread.js";
 
@@ -304,4 +304,28 @@ describe.skipIf(!built)("main thread: the built-in css extension", () => {
     expect(css.host.child.exitCode).toBeNull();
     await css.host.dispose();
   }, 120_000);
+});
+
+describe.skipIf(!built)("singleFolderWorkspace", () => {
+  it("names the workspace with the build's own hash, never the folder path", async () => {
+    const folder = mkdtempSync(join(tmpdir(), "prac-ws-id-"));
+    cleanups.push(() => rmSync(folder, { recursive: true, force: true }));
+
+    const workspace = await singleFolderWorkspace(location, folder);
+    // Why this matters: the host uses the id as the directory name under
+    // `workspaceStorage`, so a path here would grow a tree of directories
+    // named after the absolute path instead of one opaque folder.
+    const upstream = await import(
+      pathToFileURL(join(location.outBuild, "vs/base/common/hash.js")).href
+    );
+    const { URI } = await import(
+      pathToFileURL(join(location.outBuild, "vs/base/common/uri.js")).href
+    );
+    expect(workspace.id).toBe(upstream.hash(URI.file(folder).toString()).toString(16));
+    expect(workspace.id).not.toContain("/");
+    expect(workspace.name).toBe(basename(folder));
+    expect(workspace.folders).toEqual([
+      { uri: { scheme: "file", path: folder }, name: basename(folder), index: 0 },
+    ]);
+  }, 60_000);
 });

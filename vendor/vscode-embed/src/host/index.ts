@@ -335,6 +335,7 @@ export {
   extensionHostEnv,
   extensionHostInitData,
   resolveExtensionHost,
+  singleFolderWorkspace,
   startExtensionHost,
 } from "./extension-host.js";
 export type {
@@ -345,6 +346,7 @@ export type {
   ExtensionHostProtocol,
   RpcProtocol,
   RpcProxyIdentifier,
+  SingleFolderWorkspace,
   StartExtensionHostOptions,
   UriLike,
 } from "./extension-host.js";

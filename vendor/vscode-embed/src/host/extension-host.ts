@@ -34,7 +34,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import type { Server, Socket } from "node:net";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 /** The module `bootstrap-fork.js` is told to load, via `VSCODE_ESM_ENTRYPOINT`. */
@@ -203,6 +203,59 @@ export function extensionHostEnv(
 export interface UriLike {
   readonly scheme: string;
   readonly path: string;
+}
+
+/**
+ * A single-folder workspace, as init data carries it — the same structure the
+ * main thread's `MainThreadWorkspace` describes.
+ */
+export interface SingleFolderWorkspace {
+  readonly id: string;
+  readonly name: string;
+  readonly folders: readonly {
+    readonly uri: UriLike;
+    readonly name: string;
+    readonly index: number;
+  }[];
+}
+
+/**
+ * The workspace record for a **single-folder** workspace, in the shape the
+ * protocol expects.
+ *
+ * Building it here rather than letting the consumer write it keeps one upstream
+ * rule in one place: `id` is not free-form. Upstream derives it as
+ * `hash(folderUri.toString()).toString(16)`
+ * (`vs/platform/workspaces/common/workspaceIdentifier.ts`), and an extension
+ * host uses it **verbatim as the directory name** under `workspaceStorage`. A
+ * host handed a path as its id therefore creates a directory tree named after
+ * that absolute path, and never shares storage with the sibling hosts of the
+ * same workspace (which is what upstream's own per-host lock assumes).
+ *
+ * The hash can come out negative, so an id may start with `-`; upstream's
+ * directory names do too.
+ *
+ * @param location - the resolved build, whose own `URI`/`hash` are used.
+ * @param folder - absolute path of the workspace folder.
+ * @returns the workspace record for the host's init data.
+ */
+export async function singleFolderWorkspace(
+  location: ExtensionHostLocation,
+  folder: string,
+): Promise<SingleFolderWorkspace> {
+  const { hash } = await import(
+    pathToFileURL(join(location.outBuild, "vs/base/common/hash.js")).href
+  );
+  const { URI } = await import(
+    pathToFileURL(join(location.outBuild, "vs/base/common/uri.js")).href
+  );
+  const uri = URI.file(folder);
+  const name = basename(folder) || folder;
+  return {
+    id: hash(uri.toString()).toString(16),
+    name,
+    folders: [{ uri: { scheme: uri.scheme, path: uri.path }, name, index: 0 }],
+  };
 }
 
 /** What the consumer decides about the host: everything policy-shaped. */

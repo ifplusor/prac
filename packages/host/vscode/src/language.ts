@@ -27,11 +27,12 @@ import { LspError, LspProviderId } from "@deepseek-ai/dsh-lsp";
 import type { LspProvider, LspProviderQuery, LspQueryResult } from "@deepseek-ai/dsh-lsp";
 import { watch, type FSWatcher } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   resolveExtensionHost,
   scanExtensions,
+  singleFolderWorkspace,
   startMainThread,
   type ExtensionDescription,
   type ExtensionHostLocation,
@@ -90,8 +91,18 @@ export interface LanguageFeaturesOptions {
   readonly checkoutRoot: string;
   /** Where installed extensions live (`--extensions-dir`). */
   readonly userExtensionsDir: string;
-  /** Root for the host's own storage (`globalStorage` / `workspaceStorage`). */
-  readonly storageRoot: string;
+  /**
+   * The storage an extension host is given — the **code server's own**
+   * `globalStorage` / `workspaceStorage`, not a second root of ours.
+   *
+   * Upstream hands these to an extension host through the
+   * `remoteextensionsenvironment` channel, because they belong to the server
+   * that owns the extensions; a private root would be a second store for the
+   * same thing (and would step around upstream's per-host storage lock, which
+   * exists precisely because several hosts can share one root).
+   */
+  readonly globalStorageHome: string;
+  readonly workspaceStorageHome: string;
 }
 
 /**
@@ -301,11 +312,11 @@ class ExtensionHosts {
           appLanguage: "en",
           globalStorageHome: {
             scheme: "file",
-            path: join(this.options.storageRoot, "globalStorage"),
+            path: this.options.globalStorageHome,
           },
           workspaceStorageHome: {
             scheme: "file",
-            path: join(this.options.storageRoot, "workspaceStorage"),
+            path: this.options.workspaceStorageHome,
           },
           telemetry: {
             sessionId: "prac",
@@ -316,17 +327,7 @@ class ExtensionHosts {
           },
         },
         extensions,
-        workspace: {
-          id: workspaceRoot,
-          name: basename(workspaceRoot) || workspaceRoot,
-          folders: [
-            {
-              uri: { scheme: "file", path: workspaceRoot },
-              name: basename(workspaceRoot),
-              index: 0,
-            },
-          ],
-        },
+        workspace: await singleFolderWorkspace(location, workspaceRoot),
         onLog: (message) => console.log(`${name}: extension host | ${message}`),
         onUnhandledCall: ({ actor, method }) =>
           console.log(`${name}: extension host asked for ${actor}.${method} (not implemented)`),
