@@ -10,6 +10,8 @@ status: in-progress
 
 prac 同时说三套词：DSH 的（slot / 视图 / 服务）、prac 自己的（frame / region / view）、VS Code 的（workbench / part / monaco / `IWorkbench…`）。融合越深，第三套词越容易从"边界上的适配"扩散成 prac 内部的常用语——那时它不再是实现细节，而是 prac 的词汇表被上游改写。
 
+**一条用词约定（2026-09-21 补，因为真的混过一次）**：**插件 = DSH 的插件**（loader 里的一行：`prac-host-vscode`、`prac-client-vscode-host`、DSH 自带那些……），**扩展 = VS Code 扩展**（市场/内建那些，跑在扩展宿主里）。说"配置插件"时若指的是 VS Code 那边，务必写"扩展"——否则连"读哪个真源"都会选错。
+
 **James 的裁决**：prac 中使用的**所有 VS Code 概念要收束**，存在**一个清晰的转换界面**；边界之外的 prac 内部应使用**自己的或贴近 DSH 的**体系。
 
 ## 决定

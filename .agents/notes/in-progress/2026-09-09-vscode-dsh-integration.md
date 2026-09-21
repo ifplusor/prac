@@ -165,7 +165,7 @@ status: in-progress
 
 > 与"插件族"无关，是针对**给工作区装什么**这件事。
 
-- **按工作区配置"装什么"（最好也能按 agent 配）**——**这里的"插件"待明确**：是 **VS Code 扩展**（工作区启用哪些扩展；上游对应物是工作区 storage 的 `extensionsIdentifiers/disabled` 与 `enabled`，`src/vs/platform/extensionManagement/common/extensionManagement.ts:645-646`，读写见 `.../browser/extensionEnablementService.ts:775-787`），还是 **DSH 插件**（每个工作区/每个 agent 一份组合树）？前者我们这边能做（按工作区选 `myExtensions`；per-agent 卡在 seam：查询入参没有会话标识，`packages/lsp/lsp/src/types.ts:38-57`），后者是 DSH 层面的动态组合，超出本次范围。
+- **按工作区配置装哪些 VS Code 扩展（最好也能按 agent 配）**：James 2026-09-21 明确这里说的是**扩展**（不是 DSH 插件——见 [概念边界](2026-09-13-vs-concept-boundary.md) 的用词约定）。今天我们的宿主 `myExtensions` = **全部**，于是 cSpell 在每个宿主里都因 `onStartupFinished` 自动激活。**按 agent 那条卡在 seam**：查询入参没有会话标识（`packages/lsp/lsp/src/types.ts:38-57`）。**真源待定**：读 VS Code 的工作区启用/禁用（工作区 storage 的 `extensionsIdentifiers/{disabled,enabled}`，`extensionManagement.ts:645-646`；Node 有 `node:sqlite`）还是 prac 自己一份配置（不与页面 UI 联动；我们的宿主本来就用自己那份 storage 根）。
 
 ### 已定方向、尚未做
 
