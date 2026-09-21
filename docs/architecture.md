@@ -91,6 +91,15 @@
 
 ## 4. 能力
 
+### 4.0 能力怎么进 prac：接口在 DSH，提供方在任一边
+
+这是本文档里对"结合两边生态"最重要的一条：
+
+- **接口在 DSH**：agent 面向的能力做成 DSH 的能力 seam（`ctx.lsp`、`ctx.tools`、MCP 客户端…）——**形状稳定**，换提供方不改变模型请求的方式。
+- **提供方在任一边**：实现可以由 DSH 自己起，也可以由 VS Code（或别的来源）提供；同一个能力可以有多个提供方并存。
+- 所以"agent 面归 DSH"和"用 VS Code 的生态"不矛盾：**DSH 出接口与组装，VS Code 出实现与配置**。
+- 注意区分两件事：旧设计里那个"给 UI 用的快照/订阅能力面"确实不要了（§4.1 第三类）；这里说的是**给 agent 的能力 seam**，DSH 本来就有这套机制。
+
 ### 4.1 IDE 能力分三类
 
 | 类别           | 是什么                                                     | 从哪来                                                             | 给谁                                                                  |
@@ -101,7 +110,7 @@
 
 第三类不等于"扩展必须搬到 client"：上游把"在哪算"和"在哪显示"分开（装饰、状态栏、命令都由主线程代理），所以只要有一个主线程在，扩展可以在 server 侧跑、画面落到页面。
 
-### 4.2 语义服务（LSP）：主干当主线程
+### 4.2 语义服务（LSP）：DSH 出接口，VS Code 出服务器
 
 **主干自己连一条 ExtensionHost 连接**，扮演主线程，按需实现：
 
@@ -116,14 +125,15 @@
 
 **硬前提**：**文档必须由我们喂**。扩展宿主取文档时没有判空、末尾还会用 `doc.getWordRangeAtPosition()`——这不是为了编辑，而是每次问语言特性都要有一份活着的文档和版本号。
 
-**为什么接 VS Code 的服务器，而不是自己起**（James 2026-09-19：从生态看，VS Code 对 LSP 的支持更好更全面）：那一边有的东西是别处给不了的——
+**两边怎么结合**（James 2026-09-19：目标是更好地结合两边的生态与能力）：
 
-- **哪个语言用哪个服务器、谁优先、多个提供方怎么合并**（同一个语言可以挂多个，结果会被并起来）；
-- **服务器的安装与版本**由扩展生态管：内置的 css / html / json / markdown 语言服务器就在 checkout 里，不用装市场扩展；TypeScript 那份是扩展自带的 `tsserver`（注意它**不是 LSP**）；
-- **初始化参数与配置**（服务器会问 `workspace/configuration`，得由我们把配置喂进扩展宿主）；
-- **能力面是全集**：`vscode.execute*Provider` 有 24 个（hover / definition / references / implementation / symbols / code actions / completion / semantic tokens / inlay hints / call hierarchy / formatting / rename…），而不是四个闭合操作。
+- **DSH 出接口**：`ctx.lsp` 是一个能力 seam——提供方注册表（`id` + `extensionToLanguage` + `query()`），按文件扩展名每次查询选一个提供方；面向模型的 `lsp` 工具（四个操作：转到定义 / 查引用 / 查实现 / 悬停）是稳定的形状。**换提供方不改变模型请求导航的方式。**
+- **VS Code 出实现与配置**：把 VS Code 那边做成**一个 `LspProvider`**——我们当主线程连扩展宿主（P1），喂配置与文档，把扩展语言特性的结果翻译成 seam 的归一化结果。
+- **于是两边的服务器可以并存**：同一批语言上，DSH 自配的 stdio 服务器和 VS Code 扩展带来的服务器都是提供方，模型侧看到的还是那四个操作。
 
-DSH 自己那套（`packages/lsp/`：`ctx.lsp` + stdio 提供方 + `lsp` 工具）只有四个操作、不带服务器、不在任何 bundle 里，是**可选能力**——这里不作为路线。
+**为什么值得把 VS Code 这一边接进来**：那边有的东西别处给不了——哪个语言用哪个服务器、谁优先、多个提供方怎么合并；服务器的安装与版本由扩展生态管（内置的 css / html / json / markdown 就在 checkout 里，不用装市场扩展；TypeScript 那份是扩展自带的 `tsserver`，**不是 LSP**）；初始化参数与配置；以及**全集的查询**（`vscode.execute*Provider` 24 个：hover / definition / references / implementation / symbols / code actions / completion / semantic tokens / inlay hints / call hierarchy / formatting / rename…）。
+
+**要那四个操作之外的查询怎么办**：按 seam 的规矩**扩操作联合**——seam / 提供方 / 工具三处一起改（编译会强制），VS Code 那边只是多实现几个 `$provide*`。**接口仍然在 DSH 侧。**
 
 **P1 的前置条件**（都在代码里核实过）：
 
@@ -136,7 +146,7 @@ DSH 自己那套（`packages/lsp/`：`ctx.lsp` + stdio 提供方 + `lsp` 工具�
 
 ### 4.3 扩展生态里 agent 能用什么
 
-- **MCP**（工具接入）：**DSH 自己起 MCP 客户端**，只复用 VS Code 这边的 **server 定义来源**（扩展的声明点 + 工作区配置），不复用它的 `contrib/mcp`。
+- **MCP**（工具接入）：**DSH 自己起 MCP 客户端**（接口在 DSH），只复用 VS Code 这边的 **server 定义来源**（扩展的声明点 + 工作区配置）；server 本身可以是任何来源。这是 §4.0 那条原则的另一个例子。
 - **文件定制**：**不共源**——DSH 用自己的 skill / 上下文格式，不去读 VS Code 的 `SKILL.md` / `*.instructions.md` / `AGENTS.md`。
 - **扩展贡献的界面**（视图、编辑器、状态栏）——给人用。
 
@@ -180,7 +190,7 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随插件 d
 
 ## 7. 还没定的
 
-1. **P1 的第一条链**：用 checkout 自带的语言服务器（css / html / json / markdown 之一）做通——扩展激活 → 我们喂配置与文档 → 它注册 provider → 我们就工作区里的文件问一次查询。**验收**：用的是**扩展带来的服务器与它的配置**（不是手配的），而且能力面**不止那四个操作**。前置两条（配置、文档）见 §4.2。
+1. **第一条链**：用 checkout 自带的语言服务器（css / html / json / markdown 之一）做通——扩展激活 → 我们喂配置与文档 → 它注册 provider → 我们就工作区里的文件问一次查询。**验收**：它作为 `ctx.lsp` 的**一个 provider** 被 agent 用上（**模型侧接口不变**），用的是**扩展带来的服务器与它的配置**（不是手配的）。前置两条（配置、文档）见 §4.2。
 2. **自动保存打开之后，验证门怎么调**：现在那几条"文件保持不动"的断言是靠故意关掉 autoSave 才稳的。
 3. **Copilot 在我们 rig 里到底有没有激活**（实测）——它决定"树里多一个 agent"是理论问题还是已经在发生。
 4. **插件族的划分**：server 侧一族与 client 侧一族各有哪些插件、什么算一个插件。
