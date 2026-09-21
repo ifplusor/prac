@@ -150,16 +150,29 @@ function searchUp(from: string, relative: string): string {
 }
 
 function readProduct(checkoutRoot: string): ExtensionHostLocation["product"] {
-  try {
-    const raw = JSON.parse(readFileSync(join(checkoutRoot, "product.json"), "utf8")) as {
-      version?: string;
-      quality?: string;
-      commit?: string;
-    };
-    return { version: raw.version, quality: raw.quality, commit: raw.commit };
-  } catch {
-    return {};
-  }
+  const read = (file: string): Record<string, unknown> => {
+    try {
+      return JSON.parse(readFileSync(join(checkoutRoot, file), "utf8")) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  };
+  const product = read("product.json");
+  // A checkout's product.json is the *source* one: a packaging step injects
+  // `version` into the built copy. The host checks `vscode.version` against the
+  // engine range an extension declares, so falling back to the checkout's own
+  // package.json is what keeps that check meaningful instead of failing every
+  // extension with "requires VS Code version ^1.91.0 but received 0.0.0".
+  const pkg = read("package.json");
+  return {
+    version: asString(product.version) ?? asString(pkg.version),
+    quality: asString(product.quality),
+    commit: asString(product.commit),
+  };
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
 /**

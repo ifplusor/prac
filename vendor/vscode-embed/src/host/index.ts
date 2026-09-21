@@ -348,3 +348,21 @@ export type {
   StartExtensionHostOptions,
   UriLike,
 } from "./extension-host.js";
+
+export { configurationDefaults, readExtensionDescription, scanExtensions } from "./extensions.js";
+export type {
+  ExtensionDescription,
+  ExtensionLocation,
+  ScanExtensionsOptions,
+} from "./extensions.js";
+
+export { startMainThread } from "./main-thread.js";
+export type {
+  LanguageFeatureKind,
+  LanguageFeatureRegistration,
+  MainThreadDocument,
+  MainThreadEnvironment,
+  MainThreadHandle,
+  MainThreadPolicy,
+  MainThreadWorkspace,
+} from "./main-thread.js";

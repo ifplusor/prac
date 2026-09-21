@@ -87,6 +87,22 @@ describe("resolveExtensionHost", () => {
       commit: undefined,
     });
   });
+
+  it("falls back to the checkout's package.json for the version", () => {
+    // A source checkout's product.json has no version — the built copy gets one
+    // injected. Without this fallback every extension is refused for running on
+    // "VS Code 0.0.0".
+    const repo = fakeCheckout({ commit: "abc" });
+    writeFileSync(
+      join(repo, ".build", "vscode", "package.json"),
+      JSON.stringify({ version: "1.137.0" }),
+    );
+    expect(resolveExtensionHost({ from: repo }).product).toEqual({
+      version: "1.137.0",
+      quality: undefined,
+      commit: "abc",
+    });
+  });
 });
 
 describe("extensionHostEnv", () => {
