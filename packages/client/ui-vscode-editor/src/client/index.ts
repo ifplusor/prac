@@ -89,7 +89,7 @@ export function apply(ctx: Context): void {
         const registered = new Map<string, () => void>();
         const sync = (): void => {
           const wanted = new Set(host.fileViews().map((entry) => entry.view));
-          for (const [view, dispose] of [...registered]) {
+          for (const [view, dispose] of Array.from(registered)) {
             if (wanted.has(view)) continue;
             dispose();
             registered.delete(view);
