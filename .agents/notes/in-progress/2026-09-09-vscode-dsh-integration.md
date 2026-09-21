@@ -44,9 +44,9 @@ status: in-progress
 
 - **prac 是 CS/BS 两端结构，主干是 DSH**。看架构**先分 client / server**，不是先分 DSH / VS Code——两个系统各自都跨在线上。
 - **DSH 的扩展方式就是插件**：同一棵树、同一地址空间，耦合是 in-process 的 `inject`。**"扩展宿主"是 VS Code 的概念，不能带到 DSH 上**——两者是不同的机制，不是一个角色的两种形状。
-- **VS Code 是主干上的一族插件**（不是"被嵌进来的第三方 app 加一层接缝"）：server 半边拥有它的进程与能力，client 半边把 UI 贡献进 frame；bridge / part host / `prac-vscode-embed` 是**这族插件的内部实现**。
+- **VS Code 是主干上的一族 DSH 插件**（不是"被嵌进来的第三方 app 加一层接缝"）：server 半边拥有它的进程与能力，client 半边把 UI 贡献进 frame；bridge / part host / `prac-vscode-embed` 是**这族 DSH 插件的内部实现**。
 - **本次只做结合**（James 2026-09-19）：把 VS Code 现有的东西接到 DSH 现有的接口上；接口不够用时**只记录、不扩**（§1 第 3 条）。
-- **三层各归其位**：`vendor/vscode` = 引入的上游源码树 + 我们的 patch；`vendor/vscode-embed` = 在其上封装的 **lib**（可利用、不绑定 prac，**只给机制、不背政策**）；**政策**（谁放哪、何时启动、哪个 view 用哪个 part、能力怎么给 agent、code server 的生命周期）全在插件层。
+- **三层各归其位**：`vendor/vscode` = 引入的上游源码树 + 我们的 patch；`vendor/vscode-embed` = 在其上封装的 **lib**（可利用、不绑定 prac，**只给机制、不背政策**）；**政策**（谁放哪、何时启动、哪个 view 用哪个 part、能力怎么给 agent、code server 的生命周期）全在 DSH 插件层。
 
 ### 3.2 容纳与单位
 
@@ -60,7 +60,7 @@ status: in-progress
 
 - **frame 由 `ui-layout` 拥有，只借 VS Code 的行为**（视图契约、`GridDescriptor` 的树形摆放、收起记宽、maximize、layout policy 的写法）；**不让它的 grid 拥有 prac 的 frame**。
 - **机制与组合分层**：机制（`ui-layout`）/ 编排（`web-app`）/ VS Code 侧（vendor + 两个 prac 行）。**机制层不含任何具体视图名与默认落位**。
-- **code server 的进程归主干**：`prac-host-vscode` 自己 spawn 它（`out-vscode-reh/server-main.js`，不用 `--folder`——工作区由 client 的 boot 决定），端口取空闲、等 `/version` 就绪、随插件 dispose 收掉；环境变量（`PRAC_CODE_SERVER_URL` / `_ENTRY` / `_PORT` / `_PATH`）是逃生口。页面不再拥有它。
+- **code server 的进程归主干**：`prac-host-vscode` 自己 spawn 它（`out-vscode-reh/server-main.js`，不用 `--folder`——工作区由 client 的 boot 决定），端口取空闲、等 `/version` 就绪、随该 DSH 插件 dispose 收掉；环境变量（`PRAC_CODE_SERVER_URL` / `_ENTRY` / `_PORT` / `_PATH`）是逃生口。页面不再拥有它。
 - **扩展宿主也归主干（P1）**（James 2026-09-19）：主干自己连一条 ExtensionHost 连接，**不依赖页面**（页面关着语言服务照样在）。按需实现主线程那一面：三条初始化推送 + `ExtensionService` + `Errors` + **文档** + 挑出来的那几个 `$provide*`。**宿主几个**（James 2026-09-21 定）：**agent 侧一个工作区一个宿主**（同工作区的多个 agent 共用；理由与 seam 的限制见 [`docs/architecture.md`](../../../docs/architecture.md) §4.2），**UI 不与 agent 共用**（UI 仍按上游：每个页面一个宿主）。代价：agent 那份激活上下文仍是额外的一份（上游的 UI 宿主照旧），并跟着上游漂移；宿主死了要能自己起回来。**硬前提**：文档必须由我们喂给扩展宿主（取文档时没有判空）。
 - **两个服务主次分明**：`ctx.layout` 是**兼容 shim**（只服务 `ui-workspace` / `ui-sidebar` / `ui-sidebar-right` 用的 5 个方法，可整体删除）；`ctx.pracLayout` 是 prac 机制（含 `bindRoles`），机制**不知道谁是 sidebar**。
 
@@ -92,8 +92,8 @@ status: in-progress
 
 ### 3.7 生态与能力
 
-- **agent / chat 面归 DSH**（James 2026-09-18）：VS Code 自带的这一层**不作为 prac 的 agent 面**——`contrib/chat/**`（chat 循环、participants/"agents"、会话、工具注册表与内置工具如 `reviewPlanTool` / `runSubagentTool` / `setArtifactsTool`）、`contrib/mcp` 的客户端、`platform/agentHost/**`（把 copilot / claude / codex 当被托管进程）都不进；**agent 的循环、工具、会话、模型、规划与评审都在 DSH**，我们从 VS Code 取的是 **IDE 能力**（编辑、语言特性、诊断、终端、任务、调试、扩展生态）与 **UI 组件**。
-  - 直接代价：**扩展注册的 LM tools**（`contributes.languageModelTools` / `lm.registerTool`）我们拿不到——要用就得再实现一遍它的工具注册表与 `$invokeTool` 通道，等于把 agent 面搬过来。⇒ 生态里对 agent 真正开放的接口收窄成两条：**MCP**（工具协议）与**文件定制**（`SKILL.md` / `*.instructions.md` / `AGENTS.md`）。
+- **agent / chat 面归 DSH**（James 2026-09-18）：VS Code 自带的这一层**不作为 prac 的 agent 面**——`contrib/chat/**`（chat 循环、participants/"agents"、会话、工具注册表与内置工具如 `reviewPlanTool` / `runSubagentTool` / `setArtifactsTool`）、`contrib/mcp` 的客户端、`platform/agentHost/**`（把 copilot / claude / codex 当被托管进程）都不进；**agent 的循环、工具、会话、模型、规划与评审都在 DSH**，我们从 VS Code 取的是 **IDE 能力**（编辑、语言特性、诊断、终端、任务、调试、VS Code 扩展生态）与 **UI 组件**。
+  - 直接代价：**VS Code 扩展注册的 LM tools**（`contributes.languageModelTools` / `lm.registerTool`）我们拿不到——要用就得再实现一遍它的工具注册表与 `$invokeTool` 通道，等于把 agent 面搬过来。⇒ 生态里对 agent 真正开放的接口收窄成两条：**MCP**（工具协议）与**文件定制**（`SKILL.md` / `*.instructions.md` / `AGENTS.md`）。
   - 但"不用"不等于"不存在"：Copilot 是**内建扩展**（它声明 `chatParticipants` / `languageModelTools` / `mcpServerDefinitionProviders` / `chatSessions` / `chatPromptFiles` / `chatSkills`），会随扩展宿主一起活（见 §4）。
 - **MCP 客户端 DSH 自己起**（James 2026-09-19）：只复用 VS Code 这边的 **server 定义来源**（扩展声明点 + 工作区配置），不复用它的 `contrib/mcp` 客户端。
 - **文件定制不共源**（James 2026-09-19）：DSH 用自己的 skill / 上下文格式，不去读 VS Code 的 `SKILL.md` / `*.instructions.md` / `AGENTS.md`。

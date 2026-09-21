@@ -10,7 +10,7 @@ status: in-progress
 
 prac 同时说三套词：DSH 的（slot / 视图 / 服务）、prac 自己的（frame / region / view）、VS Code 的（workbench / part / monaco / `IWorkbench…`）。融合越深，第三套词越容易从"边界上的适配"扩散成 prac 内部的常用语——那时它不再是实现细节，而是 prac 的词汇表被上游改写。
 
-**一条用词约定（2026-09-21 补，因为真的混过一次）**：**插件 = DSH 的插件**（loader 里的一行：`prac-host-vscode`、`prac-client-vscode-host`、DSH 自带那些……），**扩展 = VS Code 扩展**（市场/内建那些，跑在扩展宿主里）。说"配置插件"时若指的是 VS Code 那边，务必写"扩展"——否则连"读哪个真源"都会选错。
+**一条用词要求（2026-09-21 补，因为真的混过一次）**：**不要用裸词**——既不写"插件"当 DSH 插件的简称，也不写"扩展"当 VS Code 扩展的简称。**一律说全**：**DSH 插件**（loader 里的一行：`prac-host-vscode`、`prac-client-vscode-host`、DSH 自带那些……）与 **VS Code 扩展**（市场/内建那些，跑在扩展宿主里的）。这不是文风问题：混用一次就会让人（包括我）去读错真源、选错方案。
 
 **James 的裁决**：prac 中使用的**所有 VS Code 概念要收束**，存在**一个清晰的转换界面**；边界之外的 prac 内部应使用**自己的或贴近 DSH 的**体系。
 
@@ -23,7 +23,7 @@ prac 同时说三套词：DSH 的（slot / 视图 / 服务）、prac 自己的�
 3. **`part` 只做边界词**：对外的面上用 `partHost`，机制内部只用 `view` / `region`（`ui-layout` 里没有 `part`）。
 4. **机制不知道任何来源词**：`ui-layout` 判"这是不是一个 prac 的 view"按**注册表成员**（`slots.entries("prac.view")`），不按 id 前缀。原 `VS_VIEW_SOURCE` 删除。
    - **放弃了什么**：按前缀判定的一点便利；换来的是"机制与来源解耦"这条原则真正落地。
-5. **通道：全局不是唯一可行，DSH service 才是合规载体**。机制 → 编排用 `ctx.provide`；声明视图的插件行注入服务（`inject: ["pracVscode"]`）。
+5. **通道：全局不是唯一可行，DSH service 才是合规载体**。机制 → 编排用 `ctx.provide`；声明视图的 DSH 插件行注入服务（`inject: ["pracVscode"]`）。
    - **代价（已知并接受）**：坏组合（抽掉机制行、留下声明视图的行）从"渲染空白"变成"fiber 挂起"（DSH loader：依赖缺失的 fiber 保持 pending）。
    - **必须留全局的只有补丁侧**：设置/读取它的代码跑在 workbench bundle 内部，既不在 DSH 模块图里也不在 Cordis 上下文里——这是结构性的。修法是把它换进 `create()` 的 construction options（S2），已做。
 6. **判据（怎么算收束了）**：
@@ -39,7 +39,7 @@ prac 同时说三套词：DSH 的（slot / 视图 / 服务）、prac 自己的�
   - **顺带收获**：删掉客户端的 **50ms 轮询**；契约成为可 `grep`、可 `diff` 的一份原件。
   - **收束的是四样东西**：入方向（defer 标志）、出方向（part-hosting face）、契约常量（options 字段名）、类型（face 的形状）。
 - **交互面走 service 而不是全局**：全局不是"唯一可行"，只是"模块图之外"的一个选择；Cordis 的 service 注册表才是 DSH 给的合规载体，且同一仓的"机制 → 编排"那条边已经这么做。
-  - **放弃了**：插件行对"边界还没发布"的**宽容**（`?.` → 渲染 `null`，之后靠重渲染接上）。
+  - **放弃了**：DSH 插件行对"边界还没发布"的**宽容**（`?.` → 渲染 `null`，之后靠重渲染接上）。
   - **换来**：顺序由框架保证——声明视图的行只在机制发布之后激活。
   - **代价（已实测，不再是推断）**：坏组合（抽掉机制行、留下声明视图的行）从"渲染空白"变成 **fiber 挂起**——实测报 `2 entries did not activate` + `pending (waiting for service: pracVsHost)`、`regions: 0`。
 - **服务不用 `Service` 基类**：这个面没有自己的生命周期，也没有按组隔离的需要。
@@ -92,7 +92,7 @@ prac 两侧随之变薄：`packages/host/vscode` = 路由 `/prac-vscode` + code 
 **这一步的两个真发现**（都属于"契约的消费者"这一类）：
 
 1. **DOM 上的 `PART_HOST_ATTR` 携带的是 part id，不是 view id**。契约与载荷的默认路径都按 part id 查 host，而旧的 client 半边写的是 view id。lib 改回契约值后闸门立刻红（`verify-layout` 23/24、`verify-views` 超时）——它们一直用 view id 选 host。改法：闸门里显式写 `PART_OF_VIEW` / `VIEW_OF_PART`（**DOM 说 part，frame 说 view**），不假设相等。
-2. **路由处理器拿到的是完整 pathname**。旧代码在插件里 `slice(WORKBENCH_ROUTE.length)`，抽进 lib 时漏掉 ⇒ DSH 侧 `/prac-vscode/vs/…` 全 404，而**独立页 smoke 反而正常**（那条路不走路由）——只看 smoke 会假绿。机制侧因此有 `mountPath` 参数。
+2. **路由处理器拿到的是完整 pathname**。旧代码在 DSH 插件里 `slice(WORKBENCH_ROUTE.length)`，抽进 lib 时漏掉 ⇒ DSH 侧 `/prac-vscode/vs/…` 全 404，而**独立页 smoke 反而正常**（那条路不走路由）——只看 smoke 会假绿。机制侧因此有 `mountPath` 参数。
 
 ## 2026-09-19：命名收束（续）——退役 `seat` / 座位
 

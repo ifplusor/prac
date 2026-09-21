@@ -44,7 +44,7 @@
 
 ### 2.1 一条主干，两端
 
-- **两端**：client（页面）与 server（Node）。DSH 在两端都提供骨架——client 侧是页面的壳（loader、模块表、槽、服务注册表），server 侧是组装、进程和 agent 循环。prac 自己的插件和 VS Code 的插件按所属的一端挂上去。
+- **两端**：client（页面）与 server（Node）。DSH 在两端都提供骨架——client 侧是页面的壳（loader、模块表、槽、服务注册表），server 侧是组装、进程和 agent 循环。**DSH 插件**与 **VS Code 扩展**按所属的一端挂上去。
 - **主干只有一个**：组合、状态、进程、生命周期归 DSH。**code server 是主干起停的子进程**，不是第二个主干。
 - **扩展宿主也归主干**：主干自己连一条 ExtensionHost 连接，**不依赖页面**（见 §4.2）。
 
@@ -212,7 +212,7 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随插件 d
 1. **第一条链已经通了**（css 内建扩展；四道门见工作记录）。**两组后续都搁置**（James 2026-09-21）：把 **json / html / markdown** 也编译进来（同一套手续、成本小），以及 **MCP 定义接线**（把 VS Code 那边的 server 定义来源接给 DSH 现有的 MCP 客户端）。
 2. **自动保存打开之后，验证门怎么调**：现在那几条"文件保持不动"的断言是靠故意关掉 autoSave 才稳的；`verify-file` 最近一次是 33/33 直接绿的，与旧注意不一致，待查。
 3. **Copilot 在我们 rig 里到底有没有激活**（实测）——它决定"树里多一个 agent"是理论问题还是已经在发生。**已知一条相关事实**：打开页面时 code server 会拉起一个 `--type=agentHost` 进程（VS Code 自己的 agent 层的服务端形态）。
-4. **按工作区 / 按 agent 配置装哪些 VS Code 扩展**（James 2026-09-21；他明确这里说的是**扩展**，不是 DSH 插件）。**"插件族的划分"这个问题撤销了**——不需要区分哪个插件算 server 侧、哪个算 client 侧；要的是**扩展贡献的 view 能上屏**（数据那一半见下条）。要求：一个工作区该加载哪些扩展**要可配置**（不是"扫到什么就全上"——今天 `myExtensions` 就是全部，于是 cSpell 在每个宿主里都因 `onStartupFinished` 自动激活），**最好还能按 agent 单独配**。
+4. **按工作区 / 按 agent 配置装哪些 VS Code 扩展**（James 2026-09-21；他明确这里说的是**扩展**，不是 DSH 插件）。**"插件族的划分"这个问题撤销了**——不需要区分哪个 DSH 插件算 server 侧、哪个算 client 侧；要的是**扩展贡献的 view 能上屏**（数据那一半见下条）。要求：一个工作区该加载哪些扩展**要可配置**（不是"扫到什么就全上"——今天 `myExtensions` 就是全部，于是 cSpell 在每个宿主里都因 `onStartupFinished` 自动激活），**最好还能按 agent 单独配**。
    **按 agent 那条卡在 seam**：查询入参里没有会话标识（`packages/lsp/lsp/src/types.ts:38-57`），要给 DSH 加会话键才能表达。**真源待定**：读 VS Code 自己的工作区启用/禁用状态（工作区 storage 的 `extensionsIdentifiers/disabled`、`enabled`，`src/vs/platform/extensionManagement/common/extensionManagement.ts:645-646`；本仓 Node 有 `node:sqlite`，技术上可读），还是 **prac 自己一份配置**（我们拥有真源、简单，但不与页面 UI 的启停联动——而且我们的宿主用的是自己那份 storage 根 `~/.config/prac/code-server/prac-extension-host/`，本来就和页面那份不是一处）。
 5. **插件贡献的 view 要能"出数据"**：现在 `mountViewInto` 能让扩展视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——要让它进 VS Code 自己的可见性 / 容器模型，树的数据才会来。这是"支持插件贡献的 view"的实事。
 6. **container / part 这类高级形态什么时候真的需要**（现在是按视图组合就够）。
