@@ -140,7 +140,7 @@ status: in-progress
 
 1. **id 表必须与跑着的 ext host 同源**：我们 import 的 `out-build` 与 ext host 用的 bundle 都出自同一次构建（同一个 commit），但要**实测核对**（两边都能打印 `ProxyIdentifier.count === 168`），否则会静默错位。
 2. **`out-build` 里的 `window`**：`mainThreadExtensionService.js` 这类要 `window`；我们只 import 协议层与少数几个，其余自己按 shape 实现（不 import 主线程类）。
-3. **内建扩展的构建**：`extensions/ipynb` 那条 typecheck 曾经挡住整个 extensions 构建（umbrella §4 #11）；定向编译单个扩展是否绕得开，**未核实**。
+3. **内建扩展的构建**：`extensions/ipynb` 那条 typecheck 曾经挡住整个 extensions 构建（umbrella §4 #10）；**定向编译单个扩展绕得开**——css 就是用 checkout 自带的 `tsc` 直接编出来的（client 与 server 两半都成了），没碰 ipynb。
 4. **扩展扫描**：第一条链手写扩展清单；要变成"用户装什么就能用什么"，得有一个扫描器（上游 `out-build` 里有没有可直接用的，未查）或走 code server 的 HTTP 面。
 5. **多提供方并存时的扩展名冲突**：`lsp-stdio` 与我们若都声明 `.ts`，后注册者抛 `LSP_CONFLICT`，要在 patch 层二选一或分扩展名。
 6. **两条链要不要合成一条** —— **已定（James 2026-09-21）：不合并**。agent 侧一个工作区一个宿主（同工作区的 agent 共用），UI 按上游每个页面一个宿主，两者不共用。想把 UI 也接到同一条链上，得先解决"谁是唯一主线程 + UI 的扩展界面贡献怎么呈现"，那是另一个决定。

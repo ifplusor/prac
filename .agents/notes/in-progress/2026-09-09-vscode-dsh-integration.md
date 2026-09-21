@@ -139,42 +139,42 @@ status: in-progress
 ## 4. 开放问题
 
 > 只列**还没做 / 还没定**的。已成决定的在 §3；设计为什么长这样见 [架构重做](../in-progress/2026-09-19-architecture.md)；编年与当时的数字在[工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)。
-> **下一步顺序（建议）**：先做结合的第一个点——把 VS Code 的语言服务器接成 `ctx.lsp` 的一个 provider（下面的第 3 条），再做 MCP 定义接线与 IDE 面的继续接入。
+> **下一步（2026-09-21 之后）**：语言那条链（下面第 3 条）**已经做通**；它的两组后续——更多内建扩展、MCP 定义接线——**都搁置**（James 2026-09-21）。眼下真正待决的是插件族的划分（下面"需要 James 裁"）。
 
 ### 与目标架构的差距
 
-> 对照 [docs/architecture.md](../../../docs/architecture.md)（面向目标的设计）。
+> 对照 [docs/architecture.md](../../../docs/architecture.md)（面向目标的设计）。完成的部分已从这张表里移走。
 
 | #   | 目标                                                     | 现状                                                                    |
 | --- | -------------------------------------------------------- | ----------------------------------------------------------------------- |
-| 1   | **扩展宿主归主干**（主干自己连一条 ExtensionHost 连接）  | 由页面发起：没有页面就没有扩展宿主，也就没有语言服务                    |
-| 2   | **语言服务器经 `ctx.lsp` 的一个 provider 进来**          | 没有这个 provider（DSH 自己那套只有四个操作、还要手配服务器）           |
-| 3   | **VS Code 的 MCP server 定义接给 DSH 的 MCP 客户端**     | 未接                                                                    |
+| 3   | **VS Code 的 MCP server 定义接给 DSH 的 MCP 客户端**     | 未接（**搁置**，James 2026-09-21）                                      |
 | 4   | **IDE 面都按 view 进来**                                 | 编辑器、侧栏已按 view；其余 IDE 面未接                                   |
 | 5   | **两半之间走 DSH 的线**                                  | 现在是透传（`/prac-vscode` 静态 + VS Code 自己的 WS/HTTP 原样转发）      |
 | 6   | **工作区以磁盘为准**                                     | 验证门故意关着自动保存；真实 rig 的行为未定                             |
 | 7   | **VS Code 侧是*一组*插件**                               | 族的结构还没被表述（哪些算 server 侧、哪些算 client 侧）                |
 
+> 已经达成、不再列入差距的两条：**扩展宿主归主干**（主干自己连一条 ExtensionHost 连接、不依赖页面；UI 那条按上游每页一个，是设计选择）、**语言服务器经 `ctx.lsp` 的一个 provider 进来**（css 内建扩展，四道门已过）。
+
 ### 需要 James 裁
 
-1. **阶段二**（决策空间 / 以审决策为主界面）：保持搁置；重新进入主线需要重新裁决。展开见 [2026-09-09-c2-decision-space.md](../proposed/2026-09-09-c2-decision-space.md)。
-2. **高级形态（container / part）什么时候真的需要**：现在是按视图组合就够。
+1. **插件族的划分**：哪些算 server 侧、哪些算 client 侧、什么算"一个插件"——接着做第二个 / 第三个 IDE 面前必须先定。
+2. **阶段二**（决策空间 / 以审决策为主界面）：保持搁置；重新进入主线需要重新裁决。展开见 [2026-09-09-c2-decision-space.md](../proposed/2026-09-09-c2-decision-space.md)。
+3. **高级形态（container / part）什么时候真的需要**：现在是按视图组合就够。
 
 ### 已定方向、尚未做
 
-3. **P1 第一条链**：主干连 ExtensionHost 连接、喂配置与文档，把 checkout 自带的语言服务器（css / html / json / markdown 之一）接成 `ctx.lsp` 的一个 provider。**验收**：模型侧接口不变、**DSH 不加新能力**，用的是扩展带来的服务器与它的配置。计划（已核实的事实 / 三条裁决 / 步骤 / 验证）见 [2026-09-21-p1-ext-host-chain.md](../in-progress/2026-09-21-p1-ext-host-chain.md)。
-4. **MCP 定义接线**：把 VS Code 那边的 server 定义来源（扩展声明点 + 工作区配置）接给 DSH 现有的 MCP 客户端。
-5. **frame 批次**：还差 `stage` 的 tab（需要 VS Code 侧的 `editor(file)`）；持久化的 **per-workspace 那半**未做。堆叠与底栏还缺：拖拽排序、view 间 sash 调尺寸、底栏开合入口。
-6. **扩展视图的"数据"**：`mountViewInto` 能让视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——要让视图进 VS Code 自己的可见性 / 容器模型。
-7. **自动保存打开之后，验证门怎么调**：那几条"文件保持不动"的断言是靠故意关掉 autoSave 才稳的。
-8. **扩展安装的正当路径**：等 terminal 落地（它提供 `VSCODE_IPC_HOOK_CLI`）后用 `server-cli --install-extension` 正规安装；在那之前不装用户扩展。
-9. **sidebar / panel / statusbar 的映射**：还欠被 stub 掉的 layout 语义（显隐 / zen / centered / floating / 多窗口）。
+4. **frame 批次**：还差 `stage` 的 tab（需要 VS Code 侧的 `editor(file)`）；持久化的 **per-workspace 那半**未做。堆叠与底栏还缺：拖拽排序、view 间 sash 调尺寸、底栏开合入口。
+5. **扩展视图的"数据"**：`mountViewInto` 能让视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——要让视图进 VS Code 自己的可见性 / 容器模型。
+6. **自动保存打开之后，验证门怎么调**：那几条"文件保持不动"的断言是靠故意关掉 autoSave 才稳的（`verify-file` 最近一次 33/33 直接绿、与旧注意不一致，待查）。
+7. **扩展安装的正当路径**：等 terminal 落地（它提供 `VSCODE_IPC_HOOK_CLI`）后用 `server-cli --install-extension` 正规安装；在那之前不装用户扩展（扩展目录现在由 `fs.watch` 接住，装了就能用）。
+8. **sidebar / panel / statusbar 的映射**：还欠被 stub 掉的 layout 语义（显隐 / zen / centered / floating / 多窗口）。
 
 ### 仍然开放（工程与生态）
 
-10. **契约写多遍**：view id 仍是 **6 处**字面量、`/prac-vscode` 仍是两处；**共享常量模块的落点与依赖方向未定**。
-11. **内建扩展**：挡在 `extensions/ipynb` 的 typecheck，所以 git / search / emmet 这些**内建**扩展在服务端还不可用——不影响"生态是否可用"（市场扩展已走通）。
-12. **机制正确的 checkout 覆盖开关**（重定向解析，而不是文件路径）：未做。
+9. **契约写多遍**：view id 仍是 **6 处**字面量、`/prac-vscode` 仍是两处；**共享常量模块的落点与依赖方向未定**。
+10. **内建扩展**：挡在 `extensions/ipynb` 的 typecheck，所以 git / search / emmet 这些**内建**扩展在服务端还不可用——不影响"生态是否可用"（市场扩展已走通）；css 那一个是单独定向编译出来的。
+11. **机制正确的 checkout 覆盖开关**（重定向解析，而不是文件路径）：未做。
+12. **多窗口 / 多标签页**：搁置（见 [`docs/architecture.md`](../../../docs/architecture.md) §7 #6）。
 
 ## Related
 
