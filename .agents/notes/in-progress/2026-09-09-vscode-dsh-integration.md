@@ -6,15 +6,15 @@ status: in-progress
 
 > 这是这项工作的 **umbrella**：主线定义、需求约束、决定（含被否决的路线）、开放问题。
 > **依据**（里程碑与工作记录、现在的形态快照、已核实事实、踩坑、验证元教训）在 [工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)——2026-09-17 从本 note 拆出，那时 5.7 万字符里 79% 是依据、决定只占 16%。**它不是 note**（没有状态轴、不签字）。
-> 步骤 note：[2026-09-13-vs-concept-boundary.md](2026-09-13-vs-concept-boundary.md)（概念边界与命名，实现已完成，待签字）；[../abandoned/2026-09-15-vscode-capabilities-into-prac.md](../abandoned/2026-09-15-vscode-capabilities-into-prac.md)（把能力拆散带入 prac，方案待裁）；[../abandoned/2026-09-16-vscode-integration-transport.md](../abandoned/2026-09-16-vscode-integration-transport.md)（两半之间的通信层，设计待裁——四项）；[../proposed/2026-09-19-architecture.md](../proposed/2026-09-19-architecture.md)（**从需求出发重做架构**：需求清单 + 推导 + 能力路由表 + 待裁，取代了旧设计）。
+> 步骤 note：[2026-09-13-vs-concept-boundary.md](2026-09-13-vs-concept-boundary.md)（概念边界与命名，实现已完成，待签字）；[../abandoned/2026-09-15-vscode-capabilities-into-prac.md](../abandoned/2026-09-15-vscode-capabilities-into-prac.md)（把能力拆散带入 prac，方案待裁）；[../abandoned/2026-09-16-vscode-integration-transport.md](../abandoned/2026-09-16-vscode-integration-transport.md)（两半之间的通信层，设计待裁——四项）；[../in-progress/2026-09-19-architecture.md](../in-progress/2026-09-19-architecture.md)（**从需求出发重做架构**：需求清单 + 推导 + 待裁，取代了旧设计）。
 > 口径（**§3.8 的断言分层之后**）：**vendor 侧集成门**写作 **14/14 · 28/28 · 9/9 · 6/6 · 7/7 · 33/33**（layout · views · focus · regions · view · file）；第六门 `verify-extension` 是**条件门**（装了扩展才跑 5 项，没装时明确 `SKIPPED`——SKIP 不是通过）；**prac 侧活体门**写作 `verify:stack 6/6 · verify:bottom 6/6 · verify:persistence 6/6 · verify:split 11/11`；所有 part 计数一律 **8/8**；**单测**写作 `pnpm test`。
 
 ## 1. 这个工作是什么（主线定义）
 
 1. **（2026-09-09）** 把 VS Code 与 DSH 结合成**一个**形态：prac 的界面 = agent 与 IDE **深融进一套 UI**，不是两套并列。保留**完整 IDE 能力与扩展生态**（Tier 2：语言包、GitLens 等 UI 扩展），**不要 VS Code 的布局**；以 agent 为中心，**IDE 是可按需下潜的重工具**。
-2. **（2026-09-19）现在的主线**（James）：**prac 的界面是给人用的**——和 agent 打交道的界面 + 帮他干活的 IDE 界面；**另一头 prac 是 agent 的运行时**（循环、工具、上下文、审批、沙箱、会话、持久化）。**中心是人和 agent 的交互**：chat 就是通道（松耦合），白板就是工作区里的文件。设计见 [架构重做](../proposed/2026-09-19-architecture.md) 与 [docs/architecture.md](../../../docs/architecture.md)。
+2. **（2026-09-19）现在的主线**（James）：**prac 的界面是给人用的**——和 agent 打交道的界面 + 帮他干活的 IDE 界面；**另一头 prac 是 agent 的运行时**（循环、工具、上下文、审批、沙箱、会话、持久化）。**中心是人和 agent 的交互**：chat 就是通道（松耦合），白板就是工作区里的文件。设计见 [架构重做](../in-progress/2026-09-19-architecture.md) 与 [docs/architecture.md](../../../docs/architecture.md)。
 3. **（2026-09-19）本次范围**：**只把两边现有的东西结合起来，不往 DSH 里加能力**——VS Code 有而 DSH 缺的，先记下来，不立刻加。结合点：① VS Code 的语言服务器 → `ctx.lsp` 的一个 provider；② VS Code 的 MCP server 定义 → DSH 现有的 MCP 客户端；③ VS Code 的界面 → prac 的 view；④ 人和 agent 对着同一份工作区文件。
-4. **（2026-09-15）那条旧主线已作废**——"把 VS Code 的 UI 层拆散、把能力层（如诊断）暴露给 agent"：能力面那半被扔（诊断只是缓存、agent 面归 DSH）；"拆散"那半作为 R2 / R3 / R4 的要求保留下来。见 [架构重做](../proposed/2026-09-19-architecture.md) §4。
+4. **（2026-09-15）那条旧主线已作废**——"把 VS Code 的 UI 层拆散、把能力层（如诊断）暴露给 agent"：能力面那半被扔（诊断只是缓存、agent 面归 DSH）；"拆散"那半作为 R2 / R3 / R4 的要求保留下来。见 [架构重做](../in-progress/2026-09-19-architecture.md) §4。
 
 **阶段切换**：此前在讨论 prac 的目标/理念，并以具体任务体验工作流（C1、C2）；进行到 C2 时 James 叫停，转入融合形态本身。叫停理由原文只有「我发现我们不应该再继续了」，推断是优先级——**待确认**。本工作**不欠**阶段二的那些机制（决策空间 / 以审决策为主界面）；它们要重新进入主线，需 James 重新裁决。
 
@@ -37,7 +37,7 @@ status: in-progress
 ## 3. 决定（现在的设计为什么长这样）
 
 > 这一节只写**当下的立场**：决定了什么、为什么、放弃了什么。**不记编年**——哪天裁的、当时先想到什么、被纠正过什么、落地时验了多少，都在[工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)：那里**原样保留着旧的决定台账**，历史引用 `决定 N` 按它解析（编号不再新增）。
-> 设计已在 **2026-09-19 定案**（James：「放弃当前的架构设计，从需求出发，从头设计架构」）：为什么这么设计、旧设计哪些留着哪些作废，见 [架构重做](../proposed/2026-09-19-architecture.md)；**面向目标的设计**见 [docs/architecture.md](../../../docs/architecture.md)。
+> 设计已在 **2026-09-19 定案**（James：「放弃当前的架构设计，从需求出发，从头设计架构」）：为什么这么设计、旧设计哪些留着哪些作废，见 [架构重做](../in-progress/2026-09-19-architecture.md)；**面向目标的设计**见 [docs/architecture.md](../../../docs/architecture.md)。
 > 这一节是**已经定下的**那些（为什么是现在这个形状），差距与还没做的在 §4。
 
 ### 3.1 总纲：两端结构与主干
@@ -138,7 +138,7 @@ status: in-progress
 
 ## 4. 开放问题
 
-> 只列**还没做 / 还没定**的。已成决定的在 §3；设计为什么长这样见 [架构重做](../proposed/2026-09-19-architecture.md)；编年与当时的数字在[工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)。
+> 只列**还没做 / 还没定**的。已成决定的在 §3；设计为什么长这样见 [架构重做](../in-progress/2026-09-19-architecture.md)；编年与当时的数字在[工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)。
 > **下一步顺序（建议）**：先做结合的第一个点——把 VS Code 的语言服务器接成 `ctx.lsp` 的一个 provider（下面的第 3 条），再做 MCP 定义接线与 IDE 面的继续接入。
 
 ### 与目标架构的差距
@@ -179,7 +179,7 @@ status: in-progress
 ## Related
 
 - [2026-09-13-vs-concept-boundary.md](2026-09-13-vs-concept-boundary.md)：概念边界与命名的决定 + 执行（Step A/B、命名收束、lib 抽出）。
-- [../proposed/2026-09-19-architecture.md](../proposed/2026-09-19-architecture.md)：从需求重做的架构（需求清单、推导、旧设计哪些留着哪些作废、本次范围）。
+- [../in-progress/2026-09-19-architecture.md](../in-progress/2026-09-19-architecture.md)：从需求重做的架构（需求清单、推导、旧设计哪些留着哪些作废、本次范围）。
 - [../../../docs/architecture.md](../../../docs/architecture.md)：面向目标的设计（这一版）。
 - [../resolved/2026-09-08-prac-positioning-and-dev-workflow-model.md](../resolved/2026-09-08-prac-positioning-and-dev-workflow-model.md)：prac 的定位与开发工作流模型。
 - [../../../docs/vscode.md](../../../docs/vscode.md)：VS Code 自身的结构（两半与主线程、平台服务层、extHost 协议与载体）；DSH 那半在 [../../../docs/dsh.md](../../../docs/dsh.md)。

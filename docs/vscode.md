@@ -1,7 +1,7 @@
 # VS Code 的内部结构（参考）
 
 > 这篇记 VS Code 自己的结构：它内部怎么分成两半、平台服务是什么、扩展宿主协议跑在什么通道上、诊断是怎么走的、agent / MCP / 工具 / skill / prompt 分别做在哪一层。
-> **prac 怎么用它**（用哪种运行形态、语言服务怎么接）在新的设计 note [proposed/2026-09-19-architecture.md](../.agents/notes/proposed/2026-09-19-architecture.md)；旧的目标架构 [architecture.md](architecture.md) §5.2 也写过一版（已作废）。broker 那份设计已降级为那篇里的 P1（[abandoned/2026-09-16-vscode-integration-transport.md](../.agents/notes/abandoned/2026-09-16-vscode-integration-transport.md)）。**行号与数字都指 pinned `1.137.0` checkout。**
+> **prac 怎么用它**（用哪种运行形态、语言服务怎么接）在 [in-progress/2026-09-19-architecture.md](../.agents/notes/in-progress/2026-09-19-architecture.md) 与 [architecture.md](architecture.md)（§2.2 / §4.2）。broker 那份设计已降级为那篇里的 P1（[abandoned/2026-09-16-vscode-integration-transport.md](../.agents/notes/abandoned/2026-09-16-vscode-integration-transport.md)）。**行号与数字都指 pinned `1.137.0` checkout。**
 
 **内部怎么分成两半**：**渲染器**（renderer）跑 workbench 的界面；**扩展宿主**（extension host）是另一个进程，跑扩展代码，只能用 `vscode.*` API，**没有 DOM、没有界面**。扩展宿主协议的另一端叫"**主线程**"（main thread）——**它不是线程，是那套 RPC 里的角色名**（`MainContext.MainThreadXxx` ↔ `ExtHostContext.ExtHostXxx`），实现在 workbench 里，替扩展宿主做界面、编辑器、存储、诊断这些事。**两种运行形态下主线程都在渲染器里**，远程形态搬走的只有扩展宿主。
 

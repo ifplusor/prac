@@ -1,12 +1,12 @@
 ---
-status: proposed
+status: in-progress
 ---
 
 # Agent Note: 架构（从需求出发重做）
 
 > **由来**：2026-09-19 James ——「合并相关文档，放弃当前的架构设计，从需求出发，从头设计架构」。
 > **这篇取代**：`2026-09-19-integration-replan.md`（同一件事的前半，已并进来并把文件名改成这篇）；[2026-09-16-vscode-integration-transport.md](../abandoned/2026-09-16-vscode-integration-transport.md)（broker 那份设计）与 [2026-09-15-vscode-capabilities-into-prac.md](../abandoned/2026-09-15-vscode-capabilities-into-prac.md)（把能力拆散带入 prac）**作为计划已经作废**，搬进了 `abandoned/`——内容没删，broker 那条降成这篇里的 P1。
-> `docs/architecture.md`（旧的目标架构）等这篇定了再整体重写。两个系统的内部结构事实（[`docs/dsh.md`](../../../docs/dsh.md) / [`docs/vscode.md`](../../../docs/vscode.md)）不受影响。
+> `docs/architecture.md` **已按这篇整篇重写**（现在是目标设计本身，不带"已被取代"标记）。两个系统的内部结构事实（[`docs/dsh.md`](../../../docs/dsh.md) / [`docs/vscode.md`](../../../docs/vscode.md)）不受影响。
 
 ## 1. 需求
 
@@ -174,8 +174,8 @@ code server 归主干起停：空闲端口、等就绪、随插件 dispose 收�
 | `proposed/2026-09-16-vscode-integration-transport.md`  | **已搬进 `abandoned/`**，`status: abandoned:superseded`（作为计划作废；里面的 **P1 内容保留**）       |
 | `proposed/2026-09-15-vscode-capabilities-into-prac.md` | **已搬进 `abandoned/`**，`status: abandoned:superseded`（作为主线作废；"view 是单位"等结论已继承）   |
 | `in-progress/2026-09-13-vs-concept-boundary.md`        | 保留（实现边界和 lib 抽取仍是现在的分层）                                                            |
-| `in-progress/2026-09-09-vscode-dsh-integration.md`     | 保留为 umbrella；**§1 和 §4 等这篇定了重写**                                                         |
-| `docs/architecture.md`                                 | **已加"已被取代"的说明**；这篇定了之后整体重写                                                      |
+| `in-progress/2026-09-09-vscode-dsh-integration.md`     | 保留为 umbrella；**§1 与 §4 已按这篇重写**                                                           |
+| `docs/architecture.md`                                 | **已按这篇整篇重写**（现在时的目标设计）                                                             |
 | `docs/dsh.md`、`docs/vscode.md`、worklog               | 保留（事实参考，和这篇不冲突）                                                                      |
 
 ## Related
@@ -183,6 +183,6 @@ code server 归主干起停：空闲端口、等就绪、随插件 dispose 收�
 - [../in-progress/2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)：umbrella（主线、需求约束、已经定下的决定）。
 - [../../worklog/2026-09-09-vscode-dsh-integration.md](../../worklog/2026-09-09-vscode-dsh-integration.md)：依据（协议清单、核实过的事实、决定台账）。
 - [../../../docs/vscode.md](../../../docs/vscode.md) / [../../../docs/dsh.md](../../../docs/dsh.md)：两个系统的内部结构（事实参考）。
-- [../../../docs/architecture.md](../../../docs/architecture.md)：**旧的**目标架构（这篇定了之后重写）。
+- [../../../docs/architecture.md](../../../docs/architecture.md)：目标架构（按这篇重写后的现在时参考）。
 - [../abandoned/2026-09-16-vscode-integration-transport.md](../abandoned/2026-09-16-vscode-integration-transport.md)：broker 那份设计（现在是 P1 的备选）。
 - [../abandoned/2026-09-15-vscode-capabilities-into-prac.md](../abandoned/2026-09-15-vscode-capabilities-into-prac.md)：把能力拆散带入 prac（旧主线）。

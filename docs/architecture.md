@@ -1,7 +1,7 @@
 # Prac 的目标架构
 
 > 面向目标的设计：prac 要成为什么、每部分为哪个目标而存在。实现进度、差距与踩坑在 [.agents/notes/](../.agents/notes/)；理念见 [philosophy.md](philosophy.md)；两个被依赖系统的内部结构见 [dsh.md](dsh.md) / [vscode.md](vscode.md)。
-> 设计取舍的讨论与依据在 [proposed/2026-09-19-architecture.md](../.agents/notes/proposed/2026-09-19-architecture.md)（从需求重做的那一版）。
+> 设计取舍的讨论与依据在 [in-progress/2026-09-19-architecture.md](../.agents/notes/in-progress/2026-09-19-architecture.md)（从需求重做的那一版）。
 
 ## 1. 目标
 
@@ -217,7 +217,7 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随插件 d
 - [philosophy.md](philosophy.md)：两个轴 + 认识论循环 + 决策单元（§1.2 的出发点）。
 - [dsh.md](dsh.md) / [vscode.md](vscode.md)：两个被依赖系统的内部结构（事实参考）。
 - [.agents/notes/](../.agents/notes/)：决策记忆（每个「为什么 + 放弃了什么」）与实现进度、差距、踩坑。
-- [proposed/2026-09-19-architecture.md](../.agents/notes/proposed/2026-09-19-architecture.md)：这一版设计是怎么从需求推出来的（含旧设计哪些留着、哪些作废）。
+- [in-progress/2026-09-19-architecture.md](../.agents/notes/in-progress/2026-09-19-architecture.md)：这一版设计是怎么从需求推出来的（含旧设计哪些留着、哪些作废）。
 - DSH 自己的 LSP 栈：`packages/lsp/`（`ctx.lsp` / stdio 提供方 / `lsp` 工具）——可选能力，只有四个操作、不带服务器；见 [dsh.md](dsh.md)。
 - [in-progress/2026-09-09-vscode-dsh-integration.md](../.agents/notes/in-progress/2026-09-09-vscode-dsh-integration.md)：umbrella（主线、需求约束、已经定下的决定、与目标的差距）。
 - [.agents/worklog/2026-09-09-vscode-dsh-integration.md](../.agents/worklog/2026-09-09-vscode-dsh-integration.md)：依据（协议清单、核实过的事实、踩坑、决定台账）。

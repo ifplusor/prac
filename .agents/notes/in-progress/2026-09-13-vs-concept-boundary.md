@@ -4,7 +4,7 @@ status: in-progress
 
 # Agent Note: prac 与 VS Code 的概念边界与命名
 
-> 位置：这条是一项**已完成工作的决策记录**（实现与验收都已完成）。**James 2026-09-15 决定：状态先保持 `in-progress`**，暂不转 `resolved:implemented`。umbrella 见 [2026-09-09-vscode-dsh-integration.md](2026-09-09-vscode-dsh-integration.md)；下一步（从需求重做的架构与本次范围）见 [../proposed/2026-09-19-architecture.md](../proposed/2026-09-19-architecture.md)。
+> 位置：这条是一项**已完成工作的决策记录**（实现与验收都已完成）。**James 2026-09-15 决定：状态先保持 `in-progress`**，暂不转 `resolved:implemented`。umbrella 见 [2026-09-09-vscode-dsh-integration.md](2026-09-09-vscode-dsh-integration.md)；下一步（从需求重做的架构与本次范围）见 [../in-progress/2026-09-19-architecture.md](../in-progress/2026-09-19-architecture.md)。
 
 ## Problem（2026-09-13）
 
