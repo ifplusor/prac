@@ -4,6 +4,8 @@
 
 ## 责任分配
 
+> 决策记录（为什么这么分、放弃了什么）：[.agents/notes/proposed/2026-09-08-responsibility-allocation.md](../.agents/notes/proposed/2026-09-08-responsibility-allocation.md)。
+
 主流的隐含分工是「人 = 定目标 + 全程监督 + 判对错；AI = 稳定执行」——这让人和 AI 各自接到自己最不擅长的活。
 
 Prac 的重排：

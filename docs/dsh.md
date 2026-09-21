@@ -59,6 +59,17 @@ flowchart TD
 - 这样保证了什么：seed 的值是 shell 的静态导入，所以每个 bundle 拿到的是同一个实例（`seed.ts:1-8`）；词表是唯一真源，seed 表、tsdown externals、Vite alias 都用它，模块身份不会漂（`platform.ts:1-5`）。
 - 构建期和运行期怎么保证：构建期把这 9 个（baseline）留成 external，非 baseline 的 workspace value import 会被纯度门拒掉（`tsdown.client.ts:406-416`、`:482-500`）；运行期 `require` 先命中 seed，没命中就抛（`client/system.ts:200-213`）。
 
+**DSH 已经有的能力**（prac 的"只把两边现有的东西接起来"依赖这些；都按 profile 组装，是**可选能力**，不在 agent loop 主干里）：
+
+- **工具族**（`packages/*/tool-*`）：
+  - 文件：`tool-fs`、`tool-fs-search`、`tool-present`、`tool-str-replace-editor`
+  - shell / 终端：`tool-bash`、`tool-bash-persistent`、`tool-pwsh`、`tool-pwsh-persistent`、`tool-terminal`
+  - 流程与协作：`tool-todo`、`tool-goal`、`tool-skill`、`tool-subagent`、`tool-subagent-control`、`tool-ask-user`、`tool-jobs`、`tool-session-query`、`tool-workflow`、`tool-ralph`
+  - 其它：`tool-web`、`tool-lsp`；另有 `experimental/tool-agent-team` 与 `extensions/tool-cordis`
+- **LSP**（`packages/lsp/`）：`dsh-lsp` 是能力 seam（`ctx.lsp`：提供方注册表 + 扩展名映射 + **四个**规范化只读操作——`goToDefinition` / `findReferences` / `goToImplementation` / `hover`，封闭联合）；`dsh-lsp-stdio` 是通用 stdio 提供方（按 `servers: { <id>: { command, args?, extensions? } }` 配置）；`dsh-tool-lsp` 是面向模型的 `lsp` 工具。**它不带服务器**（部署自备）、**不在任何 bundle 里**；没配提供方时返回结构化的 `LSP_UNAVAILABLE`。
+- **MCP**（`packages/mcp/mcp-client`）：MCP 客户端已经有了，带 e2e。
+- 组装方式是 profile / bundle patch 加行（`packages/bundle/*/cordis.patch.yml`）；`docs/tool-catalog.zh.md` 是生成的工具目录。
+
 **还没核实的**：
 
 - 任务里提到的 `clientPack`，在 DSH checkout 里搜不到（`packages/**` 里只有 typert 测试中的局部变量 `clientPackage`）。这里按实际存在的两个名字写：client bundle 的 `__ModuleLoader__.load` 闭包工厂封装，以及 `dsh.client` 声明。
