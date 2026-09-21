@@ -123,7 +123,7 @@
 | **工作区动作** | 文件、搜索、git、任务、调试、终端                          | code server（VS Code 的 API 和进程）                               | 人用界面；agent 走 DSH 自己的 exec 与文件工具，**不和人那条终端共用** |
 | **显示**       | 编辑器控件、面板、装饰、状态栏、视图                       | VS Code 的 client 半边                                             | 人                                                                    |
 
-第三类不等于"扩展必须搬到 client"：上游把"在哪算"和"在哪显示"分开（装饰、状态栏、命令都由主线程代理），所以只要有一个主线程在，扩展可以在 server 侧跑、画面落到页面。
+第三类不等于"VS Code 扩展必须搬到 client"：上游把"在哪算"和"在哪显示"分开（装饰、状态栏、命令都由主线程代理），所以只要有一个主线程在，扩展可以在 server 侧跑、画面落到页面。
 
 ### 4.2 语义服务（LSP）：DSH 出接口，VS Code 出服务器
 
@@ -150,7 +150,7 @@
 - **VS Code 出实现与配置**：把 VS Code 那边做成**一个 `LspProvider`**——我们当主线程连扩展宿主（P1），喂配置与文档，把扩展语言特性的结果翻译成 seam 的归一化结果。
 - **于是两边的服务器可以并存**：同一批语言上，DSH 自配的 stdio 服务器和 VS Code 扩展带来的服务器都是提供方，模型侧看到的还是那四个操作。
 
-**为什么值得把 VS Code 这一边接进来**：那边有的东西别处给不了——哪个语言用哪个服务器、谁优先、多个提供方怎么合并；服务器的安装与版本由扩展生态管（内置的 css / html / json / markdown 就在 checkout 里，不用装市场扩展；TypeScript 那份是扩展自带的 `tsserver`，**不是 LSP**）；初始化参数与配置；以及**全集的查询**（`vscode.execute*Provider` 24 个：hover / definition / references / implementation / symbols / code actions / completion / semantic tokens / inlay hints / call hierarchy / formatting / rename…）。
+**为什么值得把 VS Code 这一边接进来**：那边有的东西别处给不了——哪个语言用哪个服务器、谁优先、多个提供方怎么合并；服务器的安装与版本由扩展生态管（内置的 css / html / json / markdown 就在 checkout 里，不用装VS Code 市场扩展；TypeScript 那份是 VS Code 扩展自带的 `tsserver`，**不是 LSP**）；初始化参数与配置；以及**全集的查询**（`vscode.execute*Provider` 24 个：hover / definition / references / implementation / symbols / code actions / completion / semantic tokens / inlay hints / call hierarchy / formatting / rename…）。
 
 **那四个操作之外的查询（符号、code action、诊断…）不在本次范围**：DSH 的 seam 只有四个操作，要更多就等于**给 DSH 加能力**（§1.4）。先记下来，不做；真要做时按 seam 的规矩扩操作联合（seam / 提供方 / 工具三处同改，编译强制）。
 
@@ -161,7 +161,7 @@
 3. **激活**：三条初始化推送 + `ExtensionService` + `Errors`。
 4. 然后才是我们挑的 `$provide*`。
 
-**第一条端到端验收最省的素材**：用 checkout 里自带的 **css / html / json / markdown** 语言服务器（它们是真 `vscode-languageclient`），不用装市场扩展。
+**第一条端到端验收最省的素材**：用 checkout 里自带的 **css / html / json / markdown** 语言服务器（它们是真 `vscode-languageclient`），不用装VS Code 市场扩展。
 
 ### 4.3 扩展生态里 agent 能用什么
 
@@ -169,7 +169,7 @@
 - **文件定制**：**不共源**——DSH 用自己的 skill / 上下文格式（它已经有 `skill` 那一族），不去读 VS Code 的 `SKILL.md` / `*.instructions.md` / `AGENTS.md`。
 - **扩展贡献的界面**（视图、编辑器、状态栏）——给人用。
 
-拿不到的：扩展用 `contributes.languageModelTools` / `lm.registerTool` 注册的工具（那要重实现它的工具注册表与 `$invokeTool`，等于把 agent 面搬过来）。
+拿不到的：VS Code 扩展用 `contributes.languageModelTools` / `lm.registerTool` 注册的工具（那要重实现它的工具注册表与 `$invokeTool`，等于把 agent 面搬过来）。
 
 ### 4.4 agent 怎么用这些
 
@@ -187,7 +187,7 @@
 
 ### 5.2 谁起谁关
 
-code server 归主干起停（空闲端口、等 `/version` 就绪、随插件 dispose 收掉）；扩展宿主同样是主干那条连接的产物。工作区不由 code server 的启动参数决定——它来自 DSH 绑定的会话工作区。
+code server 归主干起停（空闲端口、等 `/version` 就绪、随 DSH 插件 dispose 收掉）；扩展宿主同样是主干那条连接的产物。工作区不由 code server 的启动参数决定——它来自 DSH 绑定的会话工作区。
 
 ## 6. prac 自己的机制
 
@@ -201,20 +201,20 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随插件 d
 
 ### 6.3 怎么知道设计成立了
 
-| 检查                      | 断言什么                                                                                      |
-| ------------------------- | --------------------------------------------------------------------------------------------- |
-| **单元测试**（`vp test`） | 机制：纯函数与纯算术（区域树重写、尺寸分配、折叠与缓存、子序、clamp、编排语义、持久化往返）   |
-| **浏览器里跑真页面**      | 真页面才能证明的事：产物过真 loader、视图挂进搬出 prac 区域并画出像素、扩展真的激活、契约成立 |
-| **每条能力一条渲染断言**  | 拦住"模型对了、渲染器没跟上"这类单元测试看不见的假绿                                          |
+| 检查                      | 断言什么                                                                                              |
+| ------------------------- | ----------------------------------------------------------------------------------------------------- |
+| **单元测试**（`vp test`） | 机制：纯函数与纯算术（区域树重写、尺寸分配、折叠与缓存、子序、clamp、编排语义、持久化往返）           |
+| **浏览器里跑真页面**      | 真页面才能证明的事：产物过真 loader、视图挂进搬出 prac 区域并画出像素、VS Code 扩展真的激活、契约成立 |
+| **每条能力一条渲染断言**  | 拦住"模型对了、渲染器没跟上"这类单元测试看不见的假绿                                                  |
 
 ## 7. 还没定的
 
-1. **第一条链已经通了**（css 内建扩展；四道门见工作记录）。**两组后续都搁置**（James 2026-09-21）：把 **json / html / markdown** 也编译进来（同一套手续、成本小），以及 **MCP 定义接线**（把 VS Code 那边的 server 定义来源接给 DSH 现有的 MCP 客户端）。
+1. **第一条链已经通了**（css VS Code 内建扩展；四道门见工作记录）。**两组后续都搁置**（James 2026-09-21）：把 **json / html / markdown** 也编译进来（同一套手续、成本小），以及 **MCP 定义接线**（把 VS Code 那边的 server 定义来源接给 DSH 现有的 MCP 客户端）。
 2. **自动保存打开之后，验证门怎么调**：现在那几条"文件保持不动"的断言是靠故意关掉 autoSave 才稳的；`verify-file` 最近一次是 33/33 直接绿的，与旧注意不一致，待查。
 3. **Copilot 在我们 rig 里到底有没有激活**（实测）——它决定"树里多一个 agent"是理论问题还是已经在发生。**已知一条相关事实**：打开页面时 code server 会拉起一个 `--type=agentHost` 进程（VS Code 自己的 agent 层的服务端形态）。
-4. **按工作区 / 按 agent 配置装哪些 VS Code 扩展**（James 2026-09-21；他明确这里说的是**扩展**，不是 DSH 插件）。**"插件族的划分"这个问题撤销了**——不需要区分哪个 DSH 插件算 server 侧、哪个算 client 侧；要的是**扩展贡献的 view 能上屏**（数据那一半见下条）。要求：一个工作区该加载哪些扩展**要可配置**（不是"扫到什么就全上"——今天 `myExtensions` 就是全部，于是 cSpell 在每个宿主里都因 `onStartupFinished` 自动激活），**最好还能按 agent 单独配**。
+4. **按工作区 / 按 agent 配置装哪些 VS Code 扩展**（James 2026-09-21；他明确这里说的是**VS Code 扩展**，不是 DSH 插件）。**"插件族的划分"这个问题撤销了**——不需要区分哪个 DSH 插件算 server 侧、哪个算 client 侧；要的是**扩展贡献的 view 能上屏**（数据那一半见下条）。要求：一个工作区该加载哪些 VS Code 扩展**要可配置**（不是"扫到什么就全上"——今天 `myExtensions` 就是全部，于是 cSpell 在每个宿主里都因 `onStartupFinished` 自动激活），**最好还能按 agent 单独配**。
    **按 agent 那条卡在 seam**：查询入参里没有会话标识（`packages/lsp/lsp/src/types.ts:38-57`），要给 DSH 加会话键才能表达。**真源待定**：读 VS Code 自己的工作区启用/禁用状态（工作区 storage 的 `extensionsIdentifiers/disabled`、`enabled`，`src/vs/platform/extensionManagement/common/extensionManagement.ts:645-646`；本仓 Node 有 `node:sqlite`，技术上可读），还是 **prac 自己一份配置**（我们拥有真源、简单，但不与页面 UI 的启停联动——而且我们的宿主用的是自己那份 storage 根 `~/.config/prac/code-server/prac-extension-host/`，本来就和页面那份不是一处）。
-5. **插件贡献的 view 要能"出数据"**：现在 `mountViewInto` 能让扩展视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——要让它进 VS Code 自己的可见性 / 容器模型，树的数据才会来。这是"支持插件贡献的 view"的实事。
+5. **VS Code 扩展贡献的 view 要能"出数据"**：现在 `mountViewInto` 能让扩展视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——要让它进 VS Code 自己的可见性 / 容器模型，树的数据才会来。这是"支持 VS Code 扩展贡献的 view"的实事。
 6. **container / part 这类高级形态什么时候真的需要**（现在是按视图组合就够）。
 7. **多窗口 / 多标签页**：**搁置**（James 2026-09-21：先保持简单，以后再说）。已核实的底子：多标签页在 DSH 身份层就是**一个 client**（浏览器会话 cookie）；VS Code 自己的多窗口机制是 **auxiliary window**（`window.open` 出来的窗口 attach 到同一个 workbench 实例，**不新增扩展宿主**），但它绕开 prac 的 frame（内容由 workbench 自己搬），要用得先在 prac 侧设计"窗口"这个概念。今天两个标签各 boot 一个实例 ⇒ 两个宿主。
 8. **阶段二**（决策空间 / 以审决策为主界面）：保持搁置，重新进入主线需要重新裁决。

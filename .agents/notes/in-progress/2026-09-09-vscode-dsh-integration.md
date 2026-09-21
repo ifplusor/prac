@@ -7,7 +7,7 @@ status: in-progress
 > 这是这项工作的 **umbrella**：主线定义、需求约束、决定（含被否决的路线）、开放问题。
 > **依据**（里程碑与工作记录、现在的形态快照、已核实事实、踩坑、验证元教训）在 [工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)——2026-09-17 从本 note 拆出，那时 5.7 万字符里 79% 是依据、决定只占 16%。**它不是 note**（没有状态轴、不签字）。
 > 步骤 note：[2026-09-13-vs-concept-boundary.md](2026-09-13-vs-concept-boundary.md)（概念边界与命名，实现已完成，待签字）；[../abandoned/2026-09-15-vscode-capabilities-into-prac.md](../abandoned/2026-09-15-vscode-capabilities-into-prac.md)（把能力拆散带入 prac，方案待裁）；[../abandoned/2026-09-16-vscode-integration-transport.md](../abandoned/2026-09-16-vscode-integration-transport.md)（两半之间的通信层，设计待裁——四项）；[../in-progress/2026-09-19-architecture.md](../in-progress/2026-09-19-architecture.md)（**从需求出发重做架构**：需求清单 + 推导 + 待裁，取代了旧设计）；[../in-progress/2026-09-21-p1-ext-host-chain.md](../in-progress/2026-09-21-p1-ext-host-chain.md)（**P1 第一条链的实现计划**：已核实的事实 + 三条裁决 + 步骤 + 验证）。
-> 口径（**§3.8 的断言分层之后**）：**vendor 侧集成门**写作 **14/14 · 28/28 · 9/9 · 6/6 · 7/7 · 33/33**（layout · views · focus · regions · view · file）；第六门 `verify-extension` 是**条件门**（装了扩展才跑 5 项，没装时明确 `SKIPPED`——SKIP 不是通过）；**prac 侧活体门**写作 `verify:stack 6/6 · verify:bottom 6/6 · verify:persistence 6/6 · verify:split 11/11`；所有 part 计数一律 **8/8**；**单测**写作 `pnpm test`。
+> 口径（**§3.8 的断言分层之后**）：**vendor 侧集成门**写作 **14/14 · 28/28 · 9/9 · 6/6 · 7/7 · 33/33**（layout · views · focus · regions · view · file）；第六门 `verify-extension` 是**条件门**（装了 VS Code 扩展才跑 5 项，没装时明确 `SKIPPED`——SKIP 不是通过）；**prac 侧活体门**写作 `verify:stack 6/6 · verify:bottom 6/6 · verify:persistence 6/6 · verify:split 11/11`；所有 part 计数一律 **8/8**；**单测**写作 `pnpm test`。
 
 ## 1. 这个工作是什么（主线定义）
 
@@ -43,7 +43,7 @@ status: in-progress
 ### 3.1 总纲：两端结构与主干
 
 - **prac 是 CS/BS 两端结构，主干是 DSH**。看架构**先分 client / server**，不是先分 DSH / VS Code——两个系统各自都跨在线上。
-- **DSH 的扩展方式就是插件**：同一棵树、同一地址空间，耦合是 in-process 的 `inject`。**"扩展宿主"是 VS Code 的概念，不能带到 DSH 上**——两者是不同的机制，不是一个角色的两种形状。
+- **DSH 的扩展方式就是 DSH 插件**：同一棵树、同一地址空间，耦合是 in-process 的 `inject`。**"扩展宿主"是 VS Code 的概念，不能带到 DSH 上**——两者是不同的机制，不是一个角色的两种形状。
 - **VS Code 是主干上的一族 DSH 插件**（不是"被嵌进来的第三方 app 加一层接缝"）：server 半边拥有它的进程与能力，client 半边把 UI 贡献进 frame；bridge / part host / `prac-vscode-embed` 是**这族 DSH 插件的内部实现**。
 - **本次只做结合**（James 2026-09-19）：把 VS Code 现有的东西接到 DSH 现有的接口上；接口不够用时**只记录、不扩**（§1 第 3 条）。
 - **三层各归其位**：`vendor/vscode` = 引入的上游源码树 + 我们的 patch；`vendor/vscode-embed` = 在其上封装的 **lib**（可利用、不绑定 prac，**只给机制、不背政策**）；**政策**（谁放哪、何时启动、哪个 view 用哪个 part、能力怎么给 agent、code server 的生命周期）全在 DSH 插件层。
@@ -68,7 +68,7 @@ status: in-progress
 
 - **不 fork DSH**：替换它的布局走它自己的组装层（bundle patch：`insert` / `disabled`，`disabled` 必须排在 `insert` **之后**）。
 - **不引入第三方改造**（`monaco-vscode-api` / Theia），**也不把源码树拷进项目**：直接对官方 Code - OSS pin + 小而可审的 patch。
-- **布局自己重做，但只做便宜的那层**：parts 编排 + layout service 我们 own；**service 层与扩展渲染不拆**（拆 ≈ `monaco-vscode-api` 级改造，等于放弃"上游可控"）。这是"保留完整生态"的落点。
+- **布局自己重做，但只做便宜的那层**：parts 编排 + layout service 我们 own；**service 层与 VS Code 扩展渲染不拆**（拆 ≈ `monaco-vscode-api` 级改造，等于放弃"上游可控"）。这是"保留完整生态"的落点。
 - 做法：自写 workbench + layout service（不走 patch 经典 `Layout` 那条路），`IWorkbenchLayoutService` 按 prac 需要实现，模板 = `src/vs/sessions/`；补丁的目标是把 workbench **从 app 变成 library**。
 
 ### 3.5 区域与编辑面
@@ -94,12 +94,12 @@ status: in-progress
 
 - **agent / chat 面归 DSH**（James 2026-09-18）：VS Code 自带的这一层**不作为 prac 的 agent 面**——`contrib/chat/**`（chat 循环、participants/"agents"、会话、工具注册表与内置工具如 `reviewPlanTool` / `runSubagentTool` / `setArtifactsTool`）、`contrib/mcp` 的客户端、`platform/agentHost/**`（把 copilot / claude / codex 当被托管进程）都不进；**agent 的循环、工具、会话、模型、规划与评审都在 DSH**，我们从 VS Code 取的是 **IDE 能力**（编辑、语言特性、诊断、终端、任务、调试、VS Code 扩展生态）与 **UI 组件**。
   - 直接代价：**VS Code 扩展注册的 LM tools**（`contributes.languageModelTools` / `lm.registerTool`）我们拿不到——要用就得再实现一遍它的工具注册表与 `$invokeTool` 通道，等于把 agent 面搬过来。⇒ 生态里对 agent 真正开放的接口收窄成两条：**MCP**（工具协议）与**文件定制**（`SKILL.md` / `*.instructions.md` / `AGENTS.md`）。
-  - 但"不用"不等于"不存在"：Copilot 是**内建扩展**（它声明 `chatParticipants` / `languageModelTools` / `mcpServerDefinitionProviders` / `chatSessions` / `chatPromptFiles` / `chatSkills`），会随扩展宿主一起活（见 §4）。
+  - 但"不用"不等于"不存在"：Copilot 是**VS Code 内建扩展**（它声明 `chatParticipants` / `languageModelTools` / `mcpServerDefinitionProviders` / `chatSessions` / `chatPromptFiles` / `chatSkills`），会随扩展宿主一起活（见 §4）。
 - **MCP 客户端 DSH 自己起**（James 2026-09-19）：只复用 VS Code 这边的 **server 定义来源**（扩展声明点 + 工作区配置），不复用它的 `contrib/mcp` 客户端。
 - **文件定制不共源**（James 2026-09-19）：DSH 用自己的 skill / 上下文格式，不去读 VS Code 的 `SKILL.md` / `*.instructions.md` / `AGENTS.md`。
 - **VS Code 的 chat 面先留着不显示**（James 2026-09-19）：不禁掉它，也不在 prac 的界面里露出它的 chat；它声明的 MCP server 定义仍然在池子里（R13 要读的那些）。代价是树里确实多一个 agent 在跑。
-- **扩展基座 = 完整 `server` 目标**（`--target server`，**必须带 `--nls`**），host 与 code server 都指向它。验收判据 = **一个 Tier 2 扩展真的激活，且它的 UI 贡献出现在 prac 的 view 目录 / 区域里**。
-- **terminal 用 VS Code 的**（`server` 目标自带 PTY + shell integration + 扩展 API），它只是底栏里的一个 view；**agent 执行命令走 DSH 自己的 exec**，不与人那条终端共用。
+- **扩展基座 = 完整 `server` 目标**（`--target server`，**必须带 `--nls`**），host 与 code server 都指向它。验收判据 = **一个 Tier 2 VS Code 扩展真的激活，且它的 UI 贡献出现在 prac 的 view 目录 / 区域里**。
+- **terminal 用 VS Code 的**（`server` 目标自带 PTY + shell integration + VS Code 扩展 API），它只是底栏里的一个 view；**agent 执行命令走 DSH 自己的 exec**，不与人那条终端共用。
   - 代价：agent 看不到人终端的输出，除非日后做桥。
   - 作废的是"纯 web 无 PTY ⇒ PTY 放 DSH host"——基座换成完整 `server` 目标后，它的前提消失了。
 
@@ -139,7 +139,7 @@ status: in-progress
 ## 4. 开放问题
 
 > 只列**还没做 / 还没定**的。已成决定的在 §3；设计为什么长这样见 [架构重做](../in-progress/2026-09-19-architecture.md)；编年与当时的数字在[工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)。
-> **下一步（2026-09-21 之后）**：语言那条链（下面第 3 条）**已经做通**；它的两组后续——更多内建扩展、MCP 定义接线——**都搁置**（James 2026-09-21）。眼下真正待决的是插件族的划分（下面"需要 James 裁"）。
+> **下一步（2026-09-21 之后）**：语言那条链（下面第 3 条）**已经做通**；它的两组后续——更多VS Code 内建扩展、MCP 定义接线——**都搁置**（James 2026-09-21）。眼下真正待决的是插件族的划分（下面"需要 James 裁"）。
 
 ### 与目标架构的差距
 
@@ -151,13 +151,13 @@ status: in-progress
 | 4   | **IDE 面都按 view 进来**                                 | 编辑器、侧栏已按 view；其余 IDE 面未接                                   |
 | 5   | **两半之间走 DSH 的线**                                  | 现在是透传（`/prac-vscode` 静态 + VS Code 自己的 WS/HTTP 原样转发）      |
 | 6   | **工作区以磁盘为准**                                     | 验证门故意关着自动保存；真实 rig 的行为未定                             |
-| 7   | **VS Code 侧是*一组*插件**                               | 族的结构还没被表述（哪些算 server 侧、哪些算 client 侧）                |
+| 7   | **VS Code 侧是*一组*DSH 插件**                               | 族的结构还没被表述（哪些算 server 侧、哪些算 client 侧）                |
 
-> 已经达成、不再列入差距的两条：**扩展宿主归主干**（主干自己连一条 ExtensionHost 连接、不依赖页面；UI 那条按上游每页一个，是设计选择）、**语言服务器经 `ctx.lsp` 的一个 provider 进来**（css 内建扩展，四道门已过）。
+> 已经达成、不再列入差距的两条：**扩展宿主归主干**（主干自己连一条 ExtensionHost 连接、不依赖页面；UI 那条按上游每页一个，是设计选择）、**语言服务器经 `ctx.lsp` 的一个 provider 进来**（css VS Code 内建扩展，四道门已过）。
 
 ### 需要 James 裁
 
-1. **插件族的划分 —— 已撤销**（James 2026-09-21）：**不需要区分哪个插件算 server 侧、哪个算 client 侧**；要的是**插件贡献的 view 能上屏**。于是"族怎么分"这个问题不成立，真正的待办回到下面第 4 条（视图的数据）。
+1. **插件族的划分 —— 已撤销**（James 2026-09-21）：**不需要区分哪个 DSH 插件算 server 侧、哪个算 client 侧**；要的是**VS Code 扩展贡献的 view 能上屏**。于是"族怎么分"这个问题不成立，真正的待办回到下面第 4 条（视图的数据）。
 2. **阶段二**（决策空间 / 以审决策为主界面）：保持搁置；重新进入主线需要重新裁决。展开见 [2026-09-09-c2-decision-space.md](../proposed/2026-09-09-c2-decision-space.md)。
 3. **高级形态（container / part）什么时候真的需要**：现在是按视图组合就够。
 
@@ -165,20 +165,20 @@ status: in-progress
 
 > 与"插件族"无关，是针对**给工作区装什么**这件事。
 
-- **按工作区配置装哪些 VS Code 扩展（最好也能按 agent 配）**：James 2026-09-21 明确这里说的是**扩展**（不是 DSH 插件——见 [概念边界](2026-09-13-vs-concept-boundary.md) 的用词约定）。今天我们的宿主 `myExtensions` = **全部**，于是 cSpell 在每个宿主里都因 `onStartupFinished` 自动激活。**按 agent 那条卡在 seam**：查询入参没有会话标识（`packages/lsp/lsp/src/types.ts:38-57`）。**真源待定**：读 VS Code 的工作区启用/禁用（工作区 storage 的 `extensionsIdentifiers/{disabled,enabled}`，`extensionManagement.ts:645-646`；Node 有 `node:sqlite`）还是 prac 自己一份配置（不与页面 UI 联动；我们的宿主本来就用自己那份 storage 根）。
+- **按工作区配置装哪些 VS Code 扩展（最好也能按 agent 配）**：James 2026-09-21 明确这里说的是**VS Code 扩展**（不是 DSH 插件——见 [概念边界](2026-09-13-vs-concept-boundary.md) 的用词约定）。今天我们的宿主 `myExtensions` = **全部**，于是 cSpell 在每个宿主里都因 `onStartupFinished` 自动激活。**按 agent 那条卡在 seam**：查询入参没有会话标识（`packages/lsp/lsp/src/types.ts:38-57`）。**真源待定**：读 VS Code 的工作区启用/禁用（工作区 storage 的 `extensionsIdentifiers/{disabled,enabled}`，`extensionManagement.ts:645-646`；Node 有 `node:sqlite`）还是 prac 自己一份配置（不与页面 UI 联动；我们的宿主本来就用自己那份 storage 根）。
 
 ### 已定方向、尚未做
 
-4. **扩展贡献的 view 要能"出数据"**（James 2026-09-21 之后这是第一优先）：`mountViewInto` 已经能让扩展视图出 pane、标题与像素，但 **tree view 的 body 还是 `no data provider registered`**——要让视图进 VS Code 自己的可见性 / 容器模型，树的数据（`TreeDataProvider` 那一层）才会来。**这才是"支持插件贡献的 view"的实事**。
+4. **扩展贡献的 view 要能"出数据"**（James 2026-09-21 之后这是第一优先）：`mountViewInto` 已经能让扩展视图出 pane、标题与像素，但 **tree view 的 body 还是 `no data provider registered`**——要让视图进 VS Code 自己的可见性 / 容器模型，树的数据（`TreeDataProvider` 那一层）才会来。**这才是"支持 VS Code 扩展贡献的 view"的实事**。
 5. **frame 批次**：还差 `stage` 的 tab（需要 VS Code 侧的 `editor(file)`）；持久化的 **per-workspace 那半**未做。堆叠与底栏还缺：拖拽排序、view 间 sash 调尺寸、底栏开合入口。
 6. **自动保存打开之后，验证门怎么调**：那几条"文件保持不动"的断言是靠故意关掉 autoSave 才稳的（`verify-file` 最近一次 33/33 直接绿、与旧注意不一致，待查）。
-7. **扩展安装的正当路径**：等 terminal 落地（它提供 `VSCODE_IPC_HOOK_CLI`）后用 `server-cli --install-extension` 正规安装；在那之前不装用户扩展（扩展目录现在由 `fs.watch` 接住，装了就能用）。
+7. **扩展安装的正当路径**：等 terminal 落地（它提供 `VSCODE_IPC_HOOK_CLI`）后用 `server-cli --install-extension` 正规安装；在那之前不装用户 VS Code 扩展（扩展目录现在由 `fs.watch` 接住，装了就能用）。
 8. **sidebar / panel / statusbar 的映射**：还欠被 stub 掉的 layout 语义（显隐 / zen / centered / floating / 多窗口）。
 
 ### 仍然开放（工程与生态）
 
 9. **契约写多遍**：view id 仍是 **6 处**字面量、`/prac-vscode` 仍是两处；**共享常量模块的落点与依赖方向未定**。
-10. **内建扩展**：挡在 `extensions/ipynb` 的 typecheck，所以 git / search / emmet 这些**内建**扩展在服务端还不可用——不影响"生态是否可用"（市场扩展已走通）；css 那一个是单独定向编译出来的。
+10. **VS Code 内建扩展**：挡在 `extensions/ipynb` 的 typecheck，所以 git / search / emmet 这些**内建**扩展在服务端还不可用——不影响"生态是否可用"（VS Code 市场扩展已走通）；css 那一个是单独定向编译出来的。
 11. **机制正确的 checkout 覆盖开关**（重定向解析，而不是文件路径）：未做。
 12. **多窗口 / 多标签页**：搁置（见 [`docs/architecture.md`](../../../docs/architecture.md) §7 #6）。
 

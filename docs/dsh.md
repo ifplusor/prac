@@ -3,7 +3,7 @@
 > 这篇记 DSH 自己的结构：`dsh web` 怎么走到像素、界面是怎么拼出来的、状态放哪、哪些包必须只有一份，以及还没核实的地方。
 > **prac 怎么用 DSH**（用它的什么、替掉了哪一层）在 [in-progress/2026-09-19-architecture.md](../.agents/notes/in-progress/2026-09-19-architecture.md) 与 [architecture.md](architecture.md)（§4）。行号除写明「本仓」的，都在 DSH checkout 的 `packages/**` 里。
 
-**从 `dsh web` 到像素**：一条单向的链——服务页面 → 注入 boot 图 → 浏览器内核 → 模块系统 → Cordis Loader → 插件 `apply` → 槽注册 → React 渲染。
+**从 `dsh web` 到像素**：一条单向的链——服务页面 → 注入 boot 图 → 浏览器内核 → 模块系统 → Cordis Loader → DSH 插件 `apply` → 槽注册 → React 渲染。
 
 ```mermaid
 flowchart TD
@@ -12,7 +12,7 @@ flowchart TD
   C --> D["模块系统：9 词 seed 表 + boot 图"]
   D --> E["Cordis Loader：逐行 import 与 apply"]
   E --> F["client.js lazy-CJS envelope 物化"]
-  F --> G["插件 apply：ctx.slots.register / provide"]
+  F --> G["DSH 插件 apply：ctx.slots.register / provide"]
   G --> H["ui-renderer：renderSlot('root')"]
   H --> I["像素：React 组件树"]
 ```

@@ -18,15 +18,15 @@ status: in-progress
 | R2  | **协作方式**：共享工作区、结对干活。白板就是工作区里的文件（notes）。流程是人提想法 → 两人在白板上讨论 → agent 去做 → 人旁观、可打断、可接手 → review。**不是模式机**：没有"商定 / 实施 / 接管"这种要声明的状态，谁在驱动是事实。**界面跟着注意力走**，要能随手换焦点，也要有返回栈。恒在的是三样：导航（工作区/记录树）、**通道**（异步留言：你说的话等我看到）、我在改什么。主场景是单工作区、长时间、重度使用。**（09-19 澄清：需求里那个"通道"就是 chat——人和 agent 通过 chat 说话，chat 本身就是松耦合的，不单独做机制。）** | umbrella §2①            |
 | R3  | **布局**：主操作台是注意力焦点，四周是辅助面板；交流时 chat 在中间，审方案时白板在中间、chat 在一边，审工件时编辑器在中间、chat 在一边、资源浏览器在另一边；主操作台能分栏；terminal 随时能调出来；各视图按需显示、能方便收起。                                                                                          | umbrella §2②            |
 | R4  | **保留完整的 IDE 能力和扩展生态**（包括语言包、GitLens 这类 UI 扩展），**但不要 VS Code 的布局**。                                                                                                                                                                                                                      | umbrella §1.1           |
-| R5  | **主干是 DSH**：组合、状态、进程、生命周期都归它。DSH 的扩展方式就是插件（同一地址空间，进程内 `inject`），prac 自己的部分和 VS Code 都作为插件挂在它上面。                                                                                                                                                            | James 2026-09-16        |
+| R5  | **主干是 DSH**：组合、状态、进程、生命周期都归它。DSH 的扩展方式就是 DSH 插件（同一地址空间，进程内 `inject`），prac 自己的部分和 VS Code 都作为 DSH 插件挂在它上面。                                                                                                                                                            | James 2026-09-16        |
 | R6  | **agent / chat 归 DSH**：VS Code 的 chat、participants、工具注册表、会话、agentHost 都不进 prac 的 agent 面。                                                                                                                                                                                                           | James 2026-09-19        |
 | R7  | **VS Code 按 prac 的两端切成两半**：code server 是 server 侧的 remote（提供 IDE 基础能力），web 是 client 侧（提供 UI）。                                                                                                                                                                                                | James 2026-09-16        |
 | R8  | **两半之间的通信层要基于 DSH 的架构重新设计**，不是把 VS Code 自己的传输透传过来。                                                                                                                                                                                                                                       | James 2026-09-16        |
 | R9  | **不 fork 上游**：DSH 走它自己的组装层；VS Code 只 pin + patch + overlay，源码不进本仓。                                                                                                                                                                                                                                 | umbrella §1.3           |
 | R10 | **三层各归其位**：`vendor/vscode`（上游源码 + 我们的 patch）；`vendor/vscode-embed`（在其上封装的 lib，可利用、不绑定 prac）；基于这个 lib 构建的 DSH 插件族（政策都在这一层）。                                                                                                                                           | James 2026-09-16        |
-| R11 | **prac 不只有 VS Code 这一族插件**：还有 frame、编排、角色、注意力、持久化，还有 **agent 面（六件事）**，以及直接从 DSH 继承的能力族。                                                                                                                                                                                  | James 2026-09-16        |
+| R11 | **prac 不只有 VS Code 这一族 DSH 插件**：还有 frame、编排、角色、注意力、持久化，还有 **agent 面（六件事）**，以及直接从 DSH 继承的能力族。                                                                                                                                                                                  | James 2026-09-16        |
 | R12 | **VS Code 里最有价值的能力是 LSP**，要接进 DSH。                                                                                                                                                                                                                                                                        | James 2026-09-19        |
-| R13 | agent 面归 DSH 之后，扩展生态里 agent 还能用的只剩 **MCP**（工具）和**文件定制**（`SKILL.md` / `*.instructions.md` / `AGENTS.md`）；扩展用 `lm.registerTool` 注册的工具我们拿不到。                                                                                                                                        | R6 的推论（09-19 核实） |
+| R13 | agent 面归 DSH 之后，扩展生态里 agent 还能用的只剩 **MCP**（工具）和**文件定制**（`SKILL.md` / `*.instructions.md` / `AGENTS.md`）；VS Code 扩展用 `lm.registerTool` 注册的工具我们拿不到。                                                                                                                                        | R6 的推论（09-19 核实） |
 | R14 | 运行期状态跟随 XDG、放在仓库外；构建期状态放 `.build/`。                                                                                                                                                                                                                                                                | 已落地                  |
 | R15 | **不引第三方改造**（`monaco-vscode-api`、Theia 这类）。                                                                                                                                                                                                                                                                   | umbrella §1.3           |
 
@@ -52,7 +52,7 @@ status: in-progress
 
 ### 2.2 一条主干，两端
 
-- 两端是 client（页面）和 server（Node）。DSH 在两端都提供骨架：client 侧是页面的壳（loader、槽、服务注册表），server 侧是组装、进程和 agent 循环。prac 自己的插件和 VS Code 的插件各按所属的一端挂上去。
+- 两端是 client（页面）和 server（Node）。DSH 在两端都提供骨架：client 侧是页面的壳（loader、槽、服务注册表），server 侧是组装、进程和 agent 循环。prac 自己的插件和 VS Code 的 DSH 插件各按所属的一端挂上去。
 - **主干只有一个**：组合和状态归 DSH；**code server 是主干起停的子进程**，不是第二个主干。
 - 两端之间只有三条线：服务调用（DSH remote，client 调 host 声明的方法）、事件与流（转发事件，加上流复用）、页面产物（同源 HTTP）。
 - **VS Code 的 extHost 协议不跨这条线**（R8）：它是 server 侧内部的事。
@@ -66,7 +66,7 @@ status: in-progress
 1. **和 agent 打交道这件事是 prac 的中心**（R1）：界面在给人那一侧，数据和运行在 DSH。chat 视图、工具调用与审批、计划与审阅都由 prac 编排。**VS Code 的 chat 面不出现在 prac 的界面里**——那是另一个 agent 的界面。
 2. **chat 就是那个通道**（R2 的 09-19 澄清）：它天然异步、松耦合——谁不在都不阻塞，回来看会话记录就行。所以不另做"留言"机制，也不做模式机。
 3. **白板就是文件**（R2）：notes 是工作区里的 markdown，人用 DSH 的文档视图看，agent 用文件工具读写。不需要第二套文档系统。
-4. **树里住着"别人家的 agent"**：Copilot 是 VS Code 的内建扩展（它声明了 `chatParticipants`、`languageModelTools`、`mcpServerDefinitionProviders`、`chatSessions`、`chatPromptFiles`、`chatSkills`），会随扩展宿主激活——**在我们 rig 里到底有没有激活，还没测**。**先留着、不显示**（James 2026-09-19）：不禁掉，也不在 prac 的界面里露出它的 chat。好处是它声明的 MCP server 定义还在池子里（§2.6 要读的那些）；坏处是树里确实多一个 agent 在跑，先接受。
+4. **树里住着"别人家的 agent"**：Copilot 是 VS Code 的VS Code 内建扩展（它声明了 `chatParticipants`、`languageModelTools`、`mcpServerDefinitionProviders`、`chatSessions`、`chatPromptFiles`、`chatSkills`），会随扩展宿主激活——**在我们 rig 里到底有没有激活，还没测**。**先留着、不显示**（James 2026-09-19）：不禁掉，也不在 prac 的界面里露出它的 chat。好处是它声明的 MCP server 定义还在池子里（§2.6 要读的那些）；坏处是树里确实多一个 agent 在跑，先接受。
 
 ### 2.5 IDE 能力分三类
 
@@ -76,7 +76,7 @@ status: in-progress
 | **工作区动作** | 文件、搜索、git、任务、调试、终端                           | code server（VS Code 的 API 和进程）      | 人用界面；agent 走 DSH 自己的 exec 和文件工具，**不和人那条终端共用** |
 | **显示**       | 编辑器控件、面板、装饰、状态栏、视图                       | VS Code 的 client 半边                    | 人                                                                 |
 
-**第三类不等于"扩展必须搬到 client"**：只要有一个主线程在，扩展可以在 server 侧跑、画面落到页面（为什么，见 §1 的第 3 条）。所以旧设计里"UI 组件必须在 client 侧"的读法不成立。
+**第三类不等于"VS Code 扩展必须搬到 client"**：只要有一个主线程在，扩展可以在 server 侧跑、画面落到页面（为什么，见 §1 的第 3 条）。所以旧设计里"UI 组件必须在 client 侧"的读法不成立。
 
 ### 2.6 扩展生态里 agent 能用什么
 
@@ -112,7 +112,7 @@ status: in-progress
 
 ### 2.10 谁起谁关
 
-code server 归主干起停：空闲端口、等就绪、随插件 dispose 收掉（**已经落地**）。
+code server 归主干起停：空闲端口、等就绪、随 DSH 插件 dispose 收掉（**已经落地**）。
 
 **扩展宿主也归主干（P1，James 2026-09-19）**：主干自己连一条 ExtensionHost 连接，**不依赖页面**——页面关着，语言服务照样在。要按需实现主线程那一面（三条初始化推送 + `ExtensionService` + `Errors` + **文档** + 我们挑的那几个 `$provide*`），代价是 agent 侧多一份激活上下文并要跟着上游漂移。**几个宿主**（James 2026-09-21 定）：**agent 侧一个工作区一个宿主**（同工作区的多个 agent 共用——它们本来就是同一个主线程后面的不同调用方），**UI 不与 agent 共用**（UI 按上游，每个页面一个）。
 
@@ -122,9 +122,9 @@ code server 归主干起停：空闲端口、等就绪、随插件 dispose 收�
 
 **两边怎么结合**（James 2026-09-19：目标是更好地结合两边的生态与能力）：**DSH 出接口，VS Code 出实现与配置**。接口是 `ctx.lsp`（提供方注册表：`id` + `extensionToLanguage` + `query()`；按扩展名每次查询选一个）加面向模型的 `lsp` 工具（四个操作）；VS Code 那边做成**一个 `LspProvider`**——我们当主线程连扩展宿主（P1）、喂配置与文档、把结果翻译成 seam 的归一化形状。于是 DSH 自配的 stdio 服务器和 VS Code 扩展带来的服务器**都是提供方，可以并存**，而模型侧形状不变。四个操作之外的查询（符号、code action、诊断…）**不在本次范围**：那等于给 DSH 加能力，按 seam 的规矩扩（三处同改、编译强制），真要做时再说。
 
-**P1 的前置条件**（核实过）：① **配置要喂**——扩展里的 `workspace.getConfiguration()` 等 `$initializeConfiguration` 开 barrier（`extHostConfiguration.ts:107-131`），不喂就挂；② **文档要喂**（含版本）；③ 激活（三条初始化推送 + `ExtensionService` + `Errors`）；④ 再是我们挑的 `$provide*`。第一条链用 checkout 自带的 css / html / json / markdown 语言服务器最省（真 `vscode-languageclient`，不用装市场扩展）。
+**P1 的前置条件**（核实过）：① **配置要喂**——扩展里的 `workspace.getConfiguration()` 等 `$initializeConfiguration` 开 barrier（`extHostConfiguration.ts:107-131`），不喂就挂；② **文档要喂**（含版本）；③ 激活（三条初始化推送 + `ExtensionService` + `Errors`）；④ 再是我们挑的 `$provide*`。第一条链用 checkout 自带的 css / html / json / markdown 语言服务器最省（真 `vscode-languageclient`，不用装VS Code 市场扩展）。
 
-### 2.11 插件怎么分
+### 2.11 DSH 插件怎么分
 
 - `vendor/vscode`：上游 + 我们的 patch；`vendor/vscode-embed`：lib（只给机制，不背政策）。
 - **server 半边**：路由、code server 起停、（如果走 P1）agent 侧的扩展宿主连接和主线程那一面。
@@ -135,7 +135,7 @@ code server 归主干起停：空闲端口、等就绪、随插件 dispose 收�
 
 | 事情                                | 谁提供                               | 走哪条线                                       | 给谁                                         |
 | ----------------------------------- | ------------------------------------ | ---------------------------------------------- | -------------------------------------------- |
-| 和 agent 打交道（对话、计划、审阅） | DSH host 插件                        | DSH remote + 转发事件                          | 人（界面）；agent 是同一份会话的运行时        |
+| 和 agent 打交道（对话、计划、审阅） | DSH host 侧插件                        | DSH remote + 转发事件                          | 人（界面）；agent 是同一份会话的运行时        |
 | 白板、笔记、工作区文档              | 工作区文件                           | 文件系统（§2.8）+ DSH 的文档视图               | 人（界面）+ agent（读写同一份文件）          |
 | **语义服务（LSP）**                 | 主干连的扩展宿主（语言服务器）        | 主干自己当主线程（P1，§2.10）                  | **agent 优先**；人的编辑器复用               |
 | 文件、搜索、git、任务、调试、终端   | code server                          | 页面内 UI；agent 走 DSH 自己的 exec 和文件工具 | 人（界面）+ agent（能力）                    |
@@ -147,7 +147,7 @@ code server 归主干起停：空闲端口、等就绪、随插件 dispose 收�
 
 ## 4. 旧设计：哪些留着，哪些作废
 
-**留着**：主干是 DSH；两端；VS Code 一族插件按端切两半；三层（vendor / lib / 插件族）；布局由 frame 拥有、**view 是单位**；code server 归主干起停；XDG；不 fork 上游；"agent 执行命令走 DSH 自己的 exec，不和人那条终端共用"。
+**留着**：主干是 DSH；两端；VS Code 一族 DSH 插件按端切两半；三层（vendor / lib / 插件族）；布局由 frame 拥有、**view 是单位**；code server 归主干起停；XDG；不 fork 上游；"agent 执行命令走 DSH 自己的 exec，不和人那条终端共用"。
 
 **作废或改正**（前提已经不成立，或者只是说法错了）：
 

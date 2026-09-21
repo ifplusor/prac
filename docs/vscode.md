@@ -61,9 +61,9 @@ flowchart LR
 
 **发起方永远是渲染器**：远程要渲染器发 `desiredConnectionType === ExtensionHost`（`remoteAgentConnection.ts:362`）服务端才 fork；桌面由渲染器 `createExtensionHost()`（`localProcessExtensionHost.ts:225`）让主进程起 utility 进程。⇒ **没有页面就没有扩展宿主**，也就没有任何扩展能力。
 
-**诊断是怎么走的**：全程靠扩展主动"推"，协议里没有"拉"的请求方法。
+**诊断是怎么走的**：全程靠 VS Code 扩展主动"推"，协议里没有"拉"的请求方法。
 
-- **什么时候算，扩展自己说了算**。公开面只有 `languages.createDiagnosticCollection()`（`vscode.d.ts:14822`）：php 扩展在 `onDidOpenTextDocument`（`php-language-features/src/features/validationProvider.ts:110`）和 `onDidChangeTextDocument` / `onDidSaveTextDocument`（`:163-166`，按 `php.validate.run` 二选一）之后跑 lint，再 `set()`（`:250`）；git 扩展监听自己 scheme 的文档变化（`git/src/diagnostics.ts:26`）。VS Code 不排期，也没有"诊断 provider"这种注册（`vscode.d.ts` 里没有）。
+- **什么时候算，VS Code 扩展自己说了算**。公开面只有 `languages.createDiagnosticCollection()`（`vscode.d.ts:14822`）：php 扩展在 `onDidOpenTextDocument`（`php-language-features/src/features/validationProvider.ts:110`）和 `onDidChangeTextDocument` / `onDidSaveTextDocument`（`:163-166`，按 `php.validate.run` 二选一）之后跑 lint，再 `set()`（`:250`）；git 扩展监听自己 scheme 的文档变化（`git/src/diagnostics.ts:26`）。VS Code 不排期，也没有"诊断 provider"这种注册（`vscode.d.ts` 里没有）。
 - **推**：`set()` 里同步调 `MainThreadDiagnostics.$changeMany(owner, entries)`（`api/common/extHostDiagnostics.ts:170`；`delete` ⇒ `:177`，`clear` / `dispose` ⇒ `$clear` `:184`/`:49`）；主线程落到 `IMarkerService.changeOne/changeAll`（`api/browser/mainThreadDiagnostics.ts:87`/`:93`），并给每条 marker 盖上 `origin = extHostId`（`:82-84`）。**上限在扩展宿主侧就先砍**：1000 条/文件、1100 条总数，超出后另加一条"还有 N 条"的 Info marker（`extHostDiagnostics.ts:134-156`）。
 - **回推**：`IMarkerService.onMarkerChanged` → `$acceptMarkersChange`（`mainThreadDiagnostics.ts:32`、`:57-66`），并且**按 `origin` 把这个扩展宿主自己推的那些滤掉**（`:61`），所以扩展宿主里的镜像装的是**别人的** marker。`languages.getDiagnostics()` 读的是**本地**（自己的 collections + 这份镜像，`extHostDiagnostics.ts:313-345`），不是 RPC。
 - **"拉"只有两处，而且都是读本地**：扩展宿主的 `languages.getDiagnostics()`（读上面那份本地表）；渲染器的 `IMarkerService.read()`（接口在 `platform/markers/common/markers.ts`；Problems 视图就是这么读的，`contrib/markers/browser/markersView.ts:549`）。两侧协议都**没有请求方法**——`MainThreadDiagnosticsShape` 只有 `$changeMany`/`$clear`，`ExtHostDiagnosticsShape` 只有 `$acceptMarkersChange`（`extHost.protocol.ts:254-257`、`:2382-2384`）。
@@ -79,23 +79,23 @@ flowchart LR
 
 - 扩展宿主的 `initialize()` **卡在** `$initializeWorkspace` 的 barrier 上（`extHostExtensionService.ts:242` → `extHostWorkspace.ts:274-276`；`Barrier.wait()` 没有超时，`base/common/async.ts:530-554`）。⇒ 主线程不发那三条初始化推送，扩展宿主就永远停在这里，一个扩展都不会激活。
 - **通道本身也是前提**：`extensionHostProcess.ts` 先等 MessagePort 或 socket——MessagePort 那条是 `process.parentPort.on('message')`（没人发就永远不 resolve，`:190-203`，而且这个分支要求父进程是 Electron），socket 那条有 60 秒超时，超时后 `onTerminate('VSCODE_EXTHOST_IPC_SOCKET timeout')`（`:208-212`）。
-- 启动之后，**远程形态的激活不等渲染器确认**：`$onWillActivateExtension` 在 `isRemote` 时发了就不等，只有本地（桌面）扩展宿主才 await（`extHostExtensionService.ts:445-455`）。⇒ 没有页面，扩展也能激活、也能自己 `set()` 诊断。
-- 但 **UI 类型的扩展**，扩展宿主会把激活**交给主线程**（`extHostExtensionService.ts:193`）：判定是 `isHostExtension`——不在本宿主的 `myRegistry` 里、却在全局注册表里、有 main/browser 代码且 `api === 'none'`（`services/extensions/common/extensionDescriptionRegistry.ts:31-45`）。⇒ 没人答，激活就**永远挂着**。
+- 启动之后，**远程形态的激活不等渲染器确认**：`$onWillActivateExtension` 在 `isRemote` 时发了就不等，只有本地（桌面）扩展宿主才 await（`extHostExtensionService.ts:445-455`）。⇒ 没有页面，VS Code 扩展也能激活、也能自己 `set()` 诊断。
+- 但 **UI 类型的 VS Code 扩展**，扩展宿主会把激活**交给主线程**（`extHostExtensionService.ts:193`）：判定是 `isHostExtension`——不在本宿主的 `myRegistry` 里、却在全局注册表里、有 main/browser 代码且 `api === 'none'`（`services/extensions/common/extensionDescriptionRegistry.ts:31-45`）。⇒ 没人答，激活就**永远挂着**。
 
 ## agent / MCP / 工具 / skill / prompt 分别做在哪一层
 
-一共五层。前四层扩展都能参与，第五层是 core 自己的循环，扩展替换不了。
+一共五层。前四层扩展都能参与，第五层是 core 自己的循环，VS Code 扩展替换不了。
 
 **① 文件（仓库里，core 负责解析）**：`promptSyntax/` 认四种文件——`*.prompt.md`、`*.instructions.md`、`*.chatmode.md`（agent）、**`SKILL.md`**（skill），语言 id 分别是 `prompt` / `instructions` / `chatagent` / `skill`（`promptTypes.ts:22-40`）；默认目录 `.github/prompts`、`.github/instructions`、`.github/skills`（`promptFileLocations.ts:97`/`:102`/`:174`），另外也认 `AGENTS.md`（`:52`）；加载是自动的（`computeAutomaticInstructions.ts`）。
 
 **② 扩展在 `package.json` 里声明**（这些声明点注册在 core）：`chatParticipants`（agent）、`languageModelTools` + `languageModelToolSets`、`languageModelChatProviders`、`chatSessions`、`chatPromptFiles` / `chatInstructions` / `chatAgents` / `chatSkills`、`chatPlugins`、`chatContext`、`chatOutputRenderer`、`chatViewsWelcome`、`mcpServerDefinitionProviders`。
 注册点：`browser/chatParticipant.contribution.ts`、`common/tools/languageModelToolsContribution.ts`、`common/languageModels.ts`、`browser/chatSessions/chatSessions.contribution.ts`、`common/promptSyntax/chatPromptFilesContribution.ts`（enum `ChatContributionPoint`）、`common/plugins/agentPluginServiceImpl.ts`、`browser/contextContrib/chatContext.contribution.ts`、`browser/chatOutputItemRenderer.ts`、`common/discovery/extensionMcpDiscovery.ts`。
 
-**③ 扩展 activate 的时候注册 API**：`chat.createChatParticipant`（`vscode.d.ts:20124`）、`lm.registerTool`（`:20777`）、`lm.registerMcpServerDefinitionProvider`（`:20841`）、选模型（`lm.selectChatModels`）。**session provider 还是 proposed**（`vscode.proposed.chatSessionsProvider.d.ts`）。
+**③ VS Code 扩展 activate 的时候注册 API**：`chat.createChatParticipant`（`vscode.d.ts:20124`）、`lm.registerTool`（`:20777`）、`lm.registerMcpServerDefinitionProvider`（`:20841`）、选模型（`lm.selectChatModels`）。**session provider 还是 proposed**（`vscode.proposed.chatSessionsProvider.d.ts`）。
 
 **④ core 自己的部分**（扩展只能往里填东西，换不掉）：chat 服务与循环（`common/chatService/`）、participants 管理（`common/participants/chatAgents.ts`）、工具的注册与确认（`common/tools/languageModelToolsService.ts`、`languageModelToolsConfirmationService.ts`）、**内建工具**（`common/tools/builtinTools/`：`askQuestionsTool` / `editFileTool` / `manageTodoListTool` / `reviewPlanTool` / `runSubagentTool` / `setArtifactsTool` / `taskCompleteTool` / `confirmationTool`…）、MCP 客户端（`contrib/mcp/**`：registry / server / connection / gateway / sandbox / sampling，工具经 `mcpLanguageModelToolContribution.ts` 变成 LM 工具）、会话模型（`chatSessionsService.ts`）、插件与技能模型（`common/plugins/agentPluginService.ts`：插件目录里有 `commands/`、`skills/`（`SKILL.md`）、`agents/`、`hooks/`、MCP 定义，见同目录的 `AGENTS_PLUGINS.md`）。
 **工具调用谁发起**：主线程发起、扩展宿主回答（`ExtHostLanguageModelToolsShape.$invokeTool`，`extHost.protocol.ts:1887`；反方向的 `MainThreadLanguageModelToolsShape.$invokeTool` 是给宿主侧调主线程用的）。这两个代理标识的历史名字还叫 `MainThreadChatSkills` / `ExtHostChatSkills`（`:4053`/`:4193`）。
 
 **⑤ agent host**（`platform/agentHost/**`）：把**外部 agent** 当被托管的进程跑起来——`node/copilot`、`node/claude`、`node/codex`、`node/localCommands`，并给它们一整套宿主设施：changeset（`agentHostChangesetService.ts`）、checkpoint（`agentHostCheckpointService.ts`）、plan review（`agentHostPlanReview.ts`）、git 和独立 worktree（`agentHostGitService.ts`；协议方法比如 `vscode/createAgentHostDetachedWorktree`，见 `agentHostExtensionProtocol.ts`）、文件系统 provider、customization、BYOK 模型（`agentHostByokLm.ts`）、managed rules / settings、OTel。
 
-**和扩展生态的关系**：上面每一项**都有对应的扩展声明点或 API**——用得最多的就是 Copilot 扩展（它同时声明了 `chatParticipants` / `languageModelTools` / `languageModelToolSets` / `languageModelChatProviders` / `mcpServerDefinitionProviders` / `chatSessions` / `chatAgents` / `chatPromptFiles` / `chatSkills`）。⇒ **在 VS Code 里，"支持 agent"本身就是一块扩展面**：core 出循环和注册表，扩展出 agent、工具、模型、会话、定制。MCP 还多一条：VS Code 会从**别的工具**那里导入服务器定义（`ExternalDiscoverySource`：Claude Desktop / Copilot / Windsurf / Cursor 的全局与工作区配置，`mcpConfiguration.ts:54-55`），也会 discovery 工作区里的 mcp 配置（`discovery/workspaceDotMcpDiscovery.ts`）。
+**和扩展生态的关系**：上面每一项**都有对应的扩展声明点或 API**——用得最多的就是 Copilot 扩展（它同时声明了 `chatParticipants` / `languageModelTools` / `languageModelToolSets` / `languageModelChatProviders` / `mcpServerDefinitionProviders` / `chatSessions` / `chatAgents` / `chatPromptFiles` / `chatSkills`）。⇒ **在 VS Code 里，"支持 agent"本身就是一块扩展面**：core 出循环和注册表，VS Code 扩展出 agent、工具、模型、会话、定制。MCP 还多一条：VS Code 会从**别的工具**那里导入服务器定义（`ExternalDiscoverySource`：Claude Desktop / Copilot / Windsurf / Cursor 的全局与工作区配置，`mcpConfiguration.ts:54-55`），也会 discovery 工作区里的 mcp 配置（`discovery/workspaceDotMcpDiscovery.ts`）。

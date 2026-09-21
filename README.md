@@ -6,7 +6,7 @@ Prac（Practice）是**前沿探索性工程实践**，研究通用 Agent 的能
 
 ## 为什么建立在 DSH 之上
 
-DSH 是一个**全插件、可插拔**的 agent harness：每个部分（模型适配、工具注册、session 日志、agent-loop）都是一个插件，没有需要 `patch` 的特权核心。扩展它的方式是**在其旁挂载插件**，通过 `dsh.bundle`、`dsh.profile`、`cordis.patch.yml` 组合。
+DSH 是一个**全插件、可插拔**的 agent harness：每个部分（模型适配、工具注册、session 日志、agent-loop）都是一个插件，没有需要 `patch` 的特权核心。扩展它的方式是**在其旁挂载 DSH 插件**，通过 `dsh.bundle`、`dsh.profile`、`cordis.patch.yml` 组合。
 
 这正是 Prac 想要的通用 agent 骨架——它已经存在，而且造得很彻底。所以 Prac 的定位是：**DSH 的一个深度定制消费者**，把 agent 理念以最省力的方式嫁接到 DSH 的扩展点上。
 
