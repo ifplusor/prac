@@ -15,8 +15,8 @@ import {
 } from "./extension-policy.js";
 
 const GLOBAL = "/home/user/.config/prac/settings.json";
-const WORKSPACE = "/work/one/.prac/settings.json";
-const OTHER_WORKSPACE = "/work/two/.prac/settings.json";
+const WORKSPACE = "/work/one/.agent/prac/settings.json";
+const OTHER_WORKSPACE = "/work/two/.agent/prac/settings.json";
 
 /** A reader over an in-memory settings file set. */
 function reader(

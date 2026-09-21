@@ -57,8 +57,12 @@ const name = "prac-host-vscode";
  * counterpart of `.vscode/settings.json`, and the reason we do not keep a map of
  * workspace paths in our own config: the setting belongs with the thing it is
  * about, where the same model puts it in VS Code.
+ *
+ * `.agent/` is the agent side's namespace in a workspace (VS Code's is
+ * `.vscode/`), and `prac/` inside it is ours; the file itself is a settings file
+ * like any other.
  */
-const WORKSPACE_SETTINGS = ".prac/settings.json";
+const WORKSPACE_SETTINGS = ".agent/prac/settings.json";
 
 /**
  * The provider id this package registers. Unique across providers, since a
@@ -121,7 +125,7 @@ export interface LanguageFeaturesOptions {
    * The **global** layer of prac's enablement policy for the agent side — our
    * user-level settings file (`$XDG_CONFIG_HOME/prac/settings.json`), the
    * counterpart of VS Code's user settings. The workspace layer is the
-   * workspace's own `.prac/settings.json`, found from the workspace root.
+   * workspace's own `.agent/prac/settings.json`, found from the workspace root.
    *
    * Both are read when a host starts, so a running host keeps the set it began
    * with and an edit lands on the next start. See `./extension-policy.ts`.

@@ -8,8 +8,9 @@
  * already knows:
  *
  * - **Scopes.** VS Code has a global layer and a workspace layer; so do we —
- *   `globalPath` (our user settings) and `workspacePath` (`<workspace>/.prac/
- *   settings.json`, the counterpart of `.vscode/settings.json`).
+ *   `globalPath` (our user settings) and `workspacePath`
+ *   (`<workspace>/.agent/prac/settings.json`, the counterpart of
+ *   `.vscode/settings.json`).
  * - **Format.** A JSONC `settings.json`: comments and trailing commas are legal,
  *   parsed by VS Code's own parser (`readSettingsJson` in `prac-vscode-embed`).
  * - **Keys.** Dotted setting ids, read from a flat object —

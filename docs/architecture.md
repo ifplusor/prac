@@ -102,16 +102,16 @@
 
 **运行期状态一律跟随 XDG、放在仓库外，并且按 XDG 的类别分家**（James 2026-09-21：**prac 走 XDG 的 config 和 state**）：
 
-| 内容                                                 | 落点                                                                                     | 类别                |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------- |
-| code server 的日志、工作区缓存                       | `$XDG_STATE_HOME/prac/code-server`                                                       | state               |
-| 已安装的 VS Code 扩展                                | `$XDG_DATA_HOME/prac/code-server/extensions`                                             | data                |
-| user-data（设置、快捷键、界面状态）                  | `$XDG_CONFIG_HOME/prac/code-server`                                                      | config              |
-| 扩展宿主的 `globalStorage` / `workspaceStorage`      | code server 的 state 下 `data/User/…`                                                    | state               |
-| agent 侧的启用策略（禁用 / 另启用哪些 VS Code 扩展） | 全局层 `$XDG_CONFIG_HOME/prac/settings.json`；工作区层 `<workspace>/.prac/settings.json` | config / 工作区文件 |
+| 内容                                                 | 落点                                                                                           | 类别                |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------- |
+| code server 的日志、工作区缓存                       | `$XDG_STATE_HOME/prac/code-server`                                                             | state               |
+| 已安装的 VS Code 扩展                                | `$XDG_DATA_HOME/prac/code-server/extensions`                                                   | data                |
+| user-data（设置、快捷键、界面状态）                  | `$XDG_CONFIG_HOME/prac/code-server`                                                            | config              |
+| 扩展宿主的 `globalStorage` / `workspaceStorage`      | code server 的 state 下 `data/User/…`                                                          | state               |
+| agent 侧的启用策略（禁用 / 另启用哪些 VS Code 扩展） | 全局层 `$XDG_CONFIG_HOME/prac/settings.json`；工作区层 `<workspace>/.agent/prac/settings.json` | config / 工作区文件 |
 
 - 扩展宿主的 `globalStorage` / `workspaceStorage` 是**状态**、不是配置 ⇒ 落在 state 下；并且**用 code server 自己那份 storage**（`--server-data-dir` 下的 `data/User/…`），**不另开一个根**。
-- **agent 侧的启用策略：文件是我们自己的，但模型与 UI 同构**（James 2026-09-21：**继续分离，但 agent 的配置模式要和 UI 同构**）。同构 = 四件事都照 VS Code 的来：**作用域**（全局层 + 工作区层）、**格式**（JSONC 的 `settings.json`，注释与尾逗号合法——用**构建自己的解析器**读，`readSettingsJson`）、**key**（点号形式：`prac.extensions.disabled` / `prac.extensions.enabled`）、**优先级**（工作区 `enabled` → 工作区 `disabled` → 全局 `disabled` → 否则启用，`extensionEnablementService.ts:634-661`）。分离 = **不写进 VS Code 的 `settings.json`**：UI 自己的启停是客户端状态，我们看不到也不镜像（§7 #4）。落点：全局层 `$XDG_CONFIG_HOME/prac/settings.json`（**config**），工作区层 `<workspace>/.prac/settings.json`（**在工作区里**，`.vscode/settings.json` 的对位——所以不必在我们自己的配置里维护"工作区路径 → 设置"那张表）。**两个文件都不在 = 装着的那份全上**。
+- **agent 侧的启用策略：文件是我们自己的，但模型与 UI 同构**（James 2026-09-21：**继续分离，但 agent 的配置模式要和 UI 同构**）。同构 = 四件事都照 VS Code 的来：**作用域**（全局层 + 工作区层）、**格式**（JSONC 的 `settings.json`，注释与尾逗号合法——用**构建自己的解析器**读，`readSettingsJson`）、**key**（点号形式：`prac.extensions.disabled` / `prac.extensions.enabled`）、**优先级**（工作区 `enabled` → 工作区 `disabled` → 全局 `disabled` → 否则启用，`extensionEnablementService.ts:634-661`）。分离 = **不写进 VS Code 的 `settings.json`**：UI 自己的启停是客户端状态，我们看不到也不镜像（§7 #4）。落点：全局层 `$XDG_CONFIG_HOME/prac/settings.json`（**config**），工作区层 `<workspace>/.agent/prac/settings.json`（**在工作区里**，`.vscode/settings.json` 的对位——所以不必在我们自己的配置里维护"工作区路径 → 设置"那张表）。**两个文件都不在 = 装着的那份全上**。
 - **同一个工作区上两个扩展宿主并存不用我们操心**：上游自己在 `<workspaceStorageHome>/<hash>` 上抢 `vscode.lock`，抢不到就退到 `<hash>-1`、`-2`…（`extHostStoragePaths.ts:26-62`）⇒ UI 宿主与 agent 宿主**各用各的一份**，这正是"两边状态各归各家"。
 - **DSH 自己的家不按 XDG 分**：`resolveDshHome` 是**单一根**（默认 `~/.dsh`，只有 `$DSH_HOME` 能覆盖，`packages/util/home-paths/src/index.ts:98`）⇒ **prac 的运行期状态不走 `$DSH_HOME/storages`**，只走上面那张表。
 
@@ -195,6 +195,8 @@
 ## 5. 工作区与进程
 
 ### 5.1 磁盘为准
+
+**工作区里 agent 侧的东西放 `.agent/`**（James 2026-09-21）：`.vscode/` 是 VS Code 在工作区里的命名空间，`.agent/` 就是 agent 侧的对位，`prac/` 再往下是我们的。眼下唯一一份是 `<workspace>/.agent/prac/settings.json`（启用策略的工作区层，§3.3）——把它放在工作区里，就是要"设置跟着它说的那个东西走"：不然我们得在自己的配置里维护一张"工作区路径 → 设置"的表。
 
 **人和 agent 读写同一份文件**：打开自动保存（切焦点或延时写盘），**不做**缓冲区级同步。反向那条（agent 改文件 → 人的编辑器）接受 VS Code 既有行为：没脏就重载，脏了就提示冲突。
 
