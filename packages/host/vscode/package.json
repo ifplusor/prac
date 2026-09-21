@@ -24,6 +24,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh-host-webserver": "catalog:",
+    "@deepseek-ai/dsh-lsp": "catalog:",
     "@types/node": "catalog:",
     "prac-vscode-embed": "workspace:*",
     "typescript": "catalog:",

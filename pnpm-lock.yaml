@@ -137,6 +137,9 @@ catalogs:
     '@deepseek-ai/dsh-host-webserver':
       specifier: 0.1.5-rc.1
       version: 0.1.5-rc.1
+    '@deepseek-ai/dsh-lsp':
+      specifier: 0.1.5-rc.1
+      version: 0.1.5-rc.1
     '@playwright/test':
       specifier: 1.61.1
       version: 1.61.1
@@ -325,6 +328,9 @@ importers:
       '@deepseek-ai/dsh-host-webserver':
         specifier: 'catalog:'
         version: 0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)
+      '@deepseek-ai/dsh-lsp':
+        specifier: 'catalog:'
+        version: 0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.3
@@ -508,6 +514,13 @@ packages:
     resolution: {integrity: sha512-5kOu9kb0AuRN60/zwPTRcki801ozgnWAFwS1QtQ4ZNgCYIbAiU8gwJHY1//qEpUOuHS+26k+Tqq5/WCJmLGE6Q==}
     peerDependencies:
       '@deepseek-ai/cordis': ^4.0.2
+
+  '@deepseek-ai/dsh-lsp@0.1.5-rc.1':
+    resolution: {integrity: sha512-p5JLi5o11+v5ml5zHwbiKPnktruWigv4GXne+T4avO3IqRIbvSwXQdXklTkt9tI9BEBu/wGhb11IERESabCDqA==}
+    peerDependencies:
+      '@deepseek-ai/cordis': ^4.0.2
+      '@deepseek-ai/dsh-brand': ^0.1.5-rc.1
+      '@deepseek-ai/dsh-llm': ^0.1.5-rc.1
 
   '@deepseek-ai/schemastery@3.18.2':
     resolution: {integrity: sha512-njDtZsznjYxok7KLLlHOPyuv2efdWVbSflAHgztSfbMsg+CVraEoRe2DjOCgClYv3ZCSm7WXoaUkbB/+RY7tWQ==}
@@ -1745,6 +1758,11 @@ snapshots:
       negotiator: 1.1.0
     transitivePeerDependencies:
       - supports-color
+
+  '@deepseek-ai/dsh-lsp@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
+    dependencies:
+      '@deepseek-ai/cordis': 4.0.2
+      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
 
   '@deepseek-ai/schemastery@3.18.2':
     dependencies:

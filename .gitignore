@@ -37,3 +37,6 @@ __pycache__/
 # Logs
 *.log
 npm-debug.log*
+
+# pnpm 的本地内容仓（沙箱下 pnpm 会把 store 落到仓内，不进版本库）
+.pnpm-store/

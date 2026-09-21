@@ -29,7 +29,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { WebServer } from "@deepseek-ai/dsh-host-webserver";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   createAssetHandler,
@@ -41,6 +41,7 @@ import {
   startCodeServer,
   type CodeServerHandle,
 } from "prac-vscode-embed";
+import { manageLanguageFeatures } from "./language.js";
 
 /** The cordis plugin name used by loader diagnostics. */
 export const name = "prac-host-vscode";
@@ -307,5 +308,14 @@ export function apply(ctx: Context): void {
       `${name}: GET ${VSCODE_ROUTE}`,
     );
     manageCodeServer(webCtx);
+  });
+
+  // The other half of the VS Code side: the extensions themselves. Injected on
+  // `lsp` rather than declared, so a profile without the seam composes exactly
+  // as before — and nothing is forked until a language question is asked.
+  manageLanguageFeatures(ctx, {
+    checkoutRoot: dirname(bundleRoot()),
+    userExtensionsDir: codeServerDirs().extensionsDir,
+    storageRoot: join(codeServerDirs().userDataDir, "prac-extension-host"),
   });
 }

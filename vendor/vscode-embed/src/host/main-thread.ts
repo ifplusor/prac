@@ -23,7 +23,8 @@
  */
 
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { ChildProcess } from "node:child_process";
 import { configurationDefaults, type ExtensionDescription } from "./extensions.js";
 import {
@@ -135,6 +136,30 @@ export interface MainThreadPolicy {
   readonly onLog?: (message: string) => void;
 }
 
+/** A position on zero-based line/character coordinates. */
+export interface ProviderPosition {
+  readonly line: number;
+  readonly character: number;
+}
+
+/** A range on zero-based coordinates, half-open. */
+export interface ProviderRange {
+  readonly start: ProviderPosition;
+  readonly end: ProviderPosition;
+}
+
+/** Somewhere a provider pointed at. */
+export interface ProviderLocation {
+  readonly uri: UriLike;
+  readonly range: ProviderRange;
+}
+
+/** What a hover provider answered. */
+export interface ProviderHover {
+  readonly contents: string;
+  readonly range?: ProviderRange;
+}
+
 /** A running extension host with the minimum main thread attached. */
 export interface MainThreadHandle {
   readonly rpc: RpcProtocol;
@@ -153,6 +178,35 @@ export interface MainThreadHandle {
   openDocument(document: MainThreadDocument): void;
   /** Drop a document from the host's mirror. */
   closeDocument(uri: UriLike): void;
+  /**
+   * Ask the provider registered under `handle` — the four the seam of a coding
+   * agent needs. Positions are **zero-based** here; the protocol's are one-based
+   * and the conversion stays on this side.
+   */
+  provideHover(
+    handle: number,
+    uri: UriLike,
+    position: ProviderPosition,
+    signal?: AbortSignal,
+  ): Promise<ProviderHover | null>;
+  provideDefinition(
+    handle: number,
+    uri: UriLike,
+    position: ProviderPosition,
+    signal?: AbortSignal,
+  ): Promise<ProviderLocation[]>;
+  provideImplementation(
+    handle: number,
+    uri: UriLike,
+    position: ProviderPosition,
+    signal?: AbortSignal,
+  ): Promise<ProviderLocation[]>;
+  provideReferences(
+    handle: number,
+    uri: UriLike,
+    position: ProviderPosition,
+    signal?: AbortSignal,
+  ): Promise<ProviderLocation[]>;
   dispose(): Promise<void>;
 }
 
@@ -167,6 +221,51 @@ interface ExtHostProxies {
   };
   readonly telemetry: { $initializeTelemetryLevel(level: number, supported: boolean): void };
   readonly languages: { $acceptLanguageIds(ids: readonly string[]): void };
+  readonly languageFeatures: {
+    $provideHover(
+      handle: number,
+      resource: UriLike,
+      position: { lineNumber: number; column: number },
+      context: unknown,
+      token: unknown,
+    ): Promise<{ contents?: { value?: string }[]; range?: VsRange } | undefined>;
+    $provideDefinition(
+      handle: number,
+      resource: UriLike,
+      position: { lineNumber: number; column: number },
+      token: unknown,
+    ): Promise<VsLocation[] | undefined>;
+    $provideImplementation(
+      handle: number,
+      resource: UriLike,
+      position: { lineNumber: number; column: number },
+      token: unknown,
+    ): Promise<VsLocation[] | undefined>;
+    $provideReferences(
+      handle: number,
+      resource: UriLike,
+      position: { lineNumber: number; column: number },
+      context: unknown,
+      token: unknown,
+    ): Promise<VsLocation[] | undefined>;
+  };
+}
+
+/** A 1-based range, as the protocol sends it. */
+interface VsRange {
+  readonly startLineNumber: number;
+  readonly startColumn: number;
+  readonly endLineNumber: number;
+  readonly endColumn: number;
+}
+
+/** A location as the protocol sends it; links point at a target range. */
+interface VsLocation {
+  readonly uri?: UriLike;
+  readonly range?: VsRange;
+  readonly targetUri?: UriLike;
+  readonly targetRange?: VsRange;
+  readonly targetSelectionRange?: VsRange;
 }
 
 /**
@@ -264,8 +363,95 @@ export async function startMainThread(options: {
     openDocument: (document) => openDocument(proxies, document),
     closeDocument: (uri) =>
       proxies.documentsAndEditors.$acceptDocumentsAndEditorsDelta({ removedDocuments: [uri] }),
+    provideHover: async (handle, uri, position, signal) => {
+      const hover = await proxies.languageFeatures.$provideHover(
+        handle,
+        uri,
+        toVsPosition(position),
+        undefined,
+        await tokenFor(options.location, signal),
+      );
+      if (!hover) return null;
+      // The protocol answers with markdown parts; the seam wants one string.
+      const contents = (hover.contents ?? [])
+        .map((part) => part.value ?? "")
+        .filter((value) => value !== "")
+        .join("\n\n");
+      const range = toProviderRange(hover.range);
+      return range ? { contents, range } : { contents };
+    },
+    provideDefinition: (handle, uri, position, signal) =>
+      locationsFrom(options.location, signal, (token) =>
+        proxies.languageFeatures.$provideDefinition(handle, uri, toVsPosition(position), token),
+      ),
+    provideImplementation: (handle, uri, position, signal) =>
+      locationsFrom(options.location, signal, (token) =>
+        proxies.languageFeatures.$provideImplementation(handle, uri, toVsPosition(position), token),
+      ),
+    provideReferences: (handle, uri, position, signal) =>
+      locationsFrom(options.location, signal, (token) =>
+        // References always include the declaration: an agent asking where a
+        // symbol is used wants to see the definition too.
+        proxies.languageFeatures.$provideReferences(
+          handle,
+          uri,
+          toVsPosition(position),
+          { includeDeclaration: true },
+          token,
+        ),
+      ),
     dispose: () => host.dispose(),
   };
+}
+
+/** Run one location-returning provider call and normalise what comes back. */
+async function locationsFrom(
+  location: ExtensionHostLocation,
+  signal: AbortSignal | undefined,
+  call: (token: unknown) => Promise<VsLocation[] | undefined>,
+): Promise<ProviderLocation[]> {
+  const result = await call(await tokenFor(location, signal));
+  return (result ?? [])
+    .map(toProviderLocation)
+    .filter((entry): entry is ProviderLocation => entry !== undefined);
+}
+
+function toVsPosition(position: ProviderPosition): { lineNumber: number; column: number } {
+  return { lineNumber: position.line + 1, column: position.character + 1 };
+}
+
+function toProviderRange(range: VsRange | undefined): ProviderRange | undefined {
+  if (!range) return undefined;
+  return {
+    start: { line: range.startLineNumber - 1, character: range.startColumn - 1 },
+    end: { line: range.endLineNumber - 1, character: range.endColumn - 1 },
+  };
+}
+
+function toProviderLocation(location: VsLocation): ProviderLocation | undefined {
+  const uri = location.targetUri ?? location.uri;
+  const range = toProviderRange(
+    location.targetSelectionRange ?? location.targetRange ?? location.range,
+  );
+  if (!uri || !range) return undefined;
+  return { uri, range };
+}
+
+/**
+ * A protocol cancellation token driven by the caller's signal.
+ *
+ * The protocol hands providers a token, not an `AbortSignal`; adapting here
+ * keeps that difference out of the consumer, which only ever sees the signal the
+ * seam gives it.
+ */
+async function tokenFor(location: ExtensionHostLocation, signal?: AbortSignal): Promise<unknown> {
+  const module = (await import(
+    pathToFileURL(join(location.outBuild, "vs/base/common/cancellation.js")).href
+  )) as { CancellationTokenSource: new () => { token: unknown; cancel(): void } };
+  const source = new module.CancellationTokenSource();
+  if (signal?.aborted) source.cancel();
+  else signal?.addEventListener("abort", () => source.cancel(), { once: true });
+  return source.token;
 }
 
 function openDocument(proxies: ExtHostProxies, document: MainThreadDocument): void {
@@ -335,6 +521,7 @@ function extHostProxies(rpc: RpcProtocol, protocol: ExtensionHostProtocol): ExtH
     extensionService: proxy("ExtHostExtensionService") as ExtHostProxies["extensionService"],
     telemetry: proxy("ExtHostTelemetry") as ExtHostProxies["telemetry"],
     languages: proxy("ExtHostLanguages") as ExtHostProxies["languages"],
+    languageFeatures: proxy("ExtHostLanguageFeatures") as ExtHostProxies["languageFeatures"],
   };
 }
 

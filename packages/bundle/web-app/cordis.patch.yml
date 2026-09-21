@@ -42,3 +42,13 @@
     # `id` stays `prac-web-app` so the profile can address the row.
     - id: prac-web-app
       name: "prac-web-app"
+
+    # The language-service seam (`ctx.lsp`) and the tool that exposes it to the
+    # agent. No DSH bundle ships either one, so an outside provider has nothing
+    # to register into and the model has no way to ask. They resolve at runtime
+    # from the DSH installation, like `@deepseek-ai/cordis` does.
+    - id: lsp
+      name: "@deepseek-ai/dsh-lsp"
+
+    - id: tool-lsp
+      name: "@deepseek-ai/dsh-tool-lsp"

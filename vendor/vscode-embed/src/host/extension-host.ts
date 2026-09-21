@@ -436,6 +436,11 @@ export async function startExtensionHost(
     cwd: location.checkoutRoot,
     env: extensionHostEnv(location, pipePath),
     stdio: ["ignore", "pipe", "pipe", "ipc"],
+    // Never inherit the parent's loader flags. The host is a built program, and
+    // a flag that only made sense for the parent — a `--import tsx/esm` from a
+    // dev-mode launcher, say — makes the child die before it connects, with an
+    // error about a package that has nothing to do with either side.
+    execArgv: [],
   });
   child.stdout?.on("data", (chunk: Buffer) => options.onOutput?.("stdout", chunk.toString()));
   child.stderr?.on("data", (chunk: Buffer) => options.onOutput?.("stderr", chunk.toString()));

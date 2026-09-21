@@ -365,4 +365,8 @@ export type {
   MainThreadHandle,
   MainThreadPolicy,
   MainThreadWorkspace,
+  ProviderHover,
+  ProviderLocation,
+  ProviderPosition,
+  ProviderRange,
 } from "./main-thread.js";

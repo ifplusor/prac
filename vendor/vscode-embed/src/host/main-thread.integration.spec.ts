@@ -12,7 +12,7 @@
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { resolveExtensionHost } from "./extension-host.js";
 import { scanExtensions } from "./extensions.js";
@@ -168,31 +168,11 @@ describe.skipIf(!built)("main thread: the built-in css extension", () => {
         `registrations: ${host.registrations.map((r) => r.kind).join(", ") || "(none)"}\nlog:\n${log.join("\n")}`,
     );
 
-    // The provider is called the way the protocol calls it: an opaque handle,
-    // a URI, a 1-based position, a hover context, and a cancellation token.
-    const { CancellationToken } = (await import(
-      pathToFileURL(join(location.outBuild, "vs/base/common/cancellation.js")).href
-    )) as { CancellationToken: { None: unknown } };
-    const languageFeatures = host.rpc.getProxy(
-      host.protocol.ExtHostContext.ExtHostLanguageFeatures!,
-    ) as {
-      $provideHover(
-        handle: number,
-        resource: unknown,
-        position: { lineNumber: number; column: number },
-        context: unknown,
-        token: unknown,
-      ): Promise<{ contents?: { value?: string }[] } | undefined>;
-    };
-
-    const result = await languageFeatures.$provideHover(
-      hover()!.handle,
-      uri,
-      { lineNumber: 2, column: 4 },
-      undefined,
-      CancellationToken.None,
-    );
-    const contents = (result?.contents ?? []).map((part) => part.value ?? "").join("\n");
+    // The provider is called the way the protocol calls it: an opaque handle, a
+    // URI and a zero-based position; the one-based conversion and the
+    // cancellation token stay inside the module.
+    const hoverResult = await host.provideHover(hover()!.handle, uri, { line: 1, character: 3 });
+    const contents = hoverResult?.contents ?? "";
     // A real answer from the css language service: the hover for a property
     // documents the property, and nothing we wrote ourselves could know that.
     expect(contents.toLowerCase()).toContain("color");

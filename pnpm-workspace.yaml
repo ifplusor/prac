@@ -31,6 +31,11 @@ catalog:
   "@deepseek-ai/dsh-client-ui-slots": 0.1.5-rc.1
   "@deepseek-ai/dsh-client-ui-theme": 0.1.5-rc.1
   "@deepseek-ai/dsh-host-webserver": 0.1.5-rc.1
+  # The language-service seam the VS Code extension host is registered into
+  # (`ctx.lsp`). Types only, like the rest: the runtime comes from the DSH
+  # installation, and the seam has to be inserted into the composition by hand
+  # because no bundle ships it.
+  "@deepseek-ai/dsh-lsp": 0.1.5-rc.1
   "@types/node": ^24
   "@types/react": ~18.3.1
   react: ^18.2.0
