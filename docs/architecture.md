@@ -213,8 +213,9 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随 DSH 插
 2. **自动保存打开之后，验证门怎么调**：现在那几条"文件保持不动"的断言是靠故意关掉 autoSave 才稳的；`verify-file` 最近一次是 33/33 直接绿的，与旧注意不一致，待查。
 3. **Copilot 在我们 rig 里到底有没有激活**（实测）——它决定"树里多一个 agent"是理论问题还是已经在发生。**已知一条相关事实**：打开页面时 code server 会拉起一个 `--type=agentHost` 进程（VS Code 自己的 agent 层的服务端形态）。
 4. **按工作区 / 按 agent 配置装哪些 VS Code 扩展**（James 2026-09-21）。**"插件族的划分"这个问题撤销了**——不需要区分哪个 DSH 插件算 server 侧、哪个算 client 侧；要的是**VS Code 扩展贡献的 view 能上屏**（数据那一半见下条）。**James 定**：**用 VS Code 自己的按工作区启用/禁用，不另造配置机制**。
-   **上游自身的形态差异挡在这里（已核实）**：那份启停状态**在 web 形态下存在浏览器里**——`BrowserStorageService` 用 IndexedDB 存所有域（含 workspace：`workspaceStorageDatabase`），而 `web.main.ts:613-614` 构造它时**没有任何 remote 分支**；桌面/远程形态不同，渲染器的存储是服务端的（`NativeWorkbenchStorageService extends RemoteStorageService`，`electron-browser/storageService.ts:16`）。⇒ 我们的形态（web + code server）里，**"这个工作区启用了哪些扩展"是客户端状态**，主干（服务端、且不依赖页面）**读不到**。**按 agent 那条还额外卡在 seam**（查询入参没有会话标识，`packages/lsp/lsp/src/types.ts:38-57`）。
-   **照 VS Code 做只剩一条路**：配置仍由 VS Code 的界面管（状态留在浏览器），页面再把它经**已有的 DSH 客户端→host 调用**（§2.4 那条"服务调用"线）告诉主干；**没有页面时就没有这份状态**。要不要走这条待定。
+   **两个消费者在两种形态里，状态各归各家**（James 2026-09-21）：**UI 走 web**（它的按工作区启停是浏览器里的状态——`BrowserStorageService` 用 IndexedDB 存所有域含 workspace，`web.main.ts:613-614` 构造它时无 remote 分支），**由 VS Code 自己管它的宿主，我们什么都不用做**；**agent 不是 web、是服务端消费者**，所以它的"装什么"要由**服务端的事实**决定。⇒ 两边**不需要互相镜像**，也不该为一个统一机制去发明东西。
+   **要接受的一处不一致**：**UI 里禁用的扩展，agent 那边仍会加载**——这是 web 形态的必然，不是缺陷（桌面/远程形态相反：那边渲染器存储本来就在服务端）。
+   **agent 侧今天的事实**：`myExtensions` = 扫到的全部，于是 cSpell 在每个宿主里都因 `onStartupFinished` 自动激活（那 161 MB 里的一大块）。**要不要给 agent 一个服务端的来源**（工作区里的文件 / DSH 设置 / 只用 code server 的扩展目录）——那是**给 agent 的策略**，与 VS Code 的启停不冲突；待定。**按 agent 仍卡在 seam**（查询入参没有会话标识，`packages/lsp/lsp/src/types.ts:38-57`）。
 5. **VS Code 扩展贡献的 view 要能"出数据"**：现在 `mountViewInto` 能让扩展视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——要让它进 VS Code 自己的可见性 / 容器模型，树的数据才会来。这是"支持 VS Code 扩展贡献的 view"的实事。
 6. **container / part 这类高级形态什么时候真的需要**（现在是按视图组合就够）。
 7. **多窗口 / 多标签页**：**搁置**（James 2026-09-21：先保持简单，以后再说）。已核实的底子：多标签页在 DSH 身份层就是**一个 client**（浏览器会话 cookie）；VS Code 自己的多窗口机制是 **auxiliary window**（`window.open` 出来的窗口 attach 到同一个 workbench 实例，**不新增扩展宿主**），但它绕开 prac 的 frame（内容由 workbench 自己搬），要用得先在 prac 侧设计"窗口"这个概念。今天两个标签各 boot 一个实例 ⇒ 两个宿主。

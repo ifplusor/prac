@@ -165,7 +165,7 @@ status: in-progress
 
 > 与"插件族"无关，是针对**给工作区装什么**这件事。
 
-- **按工作区配置装哪些 VS Code 扩展（最好也能按 agent 配）**：**James 定：用 VS Code 自己的按工作区启用/禁用，不另造配置机制**（2026-09-21）。**已核实的形态差异**：web 形态下那份启停状态**在浏览器里**（`BrowserStorageService` 用 IndexedDB 存所有域含 workspace；`web.main.ts:613-614` 构造它时无 remote 分支），而桌面/远程形态的渲染器存储在服务端（`NativeWorkbenchStorageService extends RemoteStorageService`）⇒ 主干（服务端、不依赖页面）**读不到**；**按 agent 还卡在 seam**（入参无会话标识）。照 VS Code 做只剩一条路：页面把这份状态经**已有的客户端→host 调用**告诉主干（无页面则没有）。详见 [docs/architecture.md](../../../docs/architecture.md) §7 #4。
+- **按工作区配置装哪些 VS Code 扩展（最好也能按 agent 配）**：**用 VS Code 自己的按工作区启用/禁用，不另造配置机制**（James 2026-09-21）。**两个消费者在两种形态里，状态各归各家**（James）：**UI 走 web**（启停状态在浏览器 IndexedDB 里；`web.main.ts:613-614` 无 remote 分支），VS Code 自己管它的宿主，我们不动；**agent 不是 web、是服务端消费者**，它的"装什么"要由**服务端的事实**决定 ⇒ 两边不互相镜像、也不为了统一去发明东西。**要接受的不一致**：UI 里禁用的扩展，agent 仍会加载（web 形态的必然；桌面/远程形态相反）。**agent 侧待定**：要不要给它一个服务端来源（工作区文件 / DSH 设置 / 只用 code server 的扩展目录）——那是给 agent 的策略，与 VS Code 的启停不冲突。**按 agent 仍卡在 seam**（入参无会话标识）。详见 [docs/architecture.md](../../../docs/architecture.md) §7 #4。
 
 ### 已定方向、尚未做
 
