@@ -8,7 +8,7 @@ status: in-progress
 
 ## Problem（2026-09-13）
 
-prac 同时说三套词：DSH 的（slot / 视图 / 服务）、prac 自己的（frame / region / seat / view）、VS Code 的（workbench / part / monaco / `IWorkbench…`）。融合越深，第三套词越容易从"边界上的适配"扩散成 prac 内部的常用语——那时它不再是实现细节，而是 prac 的词汇表被上游改写。
+prac 同时说三套词：DSH 的（slot / 视图 / 服务）、prac 自己的（frame / region / view）、VS Code 的（workbench / part / monaco / `IWorkbench…`）。融合越深，第三套词越容易从"边界上的适配"扩散成 prac 内部的常用语——那时它不再是实现细节，而是 prac 的词汇表被上游改写。
 
 **James 的裁决**：prac 中使用的**所有 VS Code 概念要收束**，存在**一个清晰的转换界面**；边界之外的 prac 内部应使用**自己的或贴近 DSH 的**体系。
 
@@ -19,10 +19,10 @@ prac 同时说三套词：DSH 的（slot / 视图 / 服务）、prac 自己的�
 2. **跨平面契约用共享常量模块 + 构建期内联**（不引入运行期耦合，也不依赖 DSH 的配置通道）。
    - **放弃了什么**：一个"只放常量的最小模块"的额外包；改为让**上游本家的包**（`prac-vscode`）承担这个角色（它的 `.` 入口就是契约）。
 3. **`part` 只做边界词**：对外的面上用 `partHost`，机制内部只用 `view` / `region`（`ui-layout` 里没有 `part`）。
-4. **机制不知道任何来源词**：`ui-layout` 判"这是不是座位"按**注册表成员**（`slots.entries("prac.view")`），不按 id 前缀。原 `VS_VIEW_SOURCE` 删除。
+4. **机制不知道任何来源词**：`ui-layout` 判"这是不是一个 prac 的 view"按**注册表成员**（`slots.entries("prac.view")`），不按 id 前缀。原 `VS_VIEW_SOURCE` 删除。
    - **放弃了什么**：按前缀判定的一点便利；换来的是"机制与来源解耦"这条原则真正落地。
-5. **通道：全局不是唯一可行，DSH service 才是合规载体**。机制 → 编排用 `ctx.provide`；座位注入服务（`inject: ["pracVscode"]`）。
-   - **代价（已知并接受）**：坏组合（抽掉机制行、留座位行）从"渲染空白"变成"fiber 挂起"（DSH loader：依赖缺失的 fiber 保持 pending）。
+5. **通道：全局不是唯一可行，DSH service 才是合规载体**。机制 → 编排用 `ctx.provide`；声明视图的插件行注入服务（`inject: ["pracVscode"]`）。
+   - **代价（已知并接受）**：坏组合（抽掉机制行、留下声明视图的行）从"渲染空白"变成"fiber 挂起"（DSH loader：依赖缺失的 fiber 保持 pending）。
    - **必须留全局的只有补丁侧**：设置/读取它的代码跑在 workbench bundle 内部，既不在 DSH 模块图里也不在 Cordis 上下文里——这是结构性的。修法是把它换进 `create()` 的 construction options（S2），已做。
 6. **判据（怎么算收束了）**：
    1. 上游内部标识只出现在边界里（`workbench.parts.*`、`monaco-workbench`、`vs`/`vs-dark` 主题类、`_VSCODE_FILE_ROOT`、`remoteAuthority`/`serverBasePath`/`callbackRoute`/`productConfiguration`/`workspaceProvider`、`workbench.web.main.internal.js`）；
@@ -37,9 +37,9 @@ prac 同时说三套词：DSH 的（slot / 视图 / 服务）、prac 自己的�
   - **顺带收获**：删掉客户端的 **50ms 轮询**；契约成为可 `grep`、可 `diff` 的一份原件。
   - **收束的是四样东西**：入方向（defer 标志）、出方向（part-hosting face）、契约常量（options 字段名）、类型（face 的形状）。
 - **交互面走 service 而不是全局**：全局不是"唯一可行"，只是"模块图之外"的一个选择；Cordis 的 service 注册表才是 DSH 给的合规载体，且同一仓的"机制 → 编排"那条边已经这么做。
-  - **放弃了**：座位对"边界还没发布"的**宽容**（`?.` → 渲染 `null`，之后靠重渲染接上）。
-  - **换来**：顺序由框架保证——座位只在机制发布之后激活。
-  - **代价（已实测，不再是推断）**：坏组合（抽掉机制行、留座位行）从"渲染空白"变成 **fiber 挂起**——实测报 `2 entries did not activate` + `pending (waiting for service: pracVsHost)`、`regions: 0`。
+  - **放弃了**：插件行对"边界还没发布"的**宽容**（`?.` → 渲染 `null`，之后靠重渲染接上）。
+  - **换来**：顺序由框架保证——声明视图的行只在机制发布之后激活。
+  - **代价（已实测，不再是推断）**：坏组合（抽掉机制行、留下声明视图的行）从"渲染空白"变成 **fiber 挂起**——实测报 `2 entries did not activate` + `pending (waiting for service: pracVsHost)`、`regions: 0`。
 - **服务不用 `Service` 基类**：这个面没有自己的生命周期，也没有按组隔离的需要。
   - **留下的条件**：等这个面长出生命周期、或要按组隔离时再换。
 - **`part` 只做边界词**：对外的面上用 `partHost`，机制内部只用 `view` / `region`。
@@ -55,7 +55,7 @@ prac 同时说三套词：DSH 的（slot / 视图 / 服务）、prac 自己的�
 | --- | --- |
 | `workbench`（概念、`workbench.parts.*`、`.monaco-workbench`、`out/vs/workbench/…`、`.build/vscode`） | **vendor**——上游的词：part id / CSS 类 / 路径，改了会坏 |
 | `vscode` | **产品身份 token**：vendor 的目录与包名 ＋ prac 侧指代那个实例与它的资产（路由、服务、view id、surface id） |
-| prac 自己的词（frame / region / seat / view / slot / arrangement） | **prac** |
+| prac 自己的词（frame / region / view / slot / arrangement） | **prac** |
 
 不用 `ide`：prac 论述里 `IDE` 是**能力**（"保留完整 IDE 能力"、"可按需下潜的重工具"），不是实例，拿它当实例 token 会撞概念。
 
@@ -92,6 +92,14 @@ prac 两侧随之变薄：`packages/host/vscode` = 路由 `/prac-vscode` + code 
 1. **DOM 上的 `PART_HOST_ATTR` 携带的是 part id，不是 view id**。契约与载荷的默认路径都按 part id 查 host，而旧的 client 半边写的是 view id。lib 改回契约值后闸门立刻红（`verify-layout` 23/24、`verify-views` 超时）——它们一直用 view id 选 host。改法：闸门里显式写 `PART_OF_VIEW` / `VIEW_OF_PART`（**DOM 说 part，frame 说 view**），不假设相等。
 2. **路由处理器拿到的是完整 pathname**。旧代码在插件里 `slice(WORKBENCH_ROUTE.length)`，抽进 lib 时漏掉 ⇒ DSH 侧 `/prac-vscode/vs/…` 全 404，而**独立页 smoke 反而正常**（那条路不走路由）——只看 smoke 会假绿。机制侧因此有 `mountPath` 参数。
 
+## 2026-09-19：命名收束（续）——退役 `seat` / 座位
+
+**James 裁决：退役"座位"这个词。**
+
+- **为什么**：它没有独立含义——就是"注册进 `prac.view` 的 view"；而底层机制本来就是 DSH 的槽（`prac.view` 是一个 `root` 作用域的 list 槽，装几个由 `kind` 决定，身份是注册时的 `key`）。另造一个词只会让人问"为什么不用 slots"（这个问题真的被问了出来）。
+- **改法**：prac 侧词表收敛为 **frame / region / view**；讲机制时用 DSH 的词（槽 / `kind` / `key`）。旧文本里的"座位"按"注册进 `prac.view` 的 view"读。
+- **放弃了什么**：prac 自己那个短名字（"可编排单位"）；换来的是不需要解释的术语。
+
 ## 教训（跨步骤，都是硬证据）
 
 1. **未解析的类型在 `skipLibCheck` 下是真空通过，不是检查通过**。手写 `declare module "react"` 让 `ReactNode` 退化成 `any`，于是 `slots.register` 的组件签名真空通过；换成真 `@types/react` 后立刻抓到 `partHost(view): () => unknown` 的类型错（TS2769）。
@@ -107,9 +115,9 @@ prac 两侧随之变薄：`packages/host/vscode` = 路由 `/prac-vscode` + code 
 
 ## 仍然开放
 
-- **Step B（第二部分）**：值类跨包契约**已改名但仍是重复字面量**——view id `vscode:editor`/`vscode:sidebar` 仍是 **6 处**拼写（两个座位、`vscode-host` 的 `PART_OF_VIEW`、编排、以及注释），`/prac-vscode` 路由仍是 Node/浏览器**两处**。方案：座位在自己的 host 半边导出 view id 常量（消费方构建期内联）；路由常量由 host 包通过一个**无 Node 依赖的子路径导出**给 client 半边（直接 import 主入口会把 `node:http` 拖进浏览器 bundle）。
+- **Step B（第二部分）**：值类跨包契约**已改名但仍是重复字面量**——view id `vscode:editor`/`vscode:sidebar` 仍是 **6 处**拼写（两个 view 宿主、`vscode-host` 的 `PART_OF_VIEW`、编排、以及注释），`/prac-vscode` 路由仍是 Node/浏览器**两处**。方案：每个 view 宿主在自己的 host 半边导出 view id 常量（消费方构建期内联）；路由常量由 host 包通过一个**无 Node 依赖的子路径导出**给 client 半边（直接 import 主入口会把 `node:http` 拖进浏览器 bundle）。
   - **这个方案里最大的空洞仍未填**：那个共享常量模块**放哪、依赖方向朝哪**（"浏览器侧边界包由 Node 侧 import" vs "独立的最小模块"）——umbrella 只定了"构建期内联"，没定落点（未决项记在 umbrella §4 第 11 条）。它是"契约写 6 遍 / 2 遍"的根因。
 - **边界由哪些包构成**：本 note 前半写的是"两个 prac 包 + 一个上游本家"；2026-09-15 之后实际是 **`vendor/vscode` + `vendor/vscode-embed` + `packages/{host/vscode, client/vscode-host}`**（vendor 双子 + prac 两行）。以 umbrella §3 的图为准。
-- **类型重复**（曾记"两个座位各自手写我们的面"）：**已闭合**——Step B 第一部分发布了 `dist/client.d.mts`，两个座位改成从 `prac-client-vscode-host/client` 导入 `PracVscodeFace`。
+- **类型重复**（曾记"两个 view 宿主各自手写我们的面"）：**已闭合**——Step B 第一部分发布了 `dist/client.d.mts`，两个 view 宿主改成从 `prac-client-vscode-host/client` 导入 `PracVscodeFace`。
 - **`node_modules` 里的 DSH 类型是 npm 精确 pin**，与 checkout 的一致性靠 `scripts/dsh-types.mjs --compare --checkout <path>`；机制正确的 checkout 覆盖开关（重定向解析而非文件路径）未做——只有真需要时才做。
 - 若日后要动补丁载荷位置/拷贝归属，那时再谈。
