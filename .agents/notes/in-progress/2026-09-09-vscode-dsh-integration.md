@@ -165,7 +165,7 @@ status: in-progress
 
 > 与"插件族"无关，是针对**给工作区装什么**这件事。
 
-- **按工作区配置装哪些 VS Code 扩展（最好也能按 agent 配）**：**用 VS Code 自己的按工作区启用/禁用，不另造配置机制**（James 2026-09-21）。**两个消费者在两种形态里，状态各归各家**（James）：**UI 走 web**（启停状态在浏览器 IndexedDB 里；`web.main.ts:613-614` 无 remote 分支），VS Code 自己管它的宿主，我们不动；**agent 不是 web、是服务端消费者**，它的"装什么"要由**服务端的事实**决定 ⇒ 两边不互相镜像、也不为了统一去发明东西。**要接受的不一致**：UI 里禁用的扩展，agent 仍会加载（web 形态的必然；桌面/远程形态相反）。**agent 侧待定**：要不要给它一个服务端来源（工作区文件 / DSH 设置 / 只用 code server 的扩展目录）——那是给 agent 的策略，与 VS Code 的启停不冲突。**按 agent 仍卡在 seam**（入参无会话标识）。详见 [docs/architecture.md](../../../docs/architecture.md) §7 #4。
+- **按工作区配置装哪些 VS Code 扩展（最好也能按 agent 配）**：**用 VS Code 自己的按工作区启用/禁用，不另造配置机制**（James 2026-09-21）。**两个消费者在两种形态里，状态各归各家**（James）：**UI 走 web**（启停状态在浏览器 IndexedDB 里；`web.main.ts:613-614` 无 remote 分支），VS Code 自己管它的宿主，我们不动；**agent 不是 web、是服务端消费者**，它的"装什么"要由**服务端的事实**决定 ⇒ 两边不互相镜像、也不为了统一去发明东西。**要接受的不一致**：UI 里禁用的扩展，agent 仍会加载（web 形态的必然；桌面/远程形态相反）。**agent 侧那份记录是"我们的配置"**（James 2026-09-21 定）：它是一份"**应该**装什么"的决定、人和 agent 可改可审 ⇒ 落 **`$XDG_CONFIG_HOME/prac/…`**（**config**，不是 state——prac 的运行时状态跟随 XDG，且**不挂 DSH 的家**：`~/.dsh` 是单一根、不分 XDG）。**还剩两个小决定**：没有记录时的默认（全上 = 现状 / 只上内建 / 一个都不上）、谁写（agent 的工具 / 文件 / 界面）。**按 agent 仍卡在 seam**（入参无会话标识）。详见 [docs/architecture.md](../../../docs/architecture.md) §7 #4。
 
 ### 已定方向、尚未做
 
