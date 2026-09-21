@@ -165,7 +165,7 @@ status: in-progress
 
 > 与"插件族"无关，是针对**给工作区装什么**这件事。
 
-- **按工作区配置装哪些 VS Code 扩展（最好也能按 agent 配）**：James 2026-09-21 明确这里说的是**VS Code 扩展**（不是 DSH 插件——见 [概念边界](2026-09-13-vs-concept-boundary.md) 的用词约定）。今天我们的宿主 `myExtensions` = **全部**，于是 cSpell 在每个宿主里都因 `onStartupFinished` 自动激活。**按 agent 那条卡在 seam**：查询入参没有会话标识（`packages/lsp/lsp/src/types.ts:38-57`）。**真源待定**：读 VS Code 的工作区启用/禁用（工作区 storage 的 `extensionsIdentifiers/{disabled,enabled}`，`extensionManagement.ts:645-646`；Node 有 `node:sqlite`）还是 prac 自己一份配置（不与页面 UI 联动；我们的宿主本来就用自己那份 storage 根）。
+- **按工作区配置装哪些 VS Code 扩展（最好也能按 agent 配）**：**James 定：用 VS Code 自己的按工作区启用/禁用，不另造配置机制**（2026-09-21）。**已核实的形态差异**：web 形态下那份启停状态**在浏览器里**（`BrowserStorageService` 用 IndexedDB 存所有域含 workspace；`web.main.ts:613-614` 构造它时无 remote 分支），而桌面/远程形态的渲染器存储在服务端（`NativeWorkbenchStorageService extends RemoteStorageService`）⇒ 主干（服务端、不依赖页面）**读不到**；**按 agent 还卡在 seam**（入参无会话标识）。照 VS Code 做只剩一条路：页面把这份状态经**已有的客户端→host 调用**告诉主干（无页面则没有）。详见 [docs/architecture.md](../../../docs/architecture.md) §7 #4。
 
 ### 已定方向、尚未做
 
