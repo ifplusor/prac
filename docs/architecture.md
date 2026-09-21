@@ -212,10 +212,12 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随插件 d
 1. **第一条链已经通了**（css 内建扩展；四道门见工作记录）。**两组后续都搁置**（James 2026-09-21）：把 **json / html / markdown** 也编译进来（同一套手续、成本小），以及 **MCP 定义接线**（把 VS Code 那边的 server 定义来源接给 DSH 现有的 MCP 客户端）。
 2. **自动保存打开之后，验证门怎么调**：现在那几条"文件保持不动"的断言是靠故意关掉 autoSave 才稳的；`verify-file` 最近一次是 33/33 直接绿的，与旧注意不一致，待查。
 3. **Copilot 在我们 rig 里到底有没有激活**（实测）——它决定"树里多一个 agent"是理论问题还是已经在发生。**已知一条相关事实**：打开页面时 code server 会拉起一个 `--type=agentHost` 进程（VS Code 自己的 agent 层的服务端形态）。
-4. **插件族的划分**：server 侧一族与 client 侧一族各有哪些插件、什么算一个插件。
-5. **container / part 这类高级形态什么时候真的需要**（现在是按视图组合就够）。
-6. **多窗口 / 多标签页**：**搁置**（James 2026-09-21：先保持简单，以后再说）。已核实的底子：多标签页在 DSH 身份层就是**一个 client**（浏览器会话 cookie）；VS Code 自己的多窗口机制是 **auxiliary window**（`window.open` 出来的窗口 attach 到同一个 workbench 实例，**不新增扩展宿主**），但它绕开 prac 的 frame（内容由 workbench 自己搬），要用得先在 prac 侧设计"窗口"这个概念。今天两个标签各 boot 一个实例 ⇒ 两个宿主。
-7. **阶段二**（决策空间 / 以审决策为主界面）：保持搁置，重新进入主线需要重新裁决。
+4. **按工作区 / 按 agent 配置"装什么"**（James 2026-09-21 提出）。**"插件族的划分"这个问题撤销了**——不需要区分哪个插件算 server 侧、哪个算 client 侧；要的是**插件贡献的 view 能上屏**（数据那一半见下条）。新要求：一个工作区该装什么**要可配置**（不是"扫到什么就全上"），**最好还能按 agent 单独配**。
+   **这句里的"插件"有一处待明确**：指 **VS Code 扩展**（工作区启用/禁用哪些扩展——上游对应物是工作区 storage 的两个键 `extensionsIdentifiers/disabled` / `enabled`，`src/vs/platform/extensionManagement/common/extensionManagement.ts:645-646`）？还是指 **DSH 插件**（每个工作区、甚至每个 agent 一份组合树）？**前者我们这边就能做**（按工作区选 `myExtensions`；按 agent 那条卡在 seam——查询入参里没有会话标识，`packages/lsp/lsp/src/types.ts:38-57`）；**后者是 DSH 层面的能力**（动态组合），超出"只做结合"的本次范围。
+5. **插件贡献的 view 要能"出数据"**：现在 `mountViewInto` 能让扩展视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——要让它进 VS Code 自己的可见性 / 容器模型，树的数据才会来。这是"支持插件贡献的 view"的实事。
+6. **container / part 这类高级形态什么时候真的需要**（现在是按视图组合就够）。
+7. **多窗口 / 多标签页**：**搁置**（James 2026-09-21：先保持简单，以后再说）。已核实的底子：多标签页在 DSH 身份层就是**一个 client**（浏览器会话 cookie）；VS Code 自己的多窗口机制是 **auxiliary window**（`window.open` 出来的窗口 attach 到同一个 workbench 实例，**不新增扩展宿主**），但它绕开 prac 的 frame（内容由 workbench 自己搬），要用得先在 prac 侧设计"窗口"这个概念。今天两个标签各 boot 一个实例 ⇒ 两个宿主。
+8. **阶段二**（决策空间 / 以审决策为主界面）：保持搁置，重新进入主线需要重新裁决。
 
 ## 8. 相关
 

@@ -157,14 +157,20 @@ status: in-progress
 
 ### 需要 James 裁
 
-1. **插件族的划分**：哪些算 server 侧、哪些算 client 侧、什么算"一个插件"——接着做第二个 / 第三个 IDE 面前必须先定。
+1. **插件族的划分 —— 已撤销**（James 2026-09-21）：**不需要区分哪个插件算 server 侧、哪个算 client 侧**；要的是**插件贡献的 view 能上屏**。于是"族怎么分"这个问题不成立，真正的待办回到下面第 4 条（视图的数据）。
 2. **阶段二**（决策空间 / 以审决策为主界面）：保持搁置；重新进入主线需要重新裁决。展开见 [2026-09-09-c2-decision-space.md](../proposed/2026-09-09-c2-decision-space.md)。
 3. **高级形态（container / part）什么时候真的需要**：现在是按视图组合就够。
 
+### 新要求（James 2026-09-21）
+
+> 与"插件族"无关，是针对**给工作区装什么**这件事。
+
+- **按工作区配置"装什么"（最好也能按 agent 配）**——**这里的"插件"待明确**：是 **VS Code 扩展**（工作区启用哪些扩展；上游对应物是工作区 storage 的 `extensionsIdentifiers/disabled` 与 `enabled`，`src/vs/platform/extensionManagement/common/extensionManagement.ts:645-646`，读写见 `.../browser/extensionEnablementService.ts:775-787`），还是 **DSH 插件**（每个工作区/每个 agent 一份组合树）？前者我们这边能做（按工作区选 `myExtensions`；per-agent 卡在 seam：查询入参没有会话标识，`packages/lsp/lsp/src/types.ts:38-57`），后者是 DSH 层面的动态组合，超出本次范围。
+
 ### 已定方向、尚未做
 
-4. **frame 批次**：还差 `stage` 的 tab（需要 VS Code 侧的 `editor(file)`）；持久化的 **per-workspace 那半**未做。堆叠与底栏还缺：拖拽排序、view 间 sash 调尺寸、底栏开合入口。
-5. **扩展视图的"数据"**：`mountViewInto` 能让视图出 pane、标题与像素，但 **tree view 的 body 是 `no data provider registered`**——要让视图进 VS Code 自己的可见性 / 容器模型。
+4. **扩展贡献的 view 要能"出数据"**（James 2026-09-21 之后这是第一优先）：`mountViewInto` 已经能让扩展视图出 pane、标题与像素，但 **tree view 的 body 还是 `no data provider registered`**——要让视图进 VS Code 自己的可见性 / 容器模型，树的数据（`TreeDataProvider` 那一层）才会来。**这才是"支持插件贡献的 view"的实事**。
+5. **frame 批次**：还差 `stage` 的 tab（需要 VS Code 侧的 `editor(file)`）；持久化的 **per-workspace 那半**未做。堆叠与底栏还缺：拖拽排序、view 间 sash 调尺寸、底栏开合入口。
 6. **自动保存打开之后，验证门怎么调**：那几条"文件保持不动"的断言是靠故意关掉 autoSave 才稳的（`verify-file` 最近一次 33/33 直接绿、与旧注意不一致，待查）。
 7. **扩展安装的正当路径**：等 terminal 落地（它提供 `VSCODE_IPC_HOOK_CLI`）后用 `server-cli --install-extension` 正规安装；在那之前不装用户扩展（扩展目录现在由 `fs.watch` 接住，装了就能用）。
 8. **sidebar / panel / statusbar 的映射**：还欠被 stub 掉的 layout 语义（显隐 / zen / centered / floating / 多窗口）。
