@@ -191,6 +191,37 @@ describe.skipIf(!built)("main thread: the built-in css extension", () => {
     await css.host.dispose();
   }, 120_000);
 
+  it("runs a host per workspace, side by side", async () => {
+    const file = ":root {\n  --brand: red;\n}\n.a {\n  color: var(--brand);\n}\n";
+    const first = await startCssHost({ "one.css": file });
+    const second = await startCssHost({ "two.css": file });
+    const firstHandle = await first.registration("hover");
+    const secondHandle = await second.registration("hover");
+
+    const [fromFirst, fromSecond] = await Promise.all([
+      first.host.provideHover(
+        firstHandle,
+        { scheme: "file", path: first.path("one.css") },
+        { line: 4, character: 9 },
+      ),
+      second.host.provideHover(
+        secondHandle,
+        { scheme: "file", path: second.path("two.css") },
+        { line: 4, character: 9 },
+      ),
+    ]);
+    expect((fromFirst?.contents ?? "").toLowerCase()).toContain("color");
+    expect((fromSecond?.contents ?? "").toLowerCase()).toContain("color");
+    // Neither workspace stopped the other's host: attention moving to one is not
+    // a reason to tear the other down.
+    expect(first.host.child.exitCode).toBeNull();
+    expect(second.host.child.exitCode).toBeNull();
+    expect(first.host.child.pid).not.toBe(second.host.child.pid);
+
+    await first.host.dispose();
+    await second.host.dispose();
+  }, 180_000);
+
   it("picks up an extension that appears while it is running", async () => {
     const css = await startCssHost({ "runtime.css": "body {\n  color: red;\n}\n" });
     const hover = await css.registration("hover");

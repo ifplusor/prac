@@ -25,6 +25,7 @@
 import type { Context } from "@deepseek-ai/cordis";
 import { LspError, LspProviderId } from "@deepseek-ai/dsh-lsp";
 import type { LspProvider, LspProviderQuery, LspQueryResult } from "@deepseek-ai/dsh-lsp";
+import { watch, type FSWatcher } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -124,55 +125,67 @@ function createProvider(hosts: ExtensionHosts): LspProvider {
 }
 
 /**
- * One host per workspace root.
+ * One extension host per workspace, all of them alive at once.
  *
- * A language server is started with a root, and an extension host is the thing
- * that starts it: switching workspaces therefore means a new host, not a new
- * argument. Only one is kept — the agent works in one workspace at a time, and
- * keeping the previous one alive would keep its language server alive too.
+ * A language server is started with a root, so the root is part of a host's
+ * identity rather than an argument to one: two workspaces are two hosts running
+ * side by side, each with its own registry and its own language servers — the
+ * same shape VS Code's windows have. Work in one workspace never disturbs
+ * another, and nothing is torn down because attention moved elsewhere.
+ *
+ * The extension directories are **watched, not polled**: installing an extension
+ * writes into one of them, `fs.watch` says so, and every running host gets a
+ * registry delta. The query path therefore does no scanning at all, and a
+ * running host is never restarted because the set changed.
  */
 class ExtensionHosts {
-  private current: { readonly root: string; readonly host: Promise<MainThreadHandle> } | undefined;
-  private extensions: readonly ExtensionDescription[] = [];
-  private scannedAt = 0;
-
-  /** How long a scan is trusted before the directories are read again. */
-  private static readonly RESCAN_AFTER_MS = 2_000;
+  private readonly running = new Map<
+    string,
+    { host: Promise<MainThreadHandle>; extensions: ExtensionDescription[] }
+  >();
+  private readonly watchers: FSWatcher[] = [];
+  private reloadTimer: NodeJS.Timeout | undefined;
 
   constructor(private readonly options: LanguageFeaturesOptions) {}
 
-  /**
-   * Re-read the extension directories and tell a running host what changed.
-   *
-   * Extensions appear while the host is up — that is the normal case for a
-   * user-installed extension — and VS Code's answer is a registry delta rather
-   * than a restart, because a restart would throw away the language servers the
-   * running extensions already started. Throttled: a scan reads a manifest per
-   * directory, so it is not worth doing on every question.
-   */
-  async refresh(): Promise<void> {
-    if (Date.now() - this.scannedAt < ExtensionHosts.RESCAN_AFTER_MS) return;
-    const scanned = this.scan();
-    this.scannedAt = Date.now();
-    const current = this.current;
-    if (!current) {
-      this.extensions = scanned;
-      return;
-    }
-    const host = await current.host;
-    await host.setExtensions(scanned);
-    this.extensions = scanned;
-  }
-
-  private scan(): ExtensionDescription[] {
-    return scanExtensions({
-      builtinDir: join(this.options.checkoutRoot, "extensions"),
-      userDir: this.options.userExtensionsDir,
+  /** The host for a workspace, started on first use and kept. */
+  async for(workspaceRoot: string): Promise<MainThreadHandle> {
+    const existing = this.running.get(workspaceRoot);
+    if (existing) return existing.host;
+    const extensions = this.scan();
+    const host = this.start(workspaceRoot, extensions).catch((error: unknown) => {
+      // A failed start must not be remembered: the next query retries, which is
+      // what a build that appears later needs.
+      this.running.delete(workspaceRoot);
+      throw error;
     });
+    this.running.set(workspaceRoot, { host, extensions });
+    this.watch();
+    return host;
   }
 
   /**
-   * The extensions that say they activate for a language.
+   * Re-read the directories and hand every running host a delta.
+   *
+   * Called when the directories change, and available to a caller that knows
+   * something was installed without a filesystem event it can see.
+   */
+  async reload(): Promise<void> {
+    const scanned = this.scan();
+    for (const [root, entry] of this.running) {
+      entry.extensions = scanned;
+      try {
+        if (await (await entry.host).setExtensions(scanned)) {
+          console.log(`${name}: extension set changed — ${root} now has ${scanned.length}`);
+        }
+      } catch (error) {
+        console.warn(`${name}: could not update the extension host: ${message(error)}`);
+      }
+    }
+  }
+
+  /**
+   * The extensions that say they activate for a language in this workspace.
    *
    * Used to tell "the provider is on its way" apart from "no one provides
    * this": once all of these have finished activating and the provider is still
@@ -180,8 +193,9 @@ class ExtensionHosts {
    * event counts, because an extension that activates on it may well provide
    * for this language.
    */
-  candidatesFor(languageId: string): readonly string[] {
-    return this.extensions
+  candidatesFor(workspaceRoot: string, languageId: string): readonly string[] {
+    const extensions = this.running.get(workspaceRoot)?.extensions ?? [];
+    return extensions
       .filter((extension) => {
         const events = extension.activationEvents ?? [];
         return events.some(
@@ -192,35 +206,65 @@ class ExtensionHosts {
       .map((extension) => extension.identifier.value);
   }
 
-  async for(workspaceRoot: string): Promise<MainThreadHandle> {
-    if (this.current?.root === workspaceRoot) return this.current.host;
-    await this.dispose();
-    const host = this.start(workspaceRoot).catch((error: unknown) => {
-      // A failed start must not be remembered: the next query retries, which is
-      // what a build that appears later needs.
-      this.current = undefined;
-      throw error;
-    });
-    this.current = { root: workspaceRoot, host };
-    return host;
+  async dispose(): Promise<void> {
+    if (this.reloadTimer !== undefined) {
+      clearTimeout(this.reloadTimer);
+      this.reloadTimer = undefined;
+    }
+    for (const watcher of this.watchers.splice(0)) watcher.close();
+    const entries = [...this.running.values()];
+    this.running.clear();
+    await Promise.all(
+      entries.map(async (entry) => {
+        try {
+          await (await entry.host).dispose();
+        } catch {
+          // Already gone: disposing a host that failed to start is not an error.
+        }
+      }),
+    );
   }
 
-  async dispose(): Promise<void> {
-    const current = this.current;
-    this.current = undefined;
-    if (!current) return;
-    try {
-      await (await current.host).dispose();
-    } catch {
-      // Already gone: disposing a host that failed to start is not an error.
+  private scan(): ExtensionDescription[] {
+    return scanExtensions({
+      builtinDir: join(this.options.checkoutRoot, "extensions"),
+      userDir: this.options.userExtensionsDir,
+    });
+  }
+
+  /** Watch where extensions land, once, when the first host starts. */
+  private watch(): void {
+    if (this.watchers.length > 0) return;
+    for (const directory of [
+      this.options.userExtensionsDir,
+      join(this.options.checkoutRoot, "extensions"),
+    ]) {
+      try {
+        this.watchers.push(watch(directory, () => this.scheduleReload()));
+      } catch (error) {
+        // A directory that does not exist yet (nothing installed) is not a
+        // failure: the explicit `reload()` still covers that case.
+        console.warn(`${name}: not watching ${directory} for extensions: ${message(error)}`);
+      }
     }
   }
 
-  private async start(workspaceRoot: string): Promise<MainThreadHandle> {
+  private scheduleReload(): void {
+    if (this.reloadTimer !== undefined) clearTimeout(this.reloadTimer);
+    // Installing an extension writes several files; one reload after the dust
+    // settles is enough, and the timer must not hold a one-shot process open.
+    this.reloadTimer = setTimeout(() => {
+      this.reloadTimer = undefined;
+      void this.reload();
+    }, 500);
+    this.reloadTimer.unref();
+  }
+
+  private async start(
+    workspaceRoot: string,
+    extensions: readonly ExtensionDescription[],
+  ): Promise<MainThreadHandle> {
     const location = this.location();
-    const extensions = this.scan();
-    this.extensions = extensions;
-    this.scannedAt = Date.now();
     console.log(
       `${name}: starting the extension host for ${workspaceRoot} with ${extensions.length} extension(s)`,
     );
@@ -291,9 +335,9 @@ async function query(
       "LSP_UNSUPPORTED_OPERATION",
     );
   }
-  // An extension may have appeared since the last look, so the directories are
-  // re-read (throttled) before we ask the host to activate anything.
-  await hosts.refresh();
+  // The host for this workspace, started on first use and kept: nothing is
+  // scanned here — the extension directories are watched, so a change arrives
+  // as a registry delta rather than as work on the query path.
   const host = await hosts.for(request.workspaceRoot);
   const uri: UriLike = { scheme: "file", path: request.filePath };
   // Disk is the truth (the workspace contract): the host gets what is on disk
@@ -309,7 +353,7 @@ async function query(
     kind,
     request.languageId,
     request.filePath,
-    hosts.candidatesFor(request.languageId),
+    hosts.candidatesFor(request.workspaceRoot, request.languageId),
   );
   const position: ProviderPosition = {
     line: request.position.line,
@@ -415,4 +459,9 @@ function uriToString(uri: UriLike): string {
   const withAuthority = uri as UriLike & { readonly authority?: string };
   if (uri.scheme === "file") return pathToFileURL(uri.path).href;
   return `${uri.scheme}://${withAuthority.authority ?? ""}${uri.path}`;
+}
+
+/** An error's message, for a log line that must never throw on its own. */
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

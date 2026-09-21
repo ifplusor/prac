@@ -191,7 +191,7 @@ export interface MainThreadHandle {
    * extension does not require restarting the host, and so does not throw away
    * the language servers it already started.
    */
-  setExtensions(extensions: readonly ExtensionDescription[]): Promise<void>;
+  setExtensions(extensions: readonly ExtensionDescription[]): Promise<boolean>;
   /** The extension set the host currently knows about. */
   readonly extensions: readonly ExtensionDescription[];
   /** Feed a document, or update one already fed. */
@@ -390,9 +390,10 @@ export async function startMainThread(options: {
     setExtensions: async (next) => {
       registryVersion += 1;
       const delta = extensionsDelta(known, next, registryVersion);
-      if (delta === undefined) return;
+      if (delta === undefined) return false;
       await proxies.extensionService.$deltaExtensions(delta);
       known.splice(0, known.length, ...next);
+      return true;
     },
     extensions: known,
     activate: (extensionId) => {
