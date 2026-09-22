@@ -218,7 +218,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   private readonly parts = new Map<string, Part>();
 
   /** Views the embedder mounted, by view id — one pane each, created on demand. */
-  private readonly mountedViews = new Map<string, ViewPane>();
+  private readonly mountedViews = new Map<string, { pane: ViewPane; host: HTMLElement }>();
 
   /**
    * View hosts whose view was not resolvable yet, by view id.
@@ -471,7 +471,10 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   mountViewInto(viewId: string, element: HTMLElement): void {
     const mounted = this.mountedViews.get(viewId);
     if (mounted) {
-      element.replaceChildren(mounted.element);
+      element.replaceChildren(mounted.pane.element);
+      this.observeHost(element);
+      mounted.host = element;
+      this.layout();
       return;
     }
     if (this.tryMountView(viewId, element)) return;
@@ -514,9 +517,14 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       // `ViewPaneContainer` drives it too), so a view mounted outside a
       // container has to say so itself.
       pane.setVisible(true);
-      this.mountedViews.set(viewId, pane);
+      this.mountedViews.set(viewId, { pane, host: element });
       this._register(pane);
       element.replaceChildren(pane.element);
+      // Size it like a container would (see `layout()`): a pane mounted outside
+      // a container has no splitview to do it, and until it is sized it is a
+      // header with a zero-height body.
+      this.observeHost(element);
+      this.layout();
       return true;
     } catch (error) {
       this.logService.error(`vscode-embed: failed to mount view ${viewId}`, error);
@@ -557,11 +565,11 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    */
   releaseView(viewId: string): void {
     this.deferredViews.delete(viewId);
-    const pane = this.mountedViews.get(viewId);
-    if (!pane) return;
+    const mounted = this.mountedViews.get(viewId);
+    if (!mounted) return;
     this.mountedViews.delete(viewId);
-    pane.setVisible(false);
-    pane.dispose();
+    mounted.pane.setVisible(false);
+    mounted.pane.dispose();
   }
 
   /**
@@ -1223,6 +1231,27 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
         grid.layout(width, height);
       } catch (error) {
         this.logService.error(`vscode-embed: failed to layout part ${id}`, error);
+      }
+    }
+
+    // A view pane is sized by whoever owns it: a `ViewPaneContainer` hands it to
+    // a splitview, which sizes the element itself, gives the pane its orthogonal
+    // size and then asks it to lay out (`Pane.layout(size)`, upstream
+    // `base/browser/ui/splitview/paneview.ts`). A pane mounted into an
+    // embedder's element has no container, so this is that job — without it the
+    // pane keeps a header's height and everything it renders (a tree, a webview
+    // overlay) sits in a zero-height body.
+    for (const [id, { pane, host }] of this.mountedViews) {
+      const hostDimension = host.getBoundingClientRect();
+      const width = hostDimension.width || containerDimension.width;
+      const height = hostDimension.height || containerDimension.height;
+      try {
+        pane.element.style.width = `${width}px`;
+        pane.element.style.height = `${height}px`;
+        pane.orthogonalSize = width;
+        pane.layout(height);
+      } catch (error) {
+        this.logService.error(`vscode-embed: failed to layout view ${id}`, error);
       }
     }
 
