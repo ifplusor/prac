@@ -169,7 +169,7 @@ status: in-progress
 
 ### 已定方向、尚未做
 
-4. **扩展贡献的 view 要能"出数据"**（James 2026-09-21 之后这是第一优先）：`mountViewInto` 已经能让扩展视图出 pane、标题与像素，但 **tree view 的 body 还是 `no data provider registered`**——要让视图进 VS Code 自己的可见性 / 容器模型，树的数据（`TreeDataProvider` 那一层）才会来。**这才是"支持 VS Code 扩展贡献的 view"的实事**。
+4. **扩展贡献的 view**（**前提已改**：原来记的"tree view 没数据"是过时的，2026-09-21 核实**树视图本来就通**——挂 cSpell 的 `cSpellIssuesViewByFile` 得到的是扩展自己给的 `No issues found.`）。剩下的真缺口是：① **webview 视图**（`type=webview`，body 完全空，我们没接这条路）；② **没编译出来的内建扩展**（`references-view` / `npm` / `emmet`… 激活失败 ⇒ 视图无数据）。**"哪几个视图要进 prac 的界面"也还没定**——第一优先的排序要不要按新事实调整，待 James。
 5. **frame 批次**：还差 `stage` 的 tab（需要 VS Code 侧的 `editor(file)`）；持久化的 **per-workspace 那半**未做。堆叠与底栏还缺：拖拽排序、view 间 sash 调尺寸、底栏开合入口。
 6. **自动保存打开之后，验证门怎么调**：那几条"文件保持不动"的断言是靠故意关掉 autoSave 才稳的（`verify-file` 最近一次 33/33 直接绿、与旧注意不一致，待查）。
 7. **扩展安装的正当路径**：等 terminal 落地（它提供 `VSCODE_IPC_HOOK_CLI`）后用 `server-cli --install-extension` 正规安装；在那之前不装用户 VS Code 扩展（扩展目录现在由 `fs.watch` 接住，装了就能用）。
