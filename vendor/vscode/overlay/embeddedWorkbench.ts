@@ -218,7 +218,10 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   private readonly parts = new Map<string, Part>();
 
   /** Views the embedder mounted, by view id — one pane each, created on demand. */
-  private readonly mountedViews = new Map<string, { pane: ViewPane; host: HTMLElement }>();
+  private readonly mountedViews = new Map<
+    string,
+    { pane: ViewPane; host: HTMLElement; frame: HTMLElement }
+  >();
 
   /**
    * View hosts whose view was not resolvable yet, by view id.
@@ -471,7 +474,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   mountViewInto(viewId: string, element: HTMLElement): void {
     const mounted = this.mountedViews.get(viewId);
     if (mounted) {
-      element.replaceChildren(mounted.pane.element);
+      element.replaceChildren(mounted.frame);
       this.observeHost(element);
       mounted.host = element;
       this.layout();
@@ -517,9 +520,19 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       // `ViewPaneContainer` drives it too), so a view mounted outside a
       // container has to say so itself.
       pane.setVisible(true);
-      this.mountedViews.set(viewId, { pane, host: element });
+      // The pane goes inside the ancestor its own stylesheet requires. A
+      // `ViewPaneContainer` nests every view in a `.monaco-pane-view`, and that
+      // class is where the box model comes from — it defines
+      // `--pane-header-size` and makes `.pane` a full-height flex column with a
+      // flexible body (`base/browser/ui/splitview/paneview.css`). Mounting the
+      // pane bare leaves `.pane-body` content-sized, which is invisible for a
+      // view whose body is empty and just anchors something else (a webview).
+      const frame = document.createElement("div");
+      frame.className = "monaco-pane-view";
+      frame.appendChild(pane.element);
+      this.mountedViews.set(viewId, { pane, host: element, frame });
       this._register(pane);
-      element.replaceChildren(pane.element);
+      element.replaceChildren(frame);
       // Size it like a container would (see `layout()`): a pane mounted outside
       // a container has no splitview to do it, and until it is sized it is a
       // header with a zero-height body.
