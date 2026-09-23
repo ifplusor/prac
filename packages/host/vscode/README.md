@@ -175,7 +175,12 @@ openssl s_client -connect prac.ifplusor.win:443 \
 
 DSH 默认只绑环回，而 `dsh --host 0.0.0.0` 被**有意拒绝**（`intentionally not supported yet for safety: it would expose remote code execution to the network`，`packages/bundle/web-app/src/startup.ts`），webserver 的 schema 也只认 `127.0.0.1` / `0.0.0.0` 两个字面量。
 
-**选定的落点**（2026-09-23）：不改 DSH，改**这个 profile 自己的 patch 层** `$DSH_HOME/profiles/<name>/cordis.patch.yml`——它排在每个 bundle 层之后，是「部署事实」该待的地方；写进 prac 仓库那个 bundle patch 等于让所有 `prac-dev` 都绑 LAN。上面 `proxy_pass` 的目标也就跟着变成这台机器的 LAN 地址。
+**落点**：不改 DSH，写进**用户 patch 层**。两种写法，都不碰别人手头那套：
+
+- `$DSH_HOME/profiles/<name>/cordis.patch.yml`——该 profile 每次启动时读；
+- 启动时 `--patch <文件>` 叠加层——只影响那一次启动。
+
+**别写进 prac 仓库那个 bundle patch**（等于让所有 `prac-dev` 都绑 LAN），**也别去改别人正在用的那个 profile**：`patchReload` 是 `startup`，改它等于改对方下次启动的形状。上面 `proxy_pass` 的目标也就跟着变成这台机器的 LAN 地址。
 
 ```yaml
 - id: webserver
