@@ -47,22 +47,24 @@ webview 是第三方扩展写的 HTML/JS，跑在浏览器里。它的宿主页�
 所以 prac 只做一件事：把部署给的端点模板交给页面。**没有配置就沿用构建自带的值（CDN）**。
 
 ```bash
-# 部署侧在通配名下终止 HTTPS 并转发到这里；prac 自己保持 plain HTTP 即可
+# 部署侧在通配名下终止 HTTPS 并转发到这里；prac 自己保持 plain HTTP 即可。
+# --port 必须显式给：不传就是 3080，而 3080 通常被日常那个 web profile 占着。
 PRAC_VSCODE_WEBVIEW_ENDPOINT='https://{{uuid}}.prac-code-resource.ifplusor.win/prac-vscode/vs/workbench/contrib/webview/browser/pre/' \
-  pnpm dsh --profile prac-dev --port 3084 --no-open --trusted-host prac.ifplusor.win
+  pnpm dsh --profile prac-dev --port 3084 --no-open
 ```
 
-`--trusted-host` 不是可选项，理由在下面第 3 条前置里。
+带 prac bundle 的 profile 与公开名的信任栅栏都是前置，见下面前置表。
 
 ## 部署：在内网把那个源供起来（OpenWrt 的 UCI nginx）
 
-下面是最小配方。以 James 的内网为例：应用名 `prac.ifplusor.win`，webview 源 `*.prac-code-resource.ifplusor.win`，DSH 跑在 `192.168.1.10:3084`。OpenWrt 的 nginx 主配置是 init 每次起停从模板**现生成**的 `/etc/nginx/uci.conf`——只改 UCI 与 `/etc/nginx/conf.d/` 里的文件，别改生成物。
+下面是最小配方。以 James 的内网为例：应用名 `prac.ifplusor.win`，webview 源 `*.prac-code-resource.ifplusor.win`，DSH（`prac-dev` 那个实例）跑在 `192.168.1.11:3084`——**这个端口必须与启动时给的 `--port` 一致**。OpenWrt 的 nginx 主配置是 init 每次起停从模板**现生成**的 `/etc/nginx/uci.conf`——只改 UCI 与 `/etc/nginx/conf.d/` 里的文件，别改生成物。
 
-**三条前置**，缺一条这套配置都白配：
+**四条前置**，缺一条这套配置都白配：
 
 1. **两个名字都解析到路由器**。dnsmasq 里写一条 `prac-code-resource.ifplusor.win` 就够，它连子域一起答（`--address=/<域>/<ip>`）。
-2. **路由器够得到 DSH**。现在够不到——见本节最后的「卡住的地方」。
-3. **DSH 启动时带 `--trusted-host prac.ifplusor.win`**。`/api` 前面有一道浏览器信任栅栏，要求请求的 `Host` 是环回或已声明的权威名（`packages/client/connection/src/api-request-trust.ts` 的 `isTrustedApiRequest`）；而 nginx 这边又**必须**透传原始 `Host`（改写成 `127.0.0.1:3084` 会立刻被同一道栅栏的 Origin 比对挡掉）。⇒ 少了这个参数，页面能开、每个 `/api` 请求返 403。
+2. **路由器够得到 DSH**：DSH 默认只绑环回，要按本节末那两段 patch 放开。
+3. **被转发到的那个实例得是带 prac bundle 的 profile**（`prac-dev` 那种）。DSH 自带的 `web` profile 里没有 `prac-web-app`，也就**没有 `/prac-vscode` 这条路由**；`/prac-vscode/vs/.../pre/index.html` 会是 404（`frontend-static` 的兜底只从 dist 里取文件，取不到就 404，不会递 SPA 的 HTML），webview 那套自建源就没有落点。
+4. **公开名要进 `/api` 的浏览器信任栅栏**。栅栏要求请求的 `Host` 是环回或已声明的权威名（`packages/client/connection/src/api-request-trust.ts` 的 `isTrustedApiRequest`），而 nginx 这边又**必须**透传原始 `Host`（改写成 `127.0.0.1:3080` 会立刻被同一道栅栏的 Origin 比对挡掉）；少了它，页面能开、每个 `/api` 请求返 403。本条写进 patch 层（见末节），不用每次带 flag。
 
 ### 1. 让 nginx 接管 80/443
 
