@@ -111,13 +111,15 @@ uci set nginx.prac.ssl_certificate_key='/etc/ssl/acme/prac.ifplusor.win.key'
 uci set nginx.prac.ssl_session_cache='shared:SSL:32k'
 uci set nginx.prac.ssl_session_timeout='64m'
 uci add_list nginx.prac.include='conf.d/prac-server.inc'
+uci set nginx.prac.large_client_header_buffers='4 8k'
 uci commit nginx
 ```
 
 两个名字放一段 server 是够的：webview 要的是「另一个**源**」，而源是 `scheme://host:port`——同一段 server 里两个 `server_name` 本来就是两个源。要是两个名字各有一张证书（`prac.ifplusor.win` 一张、`*.prac-code-resource.ifplusor.win` 一张），就开两段，各配各的 `server_name` 与 `ssl_certificate`，共用同一个 `.inc`。
 
-三条会咬人的细节：
+四条会咬人的细节：
 
+- **请求行得放得下**。DSH 的客户端插件 bundle 请求是一条 **2.6 KB 的 URL**（`/plugins/??<几十个插件 id>&rev=…`，由 `packages/client/modules/src/index.ts` 拼出），而 OpenWrt 的模板把 `large_client_header_buffers` 设成 `2 1k`（nginx 官方默认是 `4 8k`）⇒ nginx 在请求行上就回 **414**，页面只报"plugins 加载失败"。**这条只能设在 `server` 层**：同一层设两次会 `is duplicate` 起不来（`ngx_conf_set_bufs_slot` 里的检查），而模板已经在 `http` 段设过一条——所以走 UCI（生成进 `server{}`）或写进那个 `.inc`，别塞进 `conf.d/*.conf`。
 - **段名不能和 `conf.d/<段名>.conf` 同名**。生成器发现有这个文件，会把**整段 server 换成一行注释**（`skipped UCI server 'nginx.prac' as it could conflict with: …`，`net/nginx-util/src/nginx-util.cpp` 的 `create_server_conf`）⇒ 所以下面那个 http 级文件叫 `prac-ws.conf`，不叫 `prac.conf`。
 - **`uci_` 开头的选项被逐字跳过**（同一个函数）。所以**不要**在这段里写 `uci_manage_ssl`——那是 `nginx-util add_ssl` 留下的记号，写了它就会来接管你的证书。
 - **选项值逐字变成 `key value;`**，`location {}` 这类块指令塞不进 UCI（会多出一个分号，nginx 报语法错）⇒ locations 只能走文件。
@@ -128,7 +130,7 @@ uci commit nginx
 
 ```nginx
 location / {
-	proxy_pass http://192.168.1.10:3084;
+	proxy_pass http://192.168.1.11:3084;
 	proxy_http_version 1.1;
 	proxy_set_header Host $host;
 	proxy_set_header X-Forwarded-Proto $scheme;
