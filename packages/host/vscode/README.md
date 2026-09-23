@@ -48,10 +48,133 @@ webview 是第三方扩展写的 HTML/JS，跑在浏览器里。它的宿主页�
 
 ```bash
 # 部署侧在通配名下终止 HTTPS 并转发到这里；prac 自己保持 plain HTTP 即可
-PRAC_VSCODE_WEBVIEW_ENDPOINT='https://{{uuid}}.prac.internal/prac-vscode/vs/workbench/contrib/webview/browser/pre/' \
-  pnpm dsh --profile prac-dev --port 3084 --no-open
+PRAC_VSCODE_WEBVIEW_ENDPOINT='https://{{uuid}}.prac-code-resource.ifplusor.win/prac-vscode/vs/workbench/contrib/webview/browser/pre/' \
+  pnpm dsh --profile prac-dev --port 3084 --no-open --trusted-host prac.ifplusor.win
 ```
 
-要提供的东西：**一条通配 DNS 记录**（`*.prac.internal` → 本机）与**一张受信任的通配证书**（内网 CA 或公网通配证书）。转发目标就是本页的 `/prac-vscode` 路由（webview 只需要 bundle 里的静态文件）。
+`--trusted-host` 不是可选项，理由在下面第 3 条前置里。
 
-已知仍未做：挂进 embedder 的视图**没有盒模型**（workbench 的 pane CSS 限定在 `.monaco-workbench` 之下），webview 的 overlay 因此锚在 0 高的 body 上 ⇒ 内容加载了但没上屏。
+## 部署：在内网把那个源供起来（OpenWrt 的 UCI nginx）
+
+下面是最小配方。以 James 的内网为例：应用名 `prac.ifplusor.win`，webview 源 `*.prac-code-resource.ifplusor.win`，DSH 跑在 `192.168.1.10:3084`。OpenWrt 的 nginx 主配置是 init 每次起停从模板**现生成**的 `/etc/nginx/uci.conf`——只改 UCI 与 `/etc/nginx/conf.d/` 里的文件，别改生成物。
+
+**三条前置**，缺一条这套配置都白配：
+
+1. **两个名字都解析到路由器**。dnsmasq 里写一条 `prac-code-resource.ifplusor.win` 就够，它连子域一起答（`--address=/<域>/<ip>`）。
+2. **路由器够得到 DSH**。现在够不到——见本节最后的「卡住的地方」。
+3. **DSH 启动时带 `--trusted-host prac.ifplusor.win`**。`/api` 前面有一道浏览器信任栅栏，要求请求的 `Host` 是环回或已声明的权威名（`packages/client/connection/src/api-request-trust.ts` 的 `isTrustedApiRequest`）；而 nginx 这边又**必须**透传原始 `Host`（改写成 `127.0.0.1:3084` 会立刻被同一道栅栏的 Origin 比对挡掉）。⇒ 少了这个参数，页面能开、每个 `/api` 请求返 403。
+
+### 1. 让 nginx 接管 80/443
+
+`luci-nginx` 自带的 uci-defaults 会把 uhttpd `disable` 并 `stop`，再 `enable` + `start` nginx（`net/nginx/files-luci-support/60_nginx-luci-support`）。`luci-ssl-nginx` 在 24.10 与 master 上都不是独立包，只是 `luci-nginx` 声明的 provides，所以装一个就够：
+
+```sh
+opkg update && opkg install luci-nginx      # 24.10 及更早；snapshot 用 apk add
+service nginx status
+```
+
+### 2. 证书
+
+`/etc/config/acme`（acme 插件；通配名只能走 DNS 验证）：
+
+```
+config cert 'prac'
+	option enabled '1'
+	option staging '0'
+	list domains 'prac.ifplusor.win'
+	list domains 'prac-code-resource.ifplusor.win'
+	list domains '*.prac-code-resource.ifplusor.win'
+	option validation_method 'dns'
+	option dns 'dns_你的服务商'
+	list credentials 'XXX="…"'
+```
+
+```sh
+uci commit acme && service acme renew
+```
+
+证书文件名跟着 `list domains` 的**第一条**走（`acme.init` 取 `main_domain`，`acme-acmesh/files/hook.sh` 的 `link_certs` 再用它命名），所以这条配置的产物是 `/etc/ssl/acme/prac.ifplusor.win.fullchain.crt` 与 `/etc/ssl/acme/prac.ifplusor.win.key`。`ssl_certificate` 指 `fullchain.crt`——它指向 acme.sh 的 `fullchain.cer`，叶证书与中间证书都在里面。
+
+**续期不用自己接钩子**：acme 在 `renewed` 时发 `ubus call service event acme.renew`（`acme-common/files/acme-notify.sh`），nginx 的 init 给这个事件挂了 `reload`（`net/nginx/files/nginx.init` 的 `service_triggers`）。只有**第一次签发**不自动（那发的是 `acme.issue`）⇒ 签发完手工 `service nginx reload` 一次。
+
+### 3. UCI server 段
+
+```sh
+uci set nginx.prac='server'
+uci add_list nginx.prac.listen='443 ssl'
+uci add_list nginx.prac.listen='[::]:443 ssl'
+uci set nginx.prac.server_name='prac.ifplusor.win *.prac-code-resource.ifplusor.win'
+uci set nginx.prac.ssl_certificate='/etc/ssl/acme/prac.ifplusor.win.fullchain.crt'
+uci set nginx.prac.ssl_certificate_key='/etc/ssl/acme/prac.ifplusor.win.key'
+uci set nginx.prac.ssl_session_cache='shared:SSL:32k'
+uci set nginx.prac.ssl_session_timeout='64m'
+uci add_list nginx.prac.include='conf.d/prac-server.inc'
+uci commit nginx
+```
+
+两个名字放一段 server 是够的：webview 要的是「另一个**源**」，而源是 `scheme://host:port`——同一段 server 里两个 `server_name` 本来就是两个源。要是两个名字各有一张证书（`prac.ifplusor.win` 一张、`*.prac-code-resource.ifplusor.win` 一张），就开两段，各配各的 `server_name` 与 `ssl_certificate`，共用同一个 `.inc`。
+
+三条会咬人的细节：
+
+- **段名不能和 `conf.d/<段名>.conf` 同名**。生成器发现有这个文件，会把**整段 server 换成一行注释**（`skipped UCI server 'nginx.prac' as it could conflict with: …`，`net/nginx-util/src/nginx-util.cpp` 的 `create_server_conf`）⇒ 所以下面那个 http 级文件叫 `prac-ws.conf`，不叫 `prac.conf`。
+- **`uci_` 开头的选项被逐字跳过**（同一个函数）。所以**不要**在这段里写 `uci_manage_ssl`——那是 `nginx-util add_ssl` 留下的记号，写了它就会来接管你的证书。
+- **选项值逐字变成 `key value;`**，`location {}` 这类块指令塞不进 UCI（会多出一个分号，nginx 报语法错）⇒ locations 只能走文件。
+
+### 4. locations
+
+`/etc/nginx/conf.d/prac-server.inc`：
+
+```nginx
+location / {
+	proxy_pass http://192.168.1.10:3084;
+	proxy_http_version 1.1;
+	proxy_set_header Host $host;
+	proxy_set_header X-Forwarded-Proto $scheme;
+	proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+	proxy_set_header Upgrade $http_upgrade;
+	proxy_set_header Connection $prac_connection_upgrade;
+	proxy_read_timeout 3600s;
+	proxy_send_timeout 3600s;
+	proxy_buffering off;
+}
+```
+
+整个源都转给 DSH 是必须的：prac 的页面在 `/`，`/prac-vscode` 只是它引的 bundle 加上 code server 的 HTTP/WS 代理，同源才拼得起来。
+
+**文件名故意不用 `.locations`**：默认那段 `_lan` server 自带 `list include 'conf.d/*.locations'`（`net/nginx-util/files/nginx.config`），会把每个 `.locations` 收进去；我们的 `location /` 一进去，`https://192.168.1.1/` 就从 LuCI 变成 prac 了。`.inc` 不在 `*.conf` / `*.locations` 这两条 glob 里，只被上面那段 server 显式 include。
+
+### 5. WebSocket 要用的那个变量
+
+生成的模板里**没有** `$connection_upgrade`，照网上抄会报 `unknown "connection_upgrade" variable`。自己定义，`/etc/nginx/conf.d/prac-ws.conf`：
+
+```nginx
+map $http_upgrade $prac_connection_upgrade {
+	default upgrade;
+	''      close;
+}
+```
+
+`*.conf` 会被 include 进 `http{}`，map 正是 http 上下文的指令；变量名加前缀是为了不和别的包撞。不想多这个文件，就把 `.inc` 里那两行 `proxy_set_header` 换成 `proxy_set_header Connection "upgrade";`——效果一样，代价是普通请求也顶着 upgrade 头。
+
+### 6. 起、看、验
+
+```sh
+service nginx reload
+nginx -T | grep -A24 "nginx.prac"        # 看生成出来的那段 server
+curl -sI https://prac.ifplusor.win/prac-vscode/vs/workbench/contrib/webview/browser/pre/index.html
+openssl s_client -connect prac.ifplusor.win:443 \
+  -servername 2abc.prac-code-resource.ifplusor.win </dev/null 2>/dev/null \
+  | openssl x509 -noout -ext subjectAltName
+```
+
+浏览器里看三样：webview 的 iframe `src` 是 `https://<52 位 base32>.prac-code-resource.ifplusor.win/…`；那条源被 service worker 接管；**没有任何去 `vscode-cdn.net` 的请求**（`*.vscode-resource.vscode-cdn.net` 那几条是 SW 自己合成的，不是外网流量）。
+
+我们这段 server 没有 include `restrict_locally`，所以 prac 这两个名字只受防火墙管：以后要走 VPN 或开给公网，加一条 firewall 规则就行，nginx 不用动。
+
+### 卡住的地方：DSH 现在只绑环回
+
+`dsh --host 0.0.0.0` **被有意拒绝**——`intentionally not supported yet for safety: it would expose remote code execution to the network`（`packages/bundle/web-app/src/startup.ts`），而 webserver 的 schema 也只认 `127.0.0.1` / `0.0.0.0` 两个字面量。⇒ **路由器上的 nginx 现在转发不到 DSH 那台机器**（它只听自己那台机器的环回）。三条路，等裁：
+
+- **甲 · 前端放在 DSH 那台机器上**：那台机器上装 nginx（或 caddy）终止 TLS，路由器只做 DNS 与 VPN。今天零改动就能跑。
+- **乙 · 让 DSH 绑全部接口**：在 prac 的 `packages/bundle/web-app/cordis.patch.yml` 里覆盖 `webserver` 那行的 `host: '0.0.0.0'`（schema 认这个字面量，CLI 守卫拦不到 profile 里的行），`web-runtime` 会自动把本机 LAN 字面量加进信任栅栏，公开名再靠 `--trusted-host` 补上。
+- **丙 · 放开 DSH 的 CLI 守卫**：主干改动。那条守卫自己写着 "yet"，而栅栏（LAN 字面量 + `--trusted-host`）明显就是为放开它准备的。
