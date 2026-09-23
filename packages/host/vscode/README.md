@@ -171,10 +171,36 @@ openssl s_client -connect prac.ifplusor.win:443 \
 
 我们这段 server 没有 include `restrict_locally`，所以 prac 这两个名字只受防火墙管：以后要走 VPN 或开给公网，加一条 firewall 规则就行，nginx 不用动。
 
-### 卡住的地方：DSH 现在只绑环回
+### 让路由器够得到 DSH：绑全部接口 + 声明公开名
 
-`dsh --host 0.0.0.0` **被有意拒绝**——`intentionally not supported yet for safety: it would expose remote code execution to the network`（`packages/bundle/web-app/src/startup.ts`），而 webserver 的 schema 也只认 `127.0.0.1` / `0.0.0.0` 两个字面量。⇒ **路由器上的 nginx 现在转发不到 DSH 那台机器**（它只听自己那台机器的环回）。三条路，等裁：
+DSH 默认只绑环回，而 `dsh --host 0.0.0.0` 被**有意拒绝**（`intentionally not supported yet for safety: it would expose remote code execution to the network`，`packages/bundle/web-app/src/startup.ts`），webserver 的 schema 也只认 `127.0.0.1` / `0.0.0.0` 两个字面量。
 
-- **甲 · 前端放在 DSH 那台机器上**：那台机器上装 nginx（或 caddy）终止 TLS，路由器只做 DNS 与 VPN。今天零改动就能跑。
-- **乙 · 让 DSH 绑全部接口**：在 prac 的 `packages/bundle/web-app/cordis.patch.yml` 里覆盖 `webserver` 那行的 `host: '0.0.0.0'`（schema 认这个字面量，CLI 守卫拦不到 profile 里的行），`web-runtime` 会自动把本机 LAN 字面量加进信任栅栏，公开名再靠 `--trusted-host` 补上。
-- **丙 · 放开 DSH 的 CLI 守卫**：主干改动。那条守卫自己写着 "yet"，而栅栏（LAN 字面量 + `--trusted-host`）明显就是为放开它准备的。
+**选定的落点**（2026-09-23）：不改 DSH，改**这个 profile 自己的 patch 层** `$DSH_HOME/profiles/<name>/cordis.patch.yml`——它排在每个 bundle 层之后，是「部署事实」该待的地方；写进 prac 仓库那个 bundle patch 等于让所有 `prac-dev` 都绑 LAN。上面 `proxy_pass` 的目标也就跟着变成这台机器的 LAN 地址。
+
+```yaml
+- id: webserver
+  config:
+    host: '0.0.0.0'
+    port: !!js ctx.webStartup.port ?? 3080
+    compression: gzip
+    compressionLevel: 1
+    compressionThresholdBytes: 1024
+
+- id: connection
+  config:
+    trustedHosts: !!js "['prac.ifplusor.win', ...ctx.webRuntime.trustedHosts]"
+```
+
+三个必须知道的点：
+
+- **patch 对 `config` 是整体替换，不是深合并**（`vendor/include` 的 `applyEntryPatches` 只按顶层键赋值）⇒ 覆盖 `webserver` 时要把上游那行的 `port` 与 gzip 三个字段一起重抄，否则退回 schema 默认。`inject` 是另一个顶层键，不受影响。
+- **`!!js` 只认标量**（同一处的 `JsExpr` 是 `kind: 'scalar'`）⇒ 数组表达式要加引号。上游 `packages/bundle/web-app/cordis.patch.yml` 在 `connection` 那行注释里给的例子写成裸的流式序列，照抄会 `unknown tag !<!js>`，配置起不来。
+- `connection` 那行的拼接**就是上游注释给的写法**：LAN 字面量由 bind 推出，公开名我们加上；`web-runtime` 那行不用动。用户 patch 层还能引用 `process.env`，想「只有显式设了变量才绑 LAN」就把 `host` 写成 `!!js process.env.PRAC_WEB_HOST ?? '127.0.0.1'`。
+
+验证要用 `--dump-config`，**不能用 `--dump-default-config`**（后者故意不含用户层）：
+
+```sh
+pnpm dsh --profile prac-dev --dump-config | grep -A9 '^- id: webserver'
+```
+
+`patchReload` 是 `startup` ⇒ 改完要**重启 DSH** 才生效。重启后从 LAN 走应用名与通配子域各拉一次，都该是 200。
