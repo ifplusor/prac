@@ -284,6 +284,24 @@ export interface VscodeEmbedHandle {
  * so a consumer may create the handle before it knows the workspace (which is
  * often the case — the workspace may only appear later).
  */
+/**
+ * The webview endpoint the deployment configured, if any.
+ *
+ * It arrives as an index injection: a template with `{{uuid}}` in it, which the
+ * workbench substitutes with the hash of this page's origin — that hash *is* the
+ * hostname the webview host page insists on, so the name has to be a wildcard
+ * the deployment controls (the chain is documented in `prac-host-vscode`'s
+ * `webview-origin` module). Nothing is derived here: with nothing configured we
+ * pass nothing and the build's own endpoint stands.
+ *
+ * @returns the template, or `undefined` when the page was not given one.
+ */
+function webviewEndpoint(): string | undefined {
+  const injected = (globalThis as { __pracVscodeWebviewEndpoint?: unknown })
+    .__pracVscodeWebviewEndpoint;
+  return typeof injected === "string" && injected !== "" ? injected : undefined;
+}
+
 export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandle {
   const record = page();
   const route = options.route.replace(/\/+$/, "");
@@ -333,10 +351,19 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
           // startup promise). `bootHost` keeps living on as the element the parts
           // are mounted from.
           record.commands = mod.commands;
+          const endpoint = webviewEndpoint();
           mod.create(bootHost, {
             ...(launch.configurationDefaults === undefined
               ? {}
               : { configurationDefaults: launch.configurationDefaults }),
+            // Webviews must not be this page's origin (a webview is third-party
+            // content in a frame sandboxed with `allow-scripts` +
+            // `allow-same-origin`, which is only a boundary when the origin
+            // differs), and their host page further insists on a secure context
+            // whose hostname is the hash of this page's origin. So the endpoint
+            // is a template the deployment provides — `https://{{uuid}}.<wildcard
+            // name>/…` — and the workbench substitutes the hash for `{{uuid}}`.
+            ...(endpoint === undefined ? {} : { webviewEndpoint: endpoint }),
             productConfiguration: {
               nameShort: productName,
               nameLong: productName,

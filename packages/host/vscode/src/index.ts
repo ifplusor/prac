@@ -43,6 +43,9 @@ import {
 } from "prac-vscode-embed";
 import { manageLanguageFeatures } from "./language.js";
 
+/** The `globalThis` property the boot page reads the webview endpoint from. */
+export const WEBVIEW_ENDPOINT_GLOBAL = "__pracVscodeWebviewEndpoint";
+
 /** The cordis plugin name used by loader diagnostics. */
 export const name = "prac-host-vscode";
 
@@ -63,6 +66,23 @@ const PORT_ENV = "PRAC_CODE_SERVER_PORT";
 
 /** Overrides the server's product segment, for a server that is not this build. */
 const SEGMENT_ENV = "PRAC_CODE_SERVER_PATH";
+
+/**
+ * The `https://` base webviews are served from, e.g.
+ * `https://{{uuid}}.prac.internal/prac-vscode/vs/workbench/contrib/webview/browser/pre/`.
+ *
+ * Webviews are not our page's origin on purpose: a webview is extension-authored
+ * content in a frame sandboxed with `allow-scripts` + `allow-same-origin`, which
+ * is only a boundary when the origin differs — and that origin must also be a
+ * **secure context** (the webview host registers a service worker) whose
+ * hostname is a *subdomain of a name the deployment controls*, because the host
+ * page checks that its hostname is the hash of its parent's origin
+ * (`pre/index.html`; the renderer substitutes that hash for `{{uuid}}`). Only
+ * `https` under a wildcard name satisfies all of it, so prac does not invent an
+ * endpoint: the deployment terminates TLS for the wildcard name and forwards
+ * here. Unset means the build's own endpoint stands — which is the CDN.
+ */
+const WEBVIEW_ENDPOINT_ENV = "PRAC_VSCODE_WEBVIEW_ENDPOINT";
 
 /**
  * Where this module sits — the starting point of the upward search for the build.
@@ -307,6 +327,26 @@ export function apply(ctx: Context): void {
         }),
       `${name}: GET ${VSCODE_ROUTE}`,
     );
+    // Hand the page the webview endpoint, when the deployment configured one.
+    // An index injection is the existing channel for a server-side value the
+    // page needs at boot — no new mechanism, and no assumption about which
+    // address the client used (the template carries the deployment's name).
+    const webviewEndpoint = process.env[WEBVIEW_ENDPOINT_ENV];
+    if (webviewEndpoint !== undefined && webviewEndpoint !== "") {
+      webCtx.effect(
+        () =>
+          webCtx.on("webserver/index-inject", (table: unknown[]) => {
+            table.push({
+              kind: "global",
+              name: WEBVIEW_ENDPOINT_GLOBAL,
+              value: webviewEndpoint,
+            });
+          }),
+        `${name}: inject the webview endpoint`,
+      );
+      console.log(`${name}: webviews are served from ${webviewEndpoint} (${WEBVIEW_ENDPOINT_ENV})`);
+    }
+
     manageCodeServer(webCtx);
   });
 
