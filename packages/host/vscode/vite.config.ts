@@ -18,6 +18,8 @@ export default defineConfig({
     format: ["esm"],
     platform: "node",
     outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
-    deps: { neverBundle: ["@deepseek-ai/cordis", "@deepseek-ai/dsh-lsp"] },
+    deps: {
+      neverBundle: ["@deepseek-ai/cordis", "@deepseek-ai/dsh-lsp"],
+    },
   },
 });
