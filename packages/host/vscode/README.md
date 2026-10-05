@@ -189,7 +189,7 @@ DSH 默认只绑环回，而 `dsh --host 0.0.0.0` 被**有意拒绝**（`intenti
 ```yaml
 - id: webserver
   config:
-    host: '0.0.0.0'
+    host: "0.0.0.0"
     port: !!js ctx.webStartup.port ?? 3080
     compression: gzip
     compressionLevel: 1
