@@ -82,6 +82,7 @@
   - `prac.view` 用单数：槽名说的是"装哪一类东西"，**装几个由槽的 `kind` 决定**（`single` / `list` / `keyed` / `chain`），单个 view 的身份是注册时的 `key`。
 - **注意力与返回栈是 frame 的能力**，不属于任何单个视图。
 - 视图契约、树形摆放、收起记宽这类做法借鉴上游，frame 由 prac 拥有。
+- **UI 框架归 prac，DSH 与 VS Code 是组件来源**（James 2026-10-05）：我们从两边**借用**现成组件（VS Code 的 part / view / webview，DSH 的视图与基础控件）、**借鉴**它们的做法；框架本身——区域树、编排、层级、浮层——不外包。⇒ **借来的组件是沙箱里的客人**：prac 给它槽位与几何，它自己的样式与浮层不许溢出（边界怎么划、沙箱用什么，见 [2026-10-05 的提案](../.agents/notes/proposed/2026-10-05-vscode-dsh-layout-boundary.md)，待裁）。
 
 ### 3.2 IDE 那一半怎么进来
 
