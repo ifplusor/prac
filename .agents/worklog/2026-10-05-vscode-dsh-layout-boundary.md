@@ -288,6 +288,21 @@
 1. **`patches/0002` 要改指**：它现在把 webview 的 overlay 挂到 `document.body`（补丁注释写的理由是“锚点跨不过子树边界”）。隔离之后这条理由从“子树”变成“影根”，而 `body` 在根外 ⇒ **挂在那里锚点必然失效**。新目标：**挂进锚点所在的那棵树**（视图自己的根）。
 2. **验证入口已经就绪**：`~/.local/share/prac/code-server/extensions/prac.probe-webview-1.0.0` 还装着，可以拿它把“0002 现在是否真的坏了”变成实测。
 
+## ④ 落地：把 `patches/0002` 改指到“锚点所在的那棵树”（2026-10-05）
+
+**改法**（`.build/vscode/src/vs/workbench/contrib/webview/browser/overlayWebview.ts`）：
+
+- 新增 `private attachOverlay()`：取 `this._anchorState?.anchorElement`，**把 `overlayLayout.root` 挂进 `anchor.getRootNode()`**（若是 `ShadowRoot` 就挂进那个根，否则回落到 `document.body`）；只在父节点不同时才搬，避免反复重挂（webview 不能重挂，会毁内容）。
+- 调用点两处：`overlayLayout` 懒创建时（原来那处 `document.body.appendChild` 换掉），以及 **`setAnchorElement`**（锚点可能比 layout 晚知道，此时要重新安放）。
+
+**证据链**：补丁注释里原来写的理由是“锚点跨不过 `.monaco-workbench` 子树边界”；隔离之后那条边界变成**影根**（实验 7 量到：锚点在根里、浮层在文档里 → `[0,0]`）。所以 `document.body` 这个落点**必然失效**，新落点就是“锚点所在的那棵树”。
+
+**补丁**：重新生成，57 行（+33/−3）；`git apply --check -R` 通过（build 会识别为“已在位”）。
+
+**第一次验证没跑到位（如实记）**：web 产物已重建（`vscode:build` 通过，web + reh），rig 也起了，但**探针视图没被展开**——`prac.probe-webview` 贡献的是 `explorer` 容器里的一个 **webview 视图**（`pracProbeWebviewView`，`type: webview`），把 `vscode:sidebar` 提上来只看到 explorer 的树（280×133），**没有 overlay**（实测 `overlayCount: 0`；页面上唯一那个 iframe 是 0×0 的 services 页）。⇒ **下一步**：在根里点开 "Probe Webview" 那个 pane 的头（`.pane-header`）让它可见，再量 overlay 的 box 与它所在的树；对照图 `.build/scratch/webview-overlay.png`。
+
+**已确认的部分**：补丁重新生成且 `git apply --check -R` 通过；`vp check` 0 errors。
+
 ## 还没落地的
 
 - ~~**adaptor（第三步）**~~ → **已做，见下“落地：adaptor”**；旧的描述留档：：`vendor/vscode-embed` 的 `partHost` / `viewHost` 现在仍带**旧机制**——类镜像（`monaco-workbench` + 主题类）与 **200ms 轮询**。这一步要做的是：

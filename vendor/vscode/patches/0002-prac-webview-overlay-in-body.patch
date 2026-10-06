@@ -1,22 +1,57 @@
 diff --git a/src/vs/workbench/contrib/webview/browser/overlayWebview.ts b/src/vs/workbench/contrib/webview/browser/overlayWebview.ts
-index ad4e4e14..b75dc178 100644
+index ad4e4e14..23fce77c 100644
 --- a/src/vs/workbench/contrib/webview/browser/overlayWebview.ts
 +++ b/src/vs/workbench/contrib/webview/browser/overlayWebview.ts
-@@ -122,8 +122,15 @@ export class OverlayWebview extends Disposable implements IOverlayWebview {
+@@ -122,13 +122,41 @@ export class OverlayWebview extends Disposable implements IOverlayWebview {
  
  			// Webviews cannot be reparented in the dom as it will destroy their contents.
  			// Mount them to a high level node to avoid this depending on the active container.
 -			const root = this._layoutService.getContainer(this.window);
 -			root.appendChild(this._overlayLayout.root);
 +			//
-+			// prac: the embedder owns the layout, so a view pane can live *outside*
-+			// `.monaco-workbench` — and a webview positions itself over its pane's
-+			// body with CSS anchor positioning, which does not resolve across that
-+			// subtree boundary (measured: the same element resolves to the anchor's
-+			// box from `document.body`, and to 0x0 from inside the workbench root).
-+			// The document body is the common ancestor of both, so the overlay goes
-+			// there; the workbench container stays what it was for everything else.
-+			this.window.document.body.appendChild(this._overlayLayout.root);
++			// prac: the embedder gives every view its own shadow root, and a webview
++			// positions itself over its pane's body with CSS anchor positioning —
++			// which does not resolve across a shadow boundary (measured: the same
++			// element resolves to the anchor's box inside its own tree, and to 0x0
++			// outside it). So the overlay goes into the tree its anchor lives in;
++			// the document is the fallback until an anchor is known. `attachOverlay`
++			// owns that choice, and re-runs when the anchor changes.
++			this.attachOverlay();
  		}
  
  		return this._overlayLayout;
+ 	}
+ 
++	/**
++	 * prac: keep the overlay in the tree of the element it is anchored to.
++	 *
++	 * The anchor is what the overlay's CSS positions against, and anchors do not
++	 * cross a shadow boundary, so the tree has to match. Called when the layout is
++	 * created and again whenever the anchor changes.
++	 */
++	private attachOverlay(): void {
++		const layout = this._overlayLayout;
++		if (!layout) {
++			return;
++		}
++
++		const anchor = this._anchorState?.anchorElement;
++		const tree: Node = anchor ? anchor.getRootNode() : this.window.document;
++		const parent: Node = tree instanceof ShadowRoot ? tree : this.window.document.body;
++		if (layout.root.parentNode !== parent) {
++			parent.appendChild(layout.root);
++		}
++	}
++
+ 	public claim(owner: unknown, targetWindow: CodeWindow, scopedContextKeyService: IContextKeyService | undefined) {
+ 		if (this._isDisposed) {
+ 			return;
+@@ -202,6 +230,8 @@ export class OverlayWebview extends Disposable implements IOverlayWebview {
+ 		this._anchorState = { anchorElement, clippingContainer };
+ 		// Force the overlay layout to be created if it doesn't exist
+ 		this.overlayLayout.setAnchorElement(anchorElement, { clippingContainer });
++		// prac: the overlay may have been created before its anchor was known.
++		this.attachOverlay();
+ 
+ 		const part = anchorElement.closest('.part');
+ 		this._syncOuterEdgeClasses(part);
