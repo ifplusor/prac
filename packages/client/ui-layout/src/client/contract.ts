@@ -225,8 +225,9 @@ export interface LayoutFace {
  * no-ops rather than guessing a view.
  */
 export interface RoleBindings {
-  /** The view that plays the sidebar role (`dsh:sidebar` in prac's arrangement). */
-  sidebar?: string;
+  /** The view that plays the leftbar role (`dsh:sidebar` in prac's arrangement — the
+   * borrowed name of DSH's own `sidebar` slot stays what it is; the role is ours). */
+  leftbar?: string;
   /** The view that plays the rightbar role (`dsh:rightbar` in prac's arrangement). */
   rightbar?: string;
 }

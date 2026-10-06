@@ -128,7 +128,7 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
       return navigation.signal;
     },
     toggleSidebar(): void {
-      const viewId = roles.sidebar;
+      const viewId = roles.leftbar;
       if (viewId === undefined) return;
       store.update((state) => {
         const regionId = state.views[viewId]?.region;
@@ -259,7 +259,7 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
     },
     /** Bind the roles DSH's borrowed vocabulary resolves through. */
     bindRoles(next: RoleBindings): void {
-      if (next.sidebar !== undefined) roles.sidebar = next.sidebar;
+      if (next.leftbar !== undefined) roles.leftbar = next.leftbar;
       if (next.rightbar !== undefined) roles.rightbar = next.rightbar;
     },
     bindTrack(regionId: string): void {

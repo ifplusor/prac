@@ -321,6 +321,14 @@
 
 **已确认的部分**：补丁重新生成且 `git apply --check -R` 通过；`vp check` 0 errors。
 
+## ⑤ 落地：角色 `sidebar` → `leftbar`（2026-10-05）
+
+**只改 prac 自己的那层词**（`RoleBindings`）：`contract.ts`（角色接口与注释）、`services.ts`（`roles.leftbar`）、`arrangement.ts`（`ROLES = { leftbar: DSH_SIDEBAR_VIEW, rightbar: … }`）、`arrangement.spec.ts` 的断言、`ui-layout/client/index.ts` 的文档例。
+
+**没改的（有意）**：`dsh:sidebar`（指 DSH 那个叫 `sidebar` 的槽）、`vscode:sidebar`、`workbench.parts.sidebar`、`SIDEBAR_PART` 常量名——**借来的名字**。**区域 id 也没改**（`left`/`right`）：它们进持久化、被闸门读，改名要升 key ⇒ **待裁**。
+
+**验证**：单测 ui-layout **44/44**、web-app **15/15**；重建 `ui-layout` 类型产物与 `web-app` 包后，rig 上复跑 **十门**：prac 四门（stack / persistence / bottom / split）与 vendor 六门（layout / views / focus / regions / view / file）**全绿**。
+
 ## 还没落地的
 
 - ~~**adaptor（第三步）**~~ → **已做，见下“落地：adaptor”**；旧的描述留档：：`vendor/vscode-embed` 的 `partHost` / `viewHost` 现在仍带**旧机制**——类镜像（`monaco-workbench` + 主题类）与 **200ms 轮询**。这一步要做的是：

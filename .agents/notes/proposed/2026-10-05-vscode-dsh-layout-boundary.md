@@ -70,6 +70,7 @@ prac 的框架声称「区域树、编排、层级、浮层」都归自己（`do
 | `leftbar` / `rightbar` | **无** | 有 | 有 | `stack` | 待确认 |
 
 - **机制提供模式集合**（它认识 `stack` / `tab` / 分区）；**区域名绑定"可用哪些 + 默认哪个"**。两者分开，所以"区域对等"与"各区域不一样"不再打架；**这张表是数据，不是特权**。
+- **两个层次要分清（落地时容易混）**：**角色**是 prac 自己的词，已把 `sidebar` 改成 **`leftbar`**（`RoleBindings`，代码里已改）；**区域 id** 仍是 `left` / `right`，表里的 `leftbar` / `rightbar` 是**设计层的名字**——要不要连区域一起改（区域 id 进持久化，改名要升 key 并改闸门）**待裁**；**借来的名字不改**（`dsh:sidebar` 指 DSH 那个叫 `sidebar` 的槽、`vscode:sidebar` 指 VS Code 的 sidebar、`workbench.parts.sidebar` 是上游的部件 id）。
 - **区域名是设计层的名字，与来源无关**：`leftbar` / `rightbar` 是**位置的对称命名**；DSH 那边的槽名（`sidebar`）与 VS Code 那边的部件 id（`workbench.parts.sidebar`）是**借来的名字**，不在这一层出现。
 - **每个子区域跟随它所在区域名的绑定**（`stage` 拆出来的每块都有 `tab`、都不能 `stack`）。
 - **tab 是区域级的**，不是 stage 专有。
