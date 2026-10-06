@@ -301,6 +301,24 @@
 
 **第一次验证没跑到位（如实记）**：web 产物已重建（`vscode:build` 通过，web + reh），rig 也起了，但**探针视图没被展开**——`prac.probe-webview` 贡献的是 `explorer` 容器里的一个 **webview 视图**（`pracProbeWebviewView`，`type: webview`），把 `vscode:sidebar` 提上来只看到 explorer 的树（280×133），**没有 overlay**（实测 `overlayCount: 0`；页面上唯一那个 iframe 是 0×0 的 services 页）。⇒ **第二次尝试（点开 pane）也没成**：侧栏里只渲染了**文件树**那一个视图（`viewHosts: [{ id: "workbench.explorer.fileView", box: [0,18,280,133] }]`），`.pane-header` 只有 "prac-dev" 一个，**扩展贡献的 `pracProbeWebviewView` 没出现**；整页 `overlays: []`（没有可量的 overlay），唯一的 iframe 是 0×0 的 services 页。⇒ **卡在"怎么让一个 webview 视图真的上屏"上，不是卡在补丁本身**。两条可走的路：① 查 `prac.probe-webview` 为什么不上屏（启停策略 / 激活条件 / 该容器只显示了文件树）；② 换 cSpell 的 `cSpellInfoView`（`type: webview`，但它的 `when` 要命令面板，而命令面板在 0×0 修复前不可用）。对照图 `.build/scratch/webview-overlay2.png`，脚本 `.build/scratch/webview-overlay{,2}.mjs`。
 
+### 第三次：直接调 embed 的 face 挂进去 —— **验过**
+
+**为什么前两次不成**：prac **只挂它枚举的视图**——`PART_OF_VIEW` 把 `vscode:sidebar` 映射到**单个视图** `workbench.explorer.fileView`（`packages/client/vscode-host/src/client/index.ts:61`），所以扩展贡献的 `pracProbeWebviewView` 从来不会被挂载，侧栏里当然没有它的 pane、也没有 overlay。**不是启停策略、也不是激活问题**（策略文件都不存在）。
+
+**做法（不改产品）**：在真页面里拿 `globalThis.__vscodeEmbed.face.mountViewInto("pracProbeWebviewView", box)`，把那个 webview 视图**直接挂进一个视图自己的根**（放进它的 `[data-prac-view-content]`）。
+
+**读数**：
+
+| 量 | 值 | 说明 |
+| --- | --- | --- |
+| overlay（`.webview-overlay-content`） | `[0, 870, 260, 130]`，**tree = shadow** | 落在**根里**，不再是 `document.body` |
+| 锚点（`.pane-body`，带 `anchor-name: --overlay-anchor-…`） | **同一 box** `[0,870,260,130]`，tree = shadow | 与 overlay **完全重合** ⇒ **锚点解析成功** |
+| overlay 里的 iframe | 同 box，tree = shadow | webview 内容落在正确位置 |
+
+⇒ **判据成立**：改指之后 overlay 与它的锚点**同树**、位置**逐像素重合**；而实验 7 已量到“不同树时锚点给 `[0,0]`”。**`patches/0002` 这条改动验过。**
+
+对照图 `.build/scratch/webview-overlay3.png`，脚本 `.build/scratch/webview-overlay3.mjs`。
+
 **已确认的部分**：补丁重新生成且 `git apply --check -R` 通过；`vp check` 0 errors。
 
 ## 还没落地的
