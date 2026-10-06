@@ -30,9 +30,14 @@ export default defineConfig({
     // `@deepseek-ai/dsh-client-store` into the loader's module table as a
     // singleton, so the bundle requires it instead of inlining a second copy of
     // zustand/immer behind its own state.
+    //
+    // `react-dom` is a platform word too, and the frame needs it: a view's tree
+    // is rendered into its isolation root through a portal, and an inlined
+    // react-dom would be a second copy of React's DOM runtime behind the same
+    // roots (see the isolation boundary in `src/client/isolation.ts`).
     clientPack("prac-client-ui-layout", {
       entry: "src/client/index.ts",
-      external: ["@deepseek-ai/dsh-client-store"],
+      external: ["@deepseek-ai/dsh-client-store", "react-dom"],
     }),
     // The client half's published types, emitted from a type-only entry so the
     // `.d.mts` carries them (and DSH's merges) without a second runtime copy.

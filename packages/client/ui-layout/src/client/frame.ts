@@ -13,8 +13,9 @@
  * @module prac-client-ui-layout/client/frame
  */
 
-import { createElement, useEffect, useLayoutEffect, useRef } from "react";
+import { createElement, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { UsePanelInfo } from "@deepseek-ai/dsh-client-ui-layout/client";
 import type { UseSessions } from "@deepseek-ai/dsh-client-ui-session/client";
 import {
@@ -36,6 +37,7 @@ import {
   type SplitNode,
   type StyleObject,
 } from "./contract.js";
+import { mountIsolated, releaseIsolated } from "./isolation.js";
 import {
   edgeRegion,
   findRegion,
@@ -139,6 +141,46 @@ function View({ viewId, renderSlot, box, viewportWidth }: ViewProps): ReactNode 
   if (source === DSH_VIEW_SOURCE) return renderDshView(viewId, renderSlot, box, viewportWidth);
   if (isSeatView(viewId)) return renderSlot(VIEW_SEAT, {}, { only: viewId });
   return null;
+}
+
+/**
+ * A view inside its own isolation boundary.
+ *
+ * The frame owns the boundary (a view does not choose whether it is isolated),
+ * so this is the only place a root is created: one host element for the view's
+ * box, one shadow root, and the view's tree rendered into it through a portal.
+ * `isolation.ts` keeps the root supplied with the frame's own styles and the
+ * document's attributes.
+ *
+ * @param props - the view's rendered tree.
+ */
+function IsolatedView({ children }: { children?: ReactNode }): ReactElement {
+  const host = useRef<HTMLDivElement | null>(null);
+  const [content, setContent] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    const element = host.current;
+    if (!element) return undefined;
+    setContent(mountIsolated(element));
+    return () => {
+      releaseIsolated(element);
+      setContent(null);
+    };
+  }, []);
+  return createElement(
+    "div",
+    {
+      ref: host,
+      "data-prac-view-host": "",
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        flex: "1 1 auto",
+        minWidth: 0,
+        minHeight: 0,
+      },
+    },
+    content ? createPortal(children, content) : null,
+  );
 }
 
 /** A view's display label: the tail of its id (`dsh:sidebar` → `sidebar`). */
@@ -478,12 +520,16 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
                 "data-prac-stack-body": viewId,
                 style: { flex: "1 1 auto", minHeight: 0, position: "relative", overflow: "hidden" },
               },
-              createElement(View, {
-                viewId,
-                renderSlot,
-                box,
-                viewportWidth: state.viewportWidth,
-              }),
+              createElement(
+                IsolatedView,
+                null,
+                createElement(View, {
+                  viewId,
+                  renderSlot,
+                  box,
+                  viewportWidth: state.viewportWidth,
+                }),
+              ),
             ),
       );
     };
@@ -556,13 +602,16 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
      * @param box - the box of the region holding it.
      */
     const viewBody = (viewId: string, box: Box): ReactElement =>
-      createElement(View, {
-        key: viewId,
-        viewId,
-        renderSlot,
-        box,
-        viewportWidth: state.viewportWidth,
-      });
+      createElement(
+        IsolatedView,
+        { key: viewId },
+        createElement(View, {
+          viewId,
+          renderSlot,
+          box,
+          viewportWidth: state.viewportWidth,
+        }),
+      );
 
     /**
      * A region renders its front-most visible view — or, when it is a **stack**
