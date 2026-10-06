@@ -42,7 +42,7 @@ const { chromium } = require("@playwright/test");
 const sha = (buffer) => createHash("sha256").update(buffer).digest("hex");
 
 /** The seat's view id and the VS Code view it hosts (as `verify-view` reads them). */
-const VIEW_SEAT_ID = "vscode:sidebar";
+const VIEW_SEAT_ID = "vscode:view:workbench.explorer.fileView";
 const VIEW_HOST = '[data-vscode-embed-view="workbench.explorer.fileView"]';
 
 /**

@@ -39,7 +39,7 @@ const require = createRequire(join(upstreamDir, "package.json"));
 const { chromium } = require("@playwright/test");
 
 /** The seat prac declares, and the VS Code view it hosts. */
-const SEAT = "vscode:sidebar";
+const SEAT = "vscode:view:workbench.explorer.fileView";
 const VIEW = "workbench.explorer.fileView";
 const VIEW_HOST = `[data-vscode-embed-view="${VIEW}"]`;
 /** The part that must NOT be on the page: view hosting replaced it. */

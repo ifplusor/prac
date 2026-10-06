@@ -1,8 +1,8 @@
 {
-  "name": "prac-client-ui-vscode-explorer",
+  "name": "prac-client-ui-vscode-views",
   "version": "0.0.0",
   "private": true,
-  "description": "The explorer seat: declares `vscode:sidebar`, whose component is the shared VS Code part-host from `prac-client-vscode-host` (the sidebar part is where the explorer lives). Boots nothing.",
+  "description": "The VS Code views seat: declares one `prac.view` per view the app's view registry reports (core contributions and extension-contributed views alike), through the shared mechanism from `prac-client-vscode-host`. Boots nothing.",
   "files": [
     "dist"
   ],

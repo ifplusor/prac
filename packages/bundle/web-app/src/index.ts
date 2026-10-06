@@ -3,7 +3,7 @@
  *
  * This package is the **bundle**: its `cordis.patch.yml` is the composition
  * (disable DSH's `ui-layout`, mount the frame mechanism, the shared VS Code
- * client mechanism, the two seats and the VS Code host gateway), and its
+ * client mechanism, the two view consumers and the VS Code host gateway), and its
  * client half (`src/client.ts` → `dist/client.js`) is the arrangement that says
  * what is on screen and where.
  *

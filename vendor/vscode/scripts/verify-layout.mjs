@@ -68,7 +68,7 @@ const CONVERSATION_VIEW = "dsh:main:conversation";
  * nothing to drag — so the file view is split out of a region the sidebar keeps
  * occupied.
  */
-const VSCODE_SIDEBAR_VIEW = "vscode:sidebar";
+const VSCODE_SIDEBAR_VIEW = "vscode:view:workbench.explorer.fileView";
 
 /** The track the conversation parks in when a file takes the centre. */
 const TRACK_REGION = "right";

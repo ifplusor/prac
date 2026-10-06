@@ -7,12 +7,12 @@ import { PLATFORM_MODULES, clientPack } from "../../../scripts/pack-client.ts";
  * planes rather than a format choice:
  *
  * - the **host half** (`src/index.ts` → `dist/index.mjs`) is intentionally
- *   empty — the mechanism is browser-only — but every bundle row is imported on
- *   both planes, so the entry has to exist.
- * - the **client half** (`src/client.ts` → `dist/client.js`) is the seat that
- *   hosts the VS Code sidebar (explorer / SCM / outline) as a prac view. Its
- *   wrapping is DSH's loader contract, so it comes from
- *   `scripts/pack-client.ts` rather than being restated here.
+ *   empty — the client half is browser-only — but every bundle row is imported on both
+ *   planes, so the entry has to exist.
+ * - the **client half** (`src/client/index.ts` → `dist/client.js`) declares one
+ *   `prac.view` per entry of the app's view catalogue. Its wrapping is DSH's
+ *   loader contract, so it comes from `scripts/pack-client.ts` rather than being
+ *   restated here.
  *
  * `vite.config.ts` is also where the artifact is *verified*: the `check:client`
  * task asserts the emitted bytes (loader closure, answerable requires, no
@@ -26,13 +26,13 @@ export default defineConfig({
       platform: "node",
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
     },
-    clientPack("prac-client-ui-vscode-explorer", { entry: "src/client/index.ts" }),
+    clientPack("prac-client-ui-vscode-views", { entry: "src/client/index.ts" }),
   ],
   run: {
     tasks: {
       "check:client": {
         command:
-          "node ../../../scripts/bundle-client.mjs --artifact dist/client.js --id prac-client-ui-vscode-explorer" +
+          "node ../../../scripts/bundle-client.mjs --artifact dist/client.js --id prac-client-ui-vscode-views" +
           ` --allow ${PLATFORM_MODULES.join(" --allow ")} --exports apply,name,inject`,
         dependsOn: ["build"],
       },

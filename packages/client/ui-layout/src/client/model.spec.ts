@@ -102,12 +102,12 @@ describe("placement", () => {
 
   it("orders the front-most view first and skips hidden ones", () => {
     let current = place(state(), "dsh:sidebar", "left");
-    current = place(current, "vscode:sidebar", "left");
+    current = place(current, "vscode:view:a", "left");
     current = {
       ...current,
       views: {
         ...current.views,
-        "vscode:sidebar": { ...current.views["vscode:sidebar"]!, hidden: true },
+        "vscode:view:a": { ...current.views["vscode:view:a"]!, hidden: true },
       },
     };
     expect(visibleViews(current, "left")).toEqual(["dsh:sidebar"]);
@@ -125,14 +125,14 @@ describe("placement", () => {
   it("keeps a view's header cost invisible until a second one arrives", () => {
     const one = place(state(), "dsh:sidebar", "left");
     expect(isStacked(one, findRegion(one.tree, "left")!)).toBe(false);
-    const two = place(one, "vscode:sidebar", "left");
+    const two = place(one, "vscode:view:a", "left");
     expect(isStacked(two, findRegion(two.tree, "left")!)).toBe(true);
     // Folding does not un-stack: the header is what carries the fold.
     const folded = {
       ...two,
       views: {
         ...two.views,
-        "vscode:sidebar": { ...two.views["vscode:sidebar"]!, collapsed: true },
+        "vscode:view:a": { ...two.views["vscode:view:a"]!, collapsed: true },
       },
     };
     expect(isStacked(folded, findRegion(folded.tree, "left")!)).toBe(true);
@@ -200,7 +200,7 @@ describe("isPresent", () => {
 
 describe("resolveSizes", () => {
   it("gives fixed tracks their size and shares the rest with the flexible one", () => {
-    const current = place(place(state(), "dsh:sidebar", "left"), "vscode:editor", "right");
+    const current = place(place(state(), "dsh:sidebar", "left"), "vscode:view:b", "right");
     const boxes = resolveSizes(current, 1000, 800);
     // Three present children, two sashes; the centre absorbs what is left.
     expect(boxes.get("left")).toEqual({ width: 280, height: 800 });

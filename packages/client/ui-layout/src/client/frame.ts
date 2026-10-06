@@ -23,8 +23,8 @@ import {
   DSH_RIGHTBAR_VIEW,
   DSH_SIDEBAR_VIEW,
   DSH_VIEW_SOURCE,
-  VIEW_SEAT,
-  isSeatView,
+  VIEW_SLOT,
+  isDeclaredView,
   viewSource,
 } from "./catalogue.js";
 import {
@@ -131,15 +131,15 @@ function renderDshView(
  *
  * The **declaration** decides the dispatch, never the position and never the id's
  * name: DSH's own slots render through DSH's slot face, and a view the
- * `prac.view` seat declares renders that declaration (membership is read from the
- * registry — see {@link isSeatView}). Anything else renders nothing.
+ * `prac.view` slot declares renders that declaration (membership is read from the
+ * registry — see {@link isDeclaredView}). Anything else renders nothing.
  *
  * @param props - the placed view's identity, slot face and region box.
  */
 function View({ viewId, renderSlot, box, viewportWidth }: ViewProps): ReactNode {
   const source = viewSource(viewId);
   if (source === DSH_VIEW_SOURCE) return renderDshView(viewId, renderSlot, box, viewportWidth);
-  if (isSeatView(viewId)) return renderSlot(VIEW_SEAT, {}, { only: viewId });
+  if (isDeclaredView(viewId)) return renderSlot(VIEW_SLOT, {}, { only: viewId });
   return null;
 }
 
@@ -426,7 +426,7 @@ interface FrameProps {
 /**
  * The frame: the region tree, plus the frame-wide overlay layer.
  *
- * `shell.overlay` stays a layer rather than a region — it is the additive seat
+ * `shell.overlay` stays a layer rather than a region — it is the additive slot
  * for surfaces that float above every region.
  *
  * @param store - the layout store this frame renders.

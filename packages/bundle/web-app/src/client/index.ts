@@ -17,9 +17,9 @@
  *
  * It has no region rendering and no sash mechanics: the frame, the region tree
  * and the drag/collapse behaviour are `prac-client-ui-layout`'s. Every placement goes
- * through `ctx.pracLayout`; every view is rendered by the mechanism, including
- * `vscode:editor`, which the editor seat (`prac-client-ui-vscode-editor`) declares
- * through the `prac.view` seat.
+ * through `ctx.pracLayout`; every view is rendered by the mechanism, including the
+ * file views the editor package (`prac-client-ui-vscode-editor`) registers through
+ * the `prac.view` slot.
  *
  * This file is the plugin body as an ordinary ESM module (`name`, `inject`,
  * `apply`). DSH's closure-factory artifact (`window.__ModuleLoader__.load`) is
@@ -46,6 +46,7 @@ import {
   arrange,
   focusView,
   openFileInto,
+  placeCatalogue,
   placeSurfaces,
   restoreCentre,
   staleFileViews,
@@ -54,7 +55,7 @@ import {
 } from "./arrangement.js";
 
 /**
- * The overlay seat this arrangement puts its own two surfaces into.
+ * The overlay slot this arrangement puts its own two surfaces into.
  *
  * `satisfies` keeps the literal type (a union-typed key breaks `register`'s
  * inference) while still checking that DSH declares this key.
@@ -130,7 +131,7 @@ interface FocusStripProps {
  * The ambient strip: an environment readout, not a mode selector.
  *
  * It says where attention is and offers the cheap moves. Registered into
- * `shell.overlay` — a list slot, so it is additive and never displaces a seat,
+ * `shell.overlay` — a list slot, so it is additive and never displaces a view,
  * and the layer is click-through until an entry opts into pointer events.
  *
  * @param props - the focus store and the actions the strip offers.
@@ -607,12 +608,18 @@ export function apply(ctx: Context): void {
   focus.subscribe(() => placeSurfaces(layout, focus.state().current, currentFile));
 
   // The app opens files itself (an explorer click, a command, a jump), so the
-  // arrangement follows the app's open-file set instead of a fixed editor view.
+  // arrangement follows the app's catalogue instead of a fixed editor view: file
+  // entries drive attention and the centre, view entries are placed by their own
+  // location (with the arrangement's exclusions).
   ctx.inject(["pracVscode"], (scope) => {
     const vscode = scope.pracVscode;
     const sync = (): void => {
-      const files = vscode.fileViews();
+      const catalogue = vscode.catalogue();
+      const files = catalogue.filter((entry) => entry.source === "file");
       fileViews = new Set(files.map((entry) => entry.view));
+      // Views the app offers get their default region here; the ones already
+      // placed (or excluded) are left where they are.
+      placeCatalogue(layout, catalogue);
       // Files the app no longer has open stop being shown: their records outlive
       // them (the frame persists), and a stale record renders a tab for a file
       // nobody has open and holds a region with an empty view.
@@ -652,7 +659,7 @@ export function apply(ctx: Context): void {
       }
     };
     sync();
-    scope.effect(() => vscode.onDidChangeFileViews(sync), "prac-web-app: open files");
+    scope.effect(() => vscode.onDidChangeCatalogue(sync), "prac-web-app: app catalogue");
   });
 
   /**
@@ -666,7 +673,7 @@ export function apply(ctx: Context): void {
     focusView(layout, viewId);
   };
 
-  // The environment layer: additive, and the only seat a prac surface of our
+  // The environment layer: additive, and the only slot a prac surface of our
   // own may float in (registering into `root` would shadow the whole frame).
   slots.inject(OVERLAY, () =>
     slots.register({ name: OVERLAY, id: "prac-focus" }, () =>
@@ -680,7 +687,7 @@ export function apply(ctx: Context): void {
     ),
   );
 
-  // The recall surface: the same seat, a second additive entry, so the strip
+  // The recall surface: the same slot, a second additive entry, so the strip
   // keeps working untouched. It owns its own keybinding (`Cmd/Ctrl+Alt+V`).
   slots.inject(OVERLAY, () =>
     slots.register({ name: OVERLAY, id: "prac-recall" }, () =>
@@ -705,7 +712,7 @@ export function apply(ctx: Context): void {
 export const name = "prac-web-app";
 
 /**
- * The DSH services this plugin needs: the slot registry (the strip's seat) and
+ * The DSH services this plugin needs: the slot registry (the strip's slot) and
  * the mechanism's placement face. `pracLayout` is a hard dependency — every
  * placement goes through it.
  */

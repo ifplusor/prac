@@ -43,16 +43,16 @@ import { EMBED_BRIDGE } from "prac-vscode";
 
 ## 它不是 DSH 插件
 
-本包没有 `main`、没有 `dsh` 字段、`exports` 只有 `./package.json`：它**不构成 loader 行**，也不注册任何座位。它构建出来的东西由别的包消费，各归其位：
+本包没有 `main`、没有 `dsh` 字段、`exports` 只有 `./package.json`：它**不构成 loader 行**，也不注册任何 `prac.view`。它构建出来的东西由别的包消费，各归其位：
 
 | 职责                                                                  | 归属                                                                                                             |
 | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | 服务构建产物（同源路由 `/prac-vscode` + code server 的 HTTP/WS 代理） | **机制**在 `prac-vscode-embed`（`vendor/vscode-embed`）；**策略**在 `prac-host-vscode`（`packages/host/vscode`） |
-| 在 DSH 页里启动 VS Code（每页一次）+ part host 工厂                   | **机制**在 `prac-vscode-embed/client`；**何时启动 + view↔part 映射**在 `prac-client-vscode-host`                 |
-| 座位 `vscode:editor` / `vscode:sidebar`                               | `prac-client-ui-vscode-editor` / `prac-client-ui-vscode-explorer`                                                |
+| 在 DSH 页里启动 VS Code（每页一次）+ 目录（id 约定与挂载入口）        | **机制**在 `prac-vscode-embed/client`；**何时启动 + 目录怎么拼**在 `prac-client-vscode-host`                     |
+| 把目录注册成 `prac.view`                                              | `prac-client-ui-vscode-editor`（打开的文件） / `prac-client-ui-vscode-views`（视图注册表里的视图）               |
 | 落位（谁放哪、注意力、快捷键）                                        | `prac-web-app`（bundle 的编排半边）                                                                              |
 
-拆开的原因：两个座位必须能**各自单独**使用，所以启动 VS Code 的机制不能属于任何一个座位（seat）；而「谁服务产物」是 host 面的事，与「怎么改上游」是两件事。
+拆开的原因：两个消费者必须能**各自单独**使用，所以启动 VS Code 的机制不能属于任何一个消费者；而「谁服务产物」是 host 面的事，与「怎么改上游」是两件事。
 
 ## 仓库内的改动日志（local modifications）
 

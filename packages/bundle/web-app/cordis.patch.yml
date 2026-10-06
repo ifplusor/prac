@@ -22,12 +22,14 @@
     - id: prac-client-vscode-host
       name: "prac-client-vscode-host"
 
-    # The seats. Each is independent: dropping either row leaves a working
-    # window, because the boot above does not belong to a seat.
+    # The consumers: one row per upstream source, each following the shared
+    # catalogue (files from the editor service; views from the view registry).
+    # Each is independent: dropping either row leaves a working window, because
+    # the boot above does not belong to a consumer.
     - id: prac-client-ui-vscode-editor
       name: "prac-client-ui-vscode-editor"
-    - id: prac-client-ui-vscode-explorer
-      name: "prac-client-ui-vscode-explorer"
+    - id: prac-client-ui-vscode-views
+      name: "prac-client-ui-vscode-views"
 
     # The VS Code side's host half: the `/prac-vscode` route that serves the
     # built VS Code bundle, and the same-origin proxy to the code server. `prac-vscode`

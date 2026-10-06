@@ -9,7 +9,7 @@ import { PLATFORM_MODULES, clientPack } from "../../../scripts/pack-client.ts";
  * - the **host half** (`src/index.ts` → `dist/index.mjs`) is intentionally
  *   empty — the mechanism is browser-only — but every bundle row is imported on
  *   both planes, so the entry has to exist.
- * - the **client half** (`src/client.ts` → `dist/client.js`) is the seat that
+ * - the **client half** (`src/client.ts` → `dist/client.js`) is is the package that
  *   hosts the VS Code editor part as a prac view. Its wrapping is DSH's loader
  *   contract, so it comes from `scripts/pack-client.ts` rather than being
  *   restated here.

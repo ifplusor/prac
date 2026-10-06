@@ -12,17 +12,10 @@
  */
 
 import type { PracLayoutFace, ViewRecord } from "prac-client-ui-layout/client";
+import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 
 /** The mechanism's placement face, named once for this module's signatures. */
 export type PracLayout = PracLayoutFace;
-
-/**
- * The view the explorer seat (`prac-client-ui-vscode-explorer`) declares for the
- * VS Code sidebar part — the explorer (file tree, SCM) and the views hosted
- * beside it. It starts hidden: it is a tool to drop into, not part of the
- * default arrangement.
- */
-export const VSCODE_SIDEBAR_VIEW = "vscode:sidebar";
 
 /** DSH's sidebar slot as a view id (see `prac-client-ui-layout`'s catalogue). */
 export const DSH_SIDEBAR_VIEW = "dsh:sidebar";
@@ -35,6 +28,7 @@ export const DSH_CONVERSATION_VIEW = "dsh:main:conversation";
 export const LEFT = "left";
 export const STAGE = "stage";
 export const RIGHT = "right";
+export const BOTTOM = "bottom";
 
 /** The surfaces attention can rest on. */
 export const CONVERSATION = "conversation";
@@ -65,14 +59,67 @@ export const DEFAULT_PLACEMENTS: readonly {
   { view: DSH_SIDEBAR_VIEW, region: LEFT },
   { view: DSH_CONVERSATION_VIEW, region: STAGE },
   { view: DSH_RIGHTBAR_VIEW, region: RIGHT, hidden: true },
-  // Placed but not shown: the VS Code sidebar (explorer/SCM) is a tool to drop
-  // into — reachable from the recall surface — not part of the default
-  // arrangement, where `left` already carries DSH's own workspace browser.
-  { view: VSCODE_SIDEBAR_VIEW, region: LEFT, hidden: true },
 ];
 // No default for the centre's editor: since decision 17 a file is a view that
 // exists because the *app* opened it, so there is nothing to place until one is
-// open (see `trackOpenFiles`).
+// open (see `trackCatalogue`).
+// No default for the app's own views either: they are placed from the catalogue's
+// own location (see `placeCatalogue`), which is the same table the app orders its
+// containers by — restating them here would be a second source of truth.
+
+/**
+ * The app's location words, mapped to prac regions.
+ *
+ * The app's own vocabulary decides the default region, and this table is the one
+ * place the two vocabularies meet: the mechanism reports the app's word, and the
+ * frame knows only region ids.
+ */
+const LOCATION_REGION: Readonly<Record<VscodeCatalogueEntry["location"], string>> = {
+  stage: STAGE,
+  sidebar: LEFT,
+  panel: BOTTOM,
+  auxiliarybar: RIGHT,
+};
+
+/**
+ * The app's views this arrangement leaves **off screen**.
+ *
+ * Named in the app's own vocabulary (`VscodeCatalogueEntry.appId`), so the policy
+ * does not restate the mechanism's id convention. Both are real views prac
+ * deliberately does not show at startup:
+ *
+ * - Copilot's chat — another agent's UI (kept installed, not surfaced);
+ * - the debug **welcome** pane — a placeholder with no data provider, which reads
+ *   as an empty box.
+ *
+ * They stay registered as `prac.view`s either way: the recall surface can bring
+ * them up, which is what "off screen" means here.
+ */
+const EXCLUDED_VIEWS: ReadonlySet<string> = new Set([
+  "workbench.panel.chat.view.copilot",
+  "workbench.debug.welcome",
+]);
+
+/**
+ * Place the app's views by their own location, filling gaps only.
+ *
+ * Called whenever the catalogue changes, so a view that enters (an extension
+ * activating, a `when` starting to hold) gets its default region when it has no
+ * placement yet. One that already has a record is left alone, so a persisted
+ * arrangement is never dragged back — the same "fill gaps" rule as {@link arrange}.
+ *
+ * @param layout - the mechanism's placement face.
+ * @param entries - the app's catalogue.
+ */
+export function placeCatalogue(layout: PracLayout, entries: readonly VscodeCatalogueEntry[]): void {
+  const known = layout.getState().views;
+  for (const entry of entries) {
+    if (entry.source !== "view") continue;
+    if (EXCLUDED_VIEWS.has(entry.appId)) continue;
+    if (known[entry.view] !== undefined) continue;
+    layout.place(entry.view, LOCATION_REGION[entry.location]);
+  }
+}
 
 /**
  * The roles DSH's borrowed `ctx.layout` vocabulary resolves through. The

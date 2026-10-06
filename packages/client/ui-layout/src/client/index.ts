@@ -13,8 +13,8 @@
  *    (`dsh:sidebar`, `dsh:main:<key>`, `dsh:rightbar`) — their slot names are
  *    view *identities*, not positions, and because this frame is the renderer,
  *    *where* each one lands is the arrangement's decision. Anything else is a
- *    view some surface declares into the `prac.view` seat and names with its own
- *    source tag (`vscode:editor` is a VS Code part host); which ids those are is read
+ *    view some surface declares into the `prac.view` slot and names with its own
+ *    source tag (`vscode:view:<app view id>` is a VS Code part host); which ids those are is read
  *    from the registry, never assumed from the tag. The mechanism ships **no concrete
  *    view name and no default placement**: the bundle's arrangement says what
  *    goes where through {@link PracLayoutFace}. The catalogue itself is
@@ -26,7 +26,7 @@
  *    regions beside it; collapsing a region remembers its width so expanding
  *    restores it. This is the (b) option from the integration note: the frame
  *    stays React-owned (DSH-style), and VS Code parts remain *hosted* — a
- *    region renders a view, and the `vscode:editor` view renders the part host the
+ *    region renders a view, and the `vscode:view:<app view id>` view renders the part host the
  *    client mechanism publishes (`ctx.pracVscode.partHost`); the part is re-parented
  *    there, never recreated. The host
  *    mechanism is never bypassed.
@@ -37,7 +37,7 @@
  *    mechanism never hard-codes which view plays a role.
  *
  * It keeps the contracts the rest of DSH registers against: the four region slot
- * declarations plus the `prac.view` seat, `ctx.layout`, `ctx.pracLayout`, the
+ * declarations plus the `prac.view` slot, `ctx.layout`, `ctx.pracLayout`, the
  * `panelInfo` root hook, theme presentation and the document title.
  *
  * This file is the plugin body as an ordinary ESM module (`name`, `inject`,
@@ -68,7 +68,7 @@ declare global {
    */
   var __pracLayout: PracLayoutFace | undefined;
 }
-import { VIEW_SEAT, readSeatViewIds, type RegionInfo, type ViewInfo } from "./catalogue.js";
+import { VIEW_SLOT, readDeclaredViewIds, type RegionInfo, type ViewInfo } from "./catalogue.js";
 export type { PracLayoutFace, RegionInfo, ViewInfo };
 
 /**
@@ -86,9 +86,9 @@ export function apply(ctx: Context): void {
   const { layout, pracLayout, panelInfo } = createServices(ctx, store);
 
   ctx.effect(() => {
-    // A seat may already have registered (activation order is not ours to
-    // choose), so read the seat registry before the frame can render.
-    readSeatViewIds(ctx.slots);
+    // A view may already have registered (activation order is not ours to
+    // choose), so read the slot registry before the frame can render.
+    readDeclaredViewIds(ctx.slots);
     const disposeRoot = ctx.slots.register(
       {
         name: "root",
@@ -97,7 +97,7 @@ export function apply(ctx: Context): void {
           main: { kind: "keyed", scope: "root" },
           rightbar: { kind: "single", scope: "root" },
           "shell.overlay": { kind: "list", scope: "root" },
-          // The seat prac's own views (`prac:*`) and VS part hosts (`vscode:*`)
+          // The slot prac's own views (`prac:*`) and VS part hosts (`vscode:*`)
           // register into; the entry's declared id is its view id.
           "prac.view": { kind: "list", scope: "root" },
         },
@@ -113,17 +113,17 @@ export function apply(ctx: Context): void {
     // The catalogue's live sources. `listViews()` reads the registry on every
     // call, so a later registration is already visible; these subscriptions
     // only bump `catalogueVersion`, which is how a subscribed UI (and this
-    // frame) learns to re-read it — and refresh which views the seat declares,
+    // frame) learns to re-read it — and refresh which views the slot declares,
     // which is what the frame dispatches on.
     const bumpCatalogue = (): void => {
-      readSeatViewIds(ctx.slots);
+      readDeclaredViewIds(ctx.slots);
       store.update((current) => ({
         ...current,
         catalogueVersion: current.catalogueVersion + 1,
       }));
     };
     const offMain = ctx.slots.subscribe("main", bumpCatalogue);
-    const offSeat = ctx.slots.subscribe(VIEW_SEAT, bumpCatalogue);
+    const stopSlot = ctx.slots.subscribe(VIEW_SLOT, bumpCatalogue);
     // A page-level probe for verification: the bundle's `require` resolves
     // only registered bundle ids, so a driver script cannot reach the
     // Cordis context. Publishing the face is the minimal honest door —
@@ -131,7 +131,7 @@ export function apply(ctx: Context): void {
     globalThis.__pracLayout = pracLayout;
     return () => {
       if (globalThis.__pracLayout === pracLayout) delete globalThis.__pracLayout;
-      offSeat();
+      stopSlot();
       offMain();
       disposePracLayout();
       disposeLayout();

@@ -237,7 +237,7 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
      * Merge chrome flags into a view's record.
      *
      * A no-op when nothing changes, by identity: a UI that re-syncs flags on every
-     * layout change (the editor seat does) must not wake the store in a loop.
+     * layout change (the editor package does) must not wake the store in a loop.
      */
     setViewFlags(viewId: string, flags: ViewFlags): void {
       store.update((state) => {

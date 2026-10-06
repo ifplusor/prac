@@ -5,7 +5,9 @@ import type {
   RoleBindings,
   ViewRecord,
 } from "prac-client-ui-layout/client";
+import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 import {
+  BOTTOM,
   CONVERSATION,
   DEFAULT_PLACEMENTS,
   DSH_CONVERSATION_VIEW,
@@ -13,11 +15,11 @@ import {
   LEFT,
   RIGHT,
   STAGE,
-  VSCODE_SIDEBAR_VIEW,
   VSCODE_SURFACE,
   arrange,
   focusView,
   openFileInto,
+  placeCatalogue,
   placeSurfaces,
   restoreCentre,
   staleFileViews,
@@ -145,7 +147,7 @@ describe("staleFileViews", () => {
       hidden: false,
     },
     [DSH_CONVERSATION_VIEW]: { region: STAGE, order: 2, hidden: false },
-    [VSCODE_SIDEBAR_VIEW]: { region: LEFT, order: 3, hidden: true },
+    "vscode:view:workbench.view.search": { region: LEFT, order: 3, hidden: false },
   } satisfies Record<string, ViewRecord>;
   const resourceOf = (view: string): string | undefined =>
     view.startsWith("vscode:file:") ? view.slice("vscode:file:".length) : undefined;
@@ -223,21 +225,18 @@ describe("arrange", () => {
       ["place", DSH_CONVERSATION_VIEW, STAGE],
       ["place", "dsh:rightbar", RIGHT],
       ["hide", "dsh:rightbar"],
-      ["place", VSCODE_SIDEBAR_VIEW, LEFT],
-      ["hide", VSCODE_SIDEBAR_VIEW],
     ]);
   });
 
   it("fills gaps only: a view the restored state already knows keeps its placement", () => {
-    // A previous session moved the conversation into the bottom bar and showed
-    // the VS Code sidebar. Re-asserting the defaults would undo both.
+    // A previous session moved the conversation into the bottom bar and the DSH
+    // sidebar to the right. Re-asserting the defaults would undo both.
     const { face, calls } = recordingFace({
       [DSH_CONVERSATION_VIEW]: { region: "bottom", order: -2, hidden: false },
-      [VSCODE_SIDEBAR_VIEW]: { region: RIGHT, order: -1, hidden: false },
+      [DSH_SIDEBAR_VIEW]: { region: RIGHT, order: -1, hidden: false },
     });
     arrange(face);
     expect(shapes(calls.slice(2))).toEqual([
-      ["place", DSH_SIDEBAR_VIEW, LEFT],
       ["place", "dsh:rightbar", RIGHT],
       ["hide", "dsh:rightbar"],
     ]);
@@ -245,15 +244,73 @@ describe("arrange", () => {
 
   it("still places a view the state has never seen", () => {
     const known = DEFAULT_PLACEMENTS.map((entry) => entry.view).filter(
-      (view) => view !== VSCODE_SIDEBAR_VIEW,
+      (view) => view !== DSH_SIDEBAR_VIEW,
     );
     const { face, calls } = recordingFace(
       Object.fromEntries(known.map((view) => [view, { region: LEFT, order: 0, hidden: false }])),
     );
     arrange(face);
-    expect(shapes(calls.slice(2))).toEqual([
-      ["place", VSCODE_SIDEBAR_VIEW, LEFT],
-      ["hide", VSCODE_SIDEBAR_VIEW],
+    expect(shapes(calls.slice(2))).toEqual([["place", DSH_SIDEBAR_VIEW, LEFT]]);
+  });
+});
+
+describe("placeCatalogue", () => {
+  /** A catalogue entry, defaulted to one sidebar view. */
+  const entry = (over: Partial<VscodeCatalogueEntry>): VscodeCatalogueEntry => ({
+    view: "vscode:view:workbench.view.search",
+    appId: "workbench.view.search",
+    title: "Search",
+    source: "view",
+    location: "sidebar",
+    ...over,
+  });
+
+  it("places a view the app reports into the region its location names", () => {
+    const { face, calls } = recordingFace();
+    placeCatalogue(face, [entry({})]);
+    expect(shapes(calls)).toEqual([["place", "vscode:view:workbench.view.search", LEFT]]);
+  });
+
+  it("maps each app location to its region", () => {
+    const { face, calls } = recordingFace();
+    placeCatalogue(face, [
+      entry({ view: "vscode:view:a", appId: "a", location: "sidebar" }),
+      entry({ view: "vscode:view:b", appId: "b", location: "panel" }),
+      entry({ view: "vscode:view:c", appId: "c", location: "auxiliarybar" }),
     ]);
+    expect(shapes(calls)).toEqual([
+      ["place", "vscode:view:a", LEFT],
+      ["place", "vscode:view:b", BOTTOM],
+      ["place", "vscode:view:c", RIGHT],
+    ]);
+  });
+
+  it("leaves the catalogue's other source alone: files are placed by opening, not by location", () => {
+    const { face, calls } = recordingFace();
+    placeCatalogue(face, [
+      entry({ view: "vscode:file:x", appId: "x", source: "file", location: "stage" }),
+    ]);
+    expect(shapes(calls)).toEqual([]);
+  });
+
+  it("leaves the arrangement's exclusions off screen", () => {
+    const { face, calls } = recordingFace();
+    placeCatalogue(face, [
+      entry({
+        view: "vscode:view:workbench.panel.chat.view.copilot",
+        appId: "workbench.panel.chat.view.copilot",
+        location: "auxiliarybar",
+      }),
+      entry({ view: "vscode:view:workbench.debug.welcome", appId: "workbench.debug.welcome" }),
+    ]);
+    expect(shapes(calls)).toEqual([]);
+  });
+
+  it("fills gaps only: a view that already has a record keeps its placement", () => {
+    const { face, calls } = recordingFace({
+      "vscode:view:workbench.view.search": { region: RIGHT, order: 0, hidden: false },
+    });
+    placeCatalogue(face, [entry({})]);
+    expect(shapes(calls)).toEqual([]);
   });
 });

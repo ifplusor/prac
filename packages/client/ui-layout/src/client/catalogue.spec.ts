@@ -2,16 +2,16 @@ import { describe, expect, it } from "vite-plus/test";
 import type { Context } from "@deepseek-ai/cordis";
 import {
   DSH_CONVERSATION_KEY,
-  VIEW_SEAT,
+  VIEW_SLOT,
   catalogueViewIds,
-  isSeatView,
-  readSeatViewIds,
+  isDeclaredView,
+  readDeclaredViewIds,
   viewSource,
 } from "./catalogue.js";
 
 /**
  * The catalogue is a *join* of two live registries, so its rules — what a view id
- * is made of, what order the ids are offered in, and what makes a view a seat
+ * is made of, what order the ids are offered in, and what makes a view one the frame renders
  * view — are decisions, not rendering. The live gate keeps the half a browser
  * owns: that the surface renders exactly what this returns.
  */
@@ -28,13 +28,13 @@ const registry = (entries: Record<string, readonly SlotEntry[]>): Context["slots
 describe("viewSource", () => {
   it("takes the source segment, and nothing when there is none", () => {
     expect(viewSource("dsh:sidebar")).toBe("dsh:");
-    expect(viewSource("vscode:editor")).toBe("vscode:");
+    expect(viewSource("vscode:view:b")).toBe("vscode:");
     expect(viewSource("plain")).toBe("");
   });
 });
 
 describe("catalogueViewIds", () => {
-  it("lists DSH's own slots around the live main keys, then the seat", () => {
+  it("lists DSH's own slots around the live main keys, then the declared views", () => {
     const slots = registry({
       main: [
         { options: { key: DSH_CONVERSATION_KEY } },
@@ -42,22 +42,23 @@ describe("catalogueViewIds", () => {
         // A main entry with no key is not a view: it has no id to offer.
         { options: {} },
       ],
-      [VIEW_SEAT]: [{ options: { id: "vscode:editor" } }, { options: { id: "vscode:sidebar" } }],
+      [VIEW_SLOT]: [{ options: { id: "vscode:view:b" } }, { options: { id: "vscode:view:a" } }],
     });
     expect(catalogueViewIds(slots)).toEqual([
       "dsh:sidebar",
       "dsh:main:alpha",
       `dsh:main:${DSH_CONVERSATION_KEY}`,
       "dsh:rightbar",
-      "vscode:editor",
-      "vscode:sidebar",
+      // Declared views come last, sorted — not in registration order.
+      "vscode:view:a",
+      "vscode:view:b",
     ]);
   });
 
   it("is stable regardless of registration order", () => {
     const slots = registry({
       main: [{ options: { key: "beta" } }, { options: { key: "alpha" } }],
-      [VIEW_SEAT]: [{ options: { id: "z" } }, { options: { id: "a" } }],
+      [VIEW_SLOT]: [{ options: { id: "z" } }, { options: { id: "a" } }],
     });
     expect(catalogueViewIds(slots)).toEqual(catalogueViewIds(slots));
     expect(catalogueViewIds(slots)).toEqual([
@@ -75,25 +76,25 @@ describe("catalogueViewIds", () => {
   });
 });
 
-describe("readSeatViewIds / isSeatView", () => {
-  it("takes membership from the seat registry, not from a name prefix", () => {
-    readSeatViewIds(registry({ [VIEW_SEAT]: [{ options: { id: "vscode:editor" } }] }));
-    expect(isSeatView("vscode:editor")).toBe(true);
+describe("readDeclaredViewIds / isDeclaredView", () => {
+  it("takes membership from the slot registry, not from a name prefix", () => {
+    readDeclaredViewIds(registry({ [VIEW_SLOT]: [{ options: { id: "vscode:view:b" } }] }));
+    expect(isDeclaredView("vscode:view:b")).toBe(true);
     // Same source, not registered: the prefix decides nothing.
-    expect(isSeatView("vscode:sidebar")).toBe(false);
-    expect(isSeatView("dsh:sidebar")).toBe(false);
+    expect(isDeclaredView("vscode:view:a")).toBe(false);
+    expect(isDeclaredView("dsh:sidebar")).toBe(false);
   });
 
   it("re-reads, so a view appearing or leaving is picked up", () => {
-    readSeatViewIds(registry({ [VIEW_SEAT]: [{ options: { id: "prac:notes" } }] }));
-    expect(isSeatView("prac:notes")).toBe(true);
-    readSeatViewIds(registry({}));
-    expect(isSeatView("prac:notes")).toBe(false);
+    readDeclaredViewIds(registry({ [VIEW_SLOT]: [{ options: { id: "prac:notes" } }] }));
+    expect(isDeclaredView("prac:notes")).toBe(true);
+    readDeclaredViewIds(registry({}));
+    expect(isDeclaredView("prac:notes")).toBe(false);
   });
 
   it("ignores an entry that declares no id", () => {
-    const ids = readSeatViewIds(
-      registry({ [VIEW_SEAT]: [{ options: { id: "" } }, { options: { id: "prac:notes" } }] }),
+    const ids = readDeclaredViewIds(
+      registry({ [VIEW_SLOT]: [{ options: { id: "" } }, { options: { id: "prac:notes" } }] }),
     );
     expect([...ids]).toEqual(["prac:notes"]);
   });

@@ -34,9 +34,9 @@ export type { RegionInfo, ViewInfo } from "./catalogue.js";
 // `never`.
 
 /**
- * The seat key a prac surface registers its view into (`prac.view`).
+ * The slot key a prac surface registers its view into (`prac.view`).
  *
  * Consumers name it once and let the compiler check it, instead of restating the
  * literal and the `SlotMap` row it needs.
  */
-export type ViewSeatKey = typeof import("./catalogue.js").VIEW_SEAT;
+export type ViewSlotKey = typeof import("./catalogue.js").VIEW_SLOT;

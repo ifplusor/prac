@@ -28,7 +28,7 @@ import { openPrac, report, requireUrl } from "./harness.mjs";
 const LEFT = "left";
 const BOTTOM = "bottom";
 const CONVERSATION = "dsh:main:conversation";
-const VSCODE_SIDEBAR = "vscode:sidebar";
+const VSCODE_SIDEBAR = "vscode:view:workbench.explorer.fileView";
 /** The key `prac-client-ui-layout` persists under (see its `store.ts`). */
 const STATE_KEY = "prac-layout/v1";
 /** The sidebar's default size; a restored 320 can only be the resize. */

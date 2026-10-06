@@ -2,12 +2,12 @@
  * The client half's **published type surface**.
  *
  * Types only: this module exists so the pack's dts pass emits a declaration
- * bundle for the seats (`prac-client-ui-vscode-editor`, `…-explorer`) to import —
+ * bundle for the view consumers (`prac-client-ui-vscode-editor`, `…-explorer`) to import —
  * the thing that lets them stop restating this mechanism's face by hand. It must
  * stay free of runtime code (the emitted `.mjs` is a stub); the executable client
  * half is `index.ts`, wrapped by `scripts/pack-client.ts` into the loader artifact.
  *
- * The declaration below, and the DSH merges it needs, reach a consumer through
+ * The type surface below, and the DSH merges it needs, reach a consumer through
  * this single import.
  *
  * @module prac-client-vscode-host/client/public
@@ -24,49 +24,41 @@ export type { ISessions } from "@deepseek-ai/dsh-api-session-controller/client";
 /** The shared VS Code client mechanism this package publishes on the registry. */
 export interface PracVscodeFace {
   /**
-   * The seat component for one view id, backed by a **part**.
+   * Everything the app currently offers as a prac view, from **both** upstream
+   * services.
    *
-   * @param view - the view id a seat declares (`vscode:editor`, `vscode:sidebar`).
-   * @returns a component rendering the host element the part is mounted into.
+   * The app has two sources — its open files (`IEditorService`) and the views its
+   * view registry reports (`IViewDescriptorService`) — and this is the one shape
+   * they are turned into, so a consumer registers `prac.view` entries and mounts
+   * them without knowing which upstream service an entry came from. The frame
+   * sees the same thing either way; only {@link VscodeCatalogueEntry.source}
+   * records where it came from.
+   *
+   * Entries come and go: a file entry exists while the file is open, a view entry
+   * while its `when` holds. A consumer re-reads on {@link onDidChangeCatalogue}.
+   *
+   * @returns one entry per offered view.
    */
-  partHost(view: string): () => ReactElement | null;
+  catalogue(): readonly VscodeCatalogueEntry[];
   /**
-   * The seat component for one view id, backed by a single VS Code **view**.
+   * Subscribe to changes in the catalogue.
    *
-   * The finer unit: its own pane outside any part, released when the component
-   * unmounts so it can be created again. Returns a component rendering nothing
-   * when this seat has no view behind it.
-   *
-   * @param view - the view id a seat declares (`vscode:sidebar`).
-   * @returns a component rendering the host element the view is created into.
-   */
-  viewHost(view: string): () => ReactElement | null;
-  /**
-   * The files the app currently has open, as view ids a seat can declare.
-   *
-   * Decision 17's unit: the app contributes one file's editing surface
-   * (`vscode:file:<resource>`), while which files are open comes from the app's
-   * own editor service — an explorer click or a command opens a file there, and
-   * the embedder has to turn it into a view.
-   *
-   * @returns one entry per open file, oldest first.
-   */
-  fileViews(): readonly VscodeFileView[];
-  /**
-   * Subscribe to changes in the open-file set.
-   *
-   * @param listener - called when the set changed; re-read {@link fileViews}.
+   * @param listener - called when the set changed; re-read {@link catalogue}.
    * @returns a function that unsubscribes.
    */
-  onDidChangeFileViews(listener: () => void): () => void;
+  onDidChangeCatalogue(listener: () => void): () => void;
   /**
-   * The seat component for one `vscode:file:<resource>` view.
+   * The mount component for any catalogue entry, by its view id.
    *
-   * @param view - the file view id from {@link fileViews}.
-   * @returns a component rendering the host element the file is mounted into,
-   * or one rendering nothing when the id is not a file view.
+   * One entry point for both sources: the id convention (and therefore which
+   * upstream call mounts it) belongs to this package, so consumers never branch
+   * on it.
+   *
+   * @param view - a view id from {@link catalogue}.
+   * @returns a component rendering the host element the content is mounted into,
+   * or one rendering nothing when the id is not offered.
    */
-  fileHost(view: string): () => ReactElement | null;
+  hostFor(view: string): () => ReactElement | null;
   /**
    * The app resource behind a view id, or `undefined` when the id is not a file
    * view.
@@ -212,12 +204,44 @@ export interface VscodeEditorEntry {
   readonly preview: boolean;
 }
 
-/** One open file, as the pair of view id and app resource. */
-export interface VscodeFileView {
-  /** The view id a seat declares for this file. */
+/**
+ * One thing the app offers as a prac view, as {@link PracVscodeFace.catalogue}
+ * reports it.
+ *
+ * Plain data: a consumer registers `prac.view` entries from these and mounts
+ * them through {@link PracVscodeFace.hostFor}, and the arrangement uses
+ * {@link VscodeCatalogueEntry.location} for its own default placement. Nothing
+ * here says how the frame renders it — that is the frame's business.
+ */
+export interface VscodeCatalogueEntry {
+  /**
+   * The prac view id.
+   *
+   * `vscode:file:<resource>` for an open file, `vscode:view:<viewId>` for a view
+   * the app's view registry reports. The convention belongs to this package.
+   */
   readonly view: string;
-  /** The app's URI for the file. */
-  readonly resource: string;
+  /**
+   * The **app's own** identity for this entry — the view id for a view, the URI
+   * for a file.
+   *
+   * Exposed so policy written in the app's vocabulary (leave Copilot's chat off
+   * screen, say) can name things without restating this package's id convention.
+   */
+  readonly appId: string;
+  /** The display name (`report.md`, `Problems`). */
+  readonly title: string;
+  /** Which upstream service it came from: the editor service, or the view registry. */
+  readonly source: "file" | "view";
+  /**
+   * The app's own word for where this belongs, as a default-placement hint —
+   * `stage` for an open file, otherwise the container's location.
+   */
+  readonly location: "stage" | "sidebar" | "panel" | "auxiliarybar";
+  /** For `view` entries: the container the view is registered in. */
+  readonly containerId?: string;
+  /** For `view` entries: the container's display name, for grouping. */
+  readonly containerTitle?: string;
 }
 
 declare module "@deepseek-ai/cordis" {

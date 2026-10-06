@@ -2,7 +2,7 @@
  * Dump the real stacking chain for one VS part host, so positioning failures are read
  * off computed style instead of guessed at.
  *
- * Usage: URL='http://127.0.0.1:3082/?token=...' [VIEW=vscode:editor] node scripts/inspect-region.mjs
+ * Usage: URL='http://127.0.0.1:3082/?token=...' [PART=workbench.parts.editor] node scripts/inspect-region.mjs
  */
 import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
@@ -12,18 +12,12 @@ const packageDir = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageDir, "../..");
 const upstreamDir = process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode");
 const url = process.env.URL;
-const view = process.env.VIEW ?? "vscode:editor";
+// A **part** id: this tool is about the coarser unit's host element. prac's views
+// are mounted through `data-vscode-embed-view` instead (see `verify-view.mjs`).
+const part = process.env.PART ?? "workbench.parts.editor";
 if (!url) throw new Error("URL is required");
 if (!existsSync(join(upstreamDir, "node_modules/@playwright/test")))
   throw new Error("run vscode:build first");
-
-// The DOM marks **part** ids (`PART_HOST_ATTR`); this tool takes a view id, so the
-// two are related here rather than assumed equal.
-const PART_OF_VIEW = {
-  "vscode:editor": "workbench.parts.editor",
-  "vscode:sidebar": "workbench.parts.sidebar",
-};
-const part = PART_OF_VIEW[view] ?? view;
 
 const require = createRequire(join(upstreamDir, "package.json"));
 const { chromium } = require("@playwright/test");

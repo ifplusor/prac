@@ -8,17 +8,20 @@
  * 1. **when the app may boot** — only once DSH reports a workspace, because the
  *    workspace is the window's identity and that identity is fixed for the life
  *    of the page;
- * 2. **which part backs which view** — the seat packages declare views, and the
- *    part map here is what turns a view into the part the app mounts;
+ * 2. **the app's catalogue, as prac views** — the two upstream sources (the editor
+ *    service's open files, the view registry's active views) published as one
+ *    shape, together with the view-id convention and the mount entry point; which
+ *    entries a package turns into `prac.view` registrations is that package's
+ *    policy;
  * 3. **the face** — published on the DSH service registry, which is what makes
- *    `inject: ["pracVscode"]` keep a seat pending until the mechanism is there.
+ *    `inject: ["pracVscode"]` keep a consumer pending until the mechanism is there.
  *
- * The seats are declared by the seat packages (`prac-client-ui-vscode-editor`,
- * `prac-client-ui-vscode-explorer`), and *where* each seat goes is the
- * arrangement's (`prac-web-app`).
+ * The consumers are separate packages (`prac-client-ui-vscode-editor`,
+ * `prac-client-ui-vscode-views`), and *where* each view goes is the arrangement's
+ * (`prac-web-app`).
  *
  * The file is a plugin body as an ordinary ESM module (`name`, `inject`,
- * `apply`) plus exports the seat packages import. DSH's closure-factory artifact
+ * `apply`) plus exports the consumer packages import. DSH's closure-factory artifact
  * (`window.__ModuleLoader__.load`) is produced by the `pack` config in
  * `vite.config.ts` (`scripts/pack-client.ts`); only `react` stays external.
  *
@@ -29,37 +32,10 @@ import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
 import { createVscodeEmbed } from "prac-vscode-embed/client";
 import { EXTENSIONS_GALLERY } from "prac-vscode";
-import type { PracVscodeFace, VscodeFileView } from "./public.js";
+import type { PracVscodeFace, VscodeCatalogueEntry } from "./public.js";
 
 /** Same-origin prefix the host half serves the app bundle under. */
 const VSCODE_ROUTE = "/prac-vscode";
-
-/** The VS Code part behind the editor seat. */
-export const EDITOR_PART = "workbench.parts.editor";
-/** The VS Code part behind the explorer seat (the sidebar hosts it). */
-export const SIDEBAR_PART = "workbench.parts.sidebar";
-
-/** The view id of the editor seat, declared by `prac-client-ui-vscode-editor`. */
-export const VSCODE_EDITOR_VIEW = "vscode:editor";
-/** The view id of the explorer seat, declared by `prac-client-ui-vscode-explorer`. */
-export const VSCODE_SIDEBAR_VIEW = "vscode:sidebar";
-
-/** The part behind each declared view. */
-export const PART_OF_VIEW: Readonly<Record<string, string>> = {
-  [VSCODE_EDITOR_VIEW]: EDITOR_PART,
-  [VSCODE_SIDEBAR_VIEW]: SIDEBAR_PART,
-};
-
-/**
- * The VS Code **view** behind each seat that hosts one.
- *
- * A view is the finer unit (decision 2b): its own pane, outside any part, so a
- * seat can be rebuilt without the rest of the workbench composition coming with
- * it. Parts remain the coarser option ({@link PART_OF_VIEW}).
- */
-export const VSCODE_VIEW_OF_SEAT: Readonly<Record<string, string>> = {
-  [VSCODE_SIDEBAR_VIEW]: "workbench.explorer.fileView",
-};
 
 /**
  * The workspace the app is started for.
@@ -75,6 +51,21 @@ export const VSCODE_VIEW_OF_SEAT: Readonly<Record<string, string>> = {
 interface WorkspaceLaunch {
   /** Absolute path of the workspace folder. */
   readonly path: string;
+}
+
+/** The tail of an app resource, for a file view's display name. */
+function fileTitle(resource: string): string {
+  const withoutQuery = resource.split("?")[0] ?? resource;
+  const segments = withoutQuery.split("/");
+  const tail = segments[segments.length - 1] ?? "";
+  return tail === "" ? resource : decodeURIComponent(tail);
+}
+
+/** The app's location word, as the catalogue's default-placement hint. */
+function viewLocation(location: string): VscodeCatalogueEntry["location"] {
+  return location === "sidebar" || location === "panel" || location === "auxiliarybar"
+    ? location
+    : "sidebar";
 }
 
 /**
@@ -140,17 +131,17 @@ export function apply(ctx: Context): void {
     });
   };
 
-  // The seat packages are separate bundles and cannot share the mechanism's state
-  // (each is inlined independently), so the face they render through is handed
-  // over on the **service registry** — the documented channel, which is what
-  // makes `inject: ["pracVscode"]` keep a seat pending until this lands. This is
-  // the same seam the embed bridge crosses, one level up — seats render parts,
-  // the mechanism owns the singleton boot, this row owns the view-to-part policy.
+  // The consumer packages are separate bundles and cannot share the mechanism's
+  // state (each is inlined independently), so the face they render through is
+  // handed over on the **service registry** — the documented channel, which is
+  // what makes `inject: ["pracVscode"]` keep a consumer pending until this lands.
+  // This is the same seam the embed bridge crosses, one level up: the consumers
+  // declare views, the mechanism owns the singleton boot and the catalogue.
   /**
    * The view-id prefix for one open file.
    *
    * The *file* is the unit (decision 17), so the resource is the identity: a view
-   * id carries it, and the host — not the seat and not the frame — is where the
+   * id carries it, and the host — not the consumer and not the frame — is where the
    * two vocabularies meet.
    */
   const FILE_VIEW_PREFIX = "vscode:file:";
@@ -162,21 +153,55 @@ export function apply(ctx: Context): void {
   const resourceOfFileView = (view: string): string | undefined =>
     view.startsWith(FILE_VIEW_PREFIX) ? view.slice(FILE_VIEW_PREFIX.length) : undefined;
 
+  /**
+   * The view-id prefix for one view the app's view registry reports.
+   *
+   * The second upstream source, next to the open files: the registry holds core
+   * contributions and extension-contributed views alike, so this covers built-in
+   * panels (Problems, Terminal, …) and whatever extensions bring.
+   */
+  const VIEW_VIEW_PREFIX = "vscode:view:";
+
+  /** The view id for one app view. */
+  const viewViewId = (vscodeView: string): string => `${VIEW_VIEW_PREFIX}${vscodeView}`;
+
+  /** The app's view id behind a view id, or undefined for any other view. */
+  const vscodeViewIdOf = (view: string): string | undefined =>
+    view.startsWith(VIEW_VIEW_PREFIX) ? view.slice(VIEW_VIEW_PREFIX.length) : undefined;
+
   const face: PracVscodeFace = {
-    partHost: (view: string): (() => ReactElement | null) => {
-      const part = PART_OF_VIEW[view];
-      return part === undefined ? () => null : embed.partHost(part);
+    catalogue: (): readonly VscodeCatalogueEntry[] => {
+      const files: VscodeCatalogueEntry[] = embed.openFiles().map((resource) => ({
+        view: fileViewId(resource),
+        appId: resource,
+        title: fileTitle(resource),
+        source: "file",
+        location: "stage",
+      }));
+      const views: VscodeCatalogueEntry[] = embed.views().map((entry) => ({
+        view: viewViewId(entry.id),
+        appId: entry.id,
+        title: entry.title,
+        source: "view",
+        location: viewLocation(entry.location),
+        containerId: entry.containerId,
+        containerTitle: entry.containerTitle,
+      }));
+      return [...files, ...views];
     },
-    viewHost: (view: string): (() => ReactElement | null) => {
-      const vscodeView = VSCODE_VIEW_OF_SEAT[view];
-      return vscodeView === undefined ? () => null : embed.view(vscodeView);
+    onDidChangeCatalogue: (listener: () => void) => {
+      const stopFiles = embed.onDidChangeOpenFiles(listener);
+      const stopViews = embed.onDidChangeViews(listener);
+      return () => {
+        stopFiles();
+        stopViews();
+      };
     },
-    fileViews: (): readonly VscodeFileView[] =>
-      embed.openFiles().map((resource) => ({ view: fileViewId(resource), resource })),
-    onDidChangeFileViews: (listener: () => void) => embed.onDidChangeOpenFiles(listener),
-    fileHost: (view: string): (() => ReactElement | null) => {
+    hostFor: (view: string): (() => ReactElement | null) => {
       const resource = resourceOfFileView(view);
-      return resource === undefined ? () => null : embed.file(resource);
+      if (resource !== undefined) return embed.file(resource);
+      const vscodeView = vscodeViewIdOf(view);
+      return vscodeView === undefined ? () => null : embed.view(vscodeView);
     },
     fileResource: (view: string): string | undefined => resourceOfFileView(view),
     capabilities: {
@@ -217,7 +242,7 @@ export const name = "prac-client-vscode-host";
 
 /**
  * Boot reads DSH's workspace registry and session list to find the workspace its
- * window is for; it declares no slot, because the seats belong to the seat
+ * window is for; it declares no slot, because the views belong to the consumer
  * packages.
  */
 export const inject = ["workspaces", "sessions"];

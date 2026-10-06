@@ -22,7 +22,7 @@ import type { RegionInfo, ViewInfo } from "./catalogue.js";
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface SlotMap {
-    /** prac's seat: a `root`-scoped list slot every prac surface declares one view into. */
+    /** prac's slot: a `root`-scoped list slot every prac surface declares one view into. */
     "prac.view": { kind: "list"; scope: "root" };
   }
 }
@@ -45,7 +45,7 @@ export type Dir = "row" | "column";
  */
 export type Side = "left" | "right" | "up" | "down";
 
-/** A sized seat for one visible view. */
+/** A sized region for one visible view. */
 export interface RegionNode {
   readonly type: "region";
   readonly id: string;
