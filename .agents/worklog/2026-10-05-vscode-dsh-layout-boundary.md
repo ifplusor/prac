@@ -339,7 +339,7 @@
 
 **代码排查的结果（候选②被排除）**：`RecallSurface`（`packages/bundle/web-app/src/client/index.ts`）**不依赖帧的轻 DOM**——它的行是 `views = layout.listViews()` 映射出来的（`rows = views.map(...)`，`data-prac-recall-row`），没有任何 `document.querySelector` / 量尺寸 / 找兄弟。所以"换树之后拿不到"这条不成立。
 
-**剩下的候选（更要紧的是时序）**：那个面的**开合键监听是在它自己的 `useEffect` 里注册**的；而 `IsolatedView` 的 children **第一次渲染是 `null`**（等内容容器就绪才 portal），于是 `RecallSurface` 比原来**晚一拍挂载**⇒ 若按键早于它挂载，toggle 落空、目录行就是空 → 正好是闸门报的那个症状（`the file view is not a row in the recall catalogue`）。
+**剩下的候选（更要紧的是时序）**：那个视图的**开合键监听是在它自己的 `useEffect` 里注册**的；而 `IsolatedView` 的 children **第一次渲染是 `null`**（等内容容器就绪才 portal），于是 `RecallSurface` 比原来**晚一拍挂载**⇒ 若按键早于它挂载，toggle 落空、目录行就是空 → 正好是闸门报的那个症状（`the file view is not a row in the recall catalogue`）。
 
 ### 结论（2026-10-05 探针）：**功能是好的，红的是闸门**
 
@@ -462,7 +462,7 @@ James 给的上游事实：**VS Code 里区域 id 是 left / right；sidebar 的
 
 ## 落地：盒子成为硬边界（2026-10-06，D1 = 甲）
 
-**裁决**（James 2026-10-06）：D1 = **甲（硬边界，要 G3 字面成立）**；D2–D6 按推荐默认——**D2** 先只做无锚点的全局面（命令面板居中 / 通知角落），有锚点的面留在视图内；**D3** 契约只承诺"框架保证隔离 + 接口对所有形态一致"，形态规则表等第二种形态真出现再写；**D4** 这类视图叫**浮层视图**；**D5** adaptor ↔ 框架那条边保持**隐式**（adaptor 自己从元素认根）；**D6** 共享构造样式表**先不做**。
+**裁决**（James 2026-10-06）：D1 = **甲（硬边界，要 G3 字面成立）**；D2–D6 按推荐默认——**D2** 先只做无锚点的全局浮层（命令面板居中 / 通知角落），有锚点的浮层留在视图内；**D3** 契约只承诺"框架保证隔离 + 接口对所有形态一致"，形态规则表等第二种形态真出现再写；**D4** 这类视图叫**浮层视图**；**D5** adaptor ↔ 框架那条边保持**隐式**（adaptor 自己从元素认根）；**D6** 共享构造样式表**先不做**。
 
 **改了两处**：
 

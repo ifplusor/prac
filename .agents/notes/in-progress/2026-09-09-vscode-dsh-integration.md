@@ -54,7 +54,7 @@ status: in-progress
 - **部件永远是被容纳的一方**：经 host 挂进来，**不是搬过来**。
 - **容纳单位 = `view`**：`prac.view` 目录里同时住着 `dsh:*` 与 `vscode:*` 两方 view，它们已经是同一种东西；**container 是可选分组**、**part 是可选的高级形态**（整块标准 IDE 区域），都不是 prac 组合的单位。
   - 为什么：用 part 当单位等于让 prac 说 workbench 的编排词汇，并继承它"单实例 / 只能搬"的约束。
-  - **（2026-09-19 James 再确认）编排单位就是一个视图**，不是整块区域；编辑器那个面上的视图 = 一个文件的编辑面（§3.5），**tab 是区域级的**（`stage` 默认 `tab`、不支持 `stack`）。
+  - **（2026-09-19 James 再确认）编排单位就是一个视图**，不是整块区域；编辑器那一侧的视图 = 一个文件一个视图（§3.5），**tab 是区域级的**（`stage` 默认 `tab`、不支持 `stack`）。
 
 ### 3.3 框架归属与分层
 
@@ -71,11 +71,11 @@ status: in-progress
 - **布局自己重做，但只做便宜的那层**：parts 编排 + layout service 我们 own；**service 层与 VS Code 扩展渲染不拆**（拆 ≈ `monaco-vscode-api` 级改造，等于放弃"上游可控"）。这是"保留完整生态"的落点。
 - 做法：自写 workbench + layout service（不走 patch 经典 `Layout` 那条路），`IWorkbenchLayoutService` 按 prac 需要实现，模板 = `src/vs/sessions/`；补丁的目标是把 workbench **从 app 变成 library**。
 
-### 3.5 区域与编辑面
+### 3.5 区域与编辑器
 
 - **区域的形态**：常驻区（区域 id `left` / `right`；**角色**用平台名 `primarySidebar` / `secondarySidebar`，绑到 DSH 的 `dsh:sidebar` / `dsh:rightbar`——位置中立，区域 id 不动、改名要升持久化 key）不分栏、但**都可堆叠**（可折叠 header、排序、尺寸记忆）；**布局模式（分区 / `tab` / `stack`）由机制提供、由「区域名」绑定**，每个子区域跟随它所在区域名的绑定；**`stage` 的分栏必须带视图**（对齐 VS Code 的 editor group）；新增**常驻底栏**（`bottom`，默认收起，放 terminal / 输出 / 问题）；`stage` 支持**任意方向**分栏（上下左右、可嵌套）——**任何方向都造不出空 region**。
 - **对话是普通 view**：`dsh:main:conversation` 可被编排放到任意 region（默认侧边），注意力可把它提升到中间；`selectPanel` 只把**新选中的**视图放进编排给它的 region，不再"替换当前 main 视图所在的那个 region"。
-- **VS Code 侧提供"单个 file view"**：prac 的"编辑器" = **一个文件的编辑面**（一个 view），**不是 editor part / editor group**；**tab 是区域级的**（不是 `stage` 专有，**frame 级标签页**）、**分栏是区域的性质**——`stage` 默认 `tab`、不支持 `stack`；frame 本身仍不认识"编辑器组"。
+- **VS Code 侧提供"单个 file view"**：prac 的"编辑器" = **一个文件一个视图**，**不是 editor part / editor group**；**tab 是区域级的**（不是 `stage` 专有，**frame 级标签页**）、**分栏是区域的性质**——`stage` 默认 `tab`、不支持 `stack`；frame 本身仍不认识"编辑器组"。
   - 为什么：用 VS Code 的 editor part（自带 tab 条与 group 模型），chat 与 editor 就无法在 stage 里自由并排。
   - 代价：`workbench.parts.editor` 现在是**过渡形态**；lib 的 editor 句柄应定义成 `editor(file) → view`。
 
@@ -97,7 +97,7 @@ status: in-progress
   - 但"不用"不等于"不存在"：Copilot 是**VS Code 内建扩展**（它声明 `chatParticipants` / `languageModelTools` / `mcpServerDefinitionProviders` / `chatSessions` / `chatPromptFiles` / `chatSkills`），会随扩展宿主一起活（见 §4）。
 - **MCP 客户端 DSH 自己起**（James 2026-09-19）：只复用 VS Code 这边的 **server 定义来源**（扩展声明点 + 工作区配置），不复用它的 `contrib/mcp` 客户端。
 - **文件定制不共源**（James 2026-09-19）：DSH 用自己的 skill / 上下文格式，不去读 VS Code 的 `SKILL.md` / `*.instructions.md` / `AGENTS.md`。
-- **VS Code 的 chat 面先留着不显示**（James 2026-09-19）：不禁掉它，也不在 prac 的界面里露出它的 chat；它声明的 MCP server 定义仍然在池子里（R13 要读的那些）。代价是树里确实多一个 agent 在跑。
+- **VS Code 的 chat 视图先留着不显示**（James 2026-09-19）：不禁掉它，也不在 prac 的界面里露出它的 chat；它声明的 MCP server 定义仍然在池子里（R13 要读的那些）。代价是树里确实多一个 agent 在跑。
 - **扩展基座 = 完整 `server` 目标**（`--target server`，**必须带 `--nls`**），host 与 code server 都指向它。验收判据 = **一个 Tier 2 VS Code 扩展真的激活，且它的 UI 贡献出现在 prac 的 view 目录 / 区域里**。
 - **terminal 用 VS Code 的**（`server` 目标自带 PTY + shell integration + VS Code 扩展 API），它只是底栏里的一个 view；**agent 执行命令走 DSH 自己的 exec**，不与人那条终端共用。
   - 代价：agent 看不到人终端的输出，除非日后做桥。

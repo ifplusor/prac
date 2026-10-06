@@ -63,7 +63,7 @@ status: in-progress
 
 ### 2.4 agent 的事都归 DSH
 
-1. **和 agent 打交道这件事是 prac 的中心**（R1）：界面在给人那一侧，数据和运行在 DSH。chat 视图、工具调用与审批、计划与审阅都由 prac 编排。**VS Code 的 chat 面不出现在 prac 的界面里**——那是另一个 agent 的界面。
+1. **和 agent 打交道这件事是 prac 的中心**（R1）：界面在给人那一侧，数据和运行在 DSH。chat 视图、工具调用与审批、计划与审阅都由 prac 编排。**VS Code 的 chat 视图不出现在 prac 的界面里**——那是另一个 agent 的界面。
 2. **chat 就是那个通道**（R2 的 09-19 澄清）：它天然异步、松耦合——谁不在都不阻塞，回来看会话记录就行。所以不另做"留言"机制，也不做模式机。
 3. **白板就是文件**（R2）：notes 是工作区里的 markdown，人用 DSH 的文档视图看，agent 用文件工具读写。不需要第二套文档系统。
 4. **树里住着"别人家的 agent"**：Copilot 是 VS Code 的VS Code 内建扩展（它声明了 `chatParticipants`、`languageModelTools`、`mcpServerDefinitionProviders`、`chatSessions`、`chatPromptFiles`、`chatSkills`），会随扩展宿主激活——**在我们 rig 里到底有没有激活，还没测**。**先留着、不显示**（James 2026-09-19）：不禁掉，也不在 prac 的界面里露出它的 chat。好处是它声明的 MCP server 定义还在池子里（§2.6 要读的那些）；坏处是树里确实多一个 agent 在跑，先接受。
@@ -89,7 +89,7 @@ status: in-progress
 - frame 是 prac 自己的：区域树、分割、堆叠、折叠、底栏、视图目录、持久化。**机制层不认识任何具体视图名。**
 - **哪些 view 归谁，看它注册进哪儿**：`dsh:*`（对话、计划、审阅、笔记）和 `vscode:*`（编辑器、问题、终端、SCM、搜索、资源）都注册进同一个 `prac.view`，frame 一视同仁地摆。
 - **注意力与返回栈是 frame 的能力**（R2）——它们是交互的机制，不属于任何单个视图。
-- **编排单位是一个视图**（James 2026-09-19）：不是整块区域。编辑器那个面上的视图就是"一个文件的编辑面"（umbrella §3.5 已定），tab 与分栏由 frame 的 stage 提供，不用 VS Code 的 editor group。
+- **编排单位是一个视图**（James 2026-09-19）：不是整块区域。编辑器那一侧的视图就是"一个文件一个视图"（umbrella §3.5 已定），tab 与分栏由 frame 的 stage 提供，不用 VS Code 的 editor group。
 - **`prac.view` 用单数**（跟 DSH 的 `root` / `sidebar` / `main` / `shell.overlay` 一致）：槽名说的是"装哪一类东西"，**装几个由槽的 `kind` 决定**（`single` / `list` / `keyed` / `chain`），单个 view 的身份是注册时的 `key`。所以不叫 `prac.views`。
 
 ### 2.8 人和 agent 看到的是同一份工作区：磁盘为准
@@ -160,7 +160,7 @@ code server 归主干起停：空闲端口、等就绪、随 DSH 插件 dispose 
 
 ## 5. 下一步（验证）
 
-七条待定都定了（P1 / DSH 自己起 MCP 客户端 / 不共源 / 磁盘为准 / 视图为单位 / 文件集合不给 agent / chat 面留着不显示）。接下来是把 P1 做出来，验收很具体：
+七条待定都定了（P1 / DSH 自己起 MCP 客户端 / 不共源 / 磁盘为准 / 视图为单位 / 文件集合不给 agent / chat 视图留着不显示）。接下来是把 P1 做出来，验收很具体：
 
 1. **P1 的第一条链**：用 checkout 自带的语言服务器（css / html / json / markdown 之一）做通——主干连 ExtensionHost 连接，喂配置与文档，扩展注册 provider，我们就工作区里的文件问一次查询。**验收**：用的是**扩展带来的服务器与它的配置**（不是手配的），且能力面**不止那四个操作**。
 2. **文档必须先喂**：这是上一条里最容易低估的部分（见 §2.10 的硬前提）。

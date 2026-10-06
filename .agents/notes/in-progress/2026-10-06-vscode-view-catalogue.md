@@ -9,11 +9,11 @@ status: in-progress
 
 ## Problem
 
-prac 的侧栏座位**写死**到一个 VS Code 视图：`packages/client/vscode-host` 的 `VSCODE_VIEW_OF_SEAT = { 'vscode:sidebar': 'workbench.explorer.fileView' }`。于是**扩展贡献的视图从不出现**（cSpell 的 `cSpellIssuesViewByFile`、webview 视图、探针那些）——缺的不是挂载能力（face 的 `mountViewInto` 已经会等未注册的视图并重试），而是**枚举**。
+prac 的侧栏 view **写死**到一个 VS Code 视图：`packages/client/vscode-host` 的 `VSCODE_VIEW_OF_SEAT = { 'vscode:sidebar': 'workbench.explorer.fileView' }`。于是**扩展贡献的视图从不出现**（cSpell 的 `cSpellIssuesViewByFile`、webview 视图、探针那些）——缺的不是挂载能力（face 的 `mountViewInto` 已经会等未注册的视图并重试），而是**枚举**。
 
 ## 设计
 
-**每个 VS Code 视图是一个 prac 视图**——不是"一个容器一个座位"，也不用一张手写的映射表。
+**每个 VS Code 视图是一个 prac 视图**——不是"一个容器一个 view"，也不用一张手写的映射表。
 
 - **枚举 `activeViewDescriptors`**。上游把容器里的视图分三层：`all`（注册集）、`active`（`when` 成立集）、`visible`（`active` ∧ 用户没隐藏——**容器实际排布的那批**）。
   - prac 的 frame 扮演的就是上游容器"排布"的角色 ⇒ prac 注册的是 **`active`**：`when` 一变，视图就进出可选集。这也是上游自己用的那一层（容器空不空、viewlet 渲染哪些、`viewsService` 判某视图在不在都在用它）。
@@ -25,7 +25,7 @@ prac 的侧栏座位**写死**到一个 VS Code 视图：`packages/client/vscode
 
 ## 代价 / 放弃了什么
 
-- **`vscode:sidebar` 这个写死的座位退役** ⇒ **五道 vendor 门按它选宿主**（`verify-layout` / `verify-views` / `verify-focus` / `verify-view` / `verify-file`）要一起迁移——"契约的消费者"那条老账。
+- **`vscode:sidebar` 这个写死的 view 声明退役** ⇒ **五道 vendor 门按它选宿主**（`verify-layout` / `verify-views` / `verify-focus` / `verify-view` / `verify-file`）要一起迁移——"契约的消费者"那条老账。
 - **容器自带的 chrome 不继承**（activity bar、容器内 tab 套 stack）：它们在借用件的盒子里，prac 只按视图单位摆。想按容器摆是另一条路（已否）。
 - **webview 视图**要真上屏还依赖部署给的 HTTPS 通配端点（已定，见 `docs/architecture.md` §7 #5）；枚举与挂载这半不依赖它。
 
