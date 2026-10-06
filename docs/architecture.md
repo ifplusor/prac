@@ -283,6 +283,7 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随 DSH 插
 
 ## 8. 相关
 
+- [concepts.md](concepts.md)：**词表与体系**——prac 的两个名词（视图 / 区域）、一条链（来源 → 注册表 → 编排 → 渲染），以及哪些词是借来的、哪些已退役。
 - [philosophy.md](philosophy.md)：两个轴 + 认识论循环 + 决策单元（§1.2 的出发点）。
 - [dsh.md](dsh.md) / [vscode.md](vscode.md)：两个被依赖系统的内部结构（事实参考）。
 - [.agents/notes/](../.agents/notes/)：决策记忆（每个「为什么 + 放弃了什么」）与实现进度、差距、踩坑。
