@@ -225,11 +225,14 @@ export interface LayoutFace {
  * no-ops rather than guessing a view.
  */
 export interface RoleBindings {
-  /** The view that plays the leftbar role (`dsh:sidebar` in prac's arrangement — the
-   * borrowed name of DSH's own `sidebar` slot stays what it is; the role is ours). */
-  leftbar?: string;
-  /** The view that plays the rightbar role (`dsh:rightbar` in prac's arrangement). */
-  rightbar?: string;
+  /** The view that plays the **primary sidebar** role (`dsh:sidebar` in prac's
+   * arrangement): borrowed from VS Code's own role name, because the role is not a
+   * position — upstream lets the primary side bar move to the right. */
+  primarySidebar?: string;
+  /** The view that plays the **secondary sidebar** role (`dsh:rightbar` in prac's
+   * arrangement; VS Code calls this location `AuxiliaryBar`, shown as "Secondary
+   * Side Bar"). */
+  secondarySidebar?: string;
 }
 
 /**

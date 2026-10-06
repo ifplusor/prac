@@ -33,7 +33,7 @@
  * 4. **Roles, not positions, are what the borrowed face speaks.** DSH's
  *    plugins still call `ctx.layout`; that compat shim translates positional
  *    vocabulary into placements using the roles the arrangement binds
- *    (`bindRoles({ leftbar: 'dsh:sidebar', rightbar: 'dsh:rightbar' })`). The
+ *    (`bindRoles({ primarySidebar: 'dsh:sidebar', secondarySidebar: 'dsh:rightbar' })`). The
  *    mechanism never hard-codes which view plays a role.
  *
  * It keeps the contracts the rest of DSH registers against: the four region slot

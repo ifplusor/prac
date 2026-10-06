@@ -79,7 +79,10 @@ export const DEFAULT_PLACEMENTS: readonly {
  * mechanism names no view; this table is what makes `toggleSidebar()` mean
  * "collapse the region holding `dsh:sidebar`".
  */
-export const ROLES = { leftbar: DSH_SIDEBAR_VIEW, rightbar: DSH_RIGHTBAR_VIEW } as const;
+export const ROLES = {
+  primarySidebar: DSH_SIDEBAR_VIEW,
+  secondarySidebar: DSH_RIGHTBAR_VIEW,
+} as const;
 
 /**
  * Put attention's surfaces in regions.

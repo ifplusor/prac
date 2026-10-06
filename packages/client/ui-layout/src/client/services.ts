@@ -128,7 +128,7 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
       return navigation.signal;
     },
     toggleSidebar(): void {
-      const viewId = roles.leftbar;
+      const viewId = roles.primarySidebar;
       if (viewId === undefined) return;
       store.update((state) => {
         const regionId = state.views[viewId]?.region;
@@ -139,7 +139,7 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
       });
     },
     openRightbar(_track: boolean, _fullscreen: boolean): void {
-      const viewId = roles.rightbar;
+      const viewId = roles.secondarySidebar;
       if (viewId === undefined) return;
       // The role's region hosts it; DSH's own right panel asks to be shown, so
       // it is unhidden and brought to the front of wherever it already sits.
@@ -153,7 +153,7 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
       });
     },
     closeRightbar(): void {
-      const viewId = roles.rightbar;
+      const viewId = roles.secondarySidebar;
       if (viewId === undefined) return;
       store.update((state) => {
         const view = ensureView(state, viewId);
@@ -259,8 +259,8 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
     },
     /** Bind the roles DSH's borrowed vocabulary resolves through. */
     bindRoles(next: RoleBindings): void {
-      if (next.leftbar !== undefined) roles.leftbar = next.leftbar;
-      if (next.rightbar !== undefined) roles.rightbar = next.rightbar;
+      if (next.primarySidebar !== undefined) roles.primarySidebar = next.primarySidebar;
+      if (next.secondarySidebar !== undefined) roles.secondarySidebar = next.secondarySidebar;
     },
     bindTrack(regionId: string): void {
       trackRegion = regionId;

@@ -205,7 +205,12 @@ describe("arrange", () => {
     arrange(face);
     expect(calls[0]).toEqual({
       method: "bindRoles",
-      args: [{ leftbar: DSH_SIDEBAR_VIEW, rightbar: "dsh:rightbar" } satisfies RoleBindings],
+      args: [
+        {
+          primarySidebar: DSH_SIDEBAR_VIEW,
+          secondarySidebar: "dsh:rightbar",
+        } satisfies RoleBindings,
+      ],
     });
     expect(calls[1]).toEqual({ method: "bindTrack", args: [RIGHT] });
   });

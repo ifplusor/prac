@@ -63,18 +63,39 @@ prac 的框架声称「区域树、编排、层级、浮层」都归自己（`do
 
 **区域 = 一组视图，模式由"命名区域"绑定：**
 
-| 区域名 | 分区（拆子区域） | `stack`（顺序） | `tab`（选择） | 默认模式 | 状态 |
+| 区域（位置） | 分区（拆子区域） | `stack`（顺序） | `tab`（选择） | 默认模式 | 状态 |
 | --- | --- | --- | --- | --- | --- |
+| `left` | **无** | 有 | 有 | `stack` | 待确认 |
+| `right` | **无** | 有 | 有 | `stack` | 待确认 |
 | `stage` | 有 | **无** | 有 | `tab` | 已定 |
 | `bottom` | **无** | **无** | 有 | `tab` | 待确认 |
-| `leftbar` / `rightbar` | **无** | 有 | 有 | `stack` | 待确认 |
+
+**区域是位置，角色是角色——两者分开**（VS Code 自己就是这么分的：`workbench.sideBar.location` 让 primary 侧栏可以放左或放右）：
+
+| 角色 | 绑到谁 | 借的是谁的名 |
+| --- | --- | --- |
+| `primarySidebar` | DSH 的 `dsh:sidebar` | VS Code：Primary Side Bar |
+| `secondarySidebar` | DSH 的 `dsh:rightbar` | VS Code：Secondary Side Bar（`ViewContainerLocation.AuxiliaryBar`） |
 
 - **机制提供模式集合**（它认识 `stack` / `tab` / 分区）；**区域名绑定"可用哪些 + 默认哪个"**。两者分开，所以"区域对等"与"各区域不一样"不再打架；**这张表是数据，不是特权**。
-- **两个层次要分清（落地时容易混）**：**角色**是 prac 自己的词，已把 `sidebar` 改成 **`leftbar`**（`RoleBindings`，代码里已改）；**区域 id** 仍是 `left` / `right`，表里的 `leftbar` / `rightbar` 是**设计层的名字**——要不要连区域一起改（区域 id 进持久化，改名要升 key 并改闸门）**待裁**；**借来的名字不改**（`dsh:sidebar` 指 DSH 那个叫 `sidebar` 的槽、`vscode:sidebar` 指 VS Code 的 sidebar、`workbench.parts.sidebar` 是上游的部件 id）。
-- **区域名是设计层的名字，与来源无关**：`leftbar` / `rightbar` 是**位置的对称命名**；DSH 那边的槽名（`sidebar`）与 VS Code 那边的部件 id（`workbench.parts.sidebar`）是**借来的名字**，不在这一层出现。
+- **两个层次要分清（落地时容易混）**：**角色**是 prac 的词，用**平台的角色名** `primarySidebar` / `secondarySidebar`（`RoleBindings`，代码里已改）——位置中立，因为上游允许 primary 侧栏换边；**区域 id** 是**位置**词 `left` / `right`（不改，改它要升持久化 key）；**借来的名字不动**（`dsh:sidebar` 是 DSH 那个叫 `sidebar` 的槽、`vscode:sidebar` 指 VS Code 的 sidebar、`workbench.parts.sidebar` / `workbench.parts.auxiliarybar` 是上游部件 id）。
+- **区域名是设计层的名字，与来源无关**：`left` / `right` / `stage` / `bottom` 是**位置**；DSH 那边的槽名（`sidebar`）与 VS Code 那边的部件 id（`workbench.parts.sidebar`）是**借来的名字**，不在这一层出现。
 - **每个子区域跟随它所在区域名的绑定**（`stage` 拆出来的每块都有 `tab`、都不能 `stack`）。
 - **tab 是区域级的**，不是 stage 专有。
 - **一个派生要求**：视图在区域之间搬时，**目标区域可能不支持它来源处的模式**；这要求**视图的呈现与它所属的分组解耦**——分组决定怎么显示，视图只管内容。不成立的话，视图就不能真正自由搬运。
+
+### 不继承 VS Code 的布局复杂度
+
+上游的布局树比我们的大（primary sidebar 里还有 activity bar、它的 position 有 top/bottom/hidden；一个 sidebar 有**多个 tab、tab 里再是 stack**；bottom 是 **Panel**，位置能绕 editor 的 top/left/right/bottom）。**分类之后大半不必继承**：
+
+| 上游的东西 | 它其实属于 | 我们的处理 |
+| --- | --- | --- |
+| activity bar 及其 position、sidebar 的 tab 套 stack | **借用件的内容**（容器树） | 不继承——它在那个视图**盒子里**（隔离之后更是如此） |
+| primary / secondary sidebar | **角色** | 借它的**名**（`primarySidebar` / `secondarySidebar`） |
+| 两个侧栏一左一右 | **位置** | 已有：区域 `left` / `right` |
+| Panel 的 top/left/right/bottom | **摆放** | 不需要 `panel.position` 这个概念——**把那个视图搬到别的区域**就行（任意方向分栏已支持） |
+
+⇒ 上游的复杂仍然是复杂，但它**留在盒子里**，不是我们布局模型的复杂度。**唯一需要时再加的是"一级还是两级"**：我们机制现在只有一级（区域内 `tab` **或** `stack`），而借用件自带的那层（tab 套 stack）在盒内；我们自己的视图又少又平，**没有真实需求就不加第二级**。
 
 ### 视图的状态
 
