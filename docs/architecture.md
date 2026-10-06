@@ -90,7 +90,7 @@
 
 ### 3.2 IDE 那一半怎么进来
 
-- **编辑器** = **一个文件的编辑面**（一个视图），不是 editor part / editor group；**tab 是区域级能力**（不是 `stage` 专有），**分栏是区域的性质**——`stage` 支持分栏、默认 `tab`、不支持 `stack`；`bottom` 只有 `tab`；`leftbar` / `rightbar` 默认 `stack`。
+- **编辑器** = **一个文件的编辑面**（一个视图），不是 editor part / editor group；**tab 是区域级能力**（不是 `stage` 专有），**分栏是区域的性质**——`stage` 支持分栏、默认 `tab`、不支持 `stack`；`bottom` 只有 `tab`；`left` / `right` 默认 `stack`。
 - 扩展贡献的视图（tree view 等）也按视图进来；容器与 part 是可选的高级形态（整块标准 IDE 区域），不是组合的单位。
 - 现在的落点是「编辑器 / 侧栏」这类面，其余 IDE 面按同一套规矩逐步接。
 - 已知的坑：视图要进 VS Code 自己的可见性模型，否则 body 会是 "no data provider registered"。

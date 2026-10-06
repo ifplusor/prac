@@ -73,7 +73,7 @@ status: in-progress
 
 ### 3.5 区域与编辑面
 
-- **区域的形态**：常驻区（**`leftbar`** / `rightbar`；**角色**已改名 `leftbar`，**区域 id** 仍是 `left` / `right`——改名要升持久化 key，待裁）不分栏、但**都可堆叠**（可折叠 header、排序、尺寸记忆）；**布局模式（分区 / `tab` / `stack`）由机制提供、由「区域名」绑定**，每个子区域跟随它所在区域名的绑定；**`stage` 的分栏必须带视图**（对齐 VS Code 的 editor group）；新增**常驻底栏**（`bottom`，默认收起，放 terminal / 输出 / 问题）；`stage` 支持**任意方向**分栏（上下左右、可嵌套）——**任何方向都造不出空 region**。
+- **区域的形态**：常驻区（区域 id `left` / `right`；**角色**用平台名 `primarySidebar` / `secondarySidebar`，绑到 DSH 的 `dsh:sidebar` / `dsh:rightbar`——位置中立，区域 id 不动、改名要升持久化 key）不分栏、但**都可堆叠**（可折叠 header、排序、尺寸记忆）；**布局模式（分区 / `tab` / `stack`）由机制提供、由「区域名」绑定**，每个子区域跟随它所在区域名的绑定；**`stage` 的分栏必须带视图**（对齐 VS Code 的 editor group）；新增**常驻底栏**（`bottom`，默认收起，放 terminal / 输出 / 问题）；`stage` 支持**任意方向**分栏（上下左右、可嵌套）——**任何方向都造不出空 region**。
 - **对话是普通 view**：`dsh:main:conversation` 可被编排放到任意 region（默认侧边），注意力可把它提升到中间；`selectPanel` 只把**新选中的**视图放进编排给它的 region，不再"替换当前 main 视图所在的那个 region"。
 - **VS Code 侧提供"单个 file view"**：prac 的"编辑器" = **一个文件的编辑面**（一个 view），**不是 editor part / editor group**；**tab 是区域级的**（不是 `stage` 专有，**frame 级标签页**）、**分栏是区域的性质**——`stage` 默认 `tab`、不支持 `stack`；frame 本身仍不认识"编辑器组"。
   - 为什么：用 VS Code 的 editor part（自带 tab 条与 group 模型），chat 与 editor 就无法在 stage 里自由并排。
