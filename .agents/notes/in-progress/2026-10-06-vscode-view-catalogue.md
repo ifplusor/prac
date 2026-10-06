@@ -41,9 +41,14 @@ prac 的侧栏 view **写死**到一个 VS Code 视图：`packages/client/vscode
 
 | 层 | 做什么 |
 | --- | --- |
-| **机制**（`vscode-host`） | boot、face、宿主组件，以及**目录**：把现在两个散装 API（`fileViews` / `views`）收敛成**一份目录 + 一个挂载入口** |
-| **注册者** | 遍历目录、把每条注册成 `prac.view` |
-| **编排**（`web-app`） | 默认落位与不上屏名单 |
+| **机制**（`vscode-host`） | boot、face、宿主组件；把**两个上游服务**（`IEditorService` 的打开文件、`IViewDescriptorService` 的 active 视图）翻成**同一形状的目录 + 一个挂载入口**（`catalogue()` / `onDidChangeCatalogue()` / `hostFor(view)`） |
+| **消费者 · 编辑**（`ui-vscode-editor`） | 遍历目录、取 `source: "file"` 的条目，注册成 `prac.view` |
+| **消费者 · 视图**（`ui-vscode-views`，新增） | 遍历目录、取 `source: "view"` 的条目，注册成 `prac.view` |
+| **编排**（`web-app`） | 默认落位（按 `location`）与不上屏名单 |
+
+- **为什么是两个消费者包**（按 DSH 的形式）：上游就是两条线（`IEditorService` vs `IViewDescriptorService`，`ViewsRegistry` **不处理 editor**）；按 DSH 那条判据"**是否独立演化**"——编辑侧会长 diff / 预览 / custom editor，视图侧会长容器分组 / `when` / webview——它们独立，所以各自成包。**机制统一的是形状，不是把消费者并掉。**
+- **目录是机制造出来的**：上游没有一张现成的表同时装着 editor 与 view；机制把两个服务翻成同一形状，`source` 就是"它来自哪个上游服务"。
+- **组合（`web-app`）不装特性**：它只落位与排除，不注册 `prac.view`。
 
 ## 代价 / 放弃了什么
 
@@ -53,9 +58,10 @@ prac 的侧栏 view **写死**到一个 VS Code 视图：`packages/client/vscode
 
 ## 还没落地
 
-- 目录层统一（机制给一份目录 + `hostFor`），以及注册者怎么拆包。
-- 按 `location` 的默认落位与不上屏名单。
-- 五道 vendor 门的迁移。
+- 机制把两个上游服务收敛成**同一形状的目录 + `hostFor`**；`ui-vscode-editor` 改成从目录取 `source: "file"` 的条目（不再写死 id）。
+- 新增 `ui-vscode-views`（取 `source: "view"` 的条目），并改 profile 的 link（需提权）。
+- 按 `location` 的默认落位与不上屏名单（在 `web-app`）。
+- 五道 vendor 门的迁移（它们按 `vscode:sidebar` 选宿主）。
 - 验证：cSpell 的 `cSpellIssuesViewByFile` 与一个 `type=webview` 的视图都出现在 prac 的视图目录里、并能上屏。
 
 ## Related
