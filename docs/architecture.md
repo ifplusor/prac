@@ -82,11 +82,15 @@
   - `prac.view` 用单数：槽名说的是"装哪一类东西"，**装几个由槽的 `kind` 决定**（`single` / `list` / `keyed` / `chain`），单个 view 的身份是注册时的 `key`。
 - **注意力与返回栈是 frame 的能力**，不属于任何单个视图。
 - 视图契约、树形摆放、收起记宽这类做法借鉴上游，frame 由 prac 拥有。
-- **UI 框架归 prac，DSH 与 VS Code 是组件来源**（James 2026-10-05）：我们从两边**借用**现成组件（VS Code 的 part / view / webview，DSH 的视图与基础控件）、**借鉴**它们的做法；框架本身——区域树、编排、层级、浮层——不外包。⇒ **借来的组件是沙箱里的客人**：prac 给它槽位与几何，它自己的样式与浮层不许溢出（边界怎么划、沙箱用什么，见 [2026-10-05 的提案](../.agents/notes/proposed/2026-10-05-vscode-dsh-layout-boundary.md)，待裁）。
+- **UI 框架归 prac，DSH 与 VS Code 是组件来源**（James 2026-10-05）：我们从两边**借用**现成组件（VS Code 的 part / view / webview，DSH 的视图与基础控件）、**借鉴**它们的做法；框架本身——区域树、编排、层级、浮层——不外包。
+- **区域是骨架、视图是单位**：视图按窗口的方式管——独立、可在区域之间移动、各有各的状态；frame 拥有的是**区域**，不拥有视图内部。
+- **所有视图隔离且对等**（James 2026-10-05）：隔离由**框架保证**（不是内容自愿配合），**形态按内容选**（DOM 内容用影子根、自成体系的内容用独立浏览上下文）；选择权在框架，结果记进视图身份。
+- **浮层按作用域分**（James 2026-10-05）：只在视图盒子内部浮的（如 webview 的 overlay）**是视图自己的事**（自闭环）；**全局、不在任何视图里**的（阻止整个应用的模态框、命令面板、通知）归框架的**悬浮层**。
+- **借用件的适配收在一处**：`monaco-workbench` 类、`--vscode-*` 变量、上游样式表、借用件浮层，都由 `vscode-host`（机制在 `vendor/vscode-embed`）投进各自的隔离根；**上游标识退进边界内部，宿主侧不再镜像**（见 [2026-10-05 的提案](../.agents/notes/proposed/2026-10-05-vscode-dsh-layout-boundary.md)）。
 
 ### 3.2 IDE 那一半怎么进来
 
-- **编辑器** = **一个文件的编辑面**（一个视图），不是 editor part / editor group；**tab 与分栏由 frame 的 stage 提供**。
+- **编辑器** = **一个文件的编辑面**（一个视图），不是 editor part / editor group；**tab 是区域级能力**（不是 `stage` 专有），**分栏是区域的性质**——`stage` 支持分栏、默认 `tab`、不支持 `stack`；`bottom` 只有 `tab`；`leftbar` / `rightbar` 默认 `stack`。
 - 扩展贡献的视图（tree view 等）也按视图进来；容器与 part 是可选的高级形态（整块标准 IDE 区域），不是组合的单位。
 - 现在的落点是「编辑器 / 侧栏」这类面，其余 IDE 面按同一套规矩逐步接。
 - 已知的坑：视图要进 VS Code 自己的可见性模型，否则 body 会是 "no data provider registered"。

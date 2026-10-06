@@ -54,7 +54,7 @@ status: in-progress
 - **部件永远是被容纳的一方**：经 host 挂进来，**不是搬过来**。
 - **容纳单位 = `view`**：`prac.view` 目录里同时住着 `dsh:*` 与 `vscode:*` 两方 view，它们已经是同一种东西；**container 是可选分组**、**part 是可选的高级形态**（整块标准 IDE 区域），都不是 prac 组合的单位。
   - 为什么：用 part 当单位等于让 prac 说 workbench 的编排词汇，并继承它"单实例 / 只能搬"的约束。
-  - **（2026-09-19 James 再确认）编排单位就是一个视图**，不是整块区域；编辑器那个面上的视图 = 一个文件的编辑面（§3.5），tab 与分栏由 stage 提供。
+  - **（2026-09-19 James 再确认）编排单位就是一个视图**，不是整块区域；编辑器那个面上的视图 = 一个文件的编辑面（§3.5），**tab 是区域级的**（`stage` 默认 `tab`、不支持 `stack`）。
 
 ### 3.3 框架归属与分层
 
@@ -73,9 +73,9 @@ status: in-progress
 
 ### 3.5 区域与编辑面
 
-- **区域的形态**：常驻区（`sidebar` / `rightbar`）不分栏、但**都可堆叠**（可折叠 header、排序、尺寸记忆）；**`stage` 的分栏必须带视图**（对齐 VS Code 的 editor group）；新增**常驻底栏**（`bottom`，默认收起，放 terminal / 输出 / 问题）；`stage` 支持**任意方向**分栏（上下左右、可嵌套）——**任何方向都造不出空 region**。
+- **区域的形态**：常驻区（**`leftbar`** / `rightbar`；**角色**已改名 `leftbar`，**区域 id** 仍是 `left` / `right`——改名要升持久化 key，待裁）不分栏、但**都可堆叠**（可折叠 header、排序、尺寸记忆）；**布局模式（分区 / `tab` / `stack`）由机制提供、由「区域名」绑定**，每个子区域跟随它所在区域名的绑定；**`stage` 的分栏必须带视图**（对齐 VS Code 的 editor group）；新增**常驻底栏**（`bottom`，默认收起，放 terminal / 输出 / 问题）；`stage` 支持**任意方向**分栏（上下左右、可嵌套）——**任何方向都造不出空 region**。
 - **对话是普通 view**：`dsh:main:conversation` 可被编排放到任意 region（默认侧边），注意力可把它提升到中间；`selectPanel` 只把**新选中的**视图放进编排给它的 region，不再"替换当前 main 视图所在的那个 region"。
-- **`stage` 提供 tab 与分栏，VS Code 侧提供"单个 file view"**：prac 的"编辑器" = **一个文件的编辑面**（一个 view），**不是 editor part / editor group**；tab 与分栏由 `stage` 提供（**frame 级标签页**，在 stage 内），frame 本身仍不认识"编辑器组"。
+- **VS Code 侧提供"单个 file view"**：prac 的"编辑器" = **一个文件的编辑面**（一个 view），**不是 editor part / editor group**；**tab 是区域级的**（不是 `stage` 专有，**frame 级标签页**）、**分栏是区域的性质**——`stage` 默认 `tab`、不支持 `stack`；frame 本身仍不认识"编辑器组"。
   - 为什么：用 VS Code 的 editor part（自带 tab 条与 group 模型），chat 与 editor 就无法在 stage 里自由并排。
   - 代价：`workbench.parts.editor` 现在是**过渡形态**；lib 的 editor 句柄应定义成 `editor(file) → view`。
 
