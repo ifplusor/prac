@@ -184,6 +184,25 @@
 
 **附带一条操作教训**：我在实验 5 / 6 里先后“以为找到了主题表”而改错了表（一次改了 `:root` 那张 2284 的，画面对不上）——**认表要认类名 `contributedColorTheme`**，别按变量数挑。
 
+## 落地：隔离的第一步（2026-10-05 已做）
+
+**做了什么**：`packages/client/ui-layout` 里新增 `isolation.ts`，`frame.ts` 在**两个**视图渲染点（stack 的 body 与非 stack 的 viewBody）把视图包进 `IsolatedView`：宿主元素挂影子根，视图的树经 `react-dom` 的 portal 渲染进去。
+
+**`isolation.ts` 投什么**（这是“影子根里缺什么”的清单）：
+
+| 缺什么 | 怎么补 | 依据 |
+| --- | --- | --- |
+| 样式表（document 的规则不作用于影子树） | 逐根克隆 `head` 的 `style` / `link[rel=stylesheet]`，**活的**（`MutationObserver` 盯 head 的插入与原地改写） | 实验 1 / 3 |
+| 属性选择器（`[data-ds-dark-theme] …` 选的是影子外的祖先） | 根内一个包装元素**镜像 document/body 的属性** | 代码核实（`ThemePresenter` 把令牌写成 body 内联属性、深色靠 body 属性选择） |
+| 尺寸规则（`[data-prac-region] > *` 只管到宿主） | 根级 `:host` + 内容填充规则 | 现有 FRAME_STYLES |
+| 自定义属性 | **不需要投**：它们继承 | 实验 1 |
+
+**`react-dom` 是平台词**（DSH 的平台表里有），放进 catalog / 包的 devDependencies / `clientPack` 的 `external`——内联它等于在同一批根后面放第二份 React DOM。产物体积核对：`dist/client.js` 从内联时的 959 kB 回到 **57 kB**，且 `check:client` 报 `externals [… react-dom …]`。
+
+**真页面验证（rig `:3084`）**：2 个视图宿主、各自有影根、**每个根里镜像了 122 个样式节点**、根级样式在位；DSH 侧栏与对话视图正常渲染（截图 `.build/scratch/iso-verify.png`），文本色是 DSH 的令牌色而不是浏览器默认；无新增报错。
+
+**闸门**：prac 侧 `verify:stack`、`verify:persistence` **仍绿**（它们读的是 frame 自己的 light-DOM 属性）；**vendor 侧 `verify-views` 红 10 条**——正是“契约的消费者”那条老账：`fileMovedIntoTheTrack`、`paintedAfterHideAndRecall`、`splitEditorPaintedInNewPane` 等**按轻 DOM 查视图内部**（`.monaco-editor` / `.pane` / `[data-vscode-embed-part-host]`），而这些东西现在在影根里。⇒ **下一步是把闸门改成穿透影根**（不是设计变更，是消费者的迁移）。
+
 ## 还没落地的
 
 - **`docs/architecture.md` §3.1 与 umbrella §3.5 仍是旧口径**（"借来的组件是沙箱里的客人"；"tab 与分栏由 stage 提供"）。它们是**现在时文档**，改它们等于把这批裁决落成正式设计 ⇒ **等 James 点头**。同批要清的还有"沙箱"这个撞词（它在本仓另指 agent 运行时的执行沙箱）。
