@@ -35,6 +35,7 @@ prac 的侧栏 view **写死**到一个 VS Code 视图：`packages/client/vscode
 
 - **自动注册**：目录增 ⇒ 注册 `prac.view`；目录减 ⇒ 撤销，并**剪掉它在持久化里的位置 / 顺序 / 选中**（见布局边界 note 的「视图的状态」）。
 - **自动上屏**：按 `location` 映射（`sidebar` → `left`、`panel` → `bottom`、`auxiliarybar` → `right`），**只填空缺**（默认放置的既有语义，持久化优先）。
+- **按容器分组**：同一个 `containerId` 的视图落成**一个具名子区域**，容器之间"**选一**"（见布局边界 note 的「容器 = 一个具名子区域」）——所以 `left` 是"Explorer / Search / SCM / Run 各一个子区域、彼此选一"，不是 7 条堆叠。
 - **不上屏名单**：Copilot 的 Chat（已定"留着不显示"）、welcome 型（如 `workbench.debug.welcome`）。**名单与落位都在编排，不在机制。**
 
 ### 落在哪一层
