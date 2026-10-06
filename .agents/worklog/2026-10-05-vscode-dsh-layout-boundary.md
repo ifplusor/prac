@@ -365,6 +365,26 @@ James 给的上游事实：**VS Code 里区域 id 是 left / right；sidebar 的
 
 **验证**（闸门已复跑）：单测 ui-layout **44/44**、web-app **15/15**；`vp check` 0 errors；链接 0 断；rig `:3084` 上**十门全绿**——vendor 六（layout / views / focus / regions / view / file）+ prac 四（stack / persistence / bottom / split）。
 
+## 整部件路（`partHost` / `movePartInto`）在 rig 里补验（2026-10-05）
+
+之前记的缺口是：当前组合**只注册了 `vscode:sidebar`（映射到单视图 `workbench.explorer.fileView`）**，没有视图映射到 **part**，所以整部件路在 rig 里没有消费者。
+
+**做法（不改产品）**：真页面里直接调 embed 的 face——`__vscodeEmbed.face.movePartInto("workbench.parts.sidebar", box)`，box 放进一个**视图自己的隔离根**的内容容器里。
+
+**读数**：
+
+| 量 | 值 |
+| --- | --- |
+| 宿主所在的树 | **shadow**（视图的隔离根里） |
+| `.part` 是否在 | **在**，类名 `part vscode-embed-part sidebar left pane-composite-part …` |
+| 盒模型 | 宿主 `[0,705,300,295]`、part 在盒内 `[0,719,300,260]` |
+| 上屏 | `background rgb(248,248,248)`、`color rgb(59,59,59)`（浅色主题色），内含 1 个 composite/header |
+| 无 pageerror | 是（只有既有的 watchdog / github 认证噪声） |
+
+⇒ **整部件也能住进隔离根并正常上屏**。**一处如实说明**：这条探针**绕过了 lib 的 `partHost` 包装**（它才是加 `monaco-workbench` 类并调 `deliverThemeToHost` 的那层），所以宿主的 `--vscode-sideBar-background` 读出来是**空**——那层包装的**形状**另有实验 6A 验过（宿主带 `monaco-workbench` 时像素零差），主题投递则与视图路**同一段代码**（已在 rig 上按“真的切主题”验过）。
+
+对照图 `.build/scratch/part-path.png`，脚本 `.build/scratch/part-path.mjs`。
+
 ## 还没落地的
 
 - ~~**adaptor（第三步）**~~ → **已做，见下“落地：adaptor”**；旧的描述留档：：`vendor/vscode-embed` 的 `partHost` / `viewHost` 现在仍带**旧机制**——类镜像（`monaco-workbench` + 主题类）与 **200ms 轮询**。这一步要做的是：
