@@ -460,6 +460,50 @@ James 给的上游事实：**VS Code 里区域 id 是 left / right；sidebar 的
 
 **报错**：无新增（两条已知噪声）。
 
+## 落地：盒子成为硬边界（2026-10-06，D1 = 甲）
+
+**裁决**（James 2026-10-06）：D1 = **甲（硬边界，要 G3 字面成立）**；D2–D6 按推荐默认——**D2** 先只做无锚点的全局面（命令面板居中 / 通知角落），有锚点的面留在视图内；**D3** 契约只承诺"框架保证隔离 + 接口对所有形态一致"，形态规则表等第二种形态真出现再写；**D4** 这类视图叫**浮层视图**；**D5** adaptor ↔ 框架那条边保持**隐式**（adaptor 自己从元素认根）；**D6** 共享构造样式表**先不做**。
+
+**改了两处**：
+
+1. `packages/client/ui-layout/src/client/isolation.ts`：`:host` 加 **`contain: paint`**。`overflow: hidden` 单独**不够**——实验 9 量到：浮层的包含块链上没有定位祖先（frame 与隔离模块的盒子都是 `position: static`），所以绝对/固定定位的后代直接逃出盒子，280 宽的视图能把浮层**画到相邻区域上**。`contain: paint` 让宿主同时成为绝对**与固定**定位后代的包含块、并裁到盒内。
+2. `packages/client/ui-layout/src/client/frame.ts`：`[data-prac-overlay-layer]` 加 `display: flex; flex-direction: column`。**这条是硬边界逼出来的**：框架自己的悬浮层宿主原本是 `1600×0`（父层 `position:absolute` 但不是 flex，宿主的 `flex:1 1 auto` 撑不开），里面的焦点条全靠绝对定位逃出去——上了硬边界它会被裁没。改完宿主盒是 `[0,0,1600,1000]`。
+
+**读数**（实验 11，`.build/scratch/exp11-hard-boundary.mjs`，真 rig `:3084`）：
+
+| 检查 | 读数 |
+| --- | --- |
+| 宿主的 `contain` / `overflow` | `paint` / `hidden` |
+| 盒外（280 宽视图，探针在 `x=320`）absolute 浮层 | `shadowRoot.elementFromPoint` **拿不到它**（`rootHitIsFloat:false`） |
+| 同上 fixed 浮层 | 同**拿不到** |
+| 盒外那段 clip 的**像素对照** | **零变化**（改前是"整块变红"） |
+| 悬浮层宿主盒 | `[0,0,1600,1000]`；焦点条 `[734,956,132,30]`，**仍在盒内可见** |
+| 视图内容 | 照常渲染（stage 内容子节点在） |
+
+**闸门**：单测 **44 · 49 · 9 · 15 全过**；`vp check` **0 errors / 3 warnings（基线）**；prac 四门（stack / bottom / persistence / split）+ vendor 六门（layout / views / focus / regions / view / file）+ 条件门（cSpell）**全绿**。
+
+## 实验 10：借用件的浮层住在哪棵树（2026-10-06，附带的）
+
+**为什么问**：D1 的代价写的是"借用件的局部菜单会被裁"。得量一下**到底会不会**。
+
+**做法**：先把 `vscode:sidebar` 调出来、在文件树行上右键，没拿到可见菜单（`.context-view` 是 `display:none` 的常驻容器）⇒ 改为**静态查树**（`.build/scratch/exp13-where-borrowed.mjs`）。
+
+**读数**：
+
+| 东西 | 住在哪 | 盒 |
+| --- | --- | --- |
+| `#vscode-embed-boot` | **document.body**（`position:fixed; width:0; height:0; overflow:hidden; pointer-events:none`） | `[0,1000,0,0]` |
+| `.monaco-workbench` | **document**（在 boot 根里），**不在任何视图宿主里** | `[0,1000,0,0]` |
+| `.context-view`（上下文视图容器） | **document**，默认 `display:none` | `[0,0,0,0]` |
+| VS Code 的**部件**（如 `workbench.parts.sidebar`） | **视图影根里**（被 `movePartInto` / `mountViewInto` 搬进去） | 视图盒 |
+
+**⇒ 两条结论**：
+
+1. **D1 不会裁到借用件的菜单**——它们根本不渲染在视图影根里，代价这一条没有 materialize。
+2. **同时暴露一条既有事实**：**借用件自己的浮层完全在隔离之外**（在 document 的 boot 根里，既不被裁、也不被框架管）。这正是 note「借用件那条边的做法」里**未落地**的那半：局部浮层要进视图自己的根、全局的才交给框架——现在两样都还没做。
+
+**踩的坑（记录）**：第一次的右键探针没打开菜单，但它在 document 里找到了一个 `.context-view`（36 个条目、高 12）——如果就此下结论"菜单在 document、没被裁"，是把**常驻的隐藏容器**当成了菜单。⇒ **交互类探针要先确认"它真的出现了"（可见、有尺寸、有像素），再谈它在哪**。
+
 ## 还没落地的（2026-10-06 校）
 
 > 这一节先前停在 half-done 的状态（adaptor / 浮层 / 改名 / 文档同步都已做完却仍列在"未落地"里），按现在时重写；实施细节以正文各节为准。
