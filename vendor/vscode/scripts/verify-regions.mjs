@@ -18,6 +18,7 @@
  * Usage: URL='http://127.0.0.1:3084/?token=...' node scripts/verify-regions.mjs
  */
 import { createRequire } from "node:module";
+import { installDeepDom } from "./deep-dom.mjs";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -84,6 +85,7 @@ page.on("console", (message) => {
 page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
 
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
+await installDeepDom(page);
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
 // The seat starts hidden and unplaced; reveal it where a composed view would go.
@@ -107,12 +109,14 @@ const facts = await page.evaluate(
         h: Math.round(r.height),
       };
     };
-    const host = document.querySelector(viewHost);
+    const host = globalThis.__deep.one(viewHost);
     const pane = host?.querySelector(".pane");
-    const detached = document.querySelector("[data-vscode-embed-detached]");
+    const detached = globalThis.__deep.one("[data-vscode-embed-detached]");
     return {
-      viewHosts: document.querySelectorAll("[data-vscode-embed-part-host]").length,
-      region: host?.closest("[data-prac-region]")?.getAttribute("data-prac-region") ?? null,
+      viewHosts: globalThis.__deep.all("[data-vscode-embed-part-host]").length,
+      region:
+        globalThis.__deep.closest(host, "[data-prac-region]")?.getAttribute("data-prac-region") ??
+        null,
       seat,
       host: box(host),
       pane: box(pane),
@@ -136,12 +140,12 @@ if (facts.host && facts.host.w > 2 && facts.host.h > 2) {
   };
   const painted = await page.screenshot({ clip });
   await page.evaluate((selector) => {
-    const el = document.querySelector(selector);
+    const el = globalThis.__deep.one(selector);
     if (el) el.style.visibility = "hidden";
   }, VIEW_HOST);
   const hidden = await page.screenshot({ clip });
   await page.evaluate((selector) => {
-    const el = document.querySelector(selector);
+    const el = globalThis.__deep.one(selector);
     if (el) el.style.visibility = "";
   }, VIEW_HOST);
   const analysis = await page.evaluate(analyse, painted.toString("base64"));

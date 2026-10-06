@@ -21,6 +21,7 @@
  * Usage: URL='http://127.0.0.1:3084/?token=...' node scripts/verify-file.mjs
  */
 import { createRequire } from "node:module";
+import { installDeepDom } from "./deep-dom.mjs";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -110,6 +111,7 @@ page.on("console", (message) => {
 page.on("pageerror", (error) => consoleErrors.push(String(error)));
 
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
+await installDeepDom(page);
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 // The face is published from inside the workbench, once its service graph has
 // restored — that is the whole point of the bridge's direction.
@@ -249,7 +251,7 @@ await page.evaluate(() => globalThis.__stopOpenFileProbe?.());
 // a second file gets its own tab, and clicking a tab brings that view forward.
 const tabsOf = () =>
   page.evaluate(() =>
-    [...document.querySelectorAll("[data-prac-tab]")].map((element) => ({
+    [...globalThis.__deep.all("[data-prac-tab]")].map((element) => ({
       id: element.getAttribute("data-prac-tab"),
       active: element.getAttribute("data-prac-tab-active") === "true",
     })),
@@ -263,7 +265,7 @@ await page.evaluate(
   `${folder}/${APP_B.path}`,
 );
 await page.waitForTimeout(2500);
-await page.waitForFunction(() => document.querySelectorAll("[data-prac-tab]").length === 2, null, {
+await page.waitForFunction(() => globalThis.__deep.all("[data-prac-tab]").length === 2, null, {
   timeout: 60_000,
 });
 await page.waitForTimeout(2500);
@@ -303,7 +305,7 @@ const capability = () =>
   page.evaluate(() => {
     const editors = globalThis.__vscodeEmbed.face.capabilities.editors;
     // The chrome the seat pushes from this capability: a tab's dot.
-    const tabs = [...document.querySelectorAll("[data-prac-tab]")].map((element) => ({
+    const tabs = [...globalThis.__deep.all("[data-prac-tab]")].map((element) => ({
       resource: element.getAttribute("data-prac-tab")?.replace(/^vscode:file:/, "") ?? null,
       dirty: element.getAttribute("data-prac-tab-dirty") === "true",
       preview: element.getAttribute("data-prac-tab-preview") === "true",
@@ -344,15 +346,18 @@ if (
 // typing below targets whatever is mounted rather than assuming which host won.
 const surfaceResource = await page.evaluate(
   () =>
-    [...document.querySelectorAll("[data-vscode-embed-file]")]
+    [...globalThis.__deep.all("[data-vscode-embed-file]")]
       .find((element) => element.querySelector(".view-lines"))
       ?.getAttribute("data-vscode-embed-file") ?? null,
 );
 if (surfaceResource === null) {
   const dump = await page.evaluate(() => ({
-    hosts: [...document.querySelectorAll("[data-vscode-embed-file]")].map((element) => ({
+    hosts: [...globalThis.__deep.all("[data-vscode-embed-file]")].map((element) => ({
       file: element.getAttribute("data-vscode-embed-file")?.split("/").pop(),
-      inRegion: element.closest("[data-prac-region]")?.getAttribute("data-prac-region") ?? null,
+      inRegion:
+        globalThis.__deep
+          .closest(element, "[data-prac-region]")
+          ?.getAttribute("data-prac-region") ?? null,
       children: element.children.length,
       monaco: element.querySelectorAll(".monaco-editor").length,
     })),
@@ -360,7 +365,7 @@ if (surfaceResource === null) {
       .filter(([id]) => id.startsWith("vscode:file:"))
       .map(([id, view]) => `${id.split("/").pop()}@${view.region}${view.hidden ? "(hidden)" : ""}`),
     open: globalThis.__vscodeEmbed.face.listOpenFiles().map((r) => r.split("/").pop()),
-    tabs: [...document.querySelectorAll("[data-prac-tab]")].map((e) =>
+    tabs: [...globalThis.__deep.all("[data-prac-tab]")].map((e) =>
       e.getAttribute("data-prac-tab")?.split("/").pop(),
     ),
   }));
@@ -437,8 +442,8 @@ await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeo
 await page.waitForTimeout(6000);
 const reloaded = await page.evaluate(() => ({
   open: globalThis.__vscodeEmbed.face.listOpenFiles(),
-  fileHosts: document.querySelectorAll("[data-vscode-embed-file]").length,
-  fileTabs: [...document.querySelectorAll("[data-prac-tab]")]
+  fileHosts: globalThis.__deep.all("[data-vscode-embed-file]").length,
+  fileTabs: [...globalThis.__deep.all("[data-prac-tab]")]
     .map((element) => element.getAttribute("data-prac-tab"))
     .filter((id) => id !== null && id.startsWith("vscode:file:")),
   conversationRegion:

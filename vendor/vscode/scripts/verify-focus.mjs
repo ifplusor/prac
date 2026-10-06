@@ -16,6 +16,7 @@
  * Usage: URL='http://127.0.0.1:3084/?token=...' node scripts/verify-focus.mjs
  */
 import { createRequire } from "node:module";
+import { installDeepDom } from "./deep-dom.mjs";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -73,6 +74,7 @@ page.on("console", (message) => {
 page.on("pageerror", (error) => errors.push(String(error.message)));
 
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
+await installDeepDom(page);
 await page.waitForSelector("[data-prac-focus-strip]", { timeout: 60_000 });
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
 
@@ -102,10 +104,12 @@ async function sample() {
         h: Math.round(r.height),
       };
     };
-    const frame = document.querySelector("[data-prac-frame]");
-    const hosts = [...document.querySelectorAll("[data-vscode-embed-file]")].map((el, index) => ({
+    const frame = globalThis.__deep.one("[data-prac-frame]");
+    const hosts = [...globalThis.__deep.all("[data-vscode-embed-file]")].map((el, index) => ({
       index,
-      region: el.closest("[data-prac-region]")?.getAttribute("data-prac-region") ?? null,
+      region:
+        globalThis.__deep.closest(el, "[data-prac-region]")?.getAttribute("data-prac-region") ??
+        null,
       hasEditor: !!el.querySelector(".monaco-editor"),
       lines: el.querySelectorAll(".view-line").length,
       // Monaco renders text with non-breaking spaces; normalise before matching.
@@ -116,9 +120,9 @@ async function sample() {
     }));
     return {
       focus:
-        document.querySelector("[data-prac-focus-strip]")?.getAttribute("data-prac-focus-strip") ??
+        globalThis.__deep.one("[data-prac-focus-strip]")?.getAttribute("data-prac-focus-strip") ??
         null,
-      hasStrip: !!document.querySelector("[data-prac-focus-strip]"),
+      hasStrip: !!globalThis.__deep.one("[data-prac-focus-strip]"),
       frame: box(frame),
       // The conversation's own region, from the layout probe: it is a view like
       // any other, so it moves with attention and the gate reads it here.
@@ -135,13 +139,13 @@ async function sample() {
     const clip = { x: host.box.x, y: host.box.y, width: host.box.w, height: host.box.h };
     const painted = await page.screenshot({ clip });
     await page.evaluate(() => {
-      document.querySelectorAll("[data-vscode-embed-file]").forEach((el) => {
+      globalThis.__deep.all("[data-vscode-embed-file]").forEach((el) => {
         el.style.visibility = "hidden";
       });
     });
     const hidden = await page.screenshot({ clip });
     await page.evaluate(() => {
-      document.querySelectorAll("[data-vscode-embed-file]").forEach((el) => {
+      globalThis.__deep.all("[data-vscode-embed-file]").forEach((el) => {
         el.style.visibility = "";
       });
     });

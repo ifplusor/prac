@@ -22,6 +22,7 @@
  * Usage: URL='http://127.0.0.1:3084/?token=...' node scripts/verify-layout.mjs
  */
 import { createRequire } from "node:module";
+import { installDeepDom } from "./deep-dom.mjs";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -100,7 +101,7 @@ const analyse = async (base64) => {
 /** Drag the sash matching `selector` by (`dx`, `dy`) px. */
 async function dragSash(page, selector, dx, dy = 0) {
   const point = await page.evaluate((sel) => {
-    const sash = document.querySelector(sel);
+    const sash = globalThis.__deep.one(sel);
     if (!sash) return null;
     const rect = sash.getBoundingClientRect();
     return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
@@ -129,7 +130,7 @@ async function sample(page, fileView) {
           h: Math.round(rect.height),
         };
       };
-      const regions = [...document.querySelectorAll("[data-prac-region]")].map((element) => ({
+      const regions = [...globalThis.__deep.all("[data-prac-region]")].map((element) => ({
         id: element.getAttribute("data-prac-region"),
         box: box(element),
       }));
@@ -138,7 +139,7 @@ async function sample(page, fileView) {
       // The direct region siblings of the split that directly holds `regionId`:
       // the two panes a sash between them moves.
       const panesOf = (regionId) => {
-        const region = document.querySelector(`[data-prac-region="${regionId}"]`);
+        const region = globalThis.__deep.one(`[data-prac-region="${regionId}"]`);
         const split = region?.parentElement?.closest("[data-prac-split]") ?? null;
         return split
           ? [...split.children]
@@ -147,7 +148,7 @@ async function sample(page, fileView) {
           : [];
       };
 
-      const host = document.querySelector("[data-vscode-embed-file]");
+      const host = globalThis.__deep.one("[data-vscode-embed-file]");
       const state = globalThis.__pracLayout?.getState?.();
       const regionOf = (node, id) => {
         if (!node) return null;
@@ -160,7 +161,7 @@ async function sample(page, fileView) {
       };
 
       return {
-        frame: box(document.querySelector("[data-prac-frame]")),
+        frame: box(globalThis.__deep.one("[data-prac-frame]")),
         regions,
         right: byId(trackRegion),
         rightPanes: panesOf(trackRegion),
@@ -168,24 +169,35 @@ async function sample(page, fileView) {
         othersExtent: regions
           .filter((region) => region.id !== trackRegion)
           .reduce((total, region) => total + (region.box?.w ?? 0), 0),
-        sashes: [...document.querySelectorAll("[data-prac-sash]")].map((element) => ({
+        sashes: [...globalThis.__deep.all("[data-prac-sash]")].map((element) => ({
           id: element.getAttribute("data-prac-sash"),
           left: element.getAttribute("data-prac-sash-left"),
           right: element.getAttribute("data-prac-sash-right"),
           dir: element.getAttribute("data-prac-sash-dir"),
           box: box(element),
         })),
-        conversationInTrack: !!document.querySelector(
-          `[data-prac-region="${trackRegion}"] [data-slot="main.conversation"], [data-prac-region="${trackRegion}"] [data-conversation-scroll]`,
-        ),
+        // The conversation's DOM lives inside its own view root, so the region
+        // it sits in is read by walking *out* of the root rather than by a
+        // descendant selector (which cannot cross the boundary).
+        conversationInTrack: globalThis.__deep
+          .all('[data-slot="main.conversation"], [data-conversation-scroll]')
+          .some(
+            (element) =>
+              globalThis.__deep
+                .closest(element, "[data-prac-region]")
+                ?.getAttribute("data-prac-region") === trackRegion,
+          ),
         file: host
           ? {
-              region: host.closest("[data-prac-region]")?.getAttribute("data-prac-region") ?? null,
+              region:
+                globalThis.__deep
+                  .closest(host, "[data-prac-region]")
+                  ?.getAttribute("data-prac-region") ?? null,
               box: box(host),
               lines: host.querySelectorAll(".view-line").length,
             }
           : null,
-        fileHostCount: document.querySelectorAll("[data-vscode-embed-file]").length,
+        fileHostCount: globalThis.__deep.all("[data-vscode-embed-file]").length,
         modelFileRegion: state?.views?.[fileView]?.region ?? null,
         modelConversationRegion: state?.views?.["dsh:main:conversation"]?.region ?? null,
         modelRightSize: regionOf(state?.tree, trackRegion)?.size ?? null,
@@ -203,7 +215,7 @@ async function sample(page, fileView) {
     // Attribute the pixels: the same clip with the file host hidden must differ.
     const hide = (visibility) =>
       page.evaluate((value) => {
-        document.querySelectorAll("[data-vscode-embed-file]").forEach((element) => {
+        globalThis.__deep.all("[data-vscode-embed-file]").forEach((element) => {
           element.style.visibility = value;
         });
       }, visibility);
@@ -228,6 +240,7 @@ page.on("console", (message) => {
 page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
 
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
+await installDeepDom(page);
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
 

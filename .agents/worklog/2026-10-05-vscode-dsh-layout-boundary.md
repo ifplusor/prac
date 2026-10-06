@@ -203,6 +203,22 @@
 
 **闸门**：prac 侧 `verify:stack`、`verify:persistence` **仍绿**（它们读的是 frame 自己的 light-DOM 属性）；**vendor 侧 `verify-views` 红 10 条**——正是“契约的消费者”那条老账：`fileMovedIntoTheTrack`、`paintedAfterHideAndRecall`、`splitEditorPaintedInNewPane` 等**按轻 DOM 查视图内部**（`.monaco-editor` / `.pane` / `[data-vscode-embed-part-host]`），而这些东西现在在影根里。⇒ **下一步是把闸门改成穿透影根**（不是设计变更，是消费者的迁移）。
 
+## 落地：闸门穿透影根（2026-10-05 已做）
+
+隔离一上线，vendor 侧 `verify-views` 红 10 条——**契约的消费者**那条老账。处置：新增 `vendor/vscode/scripts/deep-dom.mjs`，把“穿透影根”做成**一个**东西，六个 vendor 闸门改用它：
+
+| 原来的写法 | 为什么在隔离下失效 | 改成 |
+| --- | --- | --- |
+| `document.querySelector(All)` | 视图内容在影根里 | `__deep.one` / `__deep.all`（轻 DOM 优先、再进影根——是等价的超集） |
+| `host.closest("[data-prac-region]")` | `closest` **不跨**影根边界，region 归属读成 null | `__deep.closest`（沿 `getRootNode().host` 向上走） |
+| `region [data-slot=…]` 后代选择器 | 后代关系跨不过边界 | 先 deep 找到元素，再 `__deep.closest` 读它在哪个 region |
+| `page.waitForSelector` 等视图内容 | 同第一行 | `waitDeep`（`waitForFunction` + deep 查询） |
+| 隐藏某元素来归属像素 | 同上 | `__deep.hide` |
+
+**walk 的安装方式**：`addInitScript` + 立即 `evaluate` 各一次——`verify-file` 会重载页面，只 `evaluate` 会在重载后丢掉（实测踩到）。定义的是一个命名空间全局，对应用是惰性的。
+
+**复跑（rig `:3084`）**：`verify-layout` · `verify-views` · `verify-focus` · `verify-regions` · `verify-view` · `verify-file` **六门全绿**；`verify-extension` 仍是条件门（需要真装一个扩展）；prac 侧 `verify-stack` · `verify-persistence` · `verify-bottom` · `verify-split` **四门全绿**。`vp check` 0 errors、警告回到基线的 3 条。
+
 ## 还没落地的
 
 - **`docs/architecture.md` §3.1 与 umbrella §3.5 仍是旧口径**（"借来的组件是沙箱里的客人"；"tab 与分栏由 stage 提供"）。它们是**现在时文档**，改它们等于把这批裁决落成正式设计 ⇒ **等 James 点头**。同批要清的还有"沙箱"这个撞词（它在本仓另指 agent 运行时的执行沙箱）。

@@ -40,6 +40,7 @@
  * Usage: URL='http://127.0.0.1:3084/?token=...' node scripts/verify-views.mjs
  */
 import { createRequire } from "node:module";
+import { installDeepDom, waitDeep } from "./deep-dom.mjs";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -113,17 +114,9 @@ async function paintAt(page, area, hideSelector) {
   if (!area || area.w < 2 || area.h < 2) return null;
   const clip = { x: area.x, y: area.y, width: area.w, height: area.h };
   const painted = await page.screenshot({ clip });
-  await page.evaluate((selector) => {
-    document.querySelectorAll(selector).forEach((element) => {
-      element.style.visibility = "hidden";
-    });
-  }, hideSelector);
+  await page.evaluate((selector) => globalThis.__deep.hide(selector, true), hideSelector);
   const hidden = await page.screenshot({ clip });
-  await page.evaluate((selector) => {
-    document.querySelectorAll(selector).forEach((element) => {
-      element.style.visibility = "";
-    });
-  }, hideSelector);
+  await page.evaluate((selector) => globalThis.__deep.hide(selector, false), hideSelector);
   return {
     ...(await page.evaluate(analyse, painted.toString("base64"))),
     differsWhenHidden: sha(painted) !== sha(hidden),
@@ -176,7 +169,7 @@ async function sample(page) {
           h: Math.round(rect.height),
         };
       };
-      const host = document.querySelector(editorHost);
+      const host = globalThis.__deep.one(editorHost);
       const state = globalThis.__pracLayout.getState();
       const sizes = {};
       const walk = (node) => {
@@ -192,11 +185,14 @@ async function sample(page) {
         })),
         host: host
           ? {
-              region: host.closest("[data-prac-region]")?.getAttribute("data-prac-region") ?? null,
+              region:
+                globalThis.__deep
+                  .closest(host, "[data-prac-region]")
+                  ?.getAttribute("data-prac-region") ?? null,
               box: box(host),
             }
           : null,
-        hostCount: document.querySelectorAll(editorHost).length,
+        hostCount: globalThis.__deep.all(editorHost).length,
         // Where the conversation sits, from the layout probe: with the
         // conversation a view like any other it moves, so a gate that cares
         // about "the track stayed alive" has to read the placement, not infer it.
@@ -257,6 +253,7 @@ page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
 
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
 await page.waitForSelector(FRAME, { timeout: 60_000 });
+await installDeepDom(page);
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
 
 // Open one file: without one there is no editor view to list or drive.
@@ -265,7 +262,7 @@ const folder = await page.evaluate(
 );
 if (!folder) throw new Error("the workbench has no workspace folder");
 await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), `${folder}/package.json`);
-await page.waitForSelector(`${EDITOR_HOST} .monaco-editor`, { timeout: 60_000 });
+await waitDeep(page, `${EDITOR_HOST} .monaco-editor`);
 // Give Monaco a beat to paint after the grid lays it out.
 await page.waitForTimeout(3000);
 

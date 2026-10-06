@@ -18,6 +18,7 @@
  * Usage: URL='http://127.0.0.1:3084/?token=...' node scripts/verify-view.mjs
  */
 import { createRequire } from "node:module";
+import { installDeepDom } from "./deep-dom.mjs";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -69,6 +70,7 @@ page.on("console", (message) => {
 page.on("pageerror", (error) => consoleErrors.push(String(error)));
 
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
+await installDeepDom(page);
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 // The seat is hidden and unplaced by the default arrangement: reveal it in a
 // side region, which is where a view composed by prac would go.
@@ -86,7 +88,7 @@ await page.waitForTimeout(2000);
 async function sample() {
   const facts = await page.evaluate(
     ({ viewHost, sidebarPartHost }) => {
-      const host = document.querySelector(viewHost);
+      const host = globalThis.__deep.one(viewHost);
       const box = (element) => {
         if (!element) return null;
         const rect = element.getBoundingClientRect();
@@ -99,11 +101,13 @@ async function sample() {
       };
       return {
         host: box(host),
-        region: host?.closest("[data-prac-region]")?.getAttribute("data-prac-region") ?? null,
+        region:
+          globalThis.__deep.closest(host, "[data-prac-region]")?.getAttribute("data-prac-region") ??
+          null,
         panes: host?.querySelectorAll(".pane").length ?? 0,
         headerTitle: host?.querySelector(".pane-header .title")?.textContent?.trim() ?? null,
         listRows: host?.querySelectorAll(".monaco-list-row").length ?? 0,
-        sidebarPartHosts: document.querySelectorAll(sidebarPartHost).length,
+        sidebarPartHosts: globalThis.__deep.all(sidebarPartHost).length,
         mountErrors: 0,
       };
     },

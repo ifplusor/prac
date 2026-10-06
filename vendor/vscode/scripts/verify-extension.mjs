@@ -18,6 +18,7 @@
  *   VIEW=gitlens.views.repositories URL='…' node scripts/verify-extension.mjs
  */
 import { createRequire } from "node:module";
+import { installDeepDom } from "./deep-dom.mjs";
 import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -92,6 +93,7 @@ page.on("console", (message) => {
 page.on("pageerror", (error) => consoleErrors.push(String(error)));
 
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
+await installDeepDom(page);
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 // The embed face arrives with the composition's bridge; the page loads it lazily.
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
@@ -131,7 +133,7 @@ if (expectsView) {
   await page.waitForTimeout(3000);
 
   facts = await page.evaluate(() => {
-    const host = document.querySelector("#prac-extension-probe");
+    const host = globalThis.__deep.one("#prac-extension-probe");
     const box = (element) => {
       if (!element) return null;
       const rect = element.getBoundingClientRect();
@@ -165,7 +167,7 @@ if (expectsView) {
   // Release it again: an extension view has to be creatable twice, like any view.
   released = await page.evaluate((viewId) => {
     globalThis.__vscodeEmbed.face.releaseView(viewId);
-    const host = document.querySelector("#prac-extension-probe");
+    const host = globalThis.__deep.one("#prac-extension-probe");
     document.body.removeChild(host);
     return true;
   }, view);
