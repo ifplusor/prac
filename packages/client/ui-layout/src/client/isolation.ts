@@ -40,7 +40,7 @@ const ROOT_STYLES = `
 :host { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 [${ATTRIBUTE_MIRROR}] { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; }
 [${CONTENT_ATTRIBUTE}] { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; }
-[${CONTENT_ATTRIBUTE}] > * { flex: 1 1 auto; min-width: 0; min-height: 0; }
+[${CONTENT_ATTRIBUTE}] > * { flex: 1 1 auto; min-width: 0; min-height: 0; pointer-events: auto; }
 `;
 
 /** Every root this module keeps in sync. */

@@ -126,7 +126,7 @@ async function paintAt(page, area, hideSelector) {
 /** Drag the sash matching `selector` by `dx` px. */
 async function dragSash(page, selector, dx) {
   const point = await page.evaluate((sel) => {
-    const sash = document.querySelector(sel);
+    const sash = globalThis.__deep.one(sel);
     if (!sash) return null;
     const rect = sash.getBoundingClientRect();
     return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
@@ -178,8 +178,8 @@ async function sample(page) {
       };
       walk(state.tree);
       return {
-        frame: box(document.querySelector("[data-prac-frame]")),
-        regions: [...document.querySelectorAll("[data-prac-region]")].map((element) => ({
+        frame: box(globalThis.__deep.one("[data-prac-frame]")),
+        regions: [...globalThis.__deep.all("[data-prac-region]")].map((element) => ({
           id: element.getAttribute("data-prac-region"),
           ...box(element),
         })),
@@ -198,20 +198,20 @@ async function sample(page) {
         // about "the track stayed alive" has to read the placement, not infer it.
         conversationRegion:
           globalThis.__pracLayout?.getState?.().views?.["dsh:main:conversation"]?.region ?? null,
-        overlay: box(document.querySelector("[data-prac-recall]")),
-        strip: !!document.querySelector("[data-prac-focus-strip]"),
-        rows: [...document.querySelectorAll(rowSelector)].map((element) => ({
+        overlay: box(globalThis.__deep.one("[data-prac-recall]")),
+        strip: !!globalThis.__deep.one("[data-prac-focus-strip]"),
+        rows: [...globalThis.__deep.all(rowSelector)].map((element) => ({
           id: element.getAttribute("data-prac-recall-row"),
           where: element.querySelector("[data-prac-recall-where]")?.textContent?.trim() ?? null,
           hidden: element
             .querySelector("[data-prac-recall-where]")
             ?.getAttribute("data-prac-recall-hidden"),
         })),
-        regionControls: [...document.querySelectorAll(regionControlSelector)].map((element) =>
+        regionControls: [...globalThis.__deep.all(regionControlSelector)].map((element) =>
           element.getAttribute("data-prac-recall-region"),
         ),
         regionCollapseStates: Object.fromEntries(
-          [...document.querySelectorAll("[data-prac-recall-collapse]")].map((element) => [
+          [...globalThis.__deep.all("[data-prac-recall-collapse]")].map((element) => [
             element.getAttribute("data-prac-recall-collapse"),
             element.getAttribute("data-prac-recall-collapsed"),
           ]),
@@ -343,7 +343,7 @@ states.recalled = await sample(page);
 await toggleRecall(page);
 const fileRowIndex = await page.evaluate(
   ({ view, rowSelector }) =>
-    [...document.querySelectorAll(rowSelector)].findIndex(
+    [...globalThis.__deep.all(rowSelector)].findIndex(
       (row) => row.getAttribute("data-prac-recall-row") === view,
     ),
   { view: FILE_VIEW, rowSelector: ROW },
@@ -353,7 +353,7 @@ for (let step = 0; step < fileRowIndex; step += 1) await page.keyboard.press("Ar
 await page.waitForTimeout(200);
 const selectedRow = await page.evaluate(
   () =>
-    document.querySelector("[data-prac-recall-selected]")?.getAttribute("data-prac-recall-row") ??
+    globalThis.__deep.one("[data-prac-recall-selected]")?.getAttribute("data-prac-recall-row") ??
     null,
 );
 await page.keyboard.press("Enter");
@@ -372,7 +372,7 @@ await toggleRecall(page);
 await page.click(splitOf(FILE_VIEW, "right"));
 await page.waitForTimeout(800);
 const newRegion = await page.evaluate(() => {
-  const ids = [...document.querySelectorAll("[data-prac-region]")].map((element) =>
+  const ids = [...globalThis.__deep.all("[data-prac-region]")].map((element) =>
     element.getAttribute("data-prac-region"),
   );
   return ids.find((id) => !["left", "stage", "right"].includes(id)) ?? null;

@@ -341,7 +341,15 @@
 
 **剩下的候选（更要紧的是时序）**：那个面的**开合键监听是在它自己的 `useEffect` 里注册**的；而 `IsolatedView` 的 children **第一次渲染是 `null`**（等内容容器就绪才 portal），于是 `RecallSurface` 比原来**晚一拍挂载**⇒ 若按键早于它挂载，toggle 落空、目录行就是空 → 正好是闸门报的那个症状（`the file view is not a row in the recall catalogue`）。
 
-⇒ 下一步（一条探针就能定）：重新应用 (a) 后，按键**再等一拍**，dump `[data-prac-recall]` 是否存在、行数多少、以及是否有 pageerror——若"等一拍就正常"，修法就是**别让 children 晚一拍**（`IsolatedView` 首次渲染就把 children 挂进一个占位容器、或先挂后搬），而不是放弃 (a)。
+### 结论（2026-10-05 探针）：**功能是好的，红的是闸门**
+
+重新应用 (a) 后按键实测：根内 `recall: 1`、**rows: 4**、122 张镜像样式、宿主 `pointer-events: none`、**无 pageerror** ⇒ 悬浮层进隔离根**渲染正常**。
+
+闸门仍红的原因查到了：**`verify-views` 里还留着轻 DOM 读取**——`[...document.querySelectorAll(rowSelector)]` 与 `document.querySelector("[data-prac-recall-selected]")`。`sample()` 里还有一串（`[data-prac-recall]` / `[data-prac-focus-strip]` / rows / region 控件）。**这个文件是我上一轮批量转换时漏掉的**（当时只给它单独补了几处），所以在悬浮层搬进根之后它找不到那些元素。
+
+**修法**：把 `verify-views` 也整体换成 `__deep`（与其余六门一致）。改完 **`verify-views` 绿**，其余九门（vendor 五 + prac 四）**全绿**。
+
+**教训（与我自己的上一轮有关）**：批量替换要**枚举文件**，漏掉一个就会把"功能坏了"与"消费者没跟上"混淆——这次正是靠一条探针把两者分开的。
 
 **若那条也不成立**：就把"悬浮层是框架 chrome、不隔离"作为一条明确例外写进 note（像 `sash` 那样单列一类）。
 

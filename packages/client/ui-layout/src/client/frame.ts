@@ -154,7 +154,14 @@ function View({ viewId, renderSlot, box, viewportWidth }: ViewProps): ReactNode 
  *
  * @param props - the view's rendered tree.
  */
-function IsolatedView({ children }: { children?: ReactNode }): ReactElement {
+function IsolatedView({
+  children,
+  clickThrough = false,
+}: {
+  children?: ReactNode;
+  /** The box itself lets events pass; its entries opt back in (the float layer). */
+  clickThrough?: boolean;
+}): ReactElement {
   const host = useRef<HTMLDivElement | null>(null);
   const [content, setContent] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => {
@@ -177,6 +184,7 @@ function IsolatedView({ children }: { children?: ReactNode }): ReactElement {
         flex: "1 1 auto",
         minWidth: 0,
         minHeight: 0,
+        ...(clickThrough ? { pointerEvents: "none" as const } : {}),
       },
     },
     content ? createPortal(children, content) : null,
@@ -707,7 +715,9 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
           "data-prac-overlay-layer": "",
           style: { position: "absolute", inset: 0, zIndex: 20, pointerEvents: "none" },
         },
-        renderSlot("shell.overlay", {}),
+        // The float layer is a surface plane too: its entries live inside their own
+        // isolation root, while the box itself stays click-through.
+        createElement(IsolatedView, { clickThrough: true }, renderSlot("shell.overlay", {})),
       ),
     );
   };
