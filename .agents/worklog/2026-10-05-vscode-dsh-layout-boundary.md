@@ -337,7 +337,13 @@
 
 **处置：回退**（`git show HEAD:<path>` 逐文件恢复——`git checkout` 要写 `.git`，被沙箱拦；重建 `ui-layout` 后 `verify-views` **恢复绿**）。
 
-**为什么它会红（两个候选，未查）**：① 悬浮层里那两个条目是**注册进 DSH 槽**的（`slots.register({ name: "shell.overlay" })`），portal 进影子根之后，槽渲染或它们自身的取数（读 `ctx.pracLayout` 的目录）出了问题；② 它们依赖**帧的轻 DOM**（量尺寸/找兄弟），换树之后拿不到。⇒ 下一步是先**看清 recall 面到底渲染成了什么**（截图 + 它的 DOM），再决定是修它、还是把"悬浮层不隔离"作为一条明确的例外写进 note。
+**代码排查的结果（候选②被排除）**：`RecallSurface`（`packages/bundle/web-app/src/client/index.ts`）**不依赖帧的轻 DOM**——它的行是 `views = layout.listViews()` 映射出来的（`rows = views.map(...)`，`data-prac-recall-row`），没有任何 `document.querySelector` / 量尺寸 / 找兄弟。所以"换树之后拿不到"这条不成立。
+
+**剩下的候选（更要紧的是时序）**：那个面的**开合键监听是在它自己的 `useEffect` 里注册**的；而 `IsolatedView` 的 children **第一次渲染是 `null`**（等内容容器就绪才 portal），于是 `RecallSurface` 比原来**晚一拍挂载**⇒ 若按键早于它挂载，toggle 落空、目录行就是空 → 正好是闸门报的那个症状（`the file view is not a row in the recall catalogue`）。
+
+⇒ 下一步（一条探针就能定）：重新应用 (a) 后，按键**再等一拍**，dump `[data-prac-recall]` 是否存在、行数多少、以及是否有 pageerror——若"等一拍就正常"，修法就是**别让 children 晚一拍**（`IsolatedView` 首次渲染就把 children 挂进一个占位容器、或先挂后搬），而不是放弃 (a)。
+
+**若那条也不成立**：就把"悬浮层是框架 chrome、不隔离"作为一条明确例外写进 note（像 `sash` 那样单列一类）。
 
 ## 还没落地的
 
