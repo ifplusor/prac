@@ -19,18 +19,18 @@ status: in-progress
 | R3  | **布局**：主操作台是注意力焦点，四周是辅助面板；交流时 chat 在中间，审方案时白板在中间、chat 在一边，审工件时编辑器在中间、chat 在一边、资源浏览器在另一边；主操作台能分栏；terminal 随时能调出来；各视图按需显示、能方便收起。                                                                                          | umbrella §2②            |
 | R4  | **保留完整的 IDE 能力和扩展生态**（包括语言包、GitLens 这类 UI 扩展），**但不要 VS Code 的布局**。                                                                                                                                                                                                                      | umbrella §1.1           |
 | R5  | **主干是 DSH**：组合、状态、进程、生命周期都归它。DSH 的扩展方式就是 DSH 插件（同一地址空间，进程内 `inject`），prac 自己的部分和 VS Code 都作为 DSH 插件挂在它上面。                                                                                                                                                            | James 2026-09-16        |
-| R6  | **agent / chat 归 DSH**：VS Code 的 chat、participants、工具注册表、会话、agentHost 都不进 prac 的 agent 面。                                                                                                                                                                                                           | James 2026-09-19        |
+| R6  | **agent / chat 归 DSH**：VS Code 的 chat、participants、工具注册表、会话、agentHost 都不进 prac 的 agent 侧。                                                                                                                                                                                                           | James 2026-09-19        |
 | R7  | **VS Code 按 prac 的两端切成两半**：code server 是 server 侧的 remote（提供 IDE 基础能力），web 是 client 侧（提供 UI）。                                                                                                                                                                                                | James 2026-09-16        |
 | R8  | **两半之间的通信层要基于 DSH 的架构重新设计**，不是把 VS Code 自己的传输透传过来。                                                                                                                                                                                                                                       | James 2026-09-16        |
 | R9  | **不 fork 上游**：DSH 走它自己的组装层；VS Code 只 pin + patch + overlay，源码不进本仓。                                                                                                                                                                                                                                 | umbrella §1.3           |
 | R10 | **三层各归其位**：`vendor/vscode`（上游源码 + 我们的 patch）；`vendor/vscode-embed`（在其上封装的 lib，可利用、不绑定 prac）；基于这个 lib 构建的 DSH 插件族（政策都在这一层）。                                                                                                                                           | James 2026-09-16        |
-| R11 | **prac 不只有 VS Code 这一族 DSH 插件**：还有 frame、编排、角色、注意力、持久化，还有 **agent 面（六件事）**，以及直接从 DSH 继承的能力族。                                                                                                                                                                                  | James 2026-09-16        |
+| R11 | **prac 不只有 VS Code 这一族 DSH 插件**：还有 frame、编排、角色、注意力、持久化，还有 **agent 侧（六件事）**，以及直接从 DSH 继承的能力族。                                                                                                                                                                                  | James 2026-09-16        |
 | R12 | **VS Code 里最有价值的能力是 LSP**，要接进 DSH。                                                                                                                                                                                                                                                                        | James 2026-09-19        |
-| R13 | agent 面归 DSH 之后，扩展生态里 agent 还能用的只剩 **MCP**（工具）和**文件定制**（`SKILL.md` / `*.instructions.md` / `AGENTS.md`）；VS Code 扩展用 `lm.registerTool` 注册的工具我们拿不到。                                                                                                                                        | R6 的推论（09-19 核实） |
+| R13 | agent 侧归 DSH 之后，扩展生态里 agent 还能用的只剩 **MCP**（工具）和**文件定制**（`SKILL.md` / `*.instructions.md` / `AGENTS.md`）；VS Code 扩展用 `lm.registerTool` 注册的工具我们拿不到。                                                                                                                                        | R6 的推论（09-19 核实） |
 | R14 | 运行期状态跟随 XDG、放在仓库外；构建期状态放 `.build/`。                                                                                                                                                                                                                                                                | 已落地                  |
 | R15 | **不引第三方改造**（`monaco-vscode-api`、Theia 这类）。                                                                                                                                                                                                                                                                   | umbrella §1.3           |
 
-**agent 面就是六件事**：决策优先、依据是一等公民、可逆带检查点、审查是主界面、架构记忆、活的计划（见 `docs/philosophy.md`）。它归 DSH（R6、R11），是 prac 的立身之本，不是 IDE 的附属功能。
+**agent 侧就是六件事**：决策优先、依据是一等公民、可逆带检查点、审查是主界面、架构记忆、活的计划（见 `docs/philosophy.md`）。它归 DSH（R6、R11），是 prac 的立身之本，不是 IDE 的附属功能。
 
 **最近核实到的三件事**（不是需求，但它们改了这个设计）：
 
@@ -151,8 +151,8 @@ code server 归主干起停：空闲端口、等就绪、随 DSH 插件 dispose 
 
 **作废或改正**（前提已经不成立，或者只是说法错了）：
 
-1. **把"能力面（capabilities）驱动 UI 组件"当主轴**——它原来服务两拨人（UI 组件和 agent），现在两拨都不需要它了（§2.1）；
-2. **把"拆散 UI 层"和"能力面驱动"捆在一起的那套说辞**——能力面没了（第 1 条），但**"拆散"本身是设计要求**：R2（界面跟着注意力走）、R3（布局规格）、R4（不要 VS Code 的布局）合起来要求 **prac 的编排单位是 view，IDE 的每一块都要能作为 view 被 prac 摆**（umbrella §3.2 已定"容纳单位 = view"）。跟 09-15 相比，变的只是**动机**——不是把能力带给 agent，而是**人看到的界面由 prac 编排**。
+1. **把"能力（capabilities）驱动 UI 组件"当主轴**——它原来服务两拨人（UI 组件和 agent），现在两拨都不需要它了（§2.1）；
+2. **把"拆散 UI 层"和"能力驱动"捆在一起的那套说辞**——能力驱动没了（第 1 条），但**"拆散"本身是设计要求**：R2（界面跟着注意力走）、R3（布局规格）、R4（不要 VS Code 的布局）合起来要求 **prac 的编排单位是 view，IDE 的每一块都要能作为 view 被 prac 摆**（umbrella §3.2 已定"容纳单位 = view"）。跟 09-15 相比，变的只是**动机**——不是把能力带给 agent，而是**人看到的界面由 prac 编排**。
 3. **把"broker 扮主线程"当默认路径**——降成 LSP 三条路里的一条（P1）；
 4. **把诊断这类"已经跑完的结果"当 agent 能力**（§1 第 1 条）——它是给人看的显示，而且是缓存；
 5. **VS Code 的 chat、participants、LM tools、会话、agentHost**（R6）；
@@ -162,7 +162,7 @@ code server 归主干起停：空闲端口、等就绪、随 DSH 插件 dispose 
 
 七条待定都定了（P1 / DSH 自己起 MCP 客户端 / 不共源 / 磁盘为准 / 视图为单位 / 文件集合不给 agent / chat 视图留着不显示）。接下来是把 P1 做出来，验收很具体：
 
-1. **P1 的第一条链**：用 checkout 自带的语言服务器（css / html / json / markdown 之一）做通——主干连 ExtensionHost 连接，喂配置与文档，扩展注册 provider，我们就工作区里的文件问一次查询。**验收**：用的是**扩展带来的服务器与它的配置**（不是手配的），且能力面**不止那四个操作**。
+1. **P1 的第一条链**：用 checkout 自带的语言服务器（css / html / json / markdown 之一）做通——主干连 ExtensionHost 连接，喂配置与文档，扩展注册 provider，我们就工作区里的文件问一次查询。**验收**：用的是**扩展带来的服务器与它的配置**（不是手配的），且能力**不止那四个操作**。
 2. **文档必须先喂**：这是上一条里最容易低估的部分（见 §2.10 的硬前提）。
 3. **自动保存打开之后，验证门要重新看**：现在那几条"文件保持不动"的断言是靠**故意关掉 autoSave** 才稳的（§2.8）。
 

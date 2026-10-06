@@ -14,7 +14,7 @@ status: in-progress
 1. **（2026-09-09）** 把 VS Code 与 DSH 结合成**一个**形态：prac 的界面 = agent 与 IDE **深融进一套 UI**，不是两套并列。保留**完整 IDE 能力与扩展生态**（Tier 2：语言包、GitLens 等 UI 扩展），**不要 VS Code 的布局**；以 agent 为中心，**IDE 是可按需下潜的重工具**。
 2. **（2026-09-19）现在的主线**（James）：**prac 的界面是给人用的**——和 agent 打交道的界面 + 帮他干活的 IDE 界面；**另一头 prac 是 agent 的运行时**（循环、工具、上下文、审批、沙箱、会话、持久化）。**中心是人和 agent 的交互**：chat 就是通道（松耦合），白板就是工作区里的文件。设计见 [架构重做](../in-progress/2026-09-19-architecture.md) 与 [docs/architecture.md](../../../docs/architecture.md)。
 3. **（2026-09-19）本次范围**：**只把两边现有的东西结合起来，不往 DSH 里加能力**——VS Code 有而 DSH 缺的，先记下来，不立刻加。结合点：① VS Code 的语言服务器 → `ctx.lsp` 的一个 provider；② VS Code 的 MCP server 定义 → DSH 现有的 MCP 客户端；③ VS Code 的界面 → prac 的 view；④ 人和 agent 对着同一份工作区文件。
-4. **（2026-09-15）那条旧主线已作废**——"把 VS Code 的 UI 层拆散、把能力层（如诊断）暴露给 agent"：能力面那半被扔（诊断只是缓存、agent 面归 DSH）；"拆散"那半作为 R2 / R3 / R4 的要求保留下来。见 [架构重做](../in-progress/2026-09-19-architecture.md) §4。
+4. **（2026-09-15）那条旧主线已作废**——"把 VS Code 的 UI 层拆散、把能力层（如诊断）暴露给 agent"：能力那半被扔（诊断只是缓存、agent 侧归 DSH）；"拆散"那半作为 R2 / R3 / R4 的要求保留下来。见 [架构重做](../in-progress/2026-09-19-architecture.md) §4。
 
 **阶段切换**：此前在讨论 prac 的目标/理念，并以具体任务体验工作流（C1、C2）；进行到 C2 时 James 叫停，转入融合形态本身。叫停理由原文只有「我发现我们不应该再继续了」，推断是优先级——**待确认**。本工作**不欠**阶段二的那些机制（决策空间 / 以审决策为主界面）；它们要重新进入主线，需 James 重新裁决。
 
@@ -92,8 +92,8 @@ status: in-progress
 
 ### 3.7 生态与能力
 
-- **agent / chat 面归 DSH**（James 2026-09-18）：VS Code 自带的这一层**不作为 prac 的 agent 面**——`contrib/chat/**`（chat 循环、participants/"agents"、会话、工具注册表与内置工具如 `reviewPlanTool` / `runSubagentTool` / `setArtifactsTool`）、`contrib/mcp` 的客户端、`platform/agentHost/**`（把 copilot / claude / codex 当被托管进程）都不进；**agent 的循环、工具、会话、模型、规划与评审都在 DSH**，我们从 VS Code 取的是 **IDE 能力**（编辑、语言特性、诊断、终端、任务、调试、VS Code 扩展生态）与 **UI 组件**。
-  - 直接代价：**VS Code 扩展注册的 LM tools**（`contributes.languageModelTools` / `lm.registerTool`）我们拿不到——要用就得再实现一遍它的工具注册表与 `$invokeTool` 通道，等于把 agent 面搬过来。⇒ 生态里对 agent 真正开放的接口收窄成两条：**MCP**（工具协议）与**文件定制**（`SKILL.md` / `*.instructions.md` / `AGENTS.md`）。
+- **agent / chat 侧归 DSH**（James 2026-09-18）：VS Code 自带的这一层**不作为 prac 的 agent 侧**——`contrib/chat/**`（chat 循环、participants/"agents"、会话、工具注册表与内置工具如 `reviewPlanTool` / `runSubagentTool` / `setArtifactsTool`）、`contrib/mcp` 的客户端、`platform/agentHost/**`（把 copilot / claude / codex 当被托管进程）都不进；**agent 的循环、工具、会话、模型、规划与评审都在 DSH**，我们从 VS Code 取的是 **IDE 能力**（编辑、语言特性、诊断、终端、任务、调试、VS Code 扩展生态）与 **UI 组件**。
+  - 直接代价：**VS Code 扩展注册的 LM tools**（`contributes.languageModelTools` / `lm.registerTool`）我们拿不到——要用就得再实现一遍它的工具注册表与 `$invokeTool` 通道，等于把 agent 侧搬过来。⇒ 生态里对 agent 真正开放的接口收窄成两条：**MCP**（工具协议）与**文件定制**（`SKILL.md` / `*.instructions.md` / `AGENTS.md`）。
   - 但"不用"不等于"不存在"：Copilot 是**VS Code 内建扩展**（它声明 `chatParticipants` / `languageModelTools` / `mcpServerDefinitionProviders` / `chatSessions` / `chatPromptFiles` / `chatSkills`），会随扩展宿主一起活（见 §4）。
 - **MCP 客户端 DSH 自己起**（James 2026-09-19）：只复用 VS Code 这边的 **server 定义来源**（扩展声明点 + 工作区配置），不复用它的 `contrib/mcp` 客户端。
 - **文件定制不共源**（James 2026-09-19）：DSH 用自己的 skill / 上下文格式，不去读 VS Code 的 `SKILL.md` / `*.instructions.md` / `AGENTS.md`。

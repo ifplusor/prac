@@ -125,14 +125,14 @@ status: in-progress
 3. **主线程最小面**（同在 lib 里）：§2.3 那批必需顾客（含 `MainThreadStorage`、`MainThreadOutputService`，以及 §2.4 那 12 个 `$registerXxx`）＋ 初始化推送 ＋ 文档推送。**验收**：css 扩展真的激活、`$registerHoverProvider` 到达主线程。
 4. **扩展清单来自真实扫描**：扫VS Code 内建扩展目录与用户扩展目录，构造 initData 的 `extensions` 快照（第一条链可以让只有 css 进 `myExtensions`，但清单本身必须是扫出来的）。
 5. **问一次查询**：主线程调 `$provideHover`（VS Code 侧 1-based → seam 的 0-based），翻成 `{kind:'hover'}`。**验收**：拿到 CSS 属性的真实文档。
-6. **接进 agent 面**：写 provider、在 prac 的 bundle patch 里插 `@deepseek-ai/dsh-lsp` 与插件行，用 `lsp` 工具问一次。
+6. **接进 agent 侧**：写 provider、在 prac 的 bundle patch 里插 `@deepseek-ai/dsh-lsp` 与插件行，用 `lsp` 工具问一次。
 7. **生态验证**：把 cSpell 也走通（诊断 / 文档同步那条），确认多个扩展、多个提供方并存。
 
 ## 5. 怎么验证
 
 - **没有页面**：整条链在 headless（`pnpm dsh --profile prac-dev --port 3084 --no-open`，不开页面）下跑通——这本身就是设计要的那条（`docs/architecture.md:49`）。
 - **不是手配的**：profile 里**没有任何 `dsh-lsp-stdio` 的 servers 配置**；查询由扩展的语言服务回答（第 5 步用只有它才答得出的内容验，例如 CSS 属性的文档）。
-- **agent 面**：`lsp` 工具走通（1-based 入参、有结果或 `No results.`）。
+- **agent 侧**：`lsp` 工具走通（1-based 入参、有结果或 `No results.`）。
 - **不回归**：`verify-layout` 14 · `verify-views` 28 · `verify-focus` 9 · `verify-regions` 6 · `verify-view` 7 · `verify-file` 33 · `verify-extension`（带 `EXTENSION=… VIEW=none`）；prac 侧 `verify:stack` / `verify:bottom` / `verify:persistence` / `verify:split`；`pnpm test`。
 - **反例**：不推 `$initializeWorkspace` ⇒ 扩展激活挂住（证明喂的东西是必需的）。
 
