@@ -81,16 +81,52 @@
 - **编排单位是一个视图**：不是整块区域。`dsh:*`（对话、计划、审阅、笔记）和 `vscode:*`（编辑器、问题、终端、SCM、搜索、资源）都注册进**同一个 DSH 槽 `prac.view`**，frame 一视同仁地摆。
   - `prac.view` 用单数：槽名说的是"装哪一类东西"，**装几个由槽的 `kind` 决定**（`single` / `list` / `keyed` / `chain`），单个 view 的身份是注册时的 `key`。
 - **注意力与返回栈是 frame 的能力**，不属于任何单个视图。
-- 视图契约、树形摆放、收起记宽这类做法借鉴上游，frame 由 prac 拥有。
 - **UI 框架归 prac，DSH 与 VS Code 是组件来源**（James 2026-10-05）：我们从两边**借用**现成组件（VS Code 的 part / view / webview，DSH 的视图与基础控件）、**借鉴**它们的做法；框架本身——区域树、编排、层级、浮层——不外包。
-- **区域是骨架、视图是单位**：视图按窗口的方式管——独立、可在区域之间移动、各有各的状态；frame 拥有的是**区域**，不拥有视图内部。
-- **所有视图隔离且对等**（James 2026-10-05）：隔离由**框架保证**（不是内容自愿配合），**形态按内容选**（DOM 内容用影子根、自成体系的内容用独立浏览上下文）；选择权在框架，结果记进视图身份。
-- **浮层按作用域分**（James 2026-10-05）：只在视图盒子内部浮的（如 webview 的 overlay）**是视图自己的事**（自闭环）；**全局、不在任何视图里**的（阻止整个应用的模态框、命令面板、通知）归框架的**悬浮层**。
+- 视图契约、树形摆放、收起记宽这类做法借鉴上游，frame 由 prac 拥有。
+
+**区域是骨架，视图是单位**（James 2026-10-05）：
+
+- 视图按**窗口**的方式管——独立、可在区域之间移动、各有各的状态；frame 拥有的是**区域**，不拥有视图内部。
+- **常驻视图**是布局的成员：有身份、有位置，**进持久化**。**浮层视图**（右键菜单、命令面板、通知、工具提示、补全列表、就地小浮层）一次交互里出现、用完就消失，**不进持久化**。
+- 两者**是同样的视图、同样的隔离契约**。**框架 chrome**（sash、拖拽落点提示、焦点环）是唯一的例外——它不是视图。
+
+**视图契约（G1–G3）**：
+
+> layout 给每一个视图一个隔离盒子，并且所有视图对等。
+
+| #   | 不变量                                                                              | 谁保证               |
+| --- | ----------------------------------------------------------------------------------- | -------------------- |
+| G1  | 每个视图有真实几何（有尺寸，且随区域变化）                                          | 框架（区域）         |
+| G2  | 视图里的样式出不了它的盒子，也不因缺上下文而失效                                    | 框架的边界（统一）   |
+| G3  | **凡"生在 A、要出现在 B"的东西，走显式通路，由 B 落位与定序；视图不能自己画到外面** | 框架（盒子的硬边界） |
+
+- **隔离由框架保证**（不是内容自愿配合），**形态按内容选**：DOM 内容用**影子根**，自成体系的内容用**独立浏览上下文**（webview 本来就是这一种），选择权在框架、结果记进**视图身份**。内容不需要知道，也不需要声明；**契约只有一句**——"你被隔离，且我的接口对所有隔离形态一致"。
+- **盒子是硬边界**：宿主同时是绝对**与**固定定位后代的包含块，并被裁到盒内 ⇒ **视图画不到自己的盒子外面**。要出现在盒外的，只能走框架的**悬浮层**（这就是 G3 的强制手段：`contain: paint` + `overflow: hidden`）。
+- **浮层按作用域分**（James 2026-10-05）：只在视图盒子内部浮的（webview 的 overlay、视图自己的悬停 / 局部菜单）归**视图自己**（自闭环——同树才能用 CSS 锚点定位）；**全局、不在任何视图里**的（阻止整个应用的模态框、命令面板、通知）归框架的**悬浮层**。框架先只提供**不需要锚点**的这类（居中 / 贴角）；**坐标空间**（锚点矩形、失效与跟随）等真出现"必须跨视图锚定"的面再引入——不为不存在的分支写契约。
 - **借用件的适配收在一处**：`monaco-workbench` 类、`--vscode-*` 变量、上游样式表、借用件浮层，都由 `vscode-host`（机制在 `vendor/vscode-embed`）投进各自的隔离根；**上游标识退进边界内部，宿主侧不再镜像**（见 [布局边界的设计](../.agents/notes/in-progress/2026-10-05-vscode-dsh-layout-boundary.md)）。
+
+**区域名绑定布局模式——机制提供模式，数据决定谁用哪些**：
+
+| 区域（位置） | 分区（拆子区域） | `stack`（顺序） | `tab`（选择） | 默认模式 |
+| ------------ | ---------------- | --------------- | ------------- | -------- |
+| `left`       | 无               | 有              | 有            | `stack`  |
+| `right`      | 无               | 有              | 有            | `stack`  |
+| `stage`      | 有               | 无              | 有            | `tab`    |
+| `bottom`     | 无               | 无              | 有            | `tab`    |
+
+- **基础层只有"分区 / 顺序 / 选择"三种模式，叠放只在悬浮层**：叠放 = 同时可见 + 需要定序；tab 同一时刻只显示一个 ⇒ 它属"选择"、不是叠放。**基础层不需要 z 序**（"显示哪一个"是**选中**，是布局的状态，走注意力只是改变它交互的过程）。
+- **区域是位置，角色是角色，两者分开**（VS Code 自己就这么分：`workbench.sideBar.location` 允许 primary 侧栏换边）：角色用**平台的角色名**，绑到 DSH 的槽；**区域 id 是位置词** `left` / `right`（进持久化，不动）；**借来的名字不动**（`dsh:sidebar`、`workbench.parts.sidebar`）。
+
+| 角色               | 绑到谁                | 借的是谁的名                                                        |
+| ------------------ | --------------------- | ------------------------------------------------------------------- |
+| `primarySidebar`   | DSH 的 `dsh:sidebar`  | VS Code：Primary Side Bar                                           |
+| `secondarySidebar` | DSH 的 `dsh:rightbar` | VS Code：Secondary Side Bar（`ViewContainerLocation.AuxiliaryBar`） |
+
+- **一个派生要求**：视图在区域之间搬时，目标区域可能不支持它来源处的模式 ⇒ **视图的呈现与它所属的分组解耦**（分组决定怎么显示，视图只管内容），否则视图不能真正自由搬运。
 
 ### 3.2 IDE 那一半怎么进来
 
-- **编辑器** = **一个文件的编辑面**（一个视图），不是 editor part / editor group；**tab 是区域级能力**（不是 `stage` 专有），**分栏是区域的性质**——`stage` 支持分栏、默认 `tab`、不支持 `stack`；`bottom` 只有 `tab`；`left` / `right` 默认 `stack`。
+- **编辑器** = **一个文件的编辑面**（一个视图），不是 editor part / editor group；**tab 是区域级能力**（不是 `stage` 专有），**分栏是区域的性质**——模式与区域的绑定见 §3.1。
 - 扩展贡献的视图（tree view 等）也按视图进来；容器与 part 是可选的高级形态（整块标准 IDE 区域），不是组合的单位。
 - 现在的落点是「编辑器 / 侧栏」这类面，其余 IDE 面按同一套规矩逐步接。
 - 已知的坑：视图要进 VS Code 自己的可见性模型，否则 body 会是 "no data provider registered"。
@@ -122,7 +158,7 @@
 
 ### 3.4 持久化
 
-区域尺寸、每个 view 的折叠状态、堆叠顺序、哪些 view 在屏上。两份 key：**per-window**（布局）与 **per-workspace**（展开项）；key 带版本，恢复时不校验形状。**默认放置只填空缺**——否则每次激活都把视图拖回出厂位。边界：localStorage 是 per-origin，同源两个 tab 共用一份。
+**该持久化的**：视图在哪个区域、组内顺序、折叠、在屏上、**每个组的选中项、区域用的模式**。**不该持久化的**：区域内的层序、注意力栈、返回栈——前两者是布局的状态，后者是交互过程。两份 key：**per-window**（布局）与 **per-workspace**（展开项）；key 带版本，恢复时不校验形状。**默认放置只填空缺**——否则每次激活都把视图拖回出厂位。边界：localStorage 是 per-origin，同源两个 tab 共用一份。
 
 ## 4. 能力
 
@@ -238,10 +274,12 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随 DSH 插
    **两个消费者，状态各归各家**：**UI 走 web**——它的按工作区启停是浏览器里的状态（`BrowserStorageService` 用 IndexedDB 存所有域含 workspace，`web.main.ts:613-614` 无 remote 分支），**由 VS Code 自己管它的宿主，我们什么都不做**；**agent 不是 web、是服务端消费者**，所以它的「装什么」由服务端的事实决定。⇒ 两边不互相镜像、也不为统一去发明东西。
    **要接受的一处不一致**：**UI 里禁用的扩展，agent 那边仍会加载**——这是 web 形态的必然，不是缺陷（桌面/远程形态相反：那边渲染器存储本来就在服务端）。**「对齐 remote 形态」买不到那份状态**：remote 形态里渲染器的存储走 `'storage'` 通道，而那个通道是 **main process（客户端机器）** 的，code server 根本没注册它（只有 extensions / logger / userDataProfiles / remoteextensionsenvironment / request / telemetry / remoteFileSystem / remoteTerminal / remoteExtensionsScanner / mcp…）。
    **按 agent 仍卡在 seam**：查询入参没有会话标识（`packages/lsp/lsp/src/types.ts:38-57`）。逐条核实与来往见[工作记录](../.agents/worklog/2026-09-09-vscode-dsh-integration.md)。
-5. **VS Code 扩展贡献的 view**：**树视图通了**——数据侧本来就没问题（挂 cSpell 的 `cSpellIssuesViewByFile`，body 是**扩展自己**给的 `No issues found.`；数据 attach 走 registry、不经过容器，`mainThreadTreeViews.ts:212-215`），**真正缺的是尺寸**：pane 挂进 embedder 的元素后没人给它尺寸（容器是 splitview 干的），于是只剩一个 59px 的头、body 0 高，**内容全在 DOM 里但看不见**。2026-09-21 已修（`vendor/vscode/overlay` 里 view 也照 part 的做法：设元素尺寸 + `orthogonalSize` + `layout(size)`，并跟宿主 resize），实测 pane 640×560、body 13px→618px。**仍缺**：① **webview 视图**（`type=webview`）——overlay 与 iframe 都建出来了，但**宿主页有两条硬要求**（2026-09-21 核实）：**(a) 必须在安全上下文**（`pre/index.html` 一开头 `if (!crypto.subtle) throw`，且它要注册 service worker，`areServiceWorkersEnabled()` = `!!navigator.serviceWorker`）⇒ **plain HTTP 的内网地址（`http://192.168.x.x`）根本起不来**；**(b) 宿主页的 hostname 必须等于、或前缀等于 `parentOriginHash`**（`:345-363` = base32(sha256(`{parentOrigin, salt: webviewOrigin}`))，而渲染器正是把它当 `{{uuid}}` 填进端点模板，`webviewElement.ts:480,577`）⇒ 固定的 IP/localhost **永远不可能**满足。**这两条合起来解释了上游为什么默认 CDN**：只有「HTTPS + 通配名」的域才能同时满足它们。⇒ **prac 想要的「内网 + 无 DNS + plain HTTP」下 webview 做不了**；这不是挂法问题（第二端口试过：宿主页 200，之后 SW/内容一概不来，已撤销）。**已定（James 2026-09-21）：走 ② 自建 HTTPS + 通配名，零补丁**——prac 只把部署给的端点模板交给页面（`PRAC_VSCODE_WEBVIEW_ENDPOINT` → index injection → 启动选项 `webviewEndpoint`，见 `packages/host/vscode/README.md`）；**本机已端到端验过**（自签 `*.localhost` 通配证书 + 本地 TLS 前端）：宿主页 200、`fake.html` 200、service worker 真跑起来、扩展资源经它取回（那几条 `…vscode-resource.vscode-cdn.net` 的 200 是 SW 合成的，**没有外网流量**）。部署侧要提供通配 DNS + 受信任通配证书。**两处都已修**（2026-09-21）：① **盒模型**——pane 现在挂进 `.monaco-pane-view` 里（`paneview.css` 就是靠这个祖先给出 `--pane-header-size` 与 `.pane-body{flex:1}`），`.pane-body` 从 640×0 变成 640×538；② **overlay 的挂载点**——CSS anchor 查找**跨不过 `.monaco-workbench` 这条子树边界**（判别实验：同一元素挂 `document.body` 解析成 640×538，挂进 workbench 根则 0×0），而我们的 pane 在 workbench 之外、overlay 根原本在 workbench 里 ⇒ 永远不解析；改成 webview overlay 的根挂 `document.body`（**一处上游补丁** `patches/0002-prac-webview-overlay-in-body.patch`，只影响 webview，不动 `getContainer`，免得快速输入/通知那些靠 workbench 作用域 CSS 的组件受影响）。修完 overlay 精确贴合 pane body（640×538、top 22px，iframe 同位置），webview 内容上屏；八道门全绿。② **没编译出来的内建扩展**（`references-view` / `npm` / `emmet`…，激活直接 `Cannot find module …/out/extension` ⇒ 它们的视图自然没数据）。**哪几个视图要进 prac 的界面**也还没定。
+5. **VS Code 扩展贡献的 view**：**树视图通了**——数据侧本来就没问题（挂 cSpell 的 `cSpellIssuesViewByFile`，body 是**扩展自己**给的 `No issues found.`；数据 attach 走 registry、不经过容器，`mainThreadTreeViews.ts:212-215`），**真正缺的是尺寸**：pane 挂进 embedder 的元素后没人给它尺寸（容器是 splitview 干的），于是只剩一个 59px 的头、body 0 高，**内容全在 DOM 里但看不见**。2026-09-21 已修（`vendor/vscode/overlay` 里 view 也照 part 的做法：设元素尺寸 + `orthogonalSize` + `layout(size)`，并跟宿主 resize），实测 pane 640×560、body 13px→618px。**仍缺**：① **webview 视图**（`type=webview`）——overlay 与 iframe 都建出来了，但**宿主页有两条硬要求**（2026-09-21 核实）：**(a) 必须在安全上下文**（`pre/index.html` 一开头 `if (!crypto.subtle) throw`，且它要注册 service worker，`areServiceWorkersEnabled()` = `!!navigator.serviceWorker`）⇒ **plain HTTP 的内网地址（`http://192.168.x.x`）根本起不来**；**(b) 宿主页的 hostname 必须等于、或前缀等于 `parentOriginHash`**（`:345-363` = base32(sha256(`{parentOrigin, salt: webviewOrigin}`))，而渲染器正是把它当 `{{uuid}}` 填进端点模板，`webviewElement.ts:480,577`）⇒ 固定的 IP/localhost **永远不可能**满足。**这两条合起来解释了上游为什么默认 CDN**：只有「HTTPS + 通配名」的域才能同时满足它们。⇒ **prac 想要的「内网 + 无 DNS + plain HTTP」下 webview 做不了**；这不是挂法问题（第二端口试过：宿主页 200，之后 SW/内容一概不来，已撤销）。**已定（James 2026-09-21）：走 ② 自建 HTTPS + 通配名，零补丁**——prac 只把部署给的端点模板交给页面（`PRAC_VSCODE_WEBVIEW_ENDPOINT` → index injection → 启动选项 `webviewEndpoint`，见 `packages/host/vscode/README.md`）；**本机已端到端验过**（自签 `*.localhost` 通配证书 + 本地 TLS 前端）：宿主页 200、`fake.html` 200、service worker 真跑起来、扩展资源经它取回（那几条 `…vscode-resource.vscode-cdn.net` 的 200 是 SW 合成的，**没有外网流量**）。部署侧要提供通配 DNS + 受信任通配证书。**两处都已修**（2026-09-21）：① **盒模型**——pane 现在挂进 `.monaco-pane-view` 里（`paneview.css` 就是靠这个祖先给出 `--pane-header-size` 与 `.pane-body{flex:1}`），`.pane-body` 从 640×0 变成 640×538；② **overlay 的挂载点**——CSS anchor 查找跨不过**影根边界**（隔离之后那条边界从 `.monaco-workbench` 子树变成影根；判别实验：锚点在影根里、浮层在文档里 ⇒ 落到 `[0,0]`，同树则逐像素重合）。所以 overlay 的根要挂进**锚点所在的那棵树**（视图自己的隔离根），而不是 `document.body`——那是**一处上游补丁** `patches/0002`，只影响 webview，不动 `getContainer`，免得快速输入 / 通知那些靠 workbench 作用域 CSS 的组件受影响。修完 overlay 精确贴合 pane body（640×538、top 22px，iframe 同位置），webview 内容上屏；八道门全绿。② **没编译出来的内建扩展**（`references-view` / `npm` / `emmet`…，激活直接 `Cannot find module …/out/extension` ⇒ 它们的视图自然没数据）。**哪几个视图要进 prac 的界面**也还没定。
 6. **container / part 这类高级形态什么时候真的需要**（现在是按视图组合就够）。
 7. **多窗口 / 多标签页**：**搁置**（James 2026-09-21：先保持简单，以后再说）。已核实的底子：多标签页在 DSH 身份层就是**一个 client**（浏览器会话 cookie）；VS Code 自己的多窗口机制是 **auxiliary window**（`window.open` 出来的窗口 attach 到同一个 workbench 实例，**不新增扩展宿主**），但它绕开 prac 的 frame（内容由 workbench 自己搬），要用得先在 prac 侧设计"窗口"这个概念。今天两个标签各 boot 一个实例 ⇒ 两个宿主。
 8. **阶段二**（决策空间 / 以审决策为主界面）：保持搁置，重新进入主线需要重新裁决。
+9. **借用件的浮层路由**（已定方向、未落地）：借用件自己的浮层容器（`.context-view`、quick input 等）**现在不在任何隔离根里**——工作台的 boot 根挂在 `document.body`，被搬进视图影根的只有**部件** ⇒ 它们既不被边界裁、也不被框架管。「**局部浮层进视图自己的根、全局的交给框架**」这半还没做（§3.1 的浮层按作用域分）。
+10. **框架的锚点通路**（锚点矩形 + 落位 / 失效 / 跟随）：被"盒子是硬边界"逼出来的那条路；按 §3.1 的裁决**先不做**——先只做不需要锚点的全局面，等真出现"必须跨视图锚定"的面再说。
 
 ## 8. 相关
 
