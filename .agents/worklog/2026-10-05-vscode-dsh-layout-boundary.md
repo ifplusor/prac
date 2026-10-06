@@ -299,7 +299,7 @@
 
 **补丁**：重新生成，57 行（+33/−3）；`git apply --check -R` 通过（build 会识别为“已在位”）。
 
-**第一次验证没跑到位（如实记）**：web 产物已重建（`vscode:build` 通过，web + reh），rig 也起了，但**探针视图没被展开**——`prac.probe-webview` 贡献的是 `explorer` 容器里的一个 **webview 视图**（`pracProbeWebviewView`，`type: webview`），把 `vscode:sidebar` 提上来只看到 explorer 的树（280×133），**没有 overlay**（实测 `overlayCount: 0`；页面上唯一那个 iframe 是 0×0 的 services 页）。⇒ **下一步**：在根里点开 "Probe Webview" 那个 pane 的头（`.pane-header`）让它可见，再量 overlay 的 box 与它所在的树；对照图 `.build/scratch/webview-overlay.png`。
+**第一次验证没跑到位（如实记）**：web 产物已重建（`vscode:build` 通过，web + reh），rig 也起了，但**探针视图没被展开**——`prac.probe-webview` 贡献的是 `explorer` 容器里的一个 **webview 视图**（`pracProbeWebviewView`，`type: webview`），把 `vscode:sidebar` 提上来只看到 explorer 的树（280×133），**没有 overlay**（实测 `overlayCount: 0`；页面上唯一那个 iframe 是 0×0 的 services 页）。⇒ **第二次尝试（点开 pane）也没成**：侧栏里只渲染了**文件树**那一个视图（`viewHosts: [{ id: "workbench.explorer.fileView", box: [0,18,280,133] }]`），`.pane-header` 只有 "prac-dev" 一个，**扩展贡献的 `pracProbeWebviewView` 没出现**；整页 `overlays: []`（没有可量的 overlay），唯一的 iframe 是 0×0 的 services 页。⇒ **卡在"怎么让一个 webview 视图真的上屏"上，不是卡在补丁本身**。两条可走的路：① 查 `prac.probe-webview` 为什么不上屏（启停策略 / 激活条件 / 该容器只显示了文件树）；② 换 cSpell 的 `cSpellInfoView`（`type: webview`，但它的 `when` 要命令面板，而命令面板在 0×0 修复前不可用）。对照图 `.build/scratch/webview-overlay2.png`，脚本 `.build/scratch/webview-overlay{,2}.mjs`。
 
 **已确认的部分**：补丁重新生成且 `git apply --check -R` 通过；`vp check` 0 errors。
 
