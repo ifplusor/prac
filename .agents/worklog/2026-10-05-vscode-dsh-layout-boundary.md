@@ -363,7 +363,7 @@ James 给的上游事实：**VS Code 里区域 id 是 left / right；sidebar 的
 
 **同时记下不继承什么**：上游布局树里的大半（activity bar 及其 position、sidebar 的 tab 套 stack、Panel 的四周位置）分别属于**内容 / 角色 / 摆放**——内容留在盒子里、角色借名、摆放用"把视图搬到别的区域"解决（不需要 `panel.position` 这个概念）。
 
-**验证**：单测 ui-layout 44/44、web-app 15/15；`vp check` 0 errors；链接 0 断。**闸门未复跑**（这次改名形状与上一轮相同，那一轮十门全绿）。
+**验证**（闸门已复跑）：单测 ui-layout **44/44**、web-app **15/15**；`vp check` 0 errors；链接 0 断；rig `:3084` 上**十门全绿**——vendor 六（layout / views / focus / regions / view / file）+ prac 四（stack / persistence / bottom / split）。
 
 ## 还没落地的
 
