@@ -35,9 +35,18 @@ const ATTRIBUTE_MIRROR = "data-prac-view-attributes";
  * Root-level rules. The frame's own `[data-prac-region] > *` rules size the
  * *host*; inside the root nothing does, so this module says it again: the host
  * fills its box, and the view's tree fills the host.
+ *
+ * The host is also a **hard boundary**: `contain: paint` makes it the containing
+ * block for absolutely *and* fixed positioned descendants and clips them to its
+ * box, so a view cannot paint its own overlay outside its box. `overflow: hidden`
+ * alone would not do it — a positioned descendant whose containing-block chain
+ * misses the host (which none of the frame's boxes is positioned to catch) simply
+ * escapes, measured: a float born in a 280px-wide view painted over the
+ * neighbouring region. Anything that must appear outside a view therefore goes
+ * through the frame (the float layer), not around it.
  */
 const ROOT_STYLES = `
-:host { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+:host { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; contain: paint; }
 [${ATTRIBUTE_MIRROR}] { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; }
 [${CONTENT_ATTRIBUTE}] { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; }
 [${CONTENT_ATTRIBUTE}] > * { flex: 1 1 auto; min-width: 0; min-height: 0; pointer-events: auto; }

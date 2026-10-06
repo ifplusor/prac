@@ -360,6 +360,7 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
 
 /** Frame-wide rules that cannot be expressed as inline styles on rendered entries. */
 const FRAME_STYLES = `
+[data-prac-overlay-layer] { display: flex; flex-direction: column; }
 [data-prac-overlay-layer] > * { pointer-events: auto; }
 [data-prac-region] { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
 [data-prac-region] > * { flex: 1 1 auto; min-height: 0; }
