@@ -353,6 +353,18 @@
 
 **若那条也不成立**：就把"悬浮层是框架 chrome、不隔离"作为一条明确例外写进 note（像 `sash` 那样单列一类）。
 
+## ⑤ 续：角色改用平台名 `primarySidebar` / `secondarySidebar`（2026-10-05）
+
+James 给的上游事实：**VS Code 里区域 id 是 left / right；sidebar 的角色是 Primary / Secondary Side Bar**（核对：`viewQuickAccess.ts:154` 的 localize 就是 "Secondary Side Bar"，配置键 `workbench.secondarySideBar.*`；而 `workbench.sideBar.location` 让 primary 侧栏**可以换边**）。
+
+⇒ **位置 ≠ 角色**：上一轮我自造的 `leftbar`（按位置命名）方向对、选词错。这次改用平台的角色名，并把 `rightbar` 一并改成 `secondarySidebar`（消掉最初的不对称）。改动范围与上一轮相同（`RoleBindings` / `services` / `arrangement` / `spec` / 文档例）。
+
+**区域 id 不动**（`left` / `right`）——位置词、与上游一致，改名要升持久化 key 且没有收益。
+
+**同时记下不继承什么**：上游布局树里的大半（activity bar 及其 position、sidebar 的 tab 套 stack、Panel 的四周位置）分别属于**内容 / 角色 / 摆放**——内容留在盒子里、角色借名、摆放用"把视图搬到别的区域"解决（不需要 `panel.position` 这个概念）。
+
+**验证**：单测 ui-layout 44/44、web-app 15/15；`vp check` 0 errors；链接 0 断。**闸门未复跑**（这次改名形状与上一轮相同，那一轮十门全绿）。
+
 ## 还没落地的
 
 - ~~**adaptor（第三步）**~~ → **已做，见下“落地：adaptor”**；旧的描述留档：：`vendor/vscode-embed` 的 `partHost` / `viewHost` 现在仍带**旧机制**——类镜像（`monaco-workbench` + 主题类）与 **200ms 轮询**。这一步要做的是：
