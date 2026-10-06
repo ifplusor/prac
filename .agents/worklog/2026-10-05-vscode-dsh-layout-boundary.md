@@ -219,9 +219,36 @@
 
 **复跑（rig `:3084`）**：`verify-layout` · `verify-views` · `verify-focus` · `verify-regions` · `verify-view` · `verify-file` **六门全绿**；`verify-extension` 仍是条件门（需要真装一个扩展）；prac 侧 `verify-stack` · `verify-persistence` · `verify-bottom` · `verify-split` **四门全绿**。`vp check` 0 errors、警告回到基线的 3 条。
 
+## 落地：adaptor（第三步，2026-10-05 已做）
+
+新增 `vendor/vscode-embed/src/client/theme-root.ts`：**把应用的主题变量投进宿主所在的根**。
+
+- 取 `.monaco-workbench` 那条规则的**声明**（经 CSSOM，优先认类名 `contributedColorTheme` 那张表），以 **`:host` 作用域**写进根里的一张自有 `<style>`；
+- **订阅**：`MutationObserver` 盯 head（含原地改写）→ 重新取声明、重写那张表；一个根一张表，幂等；
+- `deliverThemeToHost(element)` 只在 `element.getRootNode() instanceof ShadowRoot` 时动手——独立查看页那种没有根的场合不需要投递（它本来就继承文档的主题）。
+
+**同时去掉旧机制**：`partHost` 的 **200ms 轮询**与**类镜像**（`monaco-workbench` + 主题类）删除。理由在隔离之后是结构性的：影子树里的选择器**只能靠 `:host` 命中边界元素**，所以 `.monaco-workbench …` 那套规则在根内根本匹配不到宿主，镜像类名已经不起作用。
+
+**重建**：`vendor/vscode-embed` 是**源码形态**（被消费方构建期内联），所以重建了内联它的三个客户端包（`vscode-host`、`ui-vscode-editor`、`ui-vscode-explorer`）加 `ui-layout`，三份 `check:client` 全 `ok — loader(…)`。
+
+### 真的切一次主题（rig `:3084`）
+
+用 VS Code 自己的命令面（`__vscodeEmbed.commands.executeCommand`）执行 `workbench.action.toggleLightDarkThemes`，量借用件所在的那个根：
+
+| | 切前（light） | 切后（dark） |
+| --- | --- | --- |
+| workbench 类 | `… vs …2026-light…` | `… vs-dark …2026-dark…` |
+| 根内 `--vscode-sideBar-background` | `#fafafd` | **`#191a1b`** |
+| 根内 `--vscode-foreground` | `#202020` | **`#bfbfbf`** |
+| 该视图 clip 的像素 | — | **83.5% 变化，maxDelta 675** |
+
+⇒ **两条都成立**：主题表被原地改写后，根内那份**跟上了**（订阅有效）；而且**画面跟着变了**（借用件从浅色切到深色）。实验 6B 的那个警告（“变量对了 ≠ 画面跟着”）在这里得到澄清：**真的切一次主题**时画面会跟；6B 之所以没跟，是因为它只 poke 了一个变量。
+
+**闸门**：vendor 六门（`verify-layout` / `verify-views` / `verify-focus` / `verify-regions` / `verify-view` / `verify-file`）在 adaptor 之后**仍全绿**。
+
 ## 还没落地的
 
-- **adaptor（第三步，未做）**：`vendor/vscode-embed` 的 `partHost` / `viewHost` 现在仍带**旧机制**——类镜像（`monaco-workbench` + 主题类）与 **200ms 轮询**。这一步要做的是：
+- ~~**adaptor（第三步）**~~ → **已做，见下“落地：adaptor”**；旧的描述留档：：`vendor/vscode-embed` 的 `partHost` / `viewHost` 现在仍带**旧机制**——类镜像（`monaco-workbench` + 主题类）与 **200ms 轮询**。这一步要做的是：
   1. **把主题变量投进宿主所在的根**：取 `.monaco-workbench` 那条规则的**声明**、以 `:host` 作用域投进 `host.getRootNode()`，并**订阅**主题表的原地改写（实验 3 的零补丁修法）。
   2. **去掉类镜像与轮询**：隔离之后 `.monaco-workbench` 作用域的规则在根内**匹配不到宿主**（影子树里的选择器只能靠 `:host` 命中边界元素），类镜像已不起作用。
   - **一条实测底牌（降低风险）**：实验 4 / 6B 里，变量在根内是**空的**而渲染仍正确——部件的颜色来自字面值或回退值。所以画面暂不依赖这条投递；它服务的是**换主题时借用件跟不跟**（实验 6B 说这条要按画面验）。

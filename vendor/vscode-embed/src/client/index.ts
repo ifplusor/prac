@@ -23,6 +23,7 @@
  */
 
 import { createElement, useEffect, useRef } from "react";
+import { deliverThemeToHost } from "./theme-root.js";
 import type { ReactElement } from "react";
 import { EMBED_BRIDGE, PART_HOST_ATTR } from "prac-vscode";
 import type {
@@ -133,13 +134,6 @@ function mountView(record: VscodeEmbedPage, viewId: string, element: HTMLElement
 function mountFile(record: VscodeEmbedPage, resource: string, element: HTMLElement): void {
   record.fileHosts.set(resource, element);
   record.face?.mountFileInto(resource, element);
-}
-
-/** The theme classes (`vs` / `vs-dark` / `hc-*`) the app put on its boot root. */
-function themeClasses(): string {
-  const boot = document.querySelector(`#vscode-embed-boot .monaco-workbench`);
-  if (!boot) return "";
-  return [...boot.classList].filter((c) => /^(vs|vs-dark|hc-black|hc-light)$/.test(c)).join(" ");
 }
 
 export interface VscodeEmbedOptions {
@@ -456,34 +450,21 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
       useEffect(() => {
         const element = ref.current;
         if (!element) return undefined;
-        let themeTimer: ReturnType<typeof setInterval> | undefined;
-        // The theme class (`vs` / `vs-dark`) appears shortly after startup, so
-        // copy it onto the host once it is known — theme-gated layout rules need it.
-        const applyTheme = (): void => {
-          const theme = themeClasses();
-          if (!theme) return;
-          for (const name of theme.split(" ")) {
-            if (!element.classList.contains(name)) element.classList.add(name);
-          }
-          if (themeTimer !== undefined) {
-            clearInterval(themeTimer);
-            themeTimer = undefined;
-          }
-        };
-        applyTheme();
-        themeTimer = setInterval(applyTheme, 200);
+        // The host lives inside the view's isolation root, where the app's theme
+        // variables have to be delivered (`:host`) instead of inherited.
+        const stopTheme = deliverThemeToHost(element);
         mountPart(record, partId, element);
         return () => {
-          if (themeTimer !== undefined) clearInterval(themeTimer);
+          stopTheme?.();
           if (record.hosts.get(partId) === element) record.hosts.delete(partId);
         };
       }, []);
       return createElement("div", {
         ref,
-        // The app's CSS is scoped under `.monaco-workbench` (and its theme
-        // classes `.vs` / `.vs-dark`); a part mounted outside that context is
-        // unstyled. Mirror both so the scoped rules apply here.
-        className: `monaco-workbench vscode-embed-part-host ${themeClasses()}`.trim(),
+        // No class mirroring: the frame mirrors the app's sheets into the view's
+        // root, and the theme arrives as `:host` variables, so the workbench's
+        // own class names stay inside the boundary (see `theme-root.ts`).
+        className: "vscode-embed-part-host",
         [PART_HOST_ATTR]: partId,
         // Inline sizing beats the class's absolute positioning so the host stays
         // inside its region instead of escaping the frame.
@@ -505,8 +486,10 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
       useEffect(() => {
         const element = ref.current;
         if (!element) return undefined;
+        const stopTheme = deliverThemeToHost(element);
         mountView(record, viewId, element);
         return () => {
+          stopTheme?.();
           if (record.viewHosts.get(viewId) !== element) return;
           record.viewHosts.delete(viewId);
           record.face?.releaseView(viewId);
@@ -536,8 +519,10 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
       useEffect(() => {
         const element = ref.current;
         if (!element) return undefined;
+        const stopTheme = deliverThemeToHost(element);
         mountFile(record, resource, element);
         return () => {
+          stopTheme?.();
           if (record.fileHosts.get(resource) !== element) return;
           record.fileHosts.delete(resource);
           record.face?.releaseFile(resource);
