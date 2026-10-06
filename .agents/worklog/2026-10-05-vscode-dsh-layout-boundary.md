@@ -217,7 +217,7 @@
 
 **walk 的安装方式**：`addInitScript` + 立即 `evaluate` 各一次——`verify-file` 会重载页面，只 `evaluate` 会在重载后丢掉（实测踩到）。定义的是一个命名空间全局，对应用是惰性的。
 
-**复跑（rig `:3084`）**：`verify-layout` · `verify-views` · `verify-focus` · `verify-regions` · `verify-view` · `verify-file` **六门全绿**；`verify-extension` 仍是条件门（需要真装一个扩展）；prac 侧 `verify-stack` · `verify-persistence` · `verify-bottom` · `verify-split` **四门全绿**。`vp check` 0 errors、警告回到基线的 3 条。
+**复跑（rig `:3084`）**：`verify-layout` · `verify-views` · `verify-focus` · `verify-regions` · `verify-view` · `verify-file` **六门全绿**；`verify-extension` 已用**已装的 cSpell** 跑通（`EXTENSION=… VIEW=…`）；prac 侧 `verify-stack` · `verify-persistence` · `verify-bottom` · `verify-split` **四门全绿**。`vp check` 0 errors、警告回到基线的 3 条。
 
 ## 落地：adaptor（第三步，2026-10-05 已做）
 
@@ -384,6 +384,16 @@ James 给的上游事实：**VS Code 里区域 id 是 left / right；sidebar 的
 ⇒ **整部件也能住进隔离根并正常上屏**。**一处如实说明**：这条探针**绕过了 lib 的 `partHost` 包装**（它才是加 `monaco-workbench` 类并调 `deliverThemeToHost` 的那层），所以宿主的 `--vscode-sideBar-background` 读出来是**空**——那层包装的**形状**另有实验 6A 验过（宿主带 `monaco-workbench` 时像素零差），主题投递则与视图路**同一段代码**（已在 rig 上按“真的切主题”验过）。
 
 对照图 `.build/scratch/part-path.png`，脚本 `.build/scratch/part-path.mjs`。
+
+## 条件门 `verify-extension` 也跑通了（2026-10-05）
+
+这条门默认找 GitLens（`EXTENSION=eamodio.gitlens`），而 GitLens 早就被撤装了，所以先前它只报“要真装一个扩展（deliberate act）”。**其实不必装**：cSpell 一直装在扩展目录里（`~/.local/share/prac/code-server/extensions/streetsidesoftware.code-spell-checker-4.9.3`），而这条门**自己拥有宿主元素**（`face.mountViewInto(viewId, host)`），不依赖 prac 的视图枚举。
+
+`EXTENSION=streetsidesoftware.code-spell-checker VIEW=cSpellIssuesViewByFile URL=… node vendor/vscode/scripts/verify-extension.mjs`：
+
+**OK**，各检查全真：`viewMounted` · `viewTitled` · `viewPainted` · `viewReleased` · `noMountErrors` · `capabilitySettledOnArrival` · `capabilityVersionMoved` · `capabilitySummaryCounts`。
+
+⇒ **十一门全绿**（vendor 六 + prac 四 + 这条条件门），且没有新装任何东西。
 
 ## 还没落地的
 
