@@ -329,6 +329,16 @@
 
 **验证**：单测 ui-layout **44/44**、web-app **15/15**；重建 `ui-layout` 类型产物与 `web-app` 包后，rig 上复跑 **十门**：prac 四门（stack / persistence / bottom / split）与 vendor 六门（layout / views / focus / regions / view / file）**全绿**。
 
+## ④ 续：悬浮层也进隔离根——**试了，红了，已回退**（2026-10-05）
+
+按裁定的 (a)（悬浮层的条目也是视图、照隔离）动手：`frame.ts` 里把 `renderSlot("shell.overlay", {})` 包进 `IsolatedView`，并给它一个 `clickThrough` 变体（宿主 `pointer-events: none`），同时在 `isolation.ts` 的根级规则里给内容的直接子元素补回 `pointer-events: auto`——因为轻 DOM 那条 `[data-prac-overlay-layer] > *` 在根里匹配不到。
+
+**结果：`verify-views` 红**——`the file view is not a row in the recall catalogue`：写在 `shell.overlay` 里的 recall 面**没有渲染出它的行**（闸门的 deep 查询也找不到）。prac 侧 `verify-focus` / `verify-stack` / `verify-persistence` 仍绿。
+
+**处置：回退**（`git show HEAD:<path>` 逐文件恢复——`git checkout` 要写 `.git`，被沙箱拦；重建 `ui-layout` 后 `verify-views` **恢复绿**）。
+
+**为什么它会红（两个候选，未查）**：① 悬浮层里那两个条目是**注册进 DSH 槽**的（`slots.register({ name: "shell.overlay" })`），portal 进影子根之后，槽渲染或它们自身的取数（读 `ctx.pracLayout` 的目录）出了问题；② 它们依赖**帧的轻 DOM**（量尺寸/找兄弟），换树之后拿不到。⇒ 下一步是先**看清 recall 面到底渲染成了什么**（截图 + 它的 DOM），再决定是修它、还是把"悬浮层不隔离"作为一条明确的例外写进 note。
+
 ## 还没落地的
 
 - ~~**adaptor（第三步）**~~ → **已做，见下“落地：adaptor”**；旧的描述留档：：`vendor/vscode-embed` 的 `partHost` / `viewHost` 现在仍带**旧机制**——类镜像（`monaco-workbench` + 主题类）与 **200ms 轮询**。这一步要做的是：
