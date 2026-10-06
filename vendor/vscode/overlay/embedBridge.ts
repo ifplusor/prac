@@ -34,6 +34,29 @@ export const EMBED_BRIDGE = "vscodeEmbed";
 export const PART_HOST_ATTR = "data-vscode-embed-part-host";
 
 /**
+ * One view the workbench currently offers, as {@link PartHostFace.listViews}
+ * reports it.
+ *
+ * Plain data, deliberately: the embedder maps these onto its own view catalogue
+ * and must not have to know the workbench's descriptor classes. `location` is
+ * the workbench's own word for where the view's container sits
+ * (`sidebar` / `panel` / `auxiliarybar`, see `ViewContainerLocationToString`),
+ * which is a *default placement hint* for the embedder — not a layout.
+ */
+export interface ViewCatalogueEntry {
+  /** The workbench's view id (`workbench.explorer.fileView`). */
+  readonly id: string;
+  /** The view's display name. */
+  readonly title: string;
+  /** The id of the container the view is registered in. */
+  readonly containerId: string;
+  /** The container's display name, for the embedder's own grouping. */
+  readonly containerTitle: string;
+  /** Where the container sits: `sidebar` / `panel` / `auxiliarybar`. */
+  readonly location: string;
+}
+
+/**
  * The workbench-side face, valid once the workbench's service graph has
  * restored.
  *
@@ -78,6 +101,35 @@ export interface PartHostFace {
    * @param viewId - the view id.
    */
   releaseView: (viewId: string) => void;
+  /**
+   * The views the workbench currently offers, across every container.
+   *
+   * The unit is the **active** view — one whose `when` clause holds right now —
+   * because that is the layer the workbench itself uses to decide what a
+   * container offers (a container is empty, an icon is hidden, a view is
+   * reachable). The *visible* set is deliberately not reported: it folds in the
+   * workbench's own per-view show/hide state, and the embedder owns what is on
+   * screen — one authority, not two.
+   *
+   * Whether a view can actually be mounted with
+   * {@link PartHostFace.mountViewInto} right now is a separate question: a view
+   * is created lazily, so `mountViewInto` accepts an entry even before the
+   * extension that provides it has activated.
+   *
+   * @returns one entry per active view.
+   */
+  listViews: () => readonly ViewCatalogueEntry[];
+  /**
+   * Subscribe to changes in the view catalogue.
+   *
+   * Fires when a view's `when` starts or stops holding, and when containers or
+   * views are registered or unregistered — so a listener can re-read
+   * {@link PartHostFace.listViews} and reconcile.
+   *
+   * @param listener - called when the active view set changed.
+   * @returns a function that unsubscribes.
+   */
+  onDidChangeViews: (listener: () => void) => () => void;
   /**
    * Mount **one file's editing surface** into an external host element.
    *

@@ -34,6 +34,7 @@ import type {
   EditorEntry,
   EmbedBridge,
   PartHostFace,
+  ViewCatalogueEntry,
 } from "prac-vscode";
 
 export { EMBED_BRIDGE, PART_HOST_ATTR };
@@ -45,6 +46,7 @@ export type {
   EditorEntry,
   EmbedBridge,
   PartHostFace,
+  ViewCatalogueEntry,
 };
 
 /** The command namespace the app module publishes. */
@@ -85,6 +87,8 @@ export interface VscodeEmbedPage {
    * no-op and the consumer never hears about any file the app opens.
    */
   readonly openFileListeners: Map<() => void, (() => void) | undefined>;
+  /** View-catalogue listeners, recorded until the face arrives (same reason). */
+  readonly viewCatalogueListeners: Map<() => void, (() => void) | undefined>;
   /** Subscribers to the `editors` capability, recorded until the face arrives. */
   readonly editorsListeners: Map<() => void, (() => void) | undefined>;
   /** Subscribers to the `diagnostics` capability, recorded until the face arrives. */
@@ -110,6 +114,7 @@ function page(): VscodeEmbedPage {
     viewHosts: new Map(),
     fileHosts: new Map(),
     openFileListeners: new Map(),
+    viewCatalogueListeners: new Map(),
     editorsListeners: new Map(),
     diagnosticsListeners: new Map(),
     classes: new Set(),
@@ -225,6 +230,22 @@ export interface VscodeEmbedHandle {
    * @returns a function that unsubscribes.
    */
   onDidChangeOpenFiles(listener: () => void): () => void;
+  /**
+   * The views the app currently offers, across every container.
+   *
+   * Read live from the face, so it is empty until the app boots and grows as
+   * extensions activate. Each entry carries a container and a location, which a
+   * consumer uses for its own default placement — the app does not lay anything
+   * out.
+   */
+  views(): readonly ViewCatalogueEntry[];
+  /**
+   * Subscribe to changes in the view catalogue.
+   *
+   * @param listener - called when the active view set changed; re-read {@link views}.
+   * @returns a function that unsubscribes.
+   */
+  onDidChangeViews(listener: () => void): () => void;
   /**
    * The app's capabilities, addressed by name.
    *
@@ -387,6 +408,12 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
                   }
                 }
                 for (const listener of record.openFileListeners.keys()) listener();
+                for (const [listener, detach] of record.viewCatalogueListeners) {
+                  if (detach === undefined) {
+                    record.viewCatalogueListeners.set(listener, face.onDidChangeViews(listener));
+                  }
+                }
+                for (const listener of record.viewCatalogueListeners.keys()) listener();
                 for (const [listener, detach] of record.editorsListeners) {
                   if (detach === undefined) {
                     record.editorsListeners.set(
@@ -605,6 +632,15 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
       record.openFileListeners.set(listener, detach);
       return () => {
         record.openFileListeners.delete(listener);
+        detach?.();
+      };
+    },
+    views: () => record.face?.listViews() ?? [],
+    onDidChangeViews: (listener: () => void): (() => void) => {
+      const detach = record.face?.onDidChangeViews(listener);
+      record.viewCatalogueListeners.set(listener, detach);
+      return () => {
+        record.viewCatalogueListeners.delete(listener);
         detach?.();
       };
     },

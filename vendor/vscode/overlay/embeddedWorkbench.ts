@@ -42,7 +42,7 @@ import { URI } from "../../base/common/uri.js";
 import { IEditorGroupsService } from "../services/editor/common/editorGroupsService.js";
 import type { EditorInput } from "../common/editor/editorInput.js";
 import { IPaneCompositePartService } from "../services/panecomposite/browser/panecomposite.js";
-import { IViewDescriptorService } from "../common/views.js";
+import { IViewDescriptorService, ViewContainerLocationToString } from "../common/views.js";
 import { ITitleService } from "../services/title/browser/titleService.js";
 import { IStatusbarService } from "../services/statusbar/browser/statusbar.js";
 import { IBannerService } from "../services/banner/browser/bannerService.js";
@@ -87,7 +87,7 @@ import { setBaseLayerHoverDelegate } from "../../base/browser/ui/hover/hoverDele
 // The embed bridge contract. `embedBridge.ts` is staged into this tree by this
 // package's build (`vendor/vscode/scripts/build.mjs`) from
 // `vendor/vscode/overlay/embedBridge.ts`, so both sides read one definition.
-import { PART_HOST_ATTR, readEmbedBridge } from "./embedBridge.js";
+import { PART_HOST_ATTR, readEmbedBridge, type ViewCatalogueEntry } from "./embedBridge.js";
 import { IHoverService, WorkbenchHoverDelegate } from "../../platform/hover/browser/hover.js";
 import { IMarkdownRendererService } from "../../platform/markdown/browser/markdownRenderer.js";
 import { EditorMarkdownCodeBlockRenderer } from "../../editor/browser/widget/markdownRenderer/browser/editorMarkdownCodeBlockRenderer.js";
@@ -346,6 +346,8 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
             mountViewInto: (viewId: string, element: HTMLElement) =>
               this.mountViewInto(viewId, element),
             releaseView: (viewId: string) => this.releaseView(viewId),
+            listViews: () => this.listViews(),
+            onDidChangeViews: (listener: () => void) => this.onDidChangeViews(listener),
             mountFileInto: (resource: string, element: HTMLElement) =>
               this.mountFileInto(resource, element),
             releaseFile: (resource: string) => this.releaseFile(resource),
@@ -584,6 +586,97 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     mounted.pane.setVisible(false);
     mounted.pane.dispose();
   }
+
+  //#region View catalogue
+
+  /** Listeners waiting on catalogue changes. */
+  private readonly viewCatalogueListeners = new Set<() => void>();
+  /** One active-descriptor subscription per container, keyed by container id. */
+  private readonly viewCatalogueSubscriptions = new Map<string, IDisposable>();
+  /** Whether the container-wide subscription has been installed. */
+  private viewCatalogueObserving = false;
+
+  /**
+   * The views the workbench currently offers, across every container.
+   *
+   * Reports the **active** descriptors — the ones whose `when` holds right now —
+   * because that is the layer the workbench itself uses to decide what a
+   * container offers. The `visible` layer is deliberately not reported: it folds
+   * in the workbench's own per-view show/hide state, and the embedder decides
+   * what is on screen, so reporting both would make two authorities for one
+   * question.
+   *
+   * @returns one entry per active view.
+   */
+  listViews(): ViewCatalogueEntry[] {
+    const entries: ViewCatalogueEntry[] = [];
+    for (const container of this.viewDescriptorService.viewContainers) {
+      const location = this.viewDescriptorService.getViewContainerLocation(container);
+      const model = this.viewDescriptorService.getViewContainerModel(container);
+      for (const descriptor of model.activeViewDescriptors) {
+        entries.push({
+          id: descriptor.id,
+          title: descriptor.name.value,
+          containerId: container.id,
+          containerTitle:
+            typeof container.title === "string" ? container.title : container.title.value,
+          location: location === null ? "sidebar" : ViewContainerLocationToString(location),
+        });
+      }
+    }
+    return entries;
+  }
+
+  /** Subscribe to catalogue changes (see {@link PartHostFace.onDidChangeViews}). */
+  onDidChangeViews(listener: () => void): () => void {
+    this.viewCatalogueListeners.add(listener);
+    this.observeViewCatalogue();
+    return toDisposable(() => this.viewCatalogueListeners.delete(listener));
+  }
+
+  /**
+   * Keep the catalogue observe-able as containers come and go.
+   *
+   * The container-wide event covers registration and deregistration; each
+   * container model's active-descriptor event covers `when` flipping, which is
+   * the common case (context keys change as the user works).
+   */
+  private observeViewCatalogue(): void {
+    if (!this.viewCatalogueObserving) {
+      this.viewCatalogueObserving = true;
+      this._register(
+        this.viewDescriptorService.onDidChangeViewContainers(() => {
+          this.subscribeViewCatalogueContainers();
+          this.fireViewCatalogue();
+        }),
+      );
+    }
+    this.subscribeViewCatalogueContainers();
+  }
+
+  private subscribeViewCatalogueContainers(): void {
+    const containers = this.viewDescriptorService.viewContainers;
+    const live = new Set(containers.map((container) => container.id));
+    for (const [id, subscription] of [...this.viewCatalogueSubscriptions]) {
+      if (live.has(id)) continue;
+      subscription.dispose();
+      this.viewCatalogueSubscriptions.delete(id);
+    }
+    for (const container of containers) {
+      if (this.viewCatalogueSubscriptions.has(container.id)) continue;
+      const model = this.viewDescriptorService.getViewContainerModel(container);
+      this.viewCatalogueSubscriptions.set(
+        container.id,
+        model.onDidChangeActiveViewDescriptors(() => this.fireViewCatalogue()),
+      );
+    }
+  }
+
+  private fireViewCatalogue(): void {
+    for (const listener of [...this.viewCatalogueListeners]) listener();
+  }
+
+  //#endregion
 
   /**
    * Mount one file's editing surface into an external host element.
