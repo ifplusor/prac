@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 ---
 
 # Agent Note: 视图的隔离与对等 —— 区域骨架、视图是单位

@@ -1,6 +1,6 @@
 # 布局边界 —— 工作记录（依据）
 
-> **这不是 note**：它是**这项工作**（[proposed/2026-10-05-vscode-dsh-layout-boundary.md](../notes/proposed/2026-10-05-vscode-dsh-layout-boundary.md)）的**依据**——里程碑与过程、讨论产出的事实、代码层约束、待验证。
+> **这不是 note**：它是**这项工作**（[2026-10-05-vscode-dsh-layout-boundary.md](../notes/in-progress/2026-10-05-vscode-dsh-layout-boundary.md)）的**依据**——里程碑与过程、讨论产出的事实、代码层约束、待验证。
 > 它**没有状态轴、不签字**：这里只有"当时发生了什么、哪个说法被否掉、还欠哪些验证"。
 > **上游**：融合侧的口子（命令面板 0×0、webview 上屏、盒模型）记在[融合工作的记录](2026-09-09-vscode-dsh-integration.md)——现象的出处在那里，设计结论在 note。
 
@@ -8,7 +8,7 @@
 
 | 日期 | 做了什么 | 依据（判据 / 证据） |
 | --- | --- | --- |
-| 2026-10-05 | **James 连出九条裁决（逐条都改了设计）**。原文：① ***"所有挂在 layout 中的 view 都应该隔离；所有 view 都应该对等。我们不只有浮层。"*** ② ***"我们的布局有基础的区域分隔，stage 是这一层的。基础区域之上才是悬浮层，如 popup、通知、命令 等。view 住在容器里，我们说的基础区域即为 view 容器。view 的拖放是在容器之间切换。stage 容器支持分栏分列，像 vscode 的 editor group。"*** ③ ***"悬浮层也应该是容器。"*** ④ ***"view = 窗口，而不是容器 = 窗口。"*** ⑤ ***"tab 不是 stage 专有的。"*** ⑥ ***"选中是 UI 状态，也应该在持久化中。"*** ⑦ ***"stage 拆分子区域时，每个子区域都有 tab。这样 stage 不应该支持 stack。"*** ⑧ ***"sidebar 和 bottom 区域可能不应该支持拆分，且 bottom 区域也只支持 tab。"*** ⑨ ***"tab stack 应该是区域的布局模式，这样区域是对等的。而我们的命名区域，会绑定可用的模式。"*** | 过程的产物是 [note](../notes/proposed/2026-10-05-vscode-dsh-layout-boundary.md) §已定的设计 |
+| 2026-10-05 | **James 连出九条裁决（逐条都改了设计）**。原文：① ***"所有挂在 layout 中的 view 都应该隔离；所有 view 都应该对等。我们不只有浮层。"*** ② ***"我们的布局有基础的区域分隔，stage 是这一层的。基础区域之上才是悬浮层，如 popup、通知、命令 等。view 住在容器里，我们说的基础区域即为 view 容器。view 的拖放是在容器之间切换。stage 容器支持分栏分列，像 vscode 的 editor group。"*** ③ ***"悬浮层也应该是容器。"*** ④ ***"view = 窗口，而不是容器 = 窗口。"*** ⑤ ***"tab 不是 stage 专有的。"*** ⑥ ***"选中是 UI 状态，也应该在持久化中。"*** ⑦ ***"stage 拆分子区域时，每个子区域都有 tab。这样 stage 不应该支持 stack。"*** ⑧ ***"sidebar 和 bottom 区域可能不应该支持拆分，且 bottom 区域也只支持 tab。"*** ⑨ ***"tab stack 应该是区域的布局模式，这样区域是对等的。而我们的命名区域，会绑定可用的模式。"*** | 过程的产物是 [note](../notes/in-progress/2026-10-05-vscode-dsh-layout-boundary.md) §已定的设计 |
 | 2026-10-05 | **这一稿之前被否掉/错掉的框架（防止重演）**。否掉：把关系写成"两个 UI 框架谈边界"；一个"整视口浮层 host"（`shell.overlay` 早就有，不必发明）；让组件"遮蔽 root 即可拥有拓扑"（`ui-slots` 明文 **DO NOT register**，正路是注册进 `shell.overlay`）。错掉（我自己的）：把容器当成既给几何、又是被摆弄的单位；把悬浮层当成与容器不同的另一种东西；按内容性质或来源给 view 分类（"借来的住隔离槽、自家的住普通槽"）；把 tab 当成 stage 专有；**把"选中"划给注意力、因而排除在持久化之外**；"区域对等"与"bottom 只能 tab"并置而不分层 | note 曾**九次改稿**；修订史只留这一行（note 里不写修订史）。`root` 槽那条：DSH `packages/extensions/cordis-client-runner/src/client/slot-catalog.ts:1501` + 融合 worklog「已核实事实 / DSH 侧」 |
 | 2026-10-05 | **讨论里出现的错误类比（留档）**：把悬浮层想成"每个 view 各有一块自己的浮层平面"（与"基础区域之上才是悬浮层"相冲）；把区域当成"窗口"（应为 view = 窗口）；用「帧」指布局（James：会让人联想到视频画面）。**共同点：拿渲染 / 桌面的直觉去套另一层的概念**——而 prac 的 `frame`（英文）指拥有区域树的那套机制，中文里不译 | 本仓「帧」只作协议义（RPC 帧 / 首帧全文 / 12 种 type），布局义只有过那一处，已改 |
 | 2026-10-05 | **一次性写进 `docs/architecture.md` §3.1、又被 James 拦下**：他明确"不要不管什么东西都塞到 architecture.md"。本工作因此走 note + worklog 两件，**不碰现在时文档**，直到他点头 | 同类纠正有一次在先：2026-09-21 的"配置怎么手改"配方被从 `architecture.md` 挪进 `packages/host/vscode/README.md`（见融合 worklog） |
