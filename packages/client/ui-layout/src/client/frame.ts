@@ -387,7 +387,7 @@ export function ensureStyles(): void {
  * @param node - the region to style.
  * @param dir - the parent split's axis (the axis the minimum belongs on).
  */
-function regionStyle(node: RegionNode, dir: Dir): StyleObject {
+function regionStyle(node: RegionNode, dir: Dir, fill = false): StyleObject {
   if (node.collapsed) return { flex: "0 0 0px", minWidth: 0, minHeight: 0, overflow: "hidden" };
   // The minimum is expressed on the split's own axis: a flex region with
   // `min-width: 0` can be squeezed to nothing by its siblings.
@@ -396,7 +396,12 @@ function regionStyle(node: RegionNode, dir: Dir): StyleObject {
     minHeight: dir === "column" ? node.min : 0,
   };
   const stack: StyleObject =
-    node.stack === true ? { display: "flex", flexDirection: "column" } : {};
+    node.stack === true || (node.children?.length ?? 0) > 0
+      ? { display: "flex", flexDirection: "column" }
+      : {};
+  // A selector's child is not sized by a split — the selector hands it the whole
+  // box — so it always fills, whatever basis it carries.
+  if (fill) return { flex: "1 1 0", ...minimum, overflow: "hidden", ...stack };
   if (node.flex) return { flex: "1 1 0", ...minimum, overflow: "hidden", ...stack };
   return { flex: `0 0 ${node.size}px`, ...minimum, overflow: "hidden", ...stack };
 }
@@ -667,7 +672,7 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
      * @param node - the region to render.
      * @param dir - the parent split's axis.
      */
-    const renderRegion = (node: RegionNode, dir: Dir): ReactElement => {
+    const renderRegion = (node: RegionNode, dir: Dir, fill = false): ReactElement => {
       const box = sizes.get(node.id) ?? ZERO_BOX;
       const child = activeChild(state, node);
       if (child !== null) {
@@ -676,11 +681,11 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
           {
             key: node.id,
             "data-prac-region": node.id,
-            style: regionStyle(node, dir),
+            style: regionStyle(node, dir, fill),
           },
           [
             (node.children?.length ?? 0) > 1 ? containerBar(node, child.id) : null,
-            renderRegion(child, dir),
+            renderRegion(child, dir, true),
           ],
         );
       }
@@ -691,7 +696,7 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
         {
           key: node.id,
           "data-prac-region": node.id,
-          style: regionStyle(node, dir),
+          style: regionStyle(node, dir, fill),
         },
         showsTabStrip(state, node)
           ? [tabStrip(views), viewBody(views[0] ?? "", box)]
