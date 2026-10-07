@@ -341,6 +341,15 @@ importers:
       '@deepseek-ai/dsh-client-store':
         specifier: 'catalog:'
         version: 0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)
+      '@deepseek-ai/dsh-client-ui-layout':
+        specifier: 'catalog:'
+        version: 0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)
+      '@deepseek-ai/dsh-client-ui-renderer':
+        specifier: 'catalog:'
+        version: 0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)
+      '@deepseek-ai/dsh-client-ui-slots':
+        specifier: 'catalog:'
+        version: 0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)
       '@types/react':
         specifier: 'catalog:'
         version: 18.3.31

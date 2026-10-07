@@ -30,12 +30,28 @@
 
 import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
+import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
+import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
+import type { ILayout } from "@deepseek-ai/dsh-client-ui-layout/client";
 import { createVscodeEmbed } from "prac-vscode-embed/client";
 import { EXTENSIONS_GALLERY } from "prac-vscode";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "./public.js";
 
 /** Same-origin prefix the host half serves the app bundle under. */
 const VSCODE_ROUTE = "/prac-vscode";
+
+/**
+ * The frame's whole-surface overlay slot: where the app's own root is mounted.
+ *
+ * One layer, not two: the app's floats (quick input, notifications, menus,
+ * dialogs) belong to the frame's floating layer, so they take their box and
+ * their order from it. The entry's `order` is negative on purpose — the frame's
+ * own surfaces register with the default, and the layer's order is what decides
+ * which side paints above the other, so prac's own overlays stay on top instead
+ * of it being an accident of DOM insertion.
+ */
+const OVERLAY = "shell.overlay" satisfies keyof SlotMap;
+const FLOAT_ENTRY_ORDER = -100;
 
 /**
  * The workspace the app is started for.
@@ -226,6 +242,26 @@ export function apply(ctx: Context): void {
   };
   ctx.effect(() => ctx.provide("pracVscode", face), `${name}: pracVscode service`);
 
+  // The app's own root goes into the frame's floating layer. Registering it here
+  // (and not in a consumer) is the mechanism's business: the layer is where the
+  // app is mounted, and a consumer only declares views.
+  //
+  // Naming the layout face is also what puts DSH's own slot keys in this program:
+  // without it `shell.overlay` is not a key of `SlotMap`, so the registration
+  // below would not type-check against the frame's declaration.
+  ctx.layout satisfies ILayout;
+  const slots: SlotRegistry = ctx.slots;
+  ctx.effect(
+    () =>
+      slots.inject(OVERLAY, () =>
+        slots.register(
+          { name: OVERLAY, id: "vscode-floats", order: FLOAT_ENTRY_ORDER },
+          embed.floatHost(),
+        ),
+      ),
+    `${name}: float layer entry`,
+  );
+
   if (!boot()) {
     // No workspace yet: wait for the registry to produce one, then boot once.
     ctx.effect(() => {
@@ -242,7 +278,8 @@ export const name = "prac-client-vscode-host";
 
 /**
  * Boot reads DSH's workspace registry and session list to find the workspace its
- * window is for; it declares no slot, because the views belong to the consumer
- * packages.
+ * window is for; it declares no view slot, because the views belong to the
+ * consumer packages. It does register into the frame's floating layer, which is
+ * where the app's own root is mounted.
  */
-export const inject = ["workspaces", "sessions"];
+export const inject = ["workspaces", "sessions", "slots", "layout"];

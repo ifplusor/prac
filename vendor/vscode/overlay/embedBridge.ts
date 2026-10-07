@@ -34,6 +34,22 @@ export const EMBED_BRIDGE = "vscodeEmbed";
 export const PART_HOST_ATTR = "data-vscode-embed-part-host";
 
 /**
+ * The attribute that marks the embedder's **float layer**.
+ *
+ * Optional composition, like {@link PART_HOST_ATTR}: the app's own root is placed
+ * in the element carrying it, so the floats the app creates directly (quick
+ * input, notifications, the context-view container, dialogs) belong to the
+ * embedder's floating layer instead of a second layer beside its frame — one
+ * layer, one order. The element also gives the app the box it measures for those
+ * floats, so a marks-without-a-box embedder gets zero-sized floats (the command
+ * palette is `0.62 × container width`).
+ *
+ * Spelled here once and imported by both sides: the embedder's shell writes it,
+ * this side reads it.
+ */
+export const FLOAT_HOST_ATTR = "data-vscode-embed-float-host";
+
+/**
  * One view the workbench currently offers, as {@link PartHostFace.listViews}
  * reports it.
  *

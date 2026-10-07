@@ -282,7 +282,42 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   ) {
     super();
     this.mainContainer.classList.add("monaco-workbench");
+    // Fill the root this side was handed (the embedder's float layer) instead of
+    // being measured as a zero-sized box beside it: the app sizes every float it
+    // places against its own container, so the container needs a box. Transparent
+    // and click-through — the parts live in the embedder's regions, and only the
+    // float containers opt back into pointer events (see {@link installStyles}).
+    Object.assign(this.mainContainer.style, {
+      position: "absolute",
+      inset: "0",
+      background: "transparent",
+      pointerEvents: "none",
+    });
     parent.appendChild(this.mainContainer);
+    this.installStyles();
+  }
+
+  /**
+   * The overlay's own stylesheet: which containers may take pointer events.
+   *
+   * The root is click-through so the embedder's frame stays usable, which means
+   * every float has to opt back in. The list is a **list, not a wildcard**: these
+   * are the containers this side creates for global surfaces (quick input, the
+   * context-view container — menus and dialogs — hover, notifications). Anything
+   * else the app puts in the root stays click-through, so a part that was never
+   * given a host cannot quietly start swallowing the frame's clicks.
+   */
+  private installStyles(): void {
+    const style = document.createElement("style");
+    style.dataset.vscodeEmbed = "floats";
+    style.textContent = `
+.monaco-workbench > .quick-input-widget,
+.monaco-workbench > .context-view,
+.monaco-workbench > .monaco-hover,
+.monaco-workbench > .notifications-toasts,
+.monaco-workbench > .notifications-center { pointer-events: auto; }
+`;
+    mainWindow.document.head.appendChild(style);
   }
 
   //#region Startup
@@ -1363,6 +1398,14 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
 
     this._onDidLayoutMainContainer.fire(this._mainContainerDimension);
     this._onDidLayoutActiveContainer.fire(this._mainContainerDimension);
+    // The third event is the one floats listen to for a re-layout: a quick input
+    // re-measures on `onDidLayoutContainer` for its own container, not on the two
+    // above, so a container that only fired those kept whatever size it had when
+    // the float was created.
+    this._onDidLayoutContainer.fire({
+      container: this.mainContainer,
+      dimension: this._mainContainerDimension,
+    });
   }
 
   getSize(part: Parts): IViewSize {

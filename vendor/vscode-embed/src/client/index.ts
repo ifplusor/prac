@@ -25,7 +25,7 @@
 import { createElement, useEffect, useRef } from "react";
 import { deliverThemeToHost } from "./theme-root.js";
 import type { ReactElement } from "react";
-import { EMBED_BRIDGE, PART_HOST_ATTR } from "prac-vscode";
+import { EMBED_BRIDGE, FLOAT_HOST_ATTR, PART_HOST_ATTR } from "prac-vscode";
 import type {
   DiagnosticEntry,
   DiagnosticsPage,
@@ -37,7 +37,7 @@ import type {
   ViewCatalogueEntry,
 } from "prac-vscode";
 
-export { EMBED_BRIDGE, PART_HOST_ATTR };
+export { EMBED_BRIDGE, FLOAT_HOST_ATTR, PART_HOST_ATTR };
 export type {
   DiagnosticEntry,
   DiagnosticsPage,
@@ -95,6 +95,15 @@ export interface VscodeEmbedPage {
   readonly diagnosticsListeners: Map<() => void, (() => void) | undefined>;
   /** Extra classes the consumers want on the boot root (diagnostics). */
   readonly classes: Set<string>;
+  /**
+   * The embedder's float-layer element, once its entry rendered.
+   *
+   * Recorded rather than looked up: the layer lives in the frame's overlay slot,
+   * which renders inside an isolation root, so a document query cannot see it —
+   * the entry hands its element over instead (the same handover the part hosts do
+   * through the face). Until it arrives the app's root falls back to `body`.
+   */
+  floatHost?: HTMLElement;
 }
 
 declare global {
@@ -247,6 +256,24 @@ export interface VscodeEmbedHandle {
    */
   onDidChangeViews(listener: () => void): () => void;
   /**
+   * The **float layer** component: where the app's own root is mounted.
+   *
+   * The embedder renders this into its floating layer (the frame's whole-surface
+   * overlay slot) so the surfaces the app creates directly — quick input,
+   * notifications, the context-view container, dialogs — live in the embedder's
+   * layer rather than a second layer beside its frame. One layer means one order:
+   * which of the two sides paints above the other is the slot entry's `order`, not
+   * an accident of DOM insertion.
+   *
+   * The element carries {@link FLOAT_HOST_ATTR}, is click-through (the app's own
+   * root and every float it has not opted in stay click-through too, so the frame
+   * underneath keeps its events), and **sizes the app's root**: the app measures
+   * its container for every float it places.
+   *
+   * @returns a component rendering the element the app is mounted into.
+   */
+  floatHost(): () => ReactElement;
+  /**
    * The app's capabilities, addressed by name.
    *
    * Each member reads the app's face when called, so a consumer may hold the
@@ -332,14 +359,26 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
     const bootHost = document.createElement("div");
     bootHost.id = "vscode-embed-boot";
     bootHost.classList.add(...record.classes);
+    // The app's **own root** lives in the embedder's float layer, not beside its
+    // frame: what the app creates directly (quick input, notifications, the
+    // context-view container, dialogs) belongs to that layer — one layer, one
+    // order. The parts are moved out into the embedder's regions either way, so
+    // nothing else follows the root in.
+    //
+    // Filling the layer is what gives the app a box at all: the app measures its
+    // own container for every float it places (a command palette is
+    // `0.62 × container width`), so a root with no box means floats with no box.
+    // `pointer-events: none` keeps the frame clickable; the float containers
+    // themselves opt back in (see the app overlay's stylesheet).
+    const floatHostElement = record.floatHost ?? document.body;
     Object.assign(bootHost.style, {
-      position: "fixed",
-      width: "0",
-      height: "0",
-      overflow: "hidden",
+      position: "absolute",
+      inset: "0",
+      overflow: "visible",
       pointerEvents: "none",
+      zIndex: "0",
     });
-    document.body.appendChild(bootHost);
+    floatHostElement.appendChild(bootHost);
     record.host = bootHost;
 
     globalThis._VSCODE_FILE_ROOT = new URL(`${route}/`, location.origin).toString();
@@ -469,6 +508,43 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
       });
 
     return true;
+  };
+
+  /**
+   * The float-layer component: the element the app's own root is mounted into.
+   *
+   * One element, and the embedder decides where it sits and what paints above it
+   * (the slot entry's `order`). This side only records it, so `boot()` can mount
+   * into it instead of `body` — and if the app has already booted by the time the
+   * entry renders, the root moves in here.
+   *
+   * @returns the component the embedder renders into its floating layer.
+   */
+  const floatHost = (): (() => ReactElement) => {
+    return function VscodeFloatHost(): ReactElement {
+      const ref = useRef<HTMLDivElement | null>(null);
+      useEffect(() => {
+        const element = ref.current;
+        if (!element) return undefined;
+        record.floatHost = element;
+        // Boot with no layer yet: the root went to `body`, so move it now. The
+        // app's parts are hosted elsewhere and do not move with it.
+        if (record.host !== undefined && record.host.parentElement !== element) {
+          element.appendChild(record.host);
+        }
+        return () => {
+          if (record.floatHost === element) delete record.floatHost;
+        };
+      }, []);
+      return createElement("div", {
+        ref,
+        [FLOAT_HOST_ATTR]: "",
+        // Inline `pointer-events` beats the slot's own rule (an overlay entry opts
+        // into events by default): the layer must stay click-through, and the app's
+        // float containers opt back in one by one (see the app overlay's stylesheet).
+        style: { position: "absolute", inset: 0, pointerEvents: "none" },
+      });
+    };
   };
 
   const partHost = (partId: string): (() => ReactElement) => {
@@ -622,6 +698,7 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
 
   return {
     boot,
+    floatHost,
     partHost,
     view,
     file,
