@@ -111,9 +111,20 @@ async function outline() {
     const content = entry
       ?.querySelector("[data-prac-view-host]")
       ?.shadowRoot?.querySelector("[data-prac-view-content]");
+    const message = content?.querySelector(".outline-message") ?? null;
+    const tree = content?.querySelector(".outline-tree") ?? null;
+    const pane = content?.querySelector(".outline-pane") ?? null;
+    const height = (element) => (element ? Math.round(element.getBoundingClientRect().height) : 0);
     return {
       mounted: content !== undefined && content !== null,
-      message: (content?.querySelector(".outline-message")?.textContent ?? "").trim(),
+      message: (message?.textContent ?? "").trim(),
+      // The pane's own CSS is scoped under `.monaco-workbench`, which the host has
+      // to carry inside the isolation root: without it the message never hides and
+      // the tree sizes to its content (measured: 7612px inside a 734px region) —
+      // the "Outline loaded, but the UI is wrong" a person sees.
+      messageShown: message !== null && getComputedStyle(message).display !== "none",
+      treeHeight: height(tree),
+      paneHeight: height(pane),
       symbols: [...(content?.querySelectorAll(".monaco-list-row") ?? [])].map((element) =>
         (element.textContent ?? "").replace(/\s+/g, " ").trim(),
       ),
@@ -174,6 +185,19 @@ const checks = {
     typescript,
     FIXTURES.typescript.symbols,
   ),
+  // The listing has to be *laid out*, not merely present in the DOM: the pane is
+  // sized by the app's own stylesheet, so a missing workbench context shows up as a
+  // stale message and a runaway tree rather than as empty rows.
+  "every listing is laid out inside its pane, with no stale message": [
+    first,
+    second,
+    typescript,
+  ].every(
+    (facts) =>
+      facts.messageShown === false &&
+      facts.treeHeight > 0 &&
+      facts.treeHeight <= facts.paneHeight + 2,
+  ),
 };
 const failed = Object.entries(checks)
   .filter(([, ok]) => !ok)
@@ -190,5 +214,5 @@ if (failed.length > 0) {
   process.exit(1);
 }
 console.log(
-  "OK: the Outline answers for the active file and follows the next one — which needs the workbench's Eventually phase to have run.",
+  "OK: the Outline answers for the active file, follows the next one, and is laid out inside its pane — which needs the workbench's Eventually phase and the workbench context class on the host.",
 );

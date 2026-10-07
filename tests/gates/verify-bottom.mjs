@@ -37,15 +37,40 @@ await page.waitForFunction(
   BOTTOM,
   { timeout: 90_000 },
 );
-await page.evaluate((bottom) => {
-  for (const view of globalThis.__pracLayout.listViews()) {
-    const region = view.region ?? "";
-    if (region === bottom || region.startsWith(`${bottom}/`)) {
-      globalThis.__pracLayout.hide(view.id);
-    }
+
+/**
+ * Hide every view the arrangement put in the bottom track, and wait for the bar to
+ * actually be gone.
+ *
+ * Looped rather than done once: the view catalogue keeps growing after the page
+ * settles (extensions activate late — more so since the workbench reaches its
+ * `Eventually` phase), and a view arriving between the hiding and the sampling
+ * puts the bar back. What the gate asserts is "an empty bar is absent", so it
+ * waits for that state instead of assuming the first hide was final.
+ *
+ * @returns whether the bar went away.
+ */
+async function emptyTheBar() {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    await page.evaluate((bottom) => {
+      for (const view of globalThis.__pracLayout.listViews()) {
+        const region = view.region ?? "";
+        if (region === bottom || region.startsWith(`${bottom}/`)) {
+          globalThis.__pracLayout.hide(view.id);
+        }
+      }
+    }, BOTTOM);
+    await page.waitForTimeout(500);
+    const present = await page.evaluate(
+      (bottom) => document.querySelector(`[data-prac-region="${bottom}"]`) !== null,
+      BOTTOM,
+    );
+    if (!present) return true;
   }
-}, BOTTOM);
-await page.waitForTimeout(800);
+  return false;
+}
+
+const emptied = await emptyTheBar();
 
 async function sample() {
   const facts = await page.evaluate(
@@ -111,6 +136,10 @@ const checks = {
   // editor part, so an empty track no longer has an occupant keeping it alive).
   // The bar's container children are still in the tree, but nothing in them is
   // visible, so neither they nor the bar are rendered.
+  // The setup has to have reached the empty state at all: a view arriving in the
+  // track after the hiding would make the three checks below measure the wrong
+  // thing, and this names that instead of blaming the frame.
+  barEmptied: emptied,
   absentWhileEmpty:
     initial.bottom === null &&
     initial.regions.filter((region) => !region.includes("/")).join(",") === "left,stage",
@@ -135,7 +164,7 @@ const checks = {
 
 report({
   url,
-  facts: { initial, opened, collapsed, consoleErrors },
+  facts: { emptied, initial, opened, collapsed, consoleErrors },
   checks,
   ok: "OK: the bottom bar is absent while empty, spans the frame when filled, takes its room from the row above, and gives it back when collapsed.",
 });

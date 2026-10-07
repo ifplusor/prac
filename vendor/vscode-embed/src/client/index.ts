@@ -344,6 +344,16 @@ function webviewEndpoint(): string | undefined {
   return typeof injected === "string" && injected !== "" ? injected : undefined;
 }
 
+/**
+ * The ancestor class the app's view CSS is scoped under.
+ *
+ * The app writes `.monaco-workbench .outline-pane { … }`, so any host prac mounts
+ * workbench content into has to carry this class **inside the isolation root** —
+ * that is what confines the cascade to the borrowed content instead of waking it
+ * over the whole page. See the part host below for the measurement.
+ */
+const WORKBENCH_CONTEXT = "monaco-workbench";
+
 export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandle {
   const record = page();
   const route = options.route.replace(/\/+$/, "");
@@ -564,10 +574,15 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
       }, []);
       return createElement("div", {
         ref,
-        // No class mirroring: the frame mirrors the app's sheets into the view's
-        // root, and the theme arrives as `:host` variables, so the workbench's
-        // own class names stay inside the boundary (see `theme-root.ts`).
-        className: "vscode-embed-part-host",
+        // `monaco-workbench` is load-bearing, not decoration: most of the app's
+        // view CSS is scoped under it (`.monaco-workbench .outline-pane …`), and
+        // the frame deliberately does *not* put that class on the isolation host —
+        // so without it here the rules are mirrored into the root and match
+        // nothing. Measured: the Outline's message stayed visible and its tree
+        // sized to its content (7612px inside a 734px region) until this class was
+        // on an ancestor inside the root. `theme-root.ts` still delivers the
+        // variables through `:host`; this only restores the selectors' context.
+        className: "vscode-embed-part-host monaco-workbench",
         [PART_HOST_ATTR]: partId,
         // Inline sizing beats the class's absolute positioning so the host stays
         // inside its region instead of escaping the frame.
@@ -601,8 +616,9 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
       return createElement("div", {
         ref,
         // A view brings its own pane (header and body), so the host only has to
-        // size it: the app's CSS scopes the pane under the theme classes the
-        // boot root carries.
+        // size it — and to carry `monaco-workbench`, which is the ancestor the
+        // app's pane CSS is scoped under (see the part host above).
+        className: WORKBENCH_CONTEXT,
         "data-vscode-embed-view": viewId,
         style: {
           position: "relative",
@@ -634,7 +650,9 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
       return createElement("div", {
         ref,
         // An editor widget carries its own theme classes from the app's global
-        // styles; the host only has to size it.
+        // styles; the host sizes it and carries `monaco-workbench`, the ancestor
+        // the editor chrome's rules are scoped under.
+        className: WORKBENCH_CONTEXT,
         "data-vscode-embed-file": resource,
         style: {
           position: "relative",
