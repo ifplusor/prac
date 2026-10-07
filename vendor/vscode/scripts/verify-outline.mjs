@@ -52,6 +52,16 @@ const FIXTURES = {
     body: "@media screen { .delta { color: black; } }\n.epsilon { color: white; }\n",
     symbols: ["@media screen", ".delta", ".epsilon"],
   },
+  // Two languages, because they arrive by different routes: CSS through the
+  // language server the deployment wires into `ctx.lsp`, TypeScript through VS
+  // Code's own bundled extension (`typescript-language-features` plus the
+  // `typescript` package it spawns). A build that compiles one and not the other
+  // is exactly the state this gate is here to catch.
+  typescript: {
+    name: "prac-outline-typescript.ts",
+    body: "interface Alpha { value: number; }\nclass Beta { method(): void {} }\n",
+    symbols: ["Alpha", "value", "Beta", "method"],
+  },
 };
 
 for (const fixture of Object.values(FIXTURES)) {
@@ -114,6 +124,10 @@ async function outline() {
 /**
  * Open one fixture through the app's own open path and read the Outline.
  *
+ * Polls rather than sleeps: a language server answers late (the TypeScript one
+ * spawns a process), so a fixed delay would pass on a warm page and fail on a cold
+ * one.
+ *
  * @param fixture - one of {@link FIXTURES}.
  * @returns the outline facts while that file is the active editor.
  */
@@ -123,17 +137,24 @@ async function opened(fixture) {
       globalThis.__vscodeEmbed.face.openFile(`${root}/${relative}/${name}`),
     { folder, relative: FIXTURE_RELATIVE, name: fixture.name },
   );
-  await page.waitForTimeout(6000);
+  const wanted = fixture.symbols.length;
+  for (let attempt = 0; attempt < 40; attempt++) {
+    await page.waitForTimeout(1000);
+    const facts = await outline();
+    if (facts.symbols.filter((row) => row !== "").length >= wanted) return facts;
+  }
   return outline();
 }
 
 const first = await opened(FIXTURES.alpha);
 const second = await opened(FIXTURES.delta);
+const typescript = await opened(FIXTURES.typescript);
 
 const facts = {
   workspaceFolder: folder,
   first,
   second,
+  typescript,
   consoleErrors: consoleErrors.map((line) => line.slice(0, 160)).slice(0, 4),
 };
 console.log(JSON.stringify({ url, ...facts }, null, 2));
@@ -142,11 +163,17 @@ const has = (outlineFacts, symbols) =>
   symbols.every((symbol) => outlineFacts.symbols.some((row) => row.startsWith(symbol)));
 
 const checks = {
-  "the Outline view is mounted in the page": first.mounted && second.mounted,
+  "the Outline view is mounted in the page": first.mounted && second.mounted && typescript.mounted,
   "opening a file that has symbols puts them in the Outline": has(first, FIXTURES.alpha.symbols),
   "the Outline follows the next file (the first file's symbols are gone)":
     has(second, FIXTURES.delta.symbols) &&
     FIXTURES.alpha.symbols.every((symbol) => !second.symbols.some((row) => row.startsWith(symbol))),
+  // The built-in route: this only passes when `typescript-language-features` was
+  // built into the checkout (its `out/` compiled and its `typescript` installed).
+  "TypeScript symbols arrive from VS Code's own bundled extension": has(
+    typescript,
+    FIXTURES.typescript.symbols,
+  ),
 };
 const failed = Object.entries(checks)
   .filter(([, ok]) => !ok)

@@ -280,7 +280,7 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随 DSH 插
 8. **阶段二**（决策空间 / 以审决策为主界面）：保持搁置，重新进入主线需要重新裁决。
 9. ~~**借用件的浮层路由**~~（**2026-10-07 已落地**）：应用的根住在框架的 `shell.overlay` 里（见 §3.1），所以它自己创建的面（命令面板 / 菜单 / 悬停 / 通知 / 模态）都在框架这一个悬浮层内、由框架定序；部件与视图照旧在各视图的隔离根里。**随之要背的**：借用件的根进了隔离根 ⇒ 它内部**不能再依赖 document 级的查询**（例如按元素找宿主），宿主元素要由框架那一侧交过来。
 10. **框架的锚点通路**（锚点矩形 + 落位 / 失效 / 跟随）：被"盒子是硬边界"逼出来的那条路，但**先不做**——借用件自己的锚点类浮层（菜单、悬停）跟着应用的根住在悬浮层里、用视口坐标定位，不需要框架的锚点通路；等真出现**框架级**的跨视图锚定再说。
-11. **内建扩展没编译出来**的连带一处（2026-10-07 实测）：**TypeScript 的符号/大纲**走这条——补上 `Eventually` 生命周期后 Outline 已经会跟着活动文件（css 文件能列出选择器符号），但 `.ts` 文件答 `No symbols found`，因为 TS 语言特性扩展没有可加载入口；css 之所以有符号，是它的链路经 `ctx.lsp` 单独接通的。两选一：给 TS 也接一条 `ctx.lsp` 提供方，或像 css 那样**定向编译** `typescript-language-features`。
+11. ~~**TypeScript 的符号/大纲**~~（**2026-10-07 已落地**）：VS Code 自带的 `typescript-language-features`（它自己 fork `tsserver`）就是那条路，缺的只是**把它构建出来**——`out/` 没编译、`extensions/node_modules` 没装，于是扩展被扫到却激活不了（`Cannot find module …/out/extension`）。现在 `vendor/vscode/scripts/build.mjs` 里多了一步 `buildBuiltinExtensions()`（css 两半 + TS，各自装依赖后用 checkout 自带的 `tsc` 定向编译，绕开被 `extensions/ipynb` 挡住的仓库级构建）⇒ **干净重建也能拿到**。同一步可以继续加内建扩展（当前还没编译的会以同样的 `Cannot find module` 报在控制台，例如 `emmet`、`github-authentication`）。
 
 ## 8. 相关
 

@@ -352,6 +352,49 @@ function stampServerCommit() {
 }
 
 /**
+ * Build the VS Code built-in extensions the rig needs, one by one.
+ *
+ * The repo-wide extension build is blocked by an unrelated typecheck
+ * (`extensions/ipynb`), so every built-in prac wants is compiled here, directly,
+ * with the checkout's own `tsc`. Skipping this is not cosmetic: the extension host
+ * walks `<checkout>/extensions` (see `prac-host-vscode`'s `language.ts`), so an
+ * extension whose `out/` is missing is *scanned* and then fails to activate with
+ * `Cannot find module …/out/extension` — which is how "VS Code ships a JS/TS
+ * language server" still turned into "the Outline has no symbols for a `.ts` file".
+ *
+ * Two dependency trees come with it, and both are load-bearing: the shared
+ * `extensions/node_modules` holds the `typescript` package the TS extension spawns
+ * (`extensions/node_modules/typescript/lib/tsserver.js` — the root alias,
+ * `@typescript/typescript6`, does not ship that entry), and each extension's own
+ * `node_modules` holds what its code requires at activation.
+ */
+const BUILTIN_EXTENSIONS = [
+  "css-language-features/client",
+  "css-language-features/server",
+  "typescript-language-features",
+];
+
+function buildBuiltinExtensions() {
+  if (flags.has("--skip-extensions")) {
+    log("extensions", "skipped (--skip-extensions)");
+    return;
+  }
+  const install = (dir) =>
+    run(
+      "npm",
+      ["install", "--no-audit", "--no-fund", "--legacy-peer-deps", "--loglevel=error"],
+      dir,
+    );
+  install(join(upstreamDir, "extensions"));
+  for (const dir of BUILTIN_EXTENSIONS) {
+    const extension = join(upstreamDir, "extensions", dir);
+    install(extension);
+    run(join(upstreamDir, "node_modules/.bin/tsc"), ["-p", extension, "--pretty", "false"]);
+    log("extensions", `built ${dir}`);
+  }
+}
+
+/**
  * The commit the upstream checkout has checked out, read the way VS Code's own
  * `build/lib/git.ts` does (`.git/HEAD` is a detached commit or a `ref:`).
  *
@@ -373,6 +416,7 @@ function checkoutCommit() {
 ensureCheckout();
 ensureInstall();
 copyCodicons();
+buildBuiltinExtensions();
 buildBundle();
 stampServerCommit();
 console.log("[prac-vscode] done. serve it with: vp run --filter prac-vscode vscode:serve");
