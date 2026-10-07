@@ -72,6 +72,15 @@ page.on("pageerror", (error) => consoleErrors.push(String(error)));
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
 await installDeepDom(page);
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
+// Wait for the arrangement to have built the track's **container children**: a
+// view placed into the track before that would land in a child of its own that
+// nothing selects (the catalogue sync rescues it, but does not choose for the
+// person).
+await page.waitForFunction(
+  () => globalThis.__pracLayout.listViews().some((view) => (view.region ?? "").startsWith("left/")),
+  null,
+  { timeout: 90_000 },
+);
 // The seat is hidden and unplaced by the default arrangement: reveal it in a
 // side region, which is where a view composed by prac would go.
 await page.evaluate(

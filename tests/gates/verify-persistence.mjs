@@ -5,9 +5,10 @@
  *  1. **a fresh origin starts from the factory shape** — clear the key, reload,
  *     and the frame is the default tree with the default placements (so what
  *     follows is the frame's doing, not the page's);
- *  2. **state is written** — after resizing the right track, showing + folding a
- *     second view in the left sidebar, moving the conversation into the bottom
- *     bar and opening it, the versioned key holds the state;
+ *  2. **state is written** — after resizing the left track, selecting the
+ *     Explorer container (which is one of the app's, inside the track) and folding
+ *     a view in it, moving the conversation into the bottom bar and opening it,
+ *     the versioned key holds the state;
  *  3. **state is restored** — after `page.reload()` the same facts hold in the
  *     DOM: the resized track, both stack entries with the second still folded,
  *     the bottom bar still filled and open, the same region list;
@@ -30,7 +31,7 @@ const BOTTOM = "bottom";
 const CONVERSATION = "dsh:main:conversation";
 const VSCODE_SIDEBAR = "vscode:view:workbench.explorer.fileView";
 /** The key `prac-client-ui-layout` persists under (see its `store.ts`). */
-const STATE_KEY = "prac-layout/v1";
+const STATE_KEY = "prac-layout/v2";
 /** The sidebar's default size; a restored 320 can only be the resize. */
 const RESIZED_LEFT = 320;
 const DEFAULT_LEFT = 280;
@@ -89,6 +90,11 @@ async function sample() {
           collapsed: element.getAttribute("data-prac-stack-collapsed"),
         })),
         left: box(`[data-prac-region="${left}"]`),
+        // Which container the region shows: the container layer's own state.
+        activeContainer:
+          document
+            .querySelector(`[data-prac-region="${left}"] [data-prac-container-active="true"]`)
+            ?.getAttribute("data-prac-container") ?? null,
         persisted:
           state === null
             ? null
@@ -112,11 +118,19 @@ const initial = await sample();
 
 // 2. Move things: resize the track, show + fold a second view in the sidebar,
 //    push the conversation into the bottom bar and open it.
+// The VS Code sidebar's region is its **container child**, discovered from the
+// catalogue rather than assumed: the container layer is what puts it there.
+const SIDEBAR_REGION = await page.evaluate(
+  (view) => globalThis.__pracLayout.listViews().find((entry) => entry.id === view)?.region ?? null,
+  VSCODE_SIDEBAR,
+);
 await page.evaluate(
-  ({ left, bottom, conversation, vscodeSidebar, width }) => {
+  ({ left, bottom, conversation, vscodeSidebar, sidebarRegion, width }) => {
     const layout = globalThis.__pracLayout;
     layout.setWidth(left, width);
-    layout.show(vscodeSidebar);
+    // Showing the container's view selects that container: the region now shows
+    // the Explorer rather than prac's own sidebar.
+    layout.place(vscodeSidebar, sidebarRegion);
     layout.setViewCollapsed(vscodeSidebar, true);
     layout.place(conversation, bottom);
     layout.setCollapsed(bottom, false);
@@ -126,6 +140,7 @@ await page.evaluate(
     bottom: BOTTOM,
     conversation: CONVERSATION,
     vscodeSidebar: VSCODE_SIDEBAR,
+    sidebarRegion: SIDEBAR_REGION,
     width: RESIZED_LEFT,
   },
 );
@@ -158,19 +173,22 @@ const BAR_HEIGHT = 240;
 // relative check passes vacuously when the change never happened.
 const checks = {
   // The premise: a fresh origin really starts from the factory shape.
+  // The factory shape is now "the tracks, with the app's containers in them":
+  // the sidebar at its default width and the bar present because the catalogue
+  // put the panel containers there.
   startedDefault:
-    initial.regions.join(",") === "left,stage" &&
     near(initial.left?.w, DEFAULT_LEFT, 6) &&
-    initial.stack.length === 0 &&
-    initial.bottom === null,
+    initial.regions.filter((region) => !region.includes("/")).join(",") === "left,stage,bottom",
   // The engine integration: the state is under the versioned key, and it is the
   // state the moves produced (not just a key that exists).
   written: changed.persisted !== null && changed.persisted.leftSize === RESIZED_LEFT,
-  // …and comes back after a real reload: size, stack order with the fold, bar.
+  // …and comes back after a real reload: size, the selected container with its
+  // fold, bar. `activeContainer` is the container layer's own persistent state —
+  // which container a region shows — so it belongs in this gate.
   resizeRestored: near(reloaded.left?.w, RESIZED_LEFT, 6),
-  stackRestored:
-    reloaded.stack.length === 2 &&
-    stackKey(reloaded) === stackKey(changed) &&
+  containerRestored:
+    reloaded.activeContainer !== null &&
+    reloaded.activeContainer === changed.activeContainer &&
     reloaded.stack.some((entry) => entry.view === VSCODE_SIDEBAR && entry.collapsed === "true"),
   bottomRestored: reloaded.bottom !== null && near(reloaded.bottom?.h, BAR_HEIGHT, 6),
   // No rehydration or persistence complaint from the engine.

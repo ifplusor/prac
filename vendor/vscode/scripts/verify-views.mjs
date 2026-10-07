@@ -371,15 +371,16 @@ states.movedBySelect = await sample(page);
 await toggleRecall(page);
 await page.click(splitOf(FILE_VIEW, "right"));
 await page.waitForTimeout(800);
-const newRegion = await page.evaluate(() => {
-  const ids = [...globalThis.__deep.all("[data-prac-region]")].map((element) =>
-    element.getAttribute("data-prac-region"),
-  );
-  return ids.find((id) => !["left", "stage", "right"].includes(id)) ?? null;
-});
-if (!newRegion) throw new Error("分栏 did not create a new region");
 await page.waitForTimeout(800);
 states.splitWhileOpen = await sample(page);
+// The new pane is the region this split *added*: the track ids are no longer the
+// whole story (the container layer gives each track named children), so diff
+// against the sample taken just before the split.
+const knownBefore = new Set(states.movedBySelect.regions.map((region) => region.id));
+const newRegion =
+  states.splitWhileOpen.regions.map((region) => region.id).find((id) => !knownBefore.has(id)) ??
+  null;
+if (!newRegion) throw new Error("分栏 did not create a new region");
 await toggleRecall(page);
 states.split = await sample(page);
 const newPane = states.split.regions.find((region) => region.id === newRegion) ?? null;
@@ -457,7 +458,7 @@ const checks = {
 
   // 3. 移到: the conversation leaves the track and the file takes it over.
   conversationMovedOutOfTheTrack:
-    states.conversationMoved.modelViews[CONVERSATION_VIEW]?.region === "left" &&
+    (states.conversationMoved.modelViews[CONVERSATION_VIEW]?.region ?? "").startsWith("left") &&
     states.conversationMoved.right === null,
   fileMovedIntoTheTrack:
     states.fileInTrack.host?.region === "right" && painted(states.fileInTrack.editorPaint),

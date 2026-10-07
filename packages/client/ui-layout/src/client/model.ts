@@ -331,8 +331,10 @@ export function ensureView(state: LayoutState, viewId: string): ViewRecord {
 export function place(state: LayoutState, viewId: string, regionId: string): LayoutState {
   const next = placeQuietly(state, viewId, regionId);
   // Placing into a container shows that container: the selector ancestors are
-  // what decide which child is on screen.
-  const tree = revealRegion(next.tree, regionId);
+  // what decide which child is on screen. The *landing* region is the one to
+  // reveal — routing may have put the view in a child of the region named.
+  const landing = next.views[viewId]?.region ?? regionId;
+  const tree = revealRegion(next.tree, landing);
   return tree === next.tree ? next : { ...next, tree };
 }
 

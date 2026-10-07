@@ -367,8 +367,13 @@ const columnGrowth =
 // expanded. Pixel assertions are merged per phase rather than repeated per state.
 const checks = {
   // default: the file holds the centre and the conversation parks in the track.
+  // The frame's *top-level* regions: the container layer gives the tracks named
+  // children, and the catalogue's panel containers make the bottom bar present.
   defaultRegions:
-    states.default.regions.map((region) => region.id).join(",") === "left,stage,right",
+    states.default.regions
+      .map((region) => region.id)
+      .filter((id) => !id.includes("/"))
+      .join(",") === "left,stage,right,bottom",
   defaultConversationInTheTrack:
     states.default.modelConversationRegion === TRACK_REGION &&
     states.default.conversationInTrack === true,

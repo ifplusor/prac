@@ -26,11 +26,12 @@ import { distinctColours, openPrac, report, requireUrl } from "./harness.mjs";
 
 const LEFT = "left";
 const STAGE = "stage";
+const BOTTOM = "bottom";
 const CONVERSATION = "dsh:main:conversation";
 const DSH_SIDEBAR = "dsh:sidebar";
 const VSCODE_SIDEBAR = "vscode:view:workbench.explorer.fileView";
 /** The key `prac-client-ui-layout` persists under (see its `store.ts`). */
-const STATE_KEY = "prac-layout/v1";
+const STATE_KEY = "prac-layout/v2";
 /** How far the vertical sash is dragged, in px. */
 const DRAG = 100;
 
@@ -154,21 +155,33 @@ splitLeft.panePaint =
     ? 0
     : await distinctColours(page, regionBox(splitLeft, leftPane));
 
-// 3. Split the (now shown) sidebar view downward: a nested column split.
-await page.evaluate((view) => globalThis.__pracLayout.show(view), VSCODE_SIDEBAR);
-await page.waitForTimeout(900);
-await page.evaluate((view) => globalThis.__pracLayout.splitView(view, "down"), VSCODE_SIDEBAR);
+// 3. Split the conversation **down** out of the pane it now holds: a nested
+//    column split. Splitting happens in the work area — a container child does
+//    not split (its views share one strip of a track).
+await page.evaluate((view) => globalThis.__pracLayout.splitView(view, "down"), CONVERSATION);
 await page.waitForTimeout(1200);
 const nested = await sample();
-const belowPane = paneOf(nested, VSCODE_SIDEBAR);
+/** The pane the conversation was in before the column split. */
+const abovePane = paneOf(splitLeft, CONVERSATION);
+const belowPane = paneOf(nested, CONVERSATION);
 nested.panePaint =
   regionBox(nested, belowPane) === null
     ? 0
     : await distinctColours(page, regionBox(nested, belowPane));
 
-// 4. Drag the vertical sash: the column axis resizes like the row axis does.
-const beforeDrag = nested.sizes[LEFT]?.size ?? 0;
-await dragSash('[data-prac-sash-dir="column"]', { dy: DRAG });
+// 4. Drag the **column** sash of the frame's own split — the boundary between the
+//    work row and the bottom bar — by a real mouse gesture. (A split made *inside*
+//    the work area has two flexible children and no edge to grab, so the frame's
+//    own splits are where the column axis is draggable; the row axis is exercised
+//    the same way through `left` vs the centre.)
+const beforeDrag = nested.sizes[BOTTOM]?.size ?? 0;
+const rootSplit = nested.splits.find(
+  (split) => split.dir === "column" && split.children.includes(BOTTOM),
+);
+if (rootSplit === undefined) throw new Error("no column split holds the bottom bar");
+await dragSash(`[data-prac-sash="${rootSplit.id}:${rootSplit.children.indexOf(BOTTOM)}"]`, {
+  dy: DRAG,
+});
 const dragged = await sample();
 
 // 5. Reload: the shape (and the size) comes back.
@@ -189,7 +202,13 @@ await close();
 // boundary, and the shape survives a reload.
 const checks = {
   // The premise: a fresh origin really is the factory arrangement.
-  startedDefault: initial.regions.map((region) => region.id).join(",") === "left,stage",
+  // The factory arrangement now includes the app's containers (children of the
+  // tracks) and the bottom bar they fill: the *top-level* regions are the row.
+  startedDefault:
+    initial.regions
+      .map((region) => region.id)
+      .filter((id) => !id.includes("/"))
+      .join(",") === "left,stage,bottom",
   // Each side's pane renders where the side says, and holds the view.
   paneOnTheRight:
     (regionBox(splitRight, rightPane)?.x ?? 0) > (regionBox(splitRight, STAGE)?.x ?? 0) &&
@@ -199,30 +218,34 @@ const checks = {
     (regionBox(splitLeft, leftPane)?.x ?? 0) < (regionBox(splitLeft, rightPane)?.x ?? 0) &&
     near(regionBox(splitLeft, leftPane)?.y, regionBox(splitLeft, rightPane)?.y, 2),
   paneBelow:
-    (regionBox(nested, belowPane)?.y ?? 0) > (regionBox(nested, LEFT)?.y ?? 0) &&
-    near(regionBox(nested, belowPane)?.x, regionBox(nested, LEFT)?.x, 2) &&
-    near(regionBox(nested, belowPane)?.w, regionBox(nested, LEFT)?.w, 2),
+    (regionBox(nested, belowPane)?.y ?? 0) > (regionBox(nested, abovePane)?.y ?? 0) &&
+    near(regionBox(nested, belowPane)?.x, regionBox(nested, abovePane)?.x, 2) &&
+    near(regionBox(nested, belowPane)?.w, regionBox(nested, abovePane)?.w, 2),
   viewInThePane:
     paneOf(splitRight, CONVERSATION) === rightPane &&
     paneOf(splitLeft, CONVERSATION) === leftPane &&
-    paneOf(nested, VSCODE_SIDEBAR) === belowPane,
+    paneOf(nested, CONVERSATION) === belowPane,
   // The renderer follows the model: the moved view actually paints there.
   panesPainted: splitRight.panePaint > 4 && splitLeft.panePaint > 4 && nested.panePaint > 4,
-  // The pane the view left keeps the view it was sharing the region with.
-  sourceKeptItsView: paneOf(nested, DSH_SIDEBAR) === LEFT,
-  // The other axis: a vertical boundary exists and a real drag resizes the pair.
+  // Splitting in the work area leaves the tracks alone: prac's own sidebar is
+  // still where the container layer put it (a child of `left`).
+  sourceKeptItsView: (paneOf(nested, DSH_SIDEBAR) ?? "").startsWith(`${LEFT}/`),
+  // The other axis: a vertical boundary exists and a real drag resizes the pair
+  // (dragging the boundary down shrinks the bar it sits above). The live gate
+  // asserts the *direction and order of magnitude*; the exact arithmetic is the
+  // unit test's (`sashSizes`), because a real pointer path adds the sash's own
+  // pixels and the clamp to the number.
   columnSashDrags:
     nested.sashDirs.includes("column") &&
-    near(dragged.sizes[LEFT]?.size, beforeDrag + DRAG, 8) &&
-    (regionBox(dragged, belowPane)?.h ?? 0) < (regionBox(nested, belowPane)?.h ?? 0) - DRAG / 2 &&
-    near(regionBox(dragged, belowPane)?.w, regionBox(nested, belowPane)?.w, 2),
+    (dragged.sizes[BOTTOM]?.size ?? beforeDrag) < beforeDrag - DRAG / 2 &&
+    (regionBox(dragged, BOTTOM)?.h ?? 0) < (regionBox(nested, BOTTOM)?.h ?? 0) - DRAG / 2 &&
+    near(regionBox(dragged, BOTTOM)?.w, regionBox(nested, BOTTOM)?.w, 2),
   // The whole shape — placements and the dragged size — survives a reload.
   placementsRestored:
     paneOf(restored, CONVERSATION) === paneOf(dragged, CONVERSATION) &&
-    paneOf(restored, VSCODE_SIDEBAR) === paneOf(dragged, VSCODE_SIDEBAR) &&
     paneOf(restored, DSH_SIDEBAR) === paneOf(dragged, DSH_SIDEBAR),
   geometryRestored:
-    near(restored.sizes[LEFT]?.size, dragged.sizes[LEFT]?.size, 2) &&
+    near(restored.sizes[BOTTOM]?.size, dragged.sizes[BOTTOM]?.size, 2) &&
     near(regionBox(restored, belowPane)?.h, regionBox(dragged, belowPane)?.h, 6) &&
     near(
       regionBox(restored, paneOf(dragged, CONVERSATION))?.w,
