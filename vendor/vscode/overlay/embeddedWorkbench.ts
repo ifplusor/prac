@@ -386,6 +386,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
             onDidChangeViews: (listener: () => void) => this.onDidChangeViews(listener),
             mountFileInto: (resource: string, element: HTMLElement) =>
               this.mountFileInto(resource, element),
+            focusFile: (resource: string) => this.focusFile(resource),
             releaseFile: (resource: string) => this.releaseFile(resource),
             openFile: (resource: string) => this.openFile(resource),
             capabilities: {
@@ -812,6 +813,36 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   }
 
   /**
+   * Make one mounted file the app's active editor.
+   *
+   * The embedder calls this when its region for the file takes focus. The workbench
+   * follows *its* active editor — the Outline, the Timeline and every command read
+   * it — and the embedder is the only side that knows which region a person is
+   * working in, so focus has to travel up. Without it the app keeps describing
+   * whichever file was opened last.
+   *
+   * Activation only: the surface a person sees is the embedder's own widget, so
+   * this moves the workbench's notion of "current" and nothing else.
+   *
+   * @param resource - the file's resource string, as {@link mountFileInto} took it.
+   */
+  focusFile(resource: string): void {
+    try {
+      const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
+        ? URI.parse(resource)
+        : URI.file(resource);
+      const identifier = this.editorService.findEditors(uri)[0];
+      if (!identifier) return;
+      // `preserveFocus` because the person's focus is already where it should be;
+      // this only tells the workbench which editor is current.
+      void identifier.group.openEditor(identifier.editor, { preserveFocus: true });
+      this.editorGroupService.activateGroup(identifier.group);
+    } catch (error) {
+      this.logService.error(`vscode-embed: failed to focus file ${resource}`, error);
+    }
+  }
+
+  /**
    * Open a file in the workbench, by the same string vocabulary as
    * {@link mountFileInto}.
    *
@@ -868,11 +899,16 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
         // as a file fails (`createModelReference` goes through the file
         // service). The provider test is what both of those fail.
         const files = accessor.get(IFileService);
+        // One entry per *file*, not per open editor: a file can sit in more than
+        // one group (the embedder gives each mounted file a group of its own), and
+        // the embedder's catalogue is keyed by the file.
+        const seen = new Set<string>();
         return this.editorService.editors
           .map((editor) => editor.resource)
           .filter((resource): resource is URI => resource !== undefined)
           .filter((resource) => files.hasProvider(resource))
-          .map((resource) => resource.toString());
+          .map((resource) => resource.toString())
+          .filter((resource) => (seen.has(resource) ? false : (seen.add(resource), true)));
       });
     } catch (error) {
       this.logService.error("vscode-embed: failed to list open files", error);

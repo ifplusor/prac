@@ -157,14 +157,75 @@ async function opened(fixture) {
   return outline();
 }
 
+/**
+ * Put the two CSS fixtures in different regions and focus the first one's region.
+ *
+ * The Outline follows the app's **active editor**, and only the embedder knows which
+ * region a person is working in — so this is the assertion for focus travelling
+ * back up: after looking at the second file, clicking the first one's region has to
+ * bring its symbols back. (In one region the two files are tabs and only one is on
+ * screen, so the check would be vacuous there.)
+ *
+ * @returns the outline facts after focusing the first fixture's region.
+ */
+async function focusFirstFixture() {
+  const viewOf = (fixture) => `vscode:file:${folder}/${FIXTURE_RELATIVE}/${fixture.name}`;
+  const fileViews = () =>
+    globalThis.__pracLayout
+      .listViews()
+      .filter((entry) => entry.id.startsWith("vscode:file:"))
+      .map((entry) => `${entry.id.slice("vscode:file:".length).split("/").pop()} @${entry.region}`);
+  const before = await page.evaluate(fileViews);
+  // Every other fixture leaves the first one's region: they are tabs of one region
+  // otherwise, and clicking a region shows its **front** tab — the click would land
+  // on whichever file was opened last and prove nothing.
+  await page.evaluate(
+    (views) => {
+      for (const view of views) globalThis.__pracLayout.place(view, "right");
+    },
+    [viewOf(FIXTURES.delta), viewOf(FIXTURES.typescript)],
+  );
+  await page.waitForTimeout(3000);
+  const spot = await page.evaluate((view) => {
+    const region = globalThis.__pracLayout.listViews().find((entry) => entry.id === view)?.region;
+    const host = region
+      ? document.querySelector(`[data-prac-region="${region}"] [data-prac-view-host]`)
+      : null;
+    if (!host) return null;
+    const box = host.getBoundingClientRect();
+    // The centre, not a corner: the top of a region holds the frame's tab strip and
+    // the pane's own header, and a click there focuses chrome rather than the editor.
+    return { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) };
+  }, viewOf(FIXTURES.alpha));
+  focusSetup = { before, after: await page.evaluate(fileViews), spot };
+  if (!spot) return null;
+  // Retried, not done once: an editor that was just opened can activate after the
+  // click and take the app's notion of "current" back with it, which is not what
+  // this asserts. Clicking again re-sends the same focus.
+  for (let attempt = 0; attempt < 6; attempt++) {
+    await page.mouse.click(spot.x, spot.y);
+    for (let poll = 0; poll < 6; poll++) {
+      await page.waitForTimeout(500);
+      const facts = await outline();
+      if (facts.symbols.some((row) => row.startsWith(FIXTURES.alpha.symbols[0]))) return facts;
+    }
+  }
+  return outline();
+}
+
+let focusSetup = null;
 const first = await opened(FIXTURES.alpha);
 const second = await opened(FIXTURES.delta);
 const typescript = await opened(FIXTURES.typescript);
+// Last, because it rearranges regions (it needs the two files apart).
+const refocused = await focusFirstFixture();
 
 const facts = {
   workspaceFolder: folder,
   first,
   second,
+  refocused,
+  focusSetup,
   typescript,
   consoleErrors: consoleErrors.map((line) => line.slice(0, 160)).slice(0, 4),
 };
@@ -185,6 +246,10 @@ const checks = {
     typescript,
     FIXTURES.typescript.symbols,
   ),
+  // Focus travels back up: the Outline describes the region a person clicked into,
+  // not whichever file happened to be opened last.
+  "the Outline follows the region that took focus":
+    refocused !== null && has(refocused, FIXTURES.alpha.symbols),
   // The listing has to be *laid out*, not merely present in the DOM: the pane is
   // sized by the app's own stylesheet, so a missing workbench context shows up as a
   // stale message and a runaway tree rather than as empty rows.
@@ -214,5 +279,5 @@ if (failed.length > 0) {
   process.exit(1);
 }
 console.log(
-  "OK: the Outline answers for the active file, follows the next one, and is laid out inside its pane — which needs the workbench's Eventually phase and the workbench context class on the host.",
+  "OK: the Outline answers for the active file, follows the next one and the region that takes focus, and is laid out inside its pane — which needs the workbench's Eventually phase and the workbench context class on the host.",
 );

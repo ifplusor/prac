@@ -640,7 +640,14 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
         if (!element) return undefined;
         const stopTheme = deliverThemeToHost(element);
         mountFile(record, resource, element);
+        // The app follows *its* active editor, and the embedder knows which region
+        // the person is working in — so focus has to travel back up. Without this
+        // the Outline (and every command) would keep describing whichever file was
+        // mounted last.
+        const onFocusIn = (): void => record.face?.focusFile(resource);
+        element.addEventListener("focusin", onFocusIn);
         return () => {
+          element.removeEventListener("focusin", onFocusIn);
           stopTheme?.();
           if (record.fileHosts.get(resource) !== element) return;
           record.fileHosts.delete(resource);

@@ -170,6 +170,8 @@ export interface PartHostFace {
    * @param element - the host element the embedder rendered for it.
    */
   mountFileInto: (resource: string, element: HTMLElement) => void;
+  /** Make one mounted file the app's active editor (its region took focus). */
+  focusFile: (resource: string) => void;
   /**
    * Dispose the editing surface created by {@link PartHostFace.mountFileInto},
    * so the same file can be mounted again (elsewhere, or after its host went
