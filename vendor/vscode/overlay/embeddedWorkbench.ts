@@ -22,7 +22,8 @@ import {
   toDisposable,
 } from "../../base/common/lifecycle.js";
 import { Emitter, Event } from "../../base/common/event.js";
-import { Dimension, IDimension } from "../../base/browser/dom.js";
+import { RunOnceScheduler } from "../../base/common/async.js";
+import { Dimension, IDimension, runWhenWindowIdle } from "../../base/browser/dom.js";
 import { mainWindow } from "../../base/browser/window.js";
 import { IInstantiationService } from "../../platform/instantiation/common/instantiation.js";
 import { InstantiationService } from "../../platform/instantiation/common/instantiationService.js";
@@ -405,6 +406,26 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
         this.restored = true;
         this.resolveRestored();
         lifecycleService.phase = LifecyclePhase.Restored;
+
+        // Then `Eventually`, exactly as the shipped workbench does it (upstream
+        // `workbench.ts:454-458`): after a short delay and when the window is idle.
+        // Skipping this phase is not a cosmetic difference — every contribution
+        // registered at `Eventually` never runs without it, and 77 of them are
+        // registered there in this build (the document-symbols outline creator
+        // among them, which is why the Outline used to answer "The active editor
+        // cannot provide outline information" for a file it was showing).
+        const eventuallyPhaseScheduler = this._register(
+          new RunOnceScheduler(() => {
+            this._register(
+              runWhenWindowIdle(
+                mainWindow,
+                () => (lifecycleService.phase = LifecyclePhase.Eventually),
+                2500,
+              ),
+            );
+          }, 2500),
+        );
+        eventuallyPhaseScheduler.schedule();
       });
 
       return instantiationService;
