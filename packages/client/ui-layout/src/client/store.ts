@@ -30,7 +30,7 @@ import { type LayoutState } from "./contract.js";
 import { defaultTree } from "./model.js";
 
 /** The persisted state's key. Bump the version when the shape changes. */
-export const STATE_KEY = "prac-layout/v1";
+export const STATE_KEY = "prac-layout/v2";
 
 // ── store ─────────────────────────────────────────────────────────────
 
