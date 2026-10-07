@@ -170,12 +170,21 @@ export function placeCatalogue(layout: PracLayout, entries: readonly VscodeCatal
       });
     }
     layout.setRegionChildren(region, [...children.values()]);
+    // Views still sitting directly in the region (placed before it became a
+    // selector) move into a child of their own.
     for (const record of layout.listViews()) {
       if (record.region !== region) continue;
       layout.placeQuietly(record.id, childRegionId(region, record.id));
     }
+    // Views the app newly offers go into their container — **filling gaps only**:
+    // a view that already has a record keeps its placement (and its visibility),
+    // so the catalogue can grow without undoing what the person did.
+    const known = layout.getState().views;
     for (const [key, bucket] of byKey) {
-      for (const view of bucket.views) layout.placeQuietly(view, childRegionId(region, key));
+      for (const view of bucket.views) {
+        if (known[view] !== undefined) continue;
+        layout.placeQuietly(view, childRegionId(region, key));
+      }
     }
   }
 }

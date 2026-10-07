@@ -392,7 +392,11 @@ function landingRegion(
   }
   const id = `${regionId}/${viewId}`;
   if (region.children.some((child) => child.id === id)) return { tree, region: id };
-  const children = [...region.children, regionNode(id, 0, { label: viewLabelOf(viewId) })];
+  const children = [
+    ...region.children,
+    // A container's children stack: a view landing beside others shares the strip.
+    regionNode(id, 0, { label: viewLabelOf(viewId), stack: true }),
+  ];
   return { tree: setRegionChildren(tree, regionId, children), region: id };
 }
 

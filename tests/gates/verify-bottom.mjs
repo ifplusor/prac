@@ -3,9 +3,11 @@
  * terminal / output / problems belong, and which costs the default layout
  * nothing while it is empty.
  *
- *  1. **absent while empty** — the default arrangement puts nothing there, and an
- *     empty region is not rendered, so the page's region list is exactly the row
- *     (this is what keeps the bottom bar a capability instead of a redesign);
+ *  1. **absent while empty** — nothing visible there means the region is not
+ *     rendered, so the frame is exactly the row (this is what keeps the bottom
+ *     bar a capability instead of a redesign). The catalogue now **fills** the bar
+ *     with the app's panel containers by default, so the gate empties it first:
+ *     "empty" is a state to reach, not the factory arrangement;
  *  2. **appears when filled** — a view placed there renders at the bar's size,
  *     spans the frame, sits at the bottom, and paints;
  *  3. **the row gives room** — the row above shrinks by the bar's height, and
@@ -23,6 +25,27 @@ const VIEW = "dsh:main:conversation";
 const url = requireUrl();
 const { page, own, consoleErrors, close } = await openPrac(url);
 await page.waitForTimeout(1500);
+
+// Make the bar empty: the arrangement put the app's panel containers there, so
+// wait for that to have happened (the app boots after the frame) and then hide
+// everything it placed — the region and its container children.
+await page.waitForFunction(
+  (bottom) =>
+    globalThis.__pracLayout
+      .listViews()
+      .some((view) => (view.region ?? "").startsWith(`${bottom}/`)),
+  BOTTOM,
+  { timeout: 90_000 },
+);
+await page.evaluate((bottom) => {
+  for (const view of globalThis.__pracLayout.listViews()) {
+    const region = view.region ?? "";
+    if (region === bottom || region.startsWith(`${bottom}/`)) {
+      globalThis.__pracLayout.hide(view.id);
+    }
+  }
+}, BOTTOM);
+await page.waitForTimeout(800);
 
 async function sample() {
   const facts = await page.evaluate(
@@ -82,11 +105,15 @@ const near = (a, b, tolerance) => Math.abs((a ?? 0) - (b ?? 0)) <= tolerance;
 // that real CSS agrees with it — the bar is at the bottom, as wide as the frame,
 // at its size, with pixels — and that collapsing it hands the room back.
 const checks = {
-  // 1. Empty means absent: the default page is exactly the row.
+  // 1. Empty means absent: the frame is exactly the row.
   // No file is open, so the right track holds nothing and is not rendered: the
   // factory arrangement is the sidebar plus the centre (decision 17 retired the
   // editor part, so an empty track no longer has an occupant keeping it alive).
-  absentWhileEmpty: initial.bottom === null && initial.regions.join(",") === "left,stage",
+  // The bar's container children are still in the tree, but nothing in them is
+  // visible, so neither they nor the bar are rendered.
+  absentWhileEmpty:
+    initial.bottom === null &&
+    initial.regions.filter((region) => !region.includes("/")).join(",") === "left,stage",
   // 2. Filled: at the bottom, full width, at the bar's size, with pixels.
   appearsAtTheBottom:
     opened.bottom !== null &&

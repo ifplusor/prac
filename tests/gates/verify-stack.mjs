@@ -5,28 +5,41 @@
  * The point is that prac groups views itself (the workbench's view container is
  * a *higher form*, not the unit):
  *
- *  1. **bare by default** — the default arrangement puts one visible view in
- *     `left`, and that region must render exactly as it did before stacking
- *     existed (no headers, no extra chrome) — otherwise this is a redesign of
- *     the default layout rather than a capability;
+ *  1. **bare by default** — the default arrangement shows one visible view in
+ *     `left`, inside the container child that holds it, and that child must render
+ *     exactly as it did before stacking existed (no headers, no extra chrome) —
+ *     otherwise this is a redesign of the default layout rather than a capability;
  *  2. **stacked when there are two** — a second visible view in the same region
  *     stacks with headers, both bodies have height, and the region still paints;
  *  3. **fold** — folding one view keeps its header, drops its body and hands the
  *     space to the neighbour, both through the layout face and through a real
  *     click on the header.
  *
+ * Since the container layer, `left` **selects among** named children (one per
+ * borrowed container, plus one for prac's own sidebar), so the stack lives in the
+ * child that holds the views — the gate discovers that child rather than assuming
+ * the top-level region holds views directly. It also asserts the container bar
+ * that the layer introduced.
+ *
  * Usage: URL='http://127.0.0.1:3084/?token=...' vp run verify:stack
  */
 import { distinctColours, openPrac, report, requireUrl } from "./harness.mjs";
 
-/** The region that stacks, and the two views it gets (both prac's). */
-const REGION = "left";
+/** The two views the stack gets (both prac's). */
 const BASE_VIEW = "dsh:sidebar";
 const ADDED_VIEW = "dsh:main:conversation";
+/** The top-level region whose active child is the stack's home. */
+const OUTER_REGION = "left";
 
 const url = requireUrl();
 const { page, own, consoleErrors, close } = await openPrac(url);
 await page.waitForTimeout(1500);
+
+/** The region the default arrangement actually shows views in. */
+const REGION = await page.evaluate((outer) => {
+  const child = document.querySelector(`[data-prac-region="${outer}"] [data-prac-region]`);
+  return child?.getAttribute("data-prac-region") ?? outer;
+}, OUTER_REGION);
 
 /** The stack entries of the region, with their boxes and fold state. */
 async function sample() {
@@ -42,6 +55,7 @@ async function sample() {
       };
     };
     const host = document.querySelector(`[data-prac-region="${region}"]`);
+    const bar = document.querySelector('[data-prac-container-bar="left"]');
     return {
       region: box(host),
       entries: [...(host?.querySelectorAll("[data-prac-stack-entry]") ?? [])].map((entry) => ({
@@ -50,6 +64,11 @@ async function sample() {
         entry: box(entry),
         header: box(entry.querySelector("[data-prac-stack-toggle]")),
         body: box(entry.querySelector("[data-prac-stack-body]")),
+      })),
+      containers: [...(bar?.querySelectorAll("[data-prac-container]") ?? [])].map((item) => ({
+        id: item.getAttribute("data-prac-container"),
+        active: item.getAttribute("data-prac-container-active") === "true",
+        label: (item.textContent || "").trim(),
       })),
     };
   }, REGION);
@@ -94,6 +113,12 @@ const bodyHeight = (facts, view) => entryOf(facts, view)?.body?.h ?? 0;
 const checks = {
   // 1. The default layout is untouched: one visible view, no headers.
   defaultIsBare: initial.entries.length === 0,
+  // 1b. The container layer's own chrome is there: named children, one active.
+  containerBarNamed:
+    initial.containers.length > 1 &&
+    initial.containers.filter((item) => item.active).length === 1 &&
+    initial.containers.every((item) => item.label.length > 0) &&
+    initial.containers.some((item) => item.active && item.id === REGION),
   // 2. Two visible views stack, in distinct bands, each with a header and a body.
   stackedRendersBoth:
     stacked.entries.length === 2 &&

@@ -194,7 +194,11 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
     /** Give a region its child regions — the container shape. */
     setRegionChildren(regionId: string, children: readonly RegionChild[], label?: string): void {
       store.update((state) => {
-        const nodes = children.map((child) => regionNode(child.id, 0, { label: child.label }));
+        // A container's children **stack** their views: that is what a container
+        // is for — grouping views that share one strip of screen.
+        const nodes = children.map((child) =>
+          regionNode(child.id, 0, { label: child.label, stack: true }),
+        );
         const tree = setRegionChildren(state.tree, regionId, nodes, label);
         return tree === state.tree ? state : { ...state, tree };
       });
