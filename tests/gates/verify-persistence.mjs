@@ -155,12 +155,6 @@ const reloaded = await sample();
 await close();
 
 const near = (a, b, tolerance) => Math.abs((a ?? 0) - (b ?? 0)) <= tolerance;
-/**
- * The left region's stack as `<view>:<folded>` in render order.
- *
- * @param entry - a sample.
- */
-const stackKey = (entry) => entry.stack.map((item) => `${item.view}:${item.collapsed}`).join(",");
 /** The bar's own size, from the frame's tree. */
 const BAR_HEIGHT = 240;
 
