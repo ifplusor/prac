@@ -57,17 +57,15 @@ prac 的侧栏 view **写死**到一个 VS Code 视图：`packages/client/vscode
 - **容器自带的 chrome 不继承**（activity bar、容器内 tab 套 stack）：它们在借用件的盒子里；prac 只按视图单位摆。
 - **webview 视图**要真上屏还依赖部署给的 HTTPS 通配端点（已定，见 `docs/architecture.md` §7 #5）；枚举与挂载这半不依赖它。
 
-## 还没落地
+## 落地
 
-- 机制把两个上游服务收敛成**同一形状的目录 + `hostFor`**；`ui-vscode-editor` 改成从目录取 `source: "file"` 的条目（不再写死 id）。
-- 新增 `ui-vscode-views`（取 `source: "view"` 的条目），并改 profile 的 link（需提权）。
-- 按 `location` 的默认落位与不上屏名单（在 `web-app`）。
-- 五道 vendor 门的迁移（它们按 `vscode:sidebar` 选宿主）。
-- 验证：cSpell 的 `cSpellIssuesViewByFile` 与一个 `type=webview` 的视图都出现在 prac 的视图目录里、并能上屏。
+- **机制**：两个上游服务收敛成**同一形状的目录 + `hostFor`**；`ui-vscode-editor` 取 `source: "file"` 的条目，`ui-vscode-views` 取 `source: "view"` 的条目，`ui-vscode-explorer` 退役。
+- **组合**（`web-app`）：按 `location` 默认落位（借来的容器落成**选一的具名子区域**），加不上屏名单。
+- **门**：prac 侧新增 `verify:containers`（条上可切换、一次只显示一个容器、容器里每条视图都有 host 且画得出像素）；`verify:stack` / `verify:bottom` / `verify:persistence` / `verify:split` 与 vendor 六门都已按容器模型迁移。
+- **真 rig 读数**：目录 15 条，其中 13 条借来的视图落在 8 个容器里；cSpell 的两个视图与探针的 `type=webview` 视图都在其列。
 
 ## Related
 
 - [2026-09-09-vscode-dsh-integration.md](2026-09-09-vscode-dsh-integration.md)：umbrella（差距 #4 就是这件事）。
 - [2026-10-05-vscode-dsh-layout-boundary.md](2026-10-05-vscode-dsh-layout-boundary.md)：视图模型（一种视图 + 一组属性）、隔离与边界。
 - [../../../docs/architecture.md](../../../docs/architecture.md)：目标设计（§3.1 视图契约、§3.2 IDE 面按视图进来）。
-- [../../worklog/2026-10-06-vscode-view-catalogue.md](../../worklog/2026-10-06-vscode-view-catalogue.md)：依据（可借用的东西的完整清单、上游事实）。

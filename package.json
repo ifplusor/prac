@@ -10,6 +10,7 @@
     "dsh-types": "node scripts/dsh-types.mjs",
     "verify:stack": "node tests/gates/verify-stack.mjs",
     "verify:bottom": "node tests/gates/verify-bottom.mjs",
+    "verify:containers": "node tests/gates/verify-containers.mjs",
     "verify:persistence": "node tests/gates/verify-persistence.mjs",
     "verify:split": "node tests/gates/verify-split.mjs"
   },

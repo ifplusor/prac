@@ -9,9 +9,14 @@
 # 需要一页活着的 DSH（profile prac-dev）；URL 带 token，和其它门一样
 URL='http://127.0.0.1:3084/?token=…' vp run verify:stack        # 堆叠：单视图裸渲染、两个叠放、折叠
 URL='http://127.0.0.1:3084/?token=…' vp run verify:bottom       # 底栏：空则不在、填了上屏、折叠还回空间
+URL='http://127.0.0.1:3084/?token=…' vp run verify:containers   # 容器：条上可切换、一次只显示一个、视图都上屏
 URL='http://127.0.0.1:3084/?token=…' vp run verify:persistence  # 持久化：改尺寸/堆叠/折叠/底栏，reload 后复原
 URL='http://127.0.0.1:3084/?token=…' vp run verify:split        # 分栏：上下左右（可嵌套）、旧面板留视图、竖 sash 可拖、形状持久
 ```
+
+`verify:containers` 守的是「一次只显示一个容器」这条**渲染**事实：模型里 `left` 挂着四个子区域，DOM 里只准有一个。这正是单测证明不了的那半——单测能证明 `placeCatalogue` 造出了对的子区域，证明不了渲染器只画了一个。伪造过一次：把 `renderRegion` 的选择分支改成渲染全部子区域，该门只在 `one container at a time` 上变红、其余仍绿。
+
+`verify:containers` 与 `verify:persistence` 都先从**出厂形状**起（清 key + reload）：门共用一台 rig，前一个门留下的放置/隐藏/选中否则会决定后一个门看到什么。
 
 `verify:persistence` 同时守住排布的一条语义：`arrange()` 的默认放置**只填空缺**，不覆盖已恢复的状态——否则每次 reload 都会把视图拖回出厂位置，「持久化」自我撤销（去掉那条 `continue` 后该门立刻变红，是它真的在断言这件事）。
 
