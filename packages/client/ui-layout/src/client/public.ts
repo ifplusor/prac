@@ -19,6 +19,7 @@ export type {
   LayoutState,
   LayoutFace,
   PracLayoutFace,
+  RegionChild,
   RegionNode,
   RoleBindings,
   Side,

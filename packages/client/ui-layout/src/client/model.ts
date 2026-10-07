@@ -46,6 +46,35 @@ export function regionNode(id: string, size: number, extra: Partial<RegionNode> 
 }
 
 /**
+ * A node's children, whichever kind it is.
+ *
+ * A split lays out its children; a region's children are the sub-regions it
+ * **selects** among (empty when it holds views directly).
+ *
+ * @param node - the node.
+ */
+function childNodes(node: LayoutNode): readonly LayoutNode[] {
+  return node.type === "split" ? node.children : (node.children ?? []);
+}
+
+/**
+ * The child region a selector region shows.
+ *
+ * The recorded choice wins while it is still present; otherwise the first
+ * present child. `null` means the region has no children — it holds views.
+ *
+ * @param state - current state.
+ * @param node - the region to look into.
+ */
+export function activeChild(state: LayoutState, node: RegionNode): RegionNode | null {
+  const children = node.children;
+  if (children === undefined || children.length === 0) return null;
+  const chosen = children.find((child) => child.id === node.active);
+  if (chosen !== undefined && isPresent(state, chosen)) return chosen;
+  return children.find((child) => isPresent(state, child)) ?? null;
+}
+
+/**
  * The default region tree: the frame's topology, expressed as a tree.
  *
  * A row of three regions — `left` (280), `console` (flexible), `right` (420).
@@ -88,8 +117,8 @@ export function defaultTree(): SplitNode {
  * @returns the region node, or null.
  */
 export function findRegion(node: LayoutNode, id: string): RegionNode | null {
-  if (node.type === "region") return node.id === id ? node : null;
-  for (const child of node.children) {
+  if (node.type === "region" && node.id === id) return node;
+  for (const child of childNodes(node)) {
     const found = findRegion(child, id);
     if (found) return found;
   }
@@ -121,7 +150,9 @@ export function findSplit(node: LayoutNode, id: string): SplitNode | null {
  * @returns the first region id.
  */
 export function firstRegionId(node: LayoutNode): string {
-  return node.type === "region" ? node.id : firstRegionId(node.children[0]);
+  const children = childNodes(node);
+  if (node.type === "region" && children.length === 0) return node.id;
+  return firstRegionId(children[0]);
 }
 
 /**
@@ -131,8 +162,11 @@ export function firstRegionId(node: LayoutNode): string {
  * @returns one entry per region, in tree order.
  */
 export function regionInfos(node: LayoutNode): RegionInfo[] {
-  if (node.type === "region") return [{ id: node.id, collapsed: node.collapsed }];
-  return node.children.flatMap((child) => regionInfos(child));
+  if (node.type === "split") return node.children.flatMap((child) => regionInfos(child));
+  return [
+    { id: node.id, collapsed: node.collapsed },
+    ...(node.children ?? []).flatMap((child) => regionInfos(child)),
+  ];
 }
 
 /**
@@ -148,14 +182,17 @@ export function replaceNode(
   replacer: (node: LayoutNode) => LayoutNode,
 ): LayoutNode {
   if (node.id === id) return replacer(node);
-  if (node.type !== "split") return node;
+  if (node.type === "region" && node.children === undefined) return node;
   let changed = false;
-  const children = node.children.map((child) => {
+  const children = childNodes(node).map((child) => {
     const next = replaceNode(child, id, replacer);
     if (next !== child) changed = true;
     return next;
   });
-  return changed ? { ...node, children } : node;
+  if (!changed) return node;
+  return node.type === "split"
+    ? { ...node, children }
+    : { ...node, children: children as readonly RegionNode[] };
 }
 
 /**
@@ -182,6 +219,76 @@ export function updateRegion(
  */
 export function setRegionSize(tree: LayoutNode, id: string, size: number): LayoutNode {
   return updateRegion(tree, id, (node) => ({ ...node, size: Math.max(0, Math.round(size)) }));
+}
+
+/**
+ * Give a region its sub-regions, and optionally a name.
+ *
+ * This is how the arrangement builds a **container**: a child region, named from
+ * the source catalogue, with the container's views placed into it. Idempotent —
+ * rebuilding after a catalogue change replaces the children wholesale, which is
+ * what "the catalogue is the truth" means here.
+ *
+ * @param tree - the tree to update.
+ * @param id - the selector region.
+ * @param children - the child regions, in bar order.
+ * @param label - an optional display name for the selector itself.
+ */
+export function setRegionChildren(
+  tree: LayoutNode,
+  id: string,
+  children: readonly RegionNode[],
+  label?: string,
+): LayoutNode {
+  return updateRegion(tree, id, (node) => ({
+    ...node,
+    children,
+    ...(label === undefined ? {} : { label }),
+  }));
+}
+
+/**
+ * Bring one child of a selector region to the front.
+ *
+ * @param tree - the tree to update.
+ * @param regionId - the selector region.
+ * @param childId - the child to show.
+ */
+export function selectChild(tree: LayoutNode, regionId: string, childId: string): LayoutNode {
+  return updateRegion(tree, regionId, (node) =>
+    node.children?.some((child) => child.id === childId) === true
+      ? { ...node, active: childId }
+      : node,
+  );
+}
+
+/**
+ * Select, in every selector region on the path, the child leading to `id`.
+ *
+ * Placing a view into a container has to make that container visible, or the view
+ * would be placed but shown by nobody: the ancestors are what decide.
+ *
+ * @param tree - the tree to update.
+ * @param id - the region to reveal.
+ */
+export function revealRegion(tree: LayoutNode, id: string): LayoutNode {
+  const walk = (node: LayoutNode): LayoutNode => {
+    if (node.type === "split") {
+      const children = node.children.map(walk);
+      return children.some((child, index) => child !== node.children[index])
+        ? { ...node, children }
+        : node;
+    }
+    const children = node.children;
+    if (children === undefined || children.length === 0) return node;
+    // A region's children are regions, so the walk stays in the region type.
+    const next = children.map((child) => walk(child) as RegionNode);
+    const target = next.find((child) => findRegion(child, id) !== null);
+    const changed = next.some((child, index) => child !== children[index]);
+    if (target === undefined) return changed ? { ...node, children: next } : node;
+    return { ...node, children: next, active: target.id };
+  };
+  return walk(tree);
 }
 
 /**
@@ -222,12 +329,71 @@ export function ensureView(state: LayoutState, viewId: string): ViewRecord {
  * @param regionId - the destination region.
  */
 export function place(state: LayoutState, viewId: string, regionId: string): LayoutState {
+  const next = placeQuietly(state, viewId, regionId);
+  // Placing into a container shows that container: the selector ancestors are
+  // what decide which child is on screen.
+  const tree = revealRegion(next.tree, regionId);
+  return tree === next.tree ? next : { ...next, tree };
+}
+
+/**
+ * Place a view **without** changing which child its region shows.
+ *
+ * The arrangement's bulk sync uses this: the source catalogue is the truth about
+ * what exists, but the person's choice of container is theirs — a view appearing
+ * somewhere must not yank the selection.
+ *
+ * @param state - current state.
+ * @param viewId - the view identity.
+ * @param regionId - the destination region.
+ */
+export function placeQuietly(state: LayoutState, viewId: string, regionId: string): LayoutState {
   const view = ensureView(state, viewId);
   const front = Math.min(0, ...Object.values(state.views).map((entry) => entry.order)) - 1;
+  // A region that selects among children shows none of its own views, so a
+  // direct placement into it lands in a child of its own — "a container with
+  // one view", the shape the design gives a view that stands alone.
+  const landing = landingRegion(state.tree, regionId, viewId);
   return {
     ...state,
-    views: { ...state.views, [viewId]: { ...view, region: regionId, hidden: false, order: front } },
+    tree: landing.tree,
+    views: {
+      ...state.views,
+      [viewId]: { ...view, region: landing.region, hidden: false, order: front },
+    },
   };
+}
+
+/** A view id's tail, as a child region's name when nothing better is known. */
+function viewLabelOf(viewId: string): string {
+  return (viewId.split(":").pop() ?? viewId).replace(/[-_]/g, " ");
+}
+
+/**
+ * Where a view placed "into" a region actually lands.
+ *
+ * A plain region shows its own views, so it takes the view as-is. A region that
+ * selects among children shows only one child, so the view gets a child of its
+ * own (created on demand) and that child is selected — otherwise the view would
+ * be placed but shown by nobody.
+ *
+ * @param tree - the tree to update.
+ * @param regionId - the region the caller named.
+ * @param viewId - the view being placed.
+ */
+function landingRegion(
+  tree: LayoutNode,
+  regionId: string,
+  viewId: string,
+): { tree: LayoutNode; region: string } {
+  const region = findRegion(tree, regionId);
+  if (region?.children === undefined || region.children.length === 0) {
+    return { tree, region: regionId };
+  }
+  const id = `${regionId}/${viewId}`;
+  if (region.children.some((child) => child.id === id)) return { tree, region: id };
+  const children = [...region.children, regionNode(id, 0, { label: viewLabelOf(viewId) })];
+  return { tree: setRegionChildren(tree, regionId, children), region: id };
 }
 
 /**
@@ -273,6 +439,10 @@ export function visibleViews(state: LayoutState, regionId: string): string[] {
 export function isPresent(state: LayoutState, node: LayoutNode): boolean {
   if (node.type === "split") return node.children.some((child) => isPresent(state, child));
   if (node.collapsed) return true;
+  const children = node.children;
+  if (children !== undefined && children.length > 0) {
+    return node.flex || children.some((child) => isPresent(state, child));
+  }
   return node.flex || visibleViews(state, node.id).length > 0;
 }
 
@@ -369,8 +539,14 @@ export function sashSizes(
  * @param node - the subtree to measure.
  */
 export function subtreeMin(node: LayoutNode): number {
-  if (node.type === "region") return node.min;
-  return node.children.reduce((total, child) => total + subtreeMin(child), 0);
+  if (node.type === "split")
+    return node.children.reduce((total, child) => total + subtreeMin(child), 0);
+  const children = node.children;
+  if (children !== undefined && children.length > 0) {
+    // One child is shown at a time, so the selector needs the widest child's room.
+    return Math.max(node.min, ...children.map((child) => subtreeMin(child)));
+  }
+  return node.min;
 }
 
 /**
@@ -408,6 +584,9 @@ export function resolveSizes(state: LayoutState, width: number, height: number):
   const visit = (node: LayoutNode, w: number, h: number): void => {
     if (node.type === "region") {
       out.set(node.id, { width: w, height: h });
+      // A selector region hands its whole box to the child it shows.
+      const child = activeChild(state, node);
+      if (child !== null) visit(child, w, h);
       return;
     }
     const present = node.children.filter((child) => isPresent(state, child));

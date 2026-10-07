@@ -65,8 +65,10 @@ const stateWith = (views: LayoutState["views"] = {}): LayoutState => ({
 function recordingFace(views: LayoutState["views"] = {}): {
   face: PracLayoutFace;
   calls: Call[];
+  children: Map<string, { id: string; label?: string }[]>;
 } {
   const calls: Call[] = [];
+  const children = new Map<string, { id: string; label?: string }[]>();
   const record =
     (method: string) =>
     (...args: readonly unknown[]): void => {
@@ -78,6 +80,15 @@ function recordingFace(views: LayoutState["views"] = {}): {
     listViews: () => [],
     listRegions: () => [],
     place: record("place"),
+    placeQuietly: record("placeQuietly"),
+    setRegionChildren: (
+      regionId: string,
+      list: readonly { id: string; label?: string }[],
+    ): void => {
+      calls.push({ method: "setRegionChildren", args: [regionId, list] });
+      children.set(regionId, [...list]);
+    },
+    regionChildren: (regionId: string) => children.get(regionId) ?? [],
     show: record("show"),
     hide: record("hide"),
     setViewCollapsed: record("setViewCollapsed"),
@@ -89,7 +100,7 @@ function recordingFace(views: LayoutState["views"] = {}): {
     setViewFlags: record("setViewFlags"),
     activeView: () => null,
   } satisfies PracLayoutFace;
-  return { face, calls };
+  return { face, calls, children };
 }
 
 /** The `[method, ...args]` shapes a recording produced. */
@@ -255,33 +266,78 @@ describe("arrange", () => {
 });
 
 describe("placeCatalogue", () => {
-  /** A catalogue entry, defaulted to one sidebar view. */
+  /** A catalogue entry, defaulted to one view of the Explorer container. */
   const entry = (over: Partial<VscodeCatalogueEntry>): VscodeCatalogueEntry => ({
-    view: "vscode:view:workbench.view.search",
-    appId: "workbench.view.search",
-    title: "Search",
+    view: "vscode:view:workbench.explorer.fileView",
+    appId: "workbench.explorer.fileView",
+    title: "Folders",
     source: "view",
     location: "sidebar",
+    containerId: "workbench.view.explorer",
+    containerTitle: "Explorer",
     ...over,
   });
 
-  it("places a view the app reports into the region its location names", () => {
+  it("gives the region one named child per container", () => {
     const { face, calls } = recordingFace();
-    placeCatalogue(face, [entry({})]);
-    expect(shapes(calls)).toEqual([["place", "vscode:view:workbench.view.search", LEFT]]);
+    placeCatalogue(face, [
+      entry({}),
+      entry({ view: "vscode:view:outline", appId: "outline", title: "Outline" }),
+      entry({
+        view: "vscode:view:workbench.view.search",
+        appId: "workbench.view.search",
+        title: "Search",
+        containerId: "workbench.view.search",
+        containerTitle: "Search",
+      }),
+    ]);
+    expect(shapes(calls)[0]).toEqual([
+      "setRegionChildren",
+      LEFT,
+      [
+        { id: "left/container:workbench.view.explorer", label: "Explorer" },
+        { id: "left/container:workbench.view.search", label: "Search" },
+      ],
+    ]);
+    expect(shapes(calls).slice(1)).toEqual([
+      [
+        "placeQuietly",
+        "vscode:view:workbench.explorer.fileView",
+        "left/container:workbench.view.explorer",
+      ],
+      ["placeQuietly", "vscode:view:outline", "left/container:workbench.view.explorer"],
+      ["placeQuietly", "vscode:view:workbench.view.search", "left/container:workbench.view.search"],
+    ]);
   });
 
   it("maps each app location to its region", () => {
     const { face, calls } = recordingFace();
     placeCatalogue(face, [
-      entry({ view: "vscode:view:a", appId: "a", location: "sidebar" }),
-      entry({ view: "vscode:view:b", appId: "b", location: "panel" }),
-      entry({ view: "vscode:view:c", appId: "c", location: "auxiliarybar" }),
+      entry({ view: "vscode:view:a", appId: "a", location: "sidebar", containerId: "c.a" }),
+      entry({ view: "vscode:view:b", appId: "b", location: "panel", containerId: "c.b" }),
+      entry({ view: "vscode:view:c", appId: "c", location: "auxiliarybar", containerId: "c.c" }),
+    ]);
+    expect(shapes(calls).filter(([method]) => method === "setRegionChildren")).toEqual([
+      ["setRegionChildren", LEFT, [{ id: "left/container:c.a", label: "Explorer" }]],
+      ["setRegionChildren", BOTTOM, [{ id: "bottom/container:c.b", label: "Explorer" }]],
+      ["setRegionChildren", RIGHT, [{ id: "right/container:c.c", label: "Explorer" }]],
+    ]);
+  });
+
+  it("gives a view with no container a child of its own", () => {
+    const { face, calls } = recordingFace();
+    placeCatalogue(face, [
+      entry({
+        view: "vscode:view:loose",
+        appId: "loose",
+        title: "Loose",
+        containerId: undefined,
+        containerTitle: undefined,
+      }),
     ]);
     expect(shapes(calls)).toEqual([
-      ["place", "vscode:view:a", LEFT],
-      ["place", "vscode:view:b", BOTTOM],
-      ["place", "vscode:view:c", RIGHT],
+      ["setRegionChildren", LEFT, [{ id: "left/vscode:view:loose", label: "Loose" }]],
+      ["placeQuietly", "vscode:view:loose", "left/vscode:view:loose"],
     ]);
   });
 
@@ -306,11 +362,18 @@ describe("placeCatalogue", () => {
     expect(shapes(calls)).toEqual([]);
   });
 
-  it("fills gaps only: a view that already has a record keeps its placement", () => {
-    const { face, calls } = recordingFace({
-      "vscode:view:workbench.view.search": { region: RIGHT, order: 0, hidden: false },
-    });
+  it("keeps a child this function does not own, ahead of the containers", () => {
+    const { face, calls } = recordingFace();
+    face.setRegionChildren(LEFT, [{ id: "left/dsh:sidebar", label: "sidebar" }]);
+    calls.length = 0;
     placeCatalogue(face, [entry({})]);
-    expect(shapes(calls)).toEqual([]);
+    expect(shapes(calls)[0]).toEqual([
+      "setRegionChildren",
+      LEFT,
+      [
+        { id: "left/dsh:sidebar", label: "sidebar" },
+        { id: "left/container:workbench.view.explorer", label: "Explorer" },
+      ],
+    ]);
   });
 });

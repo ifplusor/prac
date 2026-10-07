@@ -30,6 +30,7 @@ import {
   type LayoutFace,
   type LayoutState,
   type PracLayoutFace,
+  type RegionChild,
   type RoleBindings,
   type Side,
   type ViewFlags,
@@ -42,8 +43,11 @@ import {
   firstRegionId,
   frontView,
   place,
+  placeQuietly,
   regionInfos,
+  regionNode,
   setCollapsed,
+  setRegionChildren,
   setRegionSize,
   splitRegionWith,
 } from "./model.js";
@@ -182,6 +186,23 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
     /** Move a view into a region and show it. */
     place(viewId: string, regionId: string): void {
       store.update((state) => place(state, viewId, regionId));
+    },
+    /** Move a view into a region without changing which child that region shows. */
+    placeQuietly(viewId: string, regionId: string): void {
+      store.update((state) => placeQuietly(state, viewId, regionId));
+    },
+    /** Give a region its child regions — the container shape. */
+    setRegionChildren(regionId: string, children: readonly RegionChild[], label?: string): void {
+      store.update((state) => {
+        const nodes = children.map((child) => regionNode(child.id, 0, { label: child.label }));
+        const tree = setRegionChildren(state.tree, regionId, nodes, label);
+        return tree === state.tree ? state : { ...state, tree };
+      });
+    },
+    /** The child regions a region selects among. */
+    regionChildren(regionId: string): RegionChild[] {
+      const node = findRegion(store.get().tree, regionId);
+      return (node?.children ?? []).map((child) => ({ id: child.id, label: child.label }));
     },
     /** Show/hide a view without moving it. */
     show(viewId: string): void {

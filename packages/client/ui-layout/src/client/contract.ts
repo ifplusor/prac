@@ -84,10 +84,48 @@ export interface RegionNode {
    * the fold headers, whose per-view fold is a stack idea.
    */
   readonly tabs?: TabMode;
+  /**
+   * Child regions, when this region **selects** among them instead of holding
+   * views directly.
+   *
+   * A region's children may be views or regions; this is the region case. The
+   * children are shown **one at a time** (the "选择" mode) — which is what a
+   * borrowed **container** is: a named child region, selected among its sibling
+   * containers. A region with no children holds views, as before.
+   */
+  readonly children?: readonly RegionNode[];
+  /**
+   * Which child is shown, by id.
+   *
+   * Absent means "the first present child", so a fresh tree needs no selection
+   * of its own. Set by whatever brings a child forward (the container bar, or
+   * the arrangement placing a view into that child).
+   */
+  readonly active?: string;
+  /**
+   * A display name, when the region has one.
+   *
+   * The borrowed container's title lands here: the region is the container, and
+   * the name is what its entry in the container bar reads.
+   */
+  readonly label?: string;
 }
 
 /** How many visible views a region needs before it shows a tab strip. */
 export type TabMode = "multiple" | "single" | "none";
+
+/**
+ * A child region a caller asks for: an id and a display name.
+ *
+ * Deliberately smaller than {@link RegionNode}: the arrangement names its
+ * containers, the mechanism builds the nodes.
+ */
+export interface RegionChild {
+  /** The child region's id. */
+  readonly id: string;
+  /** The name its entry in the container bar reads. */
+  readonly label?: string;
+}
 
 /** A flex container of children along one axis. */
 export interface SplitNode {
@@ -274,6 +312,40 @@ export interface PracLayoutFace {
    * @param regionId - the destination region.
    */
   place(viewId: string, regionId: string): void;
+  /**
+   * Put a view in a region **without** changing which child its region shows.
+   *
+   * The bulk path: the source catalogue is the truth about what exists, but the
+   * person's choice of container is theirs.
+   *
+   * @param viewId - the view identity.
+   * @param regionId - the destination region.
+   */
+  placeQuietly(viewId: string, regionId: string): void;
+  /**
+   * Give a region its child regions — the **container** shape.
+   *
+   * A region whose children are regions shows one of them at a time (see
+   * {@link RegionNode.children}); the children carry the container names. The
+   * selector's own recorded choice is kept while it still names a child.
+   *
+   * The child's node itself is the mechanism's business, so callers name ids and
+   * labels and the shape is built here.
+   *
+   * @param regionId - the selector region.
+   * @param children - the child regions, in bar order.
+   * @param label - an optional display name for the selector itself.
+   */
+  setRegionChildren(regionId: string, children: readonly RegionChild[], label?: string): void;
+  /**
+   * The child regions a region currently selects among.
+   *
+   * Empty for a region that holds views; the arrangement uses this to keep the
+   * children it does not own (prac's own views) when it rebuilds the containers.
+   *
+   * @param regionId - the region to inspect.
+   */
+  regionChildren(regionId: string): RegionChild[];
   /**
    * Show a view without moving it.
    *

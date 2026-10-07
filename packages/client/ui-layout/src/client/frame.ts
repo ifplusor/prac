@@ -39,6 +39,7 @@ import {
 } from "./contract.js";
 import { mountIsolated, releaseIsolated } from "./isolation.js";
 import {
+  activeChild,
   edgeRegion,
   findRegion,
   findSplit,
@@ -46,6 +47,7 @@ import {
   isStacked,
   resolveSizes,
   sashSizes,
+  selectChild,
   setRegionSize,
   showsTabStrip,
   subtreeMin,
@@ -623,16 +625,65 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
       );
 
     /**
-     * A region renders its front-most visible view — or, when it is a **stack**
-     * and holds more than one, every visible view with a header of its own. A
-     * stack of one renders bare, so a single-view region looks and measures
-     * exactly as it did before stacking existed.
+     * The **container bar**: one entry per child of a selector region.
+     *
+     * It is the switcher an activity bar would otherwise be. prac does not
+     * inherit that chrome, so the container names live at the top of the region
+     * they select — the same "one of N" idea as a tab strip, one level up.
+     *
+     * @param node - the selector region.
+     * @param activeId - the child currently shown.
+     */
+    const containerBar = (node: RegionNode, activeId: string): ReactElement =>
+      createElement(
+        "div",
+        { key: "containers", "data-prac-container-bar": node.id, style: TAB_STRIP_STYLE },
+        (node.children ?? []).map((child) =>
+          createElement(
+            "button",
+            {
+              key: child.id,
+              type: "button",
+              "data-prac-container": child.id,
+              "data-prac-container-active": child.id === activeId ? "true" : "false",
+              onClick: () =>
+                store.update((current) => {
+                  const tree = selectChild(current.tree, node.id, child.id);
+                  return tree === current.tree ? current : { ...current, tree };
+                }),
+              style: { ...TAB_STYLE, ...(child.id === activeId ? TAB_ACTIVE_STYLE : {}) },
+            },
+            child.label ?? viewLabel(child.id),
+          ),
+        ),
+      );
+
+    /**
+     * A region renders the child it selects, or — when it holds views — its
+     * front-most visible view: a **stack** shows every visible view with a header
+     * of its own, and a stack of one renders bare, so a single-view region looks
+     * and measures exactly as it did before stacking existed.
      *
      * @param node - the region to render.
      * @param dir - the parent split's axis.
      */
     const renderRegion = (node: RegionNode, dir: Dir): ReactElement => {
       const box = sizes.get(node.id) ?? ZERO_BOX;
+      const child = activeChild(state, node);
+      if (child !== null) {
+        return createElement(
+          "div",
+          {
+            key: node.id,
+            "data-prac-region": node.id,
+            style: regionStyle(node, dir),
+          },
+          [
+            (node.children?.length ?? 0) > 1 ? containerBar(node, child.id) : null,
+            renderRegion(child, dir),
+          ],
+        );
+      }
       const views = visibleViews(state, node.id);
       const stacked = isStacked(state, node);
       return createElement(

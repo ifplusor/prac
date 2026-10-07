@@ -101,23 +101,82 @@ const EXCLUDED_VIEWS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Place the app's views by their own location, filling gaps only.
+ * The key a catalogue entry's container child is named after.
  *
- * Called whenever the catalogue changes, so a view that enters (an extension
- * activating, a `when` starting to hold) gets its default region when it has no
- * placement yet. One that already has a record is left alone, so a persisted
- * arrangement is never dragged back — the same "fill gaps" rule as {@link arrange}.
+ * A borrowed view belongs to a container; a view that stands outside one gets a
+ * child of its own — the shape VS Code reaches by generating a container.
+ */
+const entryKey = (entry: VscodeCatalogueEntry): string =>
+  entry.containerId === undefined ? entry.view : `container:${entry.containerId}`;
+
+/** The region id of one container child. */
+const childRegionId = (region: string, key: string): string => `${region}/${key}`;
+
+/** The region id prefix that marks the children this function owns. */
+const containerChildPrefix = (region: string): string => `${region}/container:`;
+
+/** A view id's tail, as a child region's name. */
+const viewLabel = (viewId: string): string =>
+  (viewId.split(":").pop() ?? viewId).replace(/[-_]/g, " ");
+
+/**
+ * Place the app's views into **named container children**, by their own location.
+ *
+ * This is where a borrowed *container* becomes a prac shape: the region stops
+ * holding views directly and instead **selects among** one child per container
+ * (see `RegionChild`), so a location shows one container at a time the way an
+ * activity bar would — without inheriting its chrome. prac's own views in the
+ * same region get a child each and stay first in the bar, so the default screen
+ * is unchanged and the borrowed containers are additions.
+ *
+ * Rebuilt whenever the catalogue changes: the catalogue is the truth about which
+ * containers exist. A view's **placement** is not disturbed beyond landing in its
+ * container, and the selector keeps whatever the person last chose.
  *
  * @param layout - the mechanism's placement face.
  * @param entries - the app's catalogue.
  */
 export function placeCatalogue(layout: PracLayout, entries: readonly VscodeCatalogueEntry[]): void {
-  const known = layout.getState().views;
+  const groups = new Map<string, Map<string, { label: string; views: string[] }>>();
   for (const entry of entries) {
     if (entry.source !== "view") continue;
     if (EXCLUDED_VIEWS.has(entry.appId)) continue;
-    if (known[entry.view] !== undefined) continue;
-    layout.place(entry.view, LOCATION_REGION[entry.location]);
+    const region = LOCATION_REGION[entry.location];
+    const byKey = groups.get(region) ?? new Map<string, { label: string; views: string[] }>();
+    const key = entryKey(entry);
+    const bucket = byKey.get(key) ?? { label: entry.containerTitle ?? entry.title, views: [] };
+    bucket.views.push(entry.view);
+    byKey.set(key, bucket);
+    groups.set(region, byKey);
+  }
+  for (const [region, byKey] of groups) {
+    const children = new Map<string, { id: string; label?: string }>();
+    for (const child of layout.regionChildren(region)) {
+      if (!child.id.startsWith(containerChildPrefix(region))) children.set(child.id, child);
+    }
+    // Views still sitting directly in the region (placed before it became a
+    // selector) move into a child of their own, ahead of the containers.
+    for (const record of layout.listViews()) {
+      if (record.region !== region) continue;
+      children.set(childRegionId(region, record.id), {
+        id: childRegionId(region, record.id),
+        label: viewLabel(record.id),
+      });
+    }
+    for (const [key, bucket] of byKey) {
+      children.set(childRegionId(region, key), {
+        id: childRegionId(region, key),
+        label: bucket.label,
+      });
+    }
+    layout.setRegionChildren(region, [...children.values()]);
+    for (const record of layout.listViews()) {
+      if (record.region !== region) continue;
+      layout.placeQuietly(record.id, childRegionId(region, record.id));
+    }
+    for (const [key, bucket] of byKey) {
+      for (const view of bucket.views) layout.placeQuietly(view, childRegionId(region, key));
+    }
   }
 }
 

@@ -5,10 +5,12 @@ import {
   BOTTOM_REGION,
   DEFAULT_MIN,
   SASH_SIZE,
+  type LayoutNode,
   type LayoutState,
   type RegionNode,
 } from "./contract.js";
 import {
+  activeChild,
   defaultTree,
   findRegion,
   findSplit,
@@ -21,6 +23,8 @@ import {
   regionNode,
   resolveSizes,
   sashSizes,
+  selectChild,
+  setRegionChildren,
   showsTabStrip,
   setCollapsed,
   setRegionSize,
@@ -39,7 +43,10 @@ import {
  * had a lower bound": 23 gate assertions passed and the layout was still
  * broken), so the extremes belong in tests that run in milliseconds.
  */
-const state = (tree = defaultTree(), views: LayoutState["views"] = {}): LayoutState => ({
+const state = (
+  tree: LayoutNode = defaultTree(),
+  views: LayoutState["views"] = {},
+): LayoutState => ({
   viewportWidth: 1000,
   viewportHeight: 800,
   tree,
@@ -369,5 +376,83 @@ describe("sideGeometry / splitRegionWith", () => {
   it("is a no-op, by identity, for a region that is not there", () => {
     const current = state();
     expect(splitRegionWith(current, "nope", "right", "split-1", "region-1")).toBe(current);
+  });
+});
+
+describe("nested regions (containers)", () => {
+  /** `left` as a selector over two named container children. */
+  const withContainers = () =>
+    setRegionChildren(defaultTree(), "left", [
+      regionNode("left.explorer", 0, { label: "Explorer" }),
+      regionNode("left.search", 0, { label: "Search" }),
+    ]);
+
+  /** One visible view in each container, so both are present. */
+  const bothFilled: LayoutState["views"] = {
+    a: { region: "left.explorer", order: 0, hidden: false },
+    b: { region: "left.search", order: 0, hidden: false },
+  };
+
+  it("lists nested regions in tree order, children after their parent", () => {
+    expect(regionInfos(withContainers()).map((region) => region.id)).toEqual([
+      "left",
+      "left.explorer",
+      "left.search",
+      CENTER_REGION,
+      "right",
+      BOTTOM_REGION,
+    ]);
+  });
+
+  it("finds a nested region by id", () => {
+    expect(findRegion(withContainers(), "left.search")?.label).toBe("Search");
+  });
+
+  it("shows the first present child when nothing is recorded", () => {
+    const tree = withContainers();
+    const only = state(tree, { b: bothFilled.b });
+    expect(activeChild(only, findRegion(tree, "left")!)?.id).toBe("left.search");
+  });
+
+  it("honours the recorded choice while that child is present", () => {
+    const tree = selectChild(withContainers(), "left", "left.explorer");
+    const both = state(tree, bothFilled);
+    expect(activeChild(both, findRegion(tree, "left")!)?.id).toBe("left.explorer");
+  });
+
+  it("falls back when the recorded choice is no longer present", () => {
+    const tree = selectChild(withContainers(), "left", "left.explorer");
+    const only = state(tree, { b: bothFilled.b });
+    expect(activeChild(only, findRegion(tree, "left")!)?.id).toBe("left.search");
+  });
+
+  it("has no active child when it holds views instead", () => {
+    const plain = state();
+    expect(activeChild(plain, findRegion(plain.tree, "left")!)).toBeNull();
+  });
+
+  it("hands the selector's box to the child it shows", () => {
+    const tree = selectChild(withContainers(), "left", "left.search");
+    const sizes = resolveSizes(state(tree, bothFilled), 1000, 800);
+    expect(sizes.get("left")).toEqual(sizes.get("left.search"));
+  });
+
+  it("needs the widest child's room, since only one is shown", () => {
+    const tree = setRegionChildren(defaultTree(), "left", [
+      regionNode("left.a", 0, { min: 120 }),
+      regionNode("left.b", 0, { min: 340 }),
+    ]);
+    expect(subtreeMin(findRegion(tree, "left")!)).toBe(340);
+  });
+
+  it("shows the container a view is placed into", () => {
+    const next = place(state(withContainers()), "v", "left.search");
+    expect(findRegion(next.tree, "left")?.active).toBe("left.search");
+  });
+
+  it("keeps a view placed in a nested container reachable by its own region", () => {
+    const next = place(state(withContainers()), "v", "left.search");
+    expect(visibleViews(next, "left.search")).toEqual(["v"]);
+    expect(visibleViews(next, "left")).toEqual([]);
   });
 });
