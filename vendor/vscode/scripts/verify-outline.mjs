@@ -80,7 +80,9 @@ const folder = await page.evaluate(
 if (!folder) throw new Error("the workbench has no workspace folder");
 
 /** The Explorer container, where the arrangement puts the Outline by default. */
-await page.click('[data-prac-container-bar="left"] [data-prac-container*="workbench.view.explorer"]');
+await page.click(
+  '[data-prac-container-bar="left"] [data-prac-container*="workbench.view.explorer"]',
+);
 await page.waitForTimeout(2500);
 
 /**
