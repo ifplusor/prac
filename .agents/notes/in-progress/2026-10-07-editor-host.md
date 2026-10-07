@@ -15,27 +15,31 @@ status: in-progress
 
 ## Proposal
 
-**在 prac 里做"工作台的编辑器面板"的等价物，并把它接到编辑器服务**；**不留离屏部件**（James 2026-10-07：「它会成为沉重的债务」）。四件事：
+**在 prac 里做"编辑器面板 / 编辑器组"的等价物，并把它接到编辑器服务**；**不留离屏部件**（James 2026-10-07：「它会成为沉重的债务」），也**不用上游的 `EditorPart` 或 `EditorGroupView`**（James 2026-10-07：部件无法与 DSH 的视图结合；组是个只装编辑器的封闭世界，装不下 prac 视图）。要点：
 
-1. **prac 当编辑器宿主**。复用上游的 `EditorGroupView`（面板、组、真生命周期都是上游那份），prac 只实现宿主三接口的**最小集**：
-   - `IEditorGroupsService`（15 个成员，多是辅助窗口 / 工作集 / 模态部件的簿记）；
-   - `IEditorPart`（8 个成员 + 继承 `IEditorGroupsView` 的 18 个）；
-   - `IEditorPartsView`（10 个成员，同样是辅助部件的簿记）。
-   其中需要**真行为**的十余个：组注册与查表、`activeGroup` 与激活事件、`addGroup`/`removeGroup`、`partOptions` 与变更事件、`onDidVisibilityChange`、layout 相关事件。其余（辅助窗口、工作集、组级网格动作）给最小实现，并在启动日志与门里**显式列出未支持**——不静默退化。
-2. **一个文件视图 = 一个编辑器组**。组的 DOM 就长在 prac 的文件视图宿主里（像今天搬 part/view 那样搬组元素）；**可见性与几何归 prac 的 frame**（这正是 prac 的模型），组不再因为"不是活动编辑器"而被隐藏。
-3. **面板类是 prac 自己的、但体验是上游的**：继承上游文本编辑器面板（`TextFileEditor` / `AbstractTextCodeEditor`），注册进 `IEditorPaneRegistry`（prac 自己的 editor id），由 `IEditorResolverService.registerEditor(工作区文件 glob, { id })` 解析到它。打开 / 关闭 / 脏 / 保存 / 视图状态仍全部走服务。
-4. **目录不变**：`listOpenFiles()` 读的仍是编辑器服务的打开集合，编排照旧按文件落位。
+1. **组是 prac 自己的对象，家在 prac 的区域里**。容器是区域的宿主，所以**同一个区域既能放 prac 视图（DSH 的、侧栏/面板的）也能放编辑器面板**——这正是不用上游组的原因，也是这条路成立的关键。
+2. **上游那半照借**（省掉重写）：
+   - `EditorGroupModel` —— 谁开着、顺序、活动、preview / pinned / sticky 的语义；
+   - `EditorPanes` —— 面板的创建 / 生命周期 / DOM 搬运（实测它只向组要 `windowId` 与 `openEditor`，所以能装在**我们自己的**组对象上）；
+   - 面板类 —— `TextFileEditor` / `AbstractTextCodeEditor` 那套编辑体验（注册成 prac 自己的 editor id，由 `IEditorResolverService` 按工作区文件 glob 解析到它）。
+3. **我们要写的**：`IEditorGroupView`（= `IEditorGroup`，51 个成员，其中绝大多数是对 `EditorGroupModel` 的转发）+ 宿主三接口的最小集（`IEditorGroupsService` 15 / `IEditorPart` 8 + `IEditorGroupsView` 18 / `IEditorPartsView` 10）。需要真行为的十余个：组注册与查表、活动组与激活事件、加/删组、`partOptions`、可见性、layout 事件、上下文键的 `bind`。
+4. **多组 + 分栏 = prac 的区域树**：一个载文件的区域 = 一个组（`stage` 是默认那个），拆区域 = 新组（与"分栏是区域的性质"一致）；只放侧栏 / 面板的区域没有组。
+5. **目录与落位**：`listOpenFiles()` 照旧读编辑器服务的打开集合；文件在哪个区域 = 它在哪个组，"把文件搬去另一个区域" = 编辑器在组之间搬（`moveEditors`）。**文件不再由 frame 给每个文件一个宿主**——那是组的活；prac 的 tab 条仍然描述这个区域里的视图顺序。
 
 ## Alternatives（放弃了什么）
 
 - **保留离屏部件**（今日形态）：James 否决——它是第二个世界，且会一直是债。
+- **把上游 `EditorPart` 挂进 `stage`**：否决——**部件无法与 DSH 的视图结合**（当初把文件做成视图、把部件挪去离屏，正是为了绕开它）。
+- **复用上游 `EditorGroupView`（一个区域一个组）**：否决——**组是只装编辑器的封闭世界，装不下 prac 视图**；区域的容器必须是 prac 的。
 - **给离屏部件真实布局，再把组/面板的 DOM 搬进 prac 视图**：实测四种做法全失败（单组搬 control 被隐藏；每文件一组 + `openEditor(描述符, group)` 只有第一次成功且开成两份；`addGroup` + `moveEditors` 搬移返回 false；`SIDE_GROUP` 让 `openEditor` 返回 undefined）——根因是离屏部件是"单格网格"。即便修好，它仍是第二个世界。
-- **prac 自己实现 `IEditorGroup`**：比复用 `EditorGroupView` + 自实现宿主大得多（组模型、面板生命周期、header/tabs 都要自己来），且会分叉上游行为。
+- **prac 从零实现面板与模型**：不必——`EditorGroupModel` 与 `EditorPanes` 都以组对象为界，可以照借。
 
 ## Open questions
 
-- **组级的网格动作**（split / move / copy / merge group、maximize、arrange）：**映射到 prac 的区域操作**（prac 的"分栏"是区域的模式），还是**先明确不支持**？倾向后者，按需逐个映射——映射要小心两套层级的语义差异。
-- **组头**（tab 条 + 面包屑）：tab 按决定 17 归 prac（已有），**面包屑挂在组头上**——搬组头会让两套 tab 重叠。倾向先把面板做对，面包屑单独裁一次。
+- **组的可见性还要不要 adaptor 参与**：按"一个区域 = 一个组"，组的"一次一个"与区域的 tab 语义一致，原则上**可见性完全归 frame**；要核的是组在"没有活动编辑器"时渲染什么（水印/空 tab 条）与 prac 的空区域渲染是否打架。
+- **组级的网格动作**（split / move / copy / merge group、maximize、arrange）：其中 **split 天然映射到"拆一个区域"**（`stage` 分栏 = 新组），其余（move/copy group、merge、maximize、arrange）与 prac 的区域层级没有对位 ⇒ 倾向**先明确不支持**，在启动日志与一条门里列出。
+- **组头**（tab 条 + 面包屑）：tab 按决定 17 归 prac（区域的 tab 条已有），**面包屑挂在组头上**——是先让 prac 的 tab 条只做 tab、把组头其余部分搬进来，还是另行处理，单独裁一次。
+- **组的 DOM 挂在哪个宿主上**：**区域级宿主**（机制给区域一个内容宿主，组画在里面，文件的视图宿主闲置）还是**跟随该区域当前活动的文件视图**（组 DOM 搬进那个视图的宿主，与今天搬 part/view 同一套）。倾向后者——它与现有机制一致，也让"文件视图"这个名字仍然名副其实。
 - **未支持清单的表达**：放在启动日志、一条活体门，还是两者都要。
 
 ## 判据（这一轮怎么算成立）
