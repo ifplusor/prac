@@ -64,7 +64,6 @@ import {
 import {
   EditorsOrder,
   GroupIdentifier,
-  GroupModelChangeKind,
   IActiveEditorChangeEvent,
   IEditorCloseEvent,
   IEditorOpenContext,
@@ -117,7 +116,6 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
   /** The host this group belongs to (prac's region-level editor host). */
   readonly groupsView: IEditorGroupsView;
 
-  private activePane: IVisibleEditorPane | undefined;
   private _isActive = false;
   private _isVisible = true;
   private _disposed = false;
@@ -259,7 +257,9 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
   }
 
   get activeEditorPane(): IVisibleEditorPane | undefined {
-    return this.activePane;
+    // Upstream asks `EditorPanes` (`editorPanes.ts:84`), so this forwards rather than
+    // keeping a second copy that can lag behind the panes.
+    return (this.editorPanes.activeEditorPane ?? undefined) as IVisibleEditorPane | undefined;
   }
 
   get whenRestored(): Promise<void> {
@@ -391,17 +391,16 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
         return undefined;
       }
       const pane = (result.pane ?? undefined) as IVisibleEditorPane | undefined;
-      this.activePane = pane;
-      // The model reported the new active editor **before its pane existed**
-      // (`model.openEditor` fires while `editorPanes.openEditor` is still running), so
-      // a listener that asked for the pane at that moment got nothing and had no reason
-      // to ask again. The Outline is exactly such a listener — measured, the first file
-      // of a session kept "The active editor cannot provide outline information."
-      // forever while every later file was fine (the group still held the previous
-      // pane, so `activeEditorPane` was merely stale rather than empty). The fact is
-      // true now, so it is announced now.
-      if (pane !== undefined && options?.inactive !== true) {
-        this._onDidActiveEditorChange.fire({ editor: target });
+      // Announce the active editor **here**, not from the model's change: upstream fires
+      // this after `editorPane.openEditor` has resolved and only when the input actually
+      // changed (`editorGroupView.ts:1300-1304`), because listeners ask
+      // `activeEditorPane` in the handler and the pane is what makes the answer true.
+      // Firing from the model change (which happens while the pane is still being
+      // created) made the first file of a session unanswerable: the Outline asked, got
+      // no pane, and had no reason to ask again — measured as "The active editor cannot
+      // provide outline information." until another file was opened.
+      if (result.changed === true) {
+        this._onDidActiveEditorChange.fire({ editor: target, isExplicit: options?.isExplicit });
       }
       if (options?.preserveFocus !== true) {
         // The focus this raises is ours, not the person's: say so, because the
@@ -474,6 +473,9 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
         );
       } else {
         this.editorPanes.closeEditor(candidate);
+        // Upstream announces the now-empty group (`editorGroupView.ts:1682`); with the
+        // next editor present the announcement comes from opening it, above.
+        this._onDidActiveEditorChange.fire({ editor: undefined });
       }
     } else {
       this.editorPanes.closeEditor(candidate);
@@ -495,8 +497,14 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
     options?: ICloseEditorOptions,
   ): Promise<boolean> {
     const list = Array.isArray(editors) ? editors : this.model.getEditors(EditorsOrder.SEQUENTIAL);
+    // Inactive editors first, the active one last — upstream's order
+    // (`editorGroupView.ts:1953-1967`), and it is not cosmetic: closing the active
+    // editor reveals the *next* one, so a list that still contains the editors being
+    // closed must not have them re-shown on the way out.
+    const inactive = list.filter((editor) => !this.model.isActive(editor));
+    const active = list.filter((editor) => this.model.isActive(editor));
     let closed = true;
-    for (const editor of list) {
+    for (const editor of [...inactive, ...active]) {
       closed = (await this.closeEditor(editor, options)) && closed;
     }
     return closed;
@@ -680,7 +688,7 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
 
   focus(): void {
     this._onDidFocus.fire();
-    this.activePane?.focus();
+    this.activeEditorPane?.focus();
   }
 
   setActive(isActive: boolean): void {
@@ -717,12 +725,9 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
 
   //#endregion
 
-  private onModelChanged(event: IGroupModelChangeEvent): void {
-    if (event.kind === GroupModelChangeKind.EDITOR_ACTIVE) {
-      this.activePane = (this.editorPanes.activeEditorPane ?? undefined) as
-        | IVisibleEditorPane
-        | undefined;
-      this._onDidActiveEditorChange.fire({ editor: this.model.activeEditor ?? undefined });
-    }
+  private onModelChanged(_event: IGroupModelChangeEvent): void {
+    // Nothing to do: the model's changes reach the outside through `onDidModelChange`
+    // (the editor service subscribes to it), and the **active editor** is announced by
+    // `openEditor`/`closeEditor` once the pane exists — the order upstream uses.
   }
 }
