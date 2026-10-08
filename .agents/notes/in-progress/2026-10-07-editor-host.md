@@ -42,6 +42,14 @@ status: in-progress
 - **组的 DOM 挂在哪个宿主上**：**区域级宿主**（机制给区域一个内容宿主，组画在里面，文件的视图宿主闲置）还是**跟随该区域当前活动的文件视图**（组 DOM 搬进那个视图的宿主，与今天搬 part/view 同一套）。倾向后者——它与现有机制一致，也让"文件视图"这个名字仍然名副其实。
 - **未支持清单的表达**：放在启动日志、一条活体门，还是两者都要。
 
+## 侦察结果（2026-10-07，探针跑在真 rig 上）
+
+1. **`EditorGroupModel` 能独立构造**（`instantiationService.createInstance(EditorGroupModel, undefined)`）——不需要组视图。
+2. **`EditorPanes` 与「组的进度指示器」需要一个"组的作用域"**，跟 `EditorGroupView` 建的一样：`ProgressBar` + scoped `IContextKeyService` + **组级的 `IEditorProgressService`**（`EditorProgressIndicator(progressBar, group)`——它**不是**全局单例，第一版探针就死在 `UNKNOWN service editorProgressService`）。⇒ 嵌入式服务图里这层 scope 要我们建。
+3. **面板会反过来向组要素成员**：`EditorPanes` 源码只用到 `windowId` / `openEditor`，但真正跑起来时**面板自己**（以及进度指示器）会调 `isEmpty`、`isPinned`、`onDidModelChange`（`textDiffEditor.ts` 里 `this.group.isPinned(input)`、`progressIndicator.ts` 里 `group.onDidModelChange`）⇒ 用一个"假组"喂 `EditorPanes` 是**死路**，**必须有一个真的 `IEditorGroupView`**。这正好把"要写什么"钉死：模型能转发的都转发给 `EditorGroupModel`，其余是我们自己的行为。
+
+⇒ 下一步就是写这个类（`PracEditorGroup`），第一批成员先覆盖"能开一个文件并画出来"：`windowId` / `element` / `container` / `openEditor` / `closeEditor` / `isEmpty` / `isPinned` / `contains` / `activeEditor` / `activeEditorPane` / `onDidModelChange` / `onDidActiveEditorChange` / `layout` / `setVisible` / `focus`，其余按最小实现并进"未支持"清单。
+
 ## 判据（这一轮怎么算成立）
 
 1. 转到符号 / 定义时，**可见编辑器真的动**（今天是离屏那份动）。
