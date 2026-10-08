@@ -273,6 +273,13 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     string,
     { readonly group: PracEditorGroup; readonly element: HTMLElement }
   >();
+  /**
+   * Files whose close is in flight, by resource string.
+   *
+   * A mount that lands while its file is being closed must not open it again — the
+   * app has already decided the file is gone.
+   */
+  private readonly closingFiles = new Set<string>();
   /** One single-view grid per mounted part; the grid supplies part positioning. */
   private readonly grids = new Map<string, Grid<ISerializableView>>();
   /**
@@ -475,7 +482,8 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     // the workbench's own parts manager in place (measured: `openFile` then failed in
     // `doFindGroup` with `activeGroup` undefined, because that manager's part is never
     // hosted any more).
-    const embedBridge = this.options?.embedBridge ?? readEmbedBridge(this.environmentService?.options);
+    const embedBridge =
+      this.options?.embedBridge ?? readEmbedBridge(this.environmentService?.options);
     if (embedBridge?.deferParts) {
       serviceCollection.set(IEditorGroupsService, new SyncDescriptor(PracEditorHost));
     }
@@ -790,14 +798,6 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    * @param element - the element the embedder rendered for the file's view.
    */
   mountFileInto(resource: string, element: HTMLElement): void {
-    const mounted = this.mountedFiles.get(resource);
-    if (mounted) {
-      // One surface per file: the same file asked for twice is the same pane,
-      // shown in the element that is on screen now.
-      mounted.group.create(element);
-      this.layoutGroup(mounted.group, element);
-      return;
-    }
     const instantiationService = this.instantiationService;
     if (!instantiationService) {
       this.logService.error(`vscode-embed: cannot mount file ${resource} before startup`);
@@ -810,19 +810,43 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       .invokeFunction(async (accessor) => {
         const host = accessor.get(IEditorGroupsService) as unknown as PracEditorHost;
         const resolver = accessor.get(IEditorResolverService);
-        // The region is read from the DOM the frame rendered ("the adaptor
-        // recognises its root from elements"): the view host sits inside its region.
-        // A host with no region ancestor (a probe mounting a file straight into an
-        // element) is a region of its own — one host, one group — so two hosts never
-        // fight over the same group element.
-        const region =
-          element.closest("[data-prac-region]")?.getAttribute("data-prac-region") ??
-          this.hostRegion(element);
+        // The region is read from the DOM the frame rendered ("the adaptor recognises
+        // its root from elements"): the view host sits inside its region. A host with
+        // no region ancestor (a probe mounting a file straight into an element) is a
+        // region of its own — one host, one group — so two hosts never fight over the
+        // same group element.
+        const region = this.regionOf(element) ?? this.hostRegion(element);
         const group = host.ensureGroup(region, region);
         group.create(element);
-        const resolved = await resolver.resolveEditor({ resource: uri });
-        const editor = (resolved as { editor?: EditorInput }).editor;
+        // The file the **group already holds** is the editor to show: the app
+        // reaches the workbench through `IEditorService.openEditor`, which builds
+        // its own input, and resolving a second one for the same resource puts two
+        // inputs for one file in the group's model — measured as a doubled entry in
+        // the `editors` capability and two tabs for one file. So the group's own
+        // editor wins, and only a file it does not hold is resolved fresh.
+        const held = group.findEditors(uri)[0];
+        const shown = group.activeEditor;
+        if (shown?.resource?.toString() === uri.toString()) {
+          // The group already shows this file, so mounting is the group's element
+          // moving into the host the frame rendered — not an open. Opening again would
+          // be redundant work on every re-render of the frame's view list.
+          host.activateGroup(group.id);
+          this.mountedFiles.set(resource, { group, element });
+          this.layoutGroup(group, element);
+          this.observeHost(element);
+          return;
+        }
+        const editor =
+          held ??
+          (
+            (await resolver.resolveEditor({ resource: uri })) as {
+              editor?: EditorInput;
+            }
+          ).editor;
         if (!editor) throw new Error(`no editor for ${resource}`);
+        // Re-checked here rather than at entry: resolving the editor is asynchronous,
+        // and a close can land while it is in flight.
+        if (this.closingFiles.has(resource)) return;
         await group.openEditor(editor, { pinned: true, preserveFocus: true });
         host.activateGroup(group.id);
         this.mountedFiles.set(resource, { group, element });
@@ -850,6 +874,31 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   /** Region ids handed to hosts that carry no `[data-prac-region]` ancestor. */
   private readonly adhocRegions = new WeakMap<HTMLElement, string>();
   private adhocRegionCount = 0;
+
+  /**
+   * The prac region a host element sits in, or `undefined` for a bare host.
+   *
+   * The frame renders every view inside **its own shadow root** (the frame owns the
+   * isolation boundary), so the host's region ancestor is across a shadow boundary and
+   * `element.closest` cannot see it. Walking out through the roots is what makes the
+   * region the group's identity: without it every mount looked like a host of its own,
+   * so every view — and every tab click — created a **new group**, and one file ended
+   * up as several editors in one session (measured: groups 0,1,2,3,4,5,6 for six
+   * mounts, and a close that left the file open).
+   *
+   * @param element - the element the embedder rendered for a file's view.
+   * @returns the region id, or `undefined` when no ancestor carries one.
+   */
+  private regionOf(element: HTMLElement): string | undefined {
+    let node: Element | null = element;
+    while (node !== null) {
+      const region = node.closest("[data-prac-region]");
+      if (region !== null) return region.getAttribute("data-prac-region") ?? undefined;
+      const root: Node = node.getRootNode();
+      node = root instanceof ShadowRoot ? (root.host as Element) : null;
+    }
+    return undefined;
+  }
 
   /**
    * The region id for a host element that is not inside a region.
@@ -896,8 +945,11 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       for (const group of this.editorGroupService.groups) {
         const editor = group.findEditors(uri)[0];
         if (editor === undefined) continue;
-        void group.openEditor(editor, { preserveFocus: true });
         this.editorGroupService.activateGroup(group);
+        // The group already shows this editor: focus travelling up must not re-open
+        // what is already open (a mount/re-parent is not an open).
+        if (group.activeEditor?.resource?.toString() === uri.toString()) return;
+        void group.openEditor(editor, { preserveFocus: true });
         return;
       }
     } catch (error) {
@@ -1049,6 +1101,13 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       version: () => revision,
       actions: {
         activate: (resource: string) => {
+          // The same rule as a mount: while this file's close is in flight, activating
+          // it would put it back. The reconciliation that calls this compares prac's
+          // front view with the app's active editor, and *during* a close those
+          // disagree for a moment — prac still shows the file, the app has moved on —
+          // so the honest answer is to let the close finish (measured: four
+          // activations arriving mid-close left the file open again).
+          if (this.closingFiles.has(resource)) return;
           const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
             ? URI.parse(resource)
             : URI.file(resource);
@@ -1058,8 +1117,18 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
           const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
             ? URI.parse(resource)
             : URI.file(resource);
+          // The close is asynchronous, and a **mount** can be in flight while it runs
+          // (the frame re-renders the view list in the same layout change). Marking the
+          // file for the duration is what keeps that mount from putting the file back:
+          // measured, closing a file whose view was re-rendered in the same tick left
+          // it open, because the mount's `openEditor` landed after the close.
+          this.closingFiles.add(resource);
           const identifiers = this.editorService.findEditors(uri);
-          if (identifiers.length > 0) void this.editorService.closeEditors(identifiers);
+          const closed =
+            identifiers.length > 0
+              ? this.editorService.closeEditors(identifiers)
+              : Promise.resolve();
+          void closed.finally(() => this.closingFiles.delete(resource));
         },
       },
     };

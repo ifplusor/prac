@@ -354,9 +354,23 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
     options?: IEditorOptions,
     internalOptions?: IInternalEditorOpenOptions,
   ): Promise<IVisibleEditorPane | undefined> {
-    this._onWillOpenEditor.fire({ editor, groupId: this.id });
+    // **One resource, one editor per group.** The app and the embedder can each
+    // resolve their own input for a file, and two inputs for one resource do not
+    // necessarily match each other (`TextResourceEditorInput` vs `FileEditorInput`),
+    // so opening the second would put two editors for one file in the group's model
+    // (measured: the `editors` capability reported one file two, four, six times).
+    // The group's own editor therefore wins.
+    const resource = editor.resource;
+    const held =
+      resource === undefined
+        ? undefined
+        : this.model
+            .getEditors(EditorsOrder.SEQUENTIAL)
+            .find((candidate) => candidate.resource?.toString() === resource.toString());
+    const target = held ?? editor;
+    this._onWillOpenEditor.fire({ editor: target, groupId: this.id });
     try {
-      this.model.openEditor(editor, {
+      this.model.openEditor(target, {
         pinned: options?.pinned,
         sticky: options?.sticky,
         transient: options?.transient,
@@ -367,13 +381,13 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
         active: options?.inactive !== true,
       });
       const result = await this.editorPanes.openEditor(
-        editor,
+        target,
         options,
         internalOptions,
         Object.create(null) as IEditorOpenContext,
       );
       if (result.error !== undefined) {
-        this._onDidOpenEditorFail.fire(editor);
+        this._onDidOpenEditorFail.fire(target);
         return undefined;
       }
       const pane = (result.pane ?? undefined) as IVisibleEditorPane | undefined;
@@ -406,6 +420,14 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
   /**
    * Close one editor.
    *
+   * Mirrors the shipped group's order, because the order is load-bearing: the **model**
+   * goes first, and only then the pane. Closing the active editor is not "dispose its
+   * pane": the model promotes the next editor and that editor's pane has to be shown,
+   * or the group is left with a disposed pane as its active one (`editorPanes` hides
+   * the pane it holds, so closing one that another editor still replaces would leave
+   * the group showing nothing). Upstream `EditorGroupView.doCloseActiveEditor` is the
+   * reference this follows.
+   *
    * @param editor - the editor to close; the active one when omitted.
    * @param options - close options (only `force` is meaningful here).
    * @returns whether an editor was closed.
@@ -413,11 +435,32 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
   async closeEditor(editor?: EditorInput, options?: ICloseEditorOptions): Promise<boolean> {
     const candidate = editor ?? this.activeEditor;
     if (!candidate) return false;
+    const wasActive = this.model.isActive(candidate);
     const event = { editor: candidate, groupId: this.id } as unknown as IEditorCloseEvent;
     this._onWillCloseEditor.fire(event);
-    this.editorPanes.closeEditor(candidate);
     const result = this.model.closeEditor(candidate);
-    if (result === undefined && options?.force !== true) return false;
+    if (result === undefined) {
+      if (options?.force !== true) return false;
+      this._onDidCloseEditor.fire(event);
+      return true;
+    }
+    if (wasActive) {
+      const next = this.model.activeEditor;
+      if (next !== null && next !== undefined) {
+        // Closing the active editor reveals the next one (upstream
+        // `doCloseActiveEditor` -> `doOpenEditor(nextActiveEditor)`).
+        await this.editorPanes.openEditor(
+          next,
+          { preserveFocus: options?.preserveFocus },
+          undefined,
+          Object.create(null) as IEditorOpenContext,
+        );
+      } else {
+        this.editorPanes.closeEditor(candidate);
+      }
+    } else {
+      this.editorPanes.closeEditor(candidate);
+    }
     this._onDidCloseEditor.fire(event);
     return true;
   }

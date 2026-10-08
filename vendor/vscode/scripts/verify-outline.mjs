@@ -38,7 +38,7 @@ if (!url) throw new Error("URL is required, e.g. URL='http://127.0.0.1:3084/?tok
 const require = createRequire(join(workDir, "package.json"));
 const { chromium } = require("@playwright/test");
 
-/** Where the fixtures live inside the workspace (the folder the app was given). */
+/** Where the fixtures live: the gate's own directory under the build's scratch. */
 const FIXTURE_RELATIVE = ".build/scratch";
 const FIXTURE_DIR = join(repoRoot, FIXTURE_RELATIVE);
 const FIXTURES = {
@@ -84,10 +84,13 @@ await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeo
 // so give the workbench room to reach it before asserting anything.
 await page.waitForTimeout(7000);
 
-const folder = await page.evaluate(
-  () => (globalThis.__vscodeEmbed.face.workspaceInfo().folders ?? [])[0] ?? null,
-);
-if (!folder) throw new Error("the workbench has no workspace folder");
+/**
+ * A fixture's URI: this checkout's path under the page's own remote authority.
+ *
+ * Not the app's workspace folder — that is DSH's last-used workspace, which is not
+ * this repository (see `gate-fixtures.mjs`).
+ */
+const uriOf = (fixture) => `vscode-remote://${new URL(url).host}${join(FIXTURE_DIR, fixture.name)}`;
 
 /** The Explorer container, where the arrangement puts the Outline by default. */
 await page.click(
@@ -143,11 +146,7 @@ async function outline() {
  * @returns the outline facts while that file is the active editor.
  */
 async function opened(fixture) {
-  await page.evaluate(
-    ({ folder: root, relative, name }) =>
-      globalThis.__vscodeEmbed.face.openFile(`${root}/${relative}/${name}`),
-    { folder, relative: FIXTURE_RELATIVE, name: fixture.name },
-  );
+  await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), uriOf(fixture));
   const wanted = fixture.symbols.length;
   for (let attempt = 0; attempt < 40; attempt++) {
     await page.waitForTimeout(1000);
@@ -169,7 +168,7 @@ async function opened(fixture) {
  * @returns the outline facts after focusing the first fixture's region.
  */
 async function focusFirstFixture() {
-  const viewOf = (fixture) => `vscode:file:${folder}/${FIXTURE_RELATIVE}/${fixture.name}`;
+  const viewOf = (fixture) => `vscode:file:${uriOf(fixture)}`;
   const fileViews = () =>
     globalThis.__pracLayout
       .listViews()
@@ -221,7 +220,7 @@ const typescript = await opened(FIXTURES.typescript);
 const refocused = await focusFirstFixture();
 
 const facts = {
-  workspaceFolder: folder,
+  fixtures: FIXTURE_DIR,
   first,
   second,
   refocused,

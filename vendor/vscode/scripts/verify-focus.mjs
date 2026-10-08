@@ -17,8 +17,9 @@
  */
 import { createRequire } from "node:module";
 import { installDeepDom } from "./deep-dom.mjs";
+import { writeFixtures } from "./gate-fixtures.mjs";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const packageDir = resolve(import.meta.dirname, "..");
@@ -33,17 +34,6 @@ const require = createRequire(join(upstreamDir, "package.json"));
 const { chromium } = require("@playwright/test");
 
 const sha = (buffer) => createHash("sha256").update(buffer).digest("hex");
-
-/**
- * The local path behind a workbench folder URI.
- *
- * The app's folders are `vscode-remote://<authority>/<path>`; the authority is
- * the page that serves the remote, so the path is what the local file system has.
- *
- * @param folder - the folder URI as the workbench reports it.
- */
-const localPathOf = (folder) =>
-  decodeURIComponent(folder.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]*/i, ""));
 
 /** Decode a PNG in the page and report how much of it is not one flat colour. */
 const analyse = async (base64) => {
@@ -81,13 +71,18 @@ await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeo
 // Open one file before sampling — the current model has no editor view until the
 // app opens a file. The expectation comes from the same file on disk, because the
 // app's workspace is DSH's active workspace, not this repository.
-const folder = await page.evaluate(
-  () => (globalThis.__vscodeEmbed.face.workspaceInfo().folders ?? [])[0] ?? null,
-);
-if (!folder) throw new Error("the workbench has no workspace folder");
-const manifest = JSON.parse(readFileSync(join(localPathOf(folder), "package.json"), "utf8"));
-const MARKER = `"name": "${manifest.name}"`;
-await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), `${folder}/package.json`);
+// The gate's own file, opened by URI: the app's folder is DSH's last-used workspace,
+// which is not this repository (see `gate-fixtures.mjs`). The marker is a line of the
+// file as it is on disk.
+const [PROBE] = writeFixtures("focus", url, [
+  {
+    name: "probe.txt",
+    body: (token) =>
+      `the focus probe ${token}\nsecond line\nthird line\nfourth line\nfifth line\nsixth line\nseventh line\neighth line\n`,
+  },
+]);
+const MARKER = PROBE.marker;
+await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), PROBE.uri);
 await page.waitForSelector("[data-vscode-embed-file] .monaco-editor", { timeout: 60_000 });
 await page.waitForTimeout(3000);
 
@@ -245,7 +240,7 @@ console.log(
   JSON.stringify(
     {
       url,
-      workspace: { folder, marker: MARKER },
+      workspace: { fixture: PROBE.name, marker: MARKER },
       checks,
       states: Object.fromEntries(
         Object.entries(states).map(([name, state]) => [

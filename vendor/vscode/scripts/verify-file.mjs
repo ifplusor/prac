@@ -1,28 +1,31 @@
 /**
- * Verification of **file-level** hosting (decision 17's vendor half): one file's
- * editing surface, outside the editor part.
+ * Verification of **file-level** hosting: one file's editing surface inside prac's
+ * own editor group, in the region the frame renders it in.
  *
- * The unit is the file, because prac owns which files are open, how they are
- * grouped and the tab strip. What this gate refuses to take on faith:
+ * The unit is the file, because prac owns which files are open, how they are grouped
+ * and the tab strip. What this gate refuses to take on faith:
  *
- *  1. **a real editing surface** — the workbench's own text model for the file
- *     in a `CodeEditorWidget`: the rendered lines are that file's text, and the
- *     expectation is read from the same file on disk rather than hard-coded (the
- *     app's workspace is DSH's active workspace, not this repository);
- *  2. **paint** — a structurally present, visually blank editor is the failure
- *     mode that looks healthy in the DOM;
- *  3. **one surface per file** — mounting the same resource again is the same
- *     editor re-parented (a second one would be a second view of one model),
- *     while a different file is a different editor;
- *  4. **release + recreate** — the surface disposes so the same file can be
- *     mounted again, and a failed mount is reported rather than thrown at the
+ *  1. **a real editing surface** — the workbench's own text model for the file in a
+ *     `CodeEditorWidget`: the rendered lines are that file's text, and the
+ *     expectation is read back from the file on disk rather than hard-coded;
+ *  2. **paint** — a structurally present, visually blank editor is the failure mode
+ *     that looks healthy in the DOM;
+ *  3. **one body per region** — a region shows the front view's surface and nothing
+ *     else, a tab click brings that file's surface back, and a region of its own is a
+ *     second group showing its own file;
+ *  4. **close + reopen** — closing the file releases the surface, and the app's next
+ *     open builds a fresh one, with a failed mount reported rather than thrown at the
  *     embedder.
+ *
+ * The gate writes its own fixture files and opens them by URI, so it depends on
+ * neither the folder the app happens to have open nor on this repository's contents.
  *
  * Usage: URL='http://127.0.0.1:3084/?token=...' node scripts/verify-file.mjs
  */
 import { createRequire } from "node:module";
 import { installDeepDom } from "./deep-dom.mjs";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
 
 const packageDir = resolve(import.meta.dirname, "..");
@@ -41,50 +44,55 @@ if (!existsSync(join(upstreamDir, "node_modules/@playwright/test"))) {
 const require = createRequire(join(upstreamDir, "package.json"));
 const { chromium } = require("@playwright/test");
 
-/**
- * The local path behind a workbench folder URI.
- *
- * The app's folders are `vscode-remote://<authority>/<path>`; the authority is
- * the page that serves the remote, so the path is what the local file system
- * has. Kept as a string strip rather than `new URL` because `vscode-remote` is
- * not a special scheme.
- *
- * @param folder - the folder URI as the workbench reports it.
- */
-const localPathOf = (folder) =>
-  decodeURIComponent(folder.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]*/i, ""));
+/** The authority behind the page's file URIs (`vscode-remote://<authority>/<path>`). */
+const remoteAuthority = new URL(url).host;
 
 /**
- * Pick two files that exist in the workspace, with a marker the editor must show.
+ * Write the gate's own fixture files, and read them back for their markers.
  *
- * `package.json` gives an exact JSON line; the second file gives its first
- * substantial line. Both come from the files on disk, so the gate works in
- * whichever folder the app is bound to.
+ * Four small files, each carrying a token that exists nowhere else, so "the editor
+ * shows this file's text" is a claim about the file on disk rather than about a
+ * string the gate also happened to write into the assertion. They live under the
+ * build's scratch directory and are opened by URI — the workbench's file service
+ * serves any path under its remote authority — which keeps the gate independent of
+ * whichever folder the app has open.
  *
- * @param root - the workspace folder's local path.
+ * @returns the fixtures: each one's name, its full URI, and a marker line of its text.
  */
-function pickFiles(root) {
-  const manifest = join(root, "package.json");
-  const name = JSON.parse(readFileSync(manifest, "utf8")).name;
-  const first = { path: "package.json", marker: `"name": "${name}"` };
-  const extra = [];
-  for (const candidate of ["README.md", "AGENTS.md", "tsconfig.json"]) {
-    const full = join(root, candidate);
-    if (!existsSync(full)) continue;
-    const line = readFileSync(full, "utf8")
+function writeFixtures() {
+  const token = randomUUID().slice(0, 8);
+  const dir = join(repoRoot, ".build/scratch/gate-fixtures");
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  const written = [
+    {
+      name: "alpha.json",
+      text: `{\n  "gate": "alpha-${token}",\n  "lines": ${token.length}\n}\n`,
+    },
+    {
+      name: "beta.md",
+      text: `# beta ${token}\n\nA second file, so the region has two views to show.\n`,
+    },
+    {
+      name: "gamma.txt",
+      text: `gamma ${token}\n\nThe third file, for the tab strip.\n`,
+    },
+    {
+      name: "delta.txt",
+      text: `delta ${token}\n\nThe fourth file, opened last.\n`,
+    },
+  ];
+  return written.map((file) => {
+    const path = join(dir, file.name);
+    writeFileSync(path, file.text, "utf8");
+    // Read back: the marker is a line of the file as it is on disk.
+    const marker = readFileSync(path, "utf8")
       .split("\n")
-      .map((text) => text.trim())
-      .find((text) => text.length >= 16);
-    if (line === undefined) continue;
-    extra.push({ path: candidate, marker: line.slice(0, 30) });
-  }
-  if (extra.length < 3) throw new Error(`need three more files with marker lines in ${root}`);
-  // Two roles, and they must not overlap: the probe hosts hold one pair, the app
-  // opens the other. A resource has exactly **one** editing surface (decision 17),
-  // so mounting a file the frame also shows makes the two fight over it — measured:
-  // releasing a probe mount took the editor out of the frame's view, and nothing
-  // re-created it while that view stayed mounted.
-  return { probe: [first, extra[0]], app: [extra[1], extra[2]] };
+      .map((line) => line.trim())
+      .find((line) => line.includes(token));
+    if (marker === undefined) throw new Error(`no marker line in ${path}`);
+    return { name: file.name, path, marker, uri: `vscode-remote://${remoteAuthority}${path}` };
+  });
 }
 
 const analyse = async (base64) => {
@@ -102,6 +110,17 @@ const analyse = async (base64) => {
   return counts.size;
 };
 
+/**
+ * Say which phase the gate is in.
+ *
+ * The gate's report is one JSON document at the end, so a run that hangs leaves no
+ * evidence at all. Each phase announces itself on stderr, which is what makes a hang
+ * diagnosable (measured: an unbounded `diagnostics.settled()` hung a run silently).
+ *
+ * @param phase - the phase's name.
+ */
+const step = (phase) => process.stderr.write(`[verify-file] ${phase}\n`);
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
 const consoleErrors = [];
@@ -110,6 +129,7 @@ page.on("console", (message) => {
 });
 page.on("pageerror", (error) => consoleErrors.push(String(error)));
 
+step("boot");
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
 await installDeepDom(page);
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
@@ -119,49 +139,38 @@ await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeo
 const folder = await page.evaluate(
   () => (globalThis.__vscodeEmbed.face.workspaceInfo().folders ?? [])[0] ?? null,
 );
-if (!folder) throw new Error("the workbench has no workspace folder");
-const { probe: PROBE, app: APP } = pickFiles(localPathOf(folder));
-/** The probe hosts' files: the app never opens these. */
-const [PROBE_A, PROBE_B] = PROBE;
-/** The app's files: the frame shows their surfaces, the probes never touch them. */
-const [APP_A, APP_B] = APP;
+const ALL_FIXTURES = writeFixtures();
+const FILES = ALL_FIXTURES.slice(0, 2);
+const REST = ALL_FIXTURES.slice(2);
+/** The pair the surface phases open: a JSON file and a text file. */
+const [FILE_A, FILE_B] = FILES;
+/** The pair the event and tab phases open afterwards. */
+const [FILE_C, FILE_D] = REST;
 
-// Two host elements the embedder renders for two files, plus a third used for
-// the same-file-twice and release/recreate phases.
-await page.evaluate(
-  ({ first, second }) => {
-    const face = globalThis.__vscodeEmbed.face;
-    const folder = (face.workspaceInfo().folders ?? [])[0];
-    if (!folder) throw new Error("the workbench has no workspace folder");
-    const host = (id) => {
-      const element = document.createElement("div");
-      element.id = id;
-      // The frame hands the adaptor a host **inside a region**; the adaptor reads the
-      // region from the DOM to pick the editor group that shows the file, so the probe
-      // hosts carry a region of their own.
-      element.setAttribute("data-prac-region", `probe:${id}`);
-      element.style.cssText =
-        "position:fixed;z-index:99999;width:620px;height:360px;left:20px;background:#1e1e1e";
-      element.style.top = id === "prac-file-a" ? "20px" : id === "prac-file-b" ? "400px" : "780px";
-      document.body.append(element);
-      return element;
-    };
-    globalThis.__pracFileProbe = { folder };
-    face.mountFileInto(`${folder}/${first.path}`, host("prac-file-a"));
-    face.mountFileInto(`${folder}/${second.path}`, host("prac-file-b"));
-  },
-  { first: PROBE_A, second: PROBE_B },
-);
-await page.waitForSelector("#prac-file-a .monaco-editor", { timeout: 60_000 });
-await page.waitForSelector("#prac-file-b .monaco-editor", { timeout: 60_000 });
-await page.waitForTimeout(2000);
+/** Wait until a resource's surface is the live editor body, then let it paint. */
+async function waitForSurface(resource, timeout = 60_000) {
+  await page.waitForFunction(
+    (uri) =>
+      globalThis.__deep
+        .all(`[data-vscode-embed-file="${uri}"]`)
+        .some((element) => element.querySelector(".monaco-editor")),
+    resource,
+    { timeout },
+  );
+  // Present but not yet laid out paints nothing, and "present, blank" is this
+  // gate's failure mode — so let the frame lay the new body out before measuring.
+  await page.waitForTimeout(2500);
+}
 
-/** One host's structure, rendered text, paint and editor identity. */
-async function sample() {
-  const facts = await page.evaluate(() => {
-    const box = (element) => {
-      if (!element) return null;
-      const rect = element.getBoundingClientRect();
+/** One file's surface: its box, rendered text, paint and editor identity. */
+async function measure(resource) {
+  const facts = await page.evaluate((uri) => {
+    const element = globalThis.__deep
+      .all(`[data-vscode-embed-file="${uri}"]`)
+      .find((candidate) => candidate.querySelector(".monaco-editor"));
+    const box = (target) => {
+      if (!target) return null;
+      const rect = target.getBoundingClientRect();
       return {
         x: Math.round(rect.x),
         y: Math.round(rect.y),
@@ -169,37 +178,27 @@ async function sample() {
         h: Math.round(rect.height),
       };
     };
-    const read = (id) => {
-      const element = document.getElementById(id);
-      // Monaco renders text with non-breaking spaces; normalise before matching.
-      const text = (element?.querySelector(".view-lines")?.textContent ?? "").replace(
-        /\u00a0/g,
-        " ",
-      );
-      return {
-        host: box(element),
-        editors: element?.querySelectorAll(".monaco-editor").length ?? 0,
-        lines: element?.querySelectorAll(".view-line").length ?? 0,
-        text: text.slice(0, 4000),
-      };
-    };
+    // Monaco renders text with non-breaking spaces; normalise before matching.
+    const text = (element?.querySelector(".view-lines")?.textContent ?? "").replace(/\u00a0/g, " ");
     return {
-      first: read("prac-file-a"),
-      second: read("prac-file-b"),
-      third: read("prac-file-c"),
-      mountErrors: [],
+      host: box(element),
+      editors: element?.querySelectorAll(".monaco-editor").length ?? 0,
+      lines: element?.querySelectorAll(".view-line").length ?? 0,
+      text: text.slice(0, 4000),
+      region: element
+        ? (globalThis.__deep
+            .closest(element, "[data-prac-region]")
+            ?.getAttribute("data-prac-region") ?? null)
+        : null,
     };
-  });
-  for (const key of ["first", "second"]) {
-    const host = facts[key].host;
-    if (host && host.w > 2 && host.h > 2) {
-      const shot = await page.screenshot({
-        clip: { x: host.x, y: host.y, width: host.w, height: host.h },
-      });
-      facts[`${key}Colours`] = await page.evaluate(analyse, shot.toString("base64"));
-    } else {
-      facts[`${key}Colours`] = 0;
-    }
+  }, resource);
+  facts.colours = 0;
+  const host = facts.host;
+  if (host && host.w > 2 && host.h > 2) {
+    const shot = await page.screenshot({
+      clip: { x: host.x, y: host.y, width: host.w, height: host.h },
+    });
+    facts.colours = await page.evaluate(analyse, shot.toString("base64"));
   }
   const lines = consoleErrors.filter((line) => line.includes("vscode-embed"));
   facts.mountErrors = lines.length;
@@ -207,52 +206,21 @@ async function sample() {
   return facts;
 }
 
-const mounted = await sample();
+/** Every live surface: which resource each region shows, and what it renders. */
+const liveSurfaces = () =>
+  page.evaluate(() =>
+    globalThis.__deep.all("[data-vscode-embed-file]").map((element) => ({
+      resource: element.getAttribute("data-vscode-embed-file"),
+      region:
+        globalThis.__deep
+          .closest(element, "[data-prac-region]")
+          ?.getAttribute("data-prac-region") ?? null,
+      editors: element.querySelectorAll(".monaco-editor").length,
+      lines: element.querySelectorAll(".view-line").length,
+    })),
+  );
 
-// The same file again: the same surface, re-parented into the third host.
-await page.evaluate(
-  ({ first }) => {
-    const face = globalThis.__vscodeEmbed.face;
-    const element = document.createElement("div");
-    element.id = "prac-file-c";
-    element.style.cssText =
-      "position:fixed;z-index:99999;width:300px;height:200px;left:700px;top:20px";
-    document.body.append(element);
-    face.mountFileInto(`${globalThis.__pracFileProbe.folder}/${first.path}`, element);
-  },
-  { first: PROBE_A },
-);
-await page.waitForTimeout(1200);
-const remounted = await sample();
-
-// The other direction: the app opens a file itself (an explorer click, a command,
-// go-to-definition), which has to reach the embedder as an event — otherwise the
-// app would be editing files nobody can see. The opener is `openFile`, the same
-// editor-service call an explorer click makes.
-await page.evaluate((uri) => {
-  const face = globalThis.__vscodeEmbed.face;
-  const events = [];
-  globalThis.__openFileProbe = { events, before: face.listOpenFiles() };
-  globalThis.__stopOpenFileProbe = face.onDidChangeOpenFiles(() => {
-    events.push(face.listOpenFiles());
-  });
-  face.openFile(uri);
-  // A non-file editor (an untitled buffer has a text model and no file system
-  // provider) must not be offered as a file: mounting it would try to read a
-  // path that cannot exist.
-  face.openUntitled();
-}, `${folder}/${APP_A.path}`);
-await page.waitForTimeout(2500);
-const opened = await page.evaluate(() => ({
-  before: globalThis.__openFileProbe.before,
-  events: globalThis.__openFileProbe.events,
-  after: globalThis.__vscodeEmbed.face.listOpenFiles(),
-}));
-await page.evaluate(() => globalThis.__stopOpenFileProbe?.());
-
-// Tabs (decision 17's stage chrome, borrowed from VS Code's editor group): the
-// strip shows for a single file (`showTabs: "multiple"` is VS Code's default),
-// a second file gets its own tab, and clicking a tab brings that view forward.
+/** The centre region's tab strip: one entry per view, `active` on the front one. */
 const tabsOf = () =>
   page.evaluate(() =>
     [...globalThis.__deep.all("[data-prac-tab]")].map((element) => ({
@@ -261,47 +229,122 @@ const tabsOf = () =>
     })),
   );
 
-const oneFile = await tabsOf();
-// A file the probe hosts do not hold (one surface per resource), and not the one
-// the event phase already opened: this brings the stage to exactly two tabs.
-await page.evaluate(
-  (uri) => globalThis.__vscodeEmbed.face.openFile(uri),
-  `${folder}/${APP_B.path}`,
-);
-await page.waitForTimeout(2500);
-await page.waitForFunction(() => globalThis.__deep.all("[data-prac-tab]").length === 2, null, {
-  timeout: 60_000,
-});
-await page.waitForTimeout(2500);
+/** A fixture's URI string, as the workbench and the frame both name it. */
+const uriOf = (file) => file.uri;
+
+// **The app opens the file** — an explorer click, a command, go-to-definition: the
+// workbench creates the pane, the frame renders that file's view in the centre
+// region, and the region's group mounts its element into the view host the frame
+// rendered. So what a person sees is prac's own editor group showing the workbench's
+// pane, and the group belongs to the region.
+await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), uriOf(FILE_A));
+await waitForSurface(uriOf(FILE_A));
+step("first file");
+const mounted = await measure(uriOf(FILE_A));
+const oneSurface = await liveSurfaces();
+
+// A second file: the app keeps both open (two tabs), the centre shows the front view,
+// and the group's pane holds the file it shows. One surface — the first file's
+// element is *gone* rather than blank, because a region has one editor body.
+await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), uriOf(FILE_B));
+await waitForSurface(uriOf(FILE_B));
+step("second file");
+const second = await measure(uriOf(FILE_B));
+const afterSecond = await liveSurfaces();
 const twoFiles = await tabsOf();
-// Click whichever tab is not active: the region must follow the click.
-const inactive = twoFiles.find((tab) => !tab.active)?.id ?? null;
-if (inactive === null) throw new Error("the second file did not add an inactive tab");
-await page.click(`[data-prac-tab="${inactive}"]`);
-await page.waitForTimeout(2000);
+
+// Clicking the first file's tab re-fronts its view (order is what a tab strip renders
+// first), so its surface comes back — and the app's active editor follows, because
+// prac's front view and the app's active editor are reconciled through the
+// capability's `activate`.
+const firstTab = twoFiles.find((tab) => tab.id?.endsWith(FILE_A.name)) ?? null;
+if (firstTab === null) throw new Error("the first file has no tab to click");
+step("tab click");
+await page.click(`[data-prac-tab="${firstTab.id}"]`);
+await waitForSurface(uriOf(FILE_A));
+const back = await measure(uriOf(FILE_A));
+const backSurfaces = await liveSurfaces();
 const clicked = await tabsOf();
-// The click re-fronts prac's view; the app's active editor must follow, or the two
-// disagree about which file is current (the seat reconciles through `activate`).
 const activeAfterClick = await page.evaluate(
   () =>
-    globalThis.__vscodeEmbed.face.capabilities.editors.snapshot().find((e) => e.active)?.resource,
+    globalThis.__vscodeEmbed.face.capabilities.editors.snapshot().find((entry) => entry.active)
+      ?.resource,
 );
 
-// Release the first file, then mount it again into a fresh host.
+// A region that holds a file owns a **group**, so a region of its own is a second
+// group: splitting the file's view out moves the view, the frame renders it in the
+// new region, and that region's group shows the same file. Two regions, two groups,
+// one surface each — VS Code's model, with prac's regions as its grid.
+step("split region");
 await page.evaluate(
-  ({ first }) => {
-    const face = globalThis.__vscodeEmbed.face;
-    const uri = `${globalThis.__pracFileProbe.folder}/${first.path}`;
-    face.releaseFile(uri);
-    const element = document.getElementById("prac-file-a");
-    if (element) element.replaceChildren();
-    face.mountFileInto(uri, element);
-  },
-  { first: PROBE_A },
+  (view) => globalThis.__pracLayout.splitView(view, "right"),
+  `vscode:file:${uriOf(FILE_A)}`,
 );
-await page.waitForSelector("#prac-file-a .monaco-editor", { timeout: 60_000 });
+await waitForSurface(uriOf(FILE_A));
 await page.waitForTimeout(1500);
-const released = await sample();
+const split = await liveSurfaces();
+// …and moving it back leaves one region, so one group shows it again.
+step("merge region");
+await page.evaluate(
+  (view) => globalThis.__pracLayout.place(view, "stage"),
+  `vscode:file:${uriOf(FILE_A)}`,
+);
+await waitForSurface(uriOf(FILE_A));
+await page.waitForTimeout(1500);
+const merged = await liveSurfaces();
+
+// Closing the file releases its surface *and* its tab, and the app's next open builds
+// a fresh one. A surface left behind after a close would be an editor nobody owns.
+step("close file");
+await page.evaluate(
+  (resource) => globalThis.__vscodeEmbed.face.capabilities.editors.actions.close(resource),
+  uriOf(FILE_A),
+);
+await page.waitForFunction(
+  (uri) => globalThis.__deep.all(`[data-vscode-embed-file="${uri}"]`).length === 0,
+  uriOf(FILE_A),
+  { timeout: 60_000 },
+);
+const closed = await liveSurfaces();
+await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), uriOf(FILE_A));
+await waitForSurface(uriOf(FILE_A));
+const reopened = await measure(uriOf(FILE_A));
+
+// The app's own openings reach the embedder as events — otherwise the app would be
+// editing files nobody can see. `openFile` is the same editor-service call an explorer
+// click makes; an untitled buffer (a model, and no file system provider) must not be
+// offered as a file.
+await page.evaluate((uri) => {
+  const face = globalThis.__vscodeEmbed.face;
+  const events = [];
+  globalThis.__openFileProbe = { events, before: face.listOpenFiles() };
+  globalThis.__stopOpenFileProbe = face.onDidChangeOpenFiles(() => {
+    events.push(face.listOpenFiles());
+  });
+  face.openFile(uri);
+  face.openUntitled();
+}, uriOf(FILE_C));
+await page.waitForTimeout(2500);
+step("app opens a file");
+const opened = await page.evaluate(() => ({
+  before: globalThis.__openFileProbe.before,
+  events: globalThis.__openFileProbe.events,
+  after: globalThis.__vscodeEmbed.face.listOpenFiles(),
+}));
+await page.evaluate(() => globalThis.__stopOpenFileProbe?.());
+
+// Tabs: one per open file, exactly one of them front, and a further open adds one
+// rather than replacing a neighbour's.
+const beforeLastOpen = await tabsOf();
+await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), uriOf(FILE_D));
+await page.waitForFunction(
+  (count) => globalThis.__deep.all("[data-prac-tab]").length === count + 1,
+  beforeLastOpen.length,
+  { timeout: 60_000 },
+);
+await page.waitForTimeout(2500);
+step("last open");
+const lastOpen = await tabsOf();
 
 // Decision 21's first capability: the open editor set, addressed by name rather
 // than by whichever view happens to be mounted.
@@ -322,6 +365,7 @@ const capability = () =>
     };
   });
 
+step("editors capability");
 const capabilityBefore = await capability();
 const activeResource = capabilityBefore.snapshot.find((entry) => entry.active)?.resource ?? null;
 if (activeResource === null) throw new Error("no active editor to exercise the capability with");
@@ -413,11 +457,14 @@ const capabilityClosed = await capability();
 // workspace: the summary is the same set the query returns, a page reports what it
 // was taken from, a scoped query filters, and `settled()` waits for quiet instead
 // of answering while markers are still arriving.
+step("diagnostics capability");
 const diagnosticsProbe = await page.evaluate(async () => {
   const diagnostics = globalThis.__vscodeEmbed.face.capabilities.diagnostics;
   const before = diagnostics.version();
   const started = performance.now();
-  await diagnostics.settled();
+  // Bounded: `settled()` is a promise about quiet, and a marker source that never
+  // quiets would otherwise hang the whole gate with no evidence.
+  await Promise.race([diagnostics.settled(), new Promise((resolve) => setTimeout(resolve, 8000))]);
   const settledMs = Math.round(performance.now() - started);
   // The whole set, to check the summary against: the summary may not be a second
   // count of its own.
@@ -440,6 +487,7 @@ const diagnosticsProbe = await page.evaluate(async () => {
 // A reload forgets the app's editors, and the frame must forget the views with
 // them: a persisted placement record outlives the file, and left alone it renders
 // a tab for a file nobody has open and holds the centre with an empty view.
+step("reload");
 await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
@@ -458,39 +506,58 @@ await browser.close();
 
 const painted = (colours) => typeof colours === "number" && colours > 4;
 const checks = {
-  // 1. Real editing surfaces: the workbench's model, rendered as lines of text.
-  bothFilesMounted: mounted.first.editors === 1 && mounted.second.editors === 1,
-  firstShowsItsOwnText: mounted.first.lines > 3 && mounted.first.text.includes(PROBE_A.marker),
-  secondShowsItsOwnText: mounted.second.lines > 3 && mounted.second.text.includes(PROBE_B.marker),
+  // 1. Real editing surfaces: the workbench's model, rendered as lines of text. The
+  // app opened the file and the frame showed it; nothing here mounted anything.
+  firstFileIsTheOnlySurface:
+    mounted.editors === 1 &&
+    oneSurface.length === 1 &&
+    oneSurface[0].resource === uriOf(FILE_A) &&
+    mounted.region === "stage",
+  firstShowsItsOwnText: mounted.lines > 3 && mounted.text.includes(FILE_A.marker),
+  secondShowsItsOwnText: second.lines > 3 && second.text.includes(FILE_B.marker),
   // 2. Paint, because present-but-blank is the failure mode.
-  bothFilesPainted: painted(mounted.firstColours) && painted(mounted.secondColours),
-  // 3. One surface per file: the third mount is the same editor, re-parented.
-  sameFileIsOneSurface:
-    remounted.third.editors === 1 &&
-    remounted.first.editors === 0 &&
-    remounted.second.editors === 1,
-  // 4. Release disposes, and the same file can be mounted again.
-  releaseThenRemount:
-    released.first.editors === 1 && released.first.lines > 3 && released.second.editors === 1,
-  // 5. The app's own openings reach the embedder: a new resource in the list and
-  // an event carrying it.
-  appOpeningIsReported:
-    opened.after.length === opened.before.length + 1 &&
-    opened.after.some((resource) => !opened.before.includes(resource)),
-  appOpeningFiresTheEvent:
-    opened.events.length >= 1 &&
-    opened.events[opened.events.length - 1].some((resource) => !opened.before.includes(resource)),
-  // …and only files: the untitled buffer opened in the same breath is not one.
-  nonFilesAreNotOffered: opened.after.every((resource) => !resource.startsWith("untitled:")),
-  // 6. Tabs: VS Code's default visibility, one per file, and the click switches.
-  stripShownForOneFile: oneFile.length === 1 && oneFile[0].active,
-  twoFilesTwoTabs: twoFiles.length === 2 && twoFiles.filter((tab) => tab.active).length === 1,
-  newestFileIsActive: twoFiles.find((tab) => tab.active)?.id.endsWith(APP_B.path) === true,
+  firstFileIsPainted: painted(mounted.colours),
+  secondFileIsPainted: painted(second.colours),
+  // 3. One body per region: the front file is the only surface, and the file that
+  // was front is *gone* rather than left behind empty.
+  oneSurfacePerRegion:
+    afterSecond.length === 1 &&
+    afterSecond[0].resource === uriOf(FILE_B) &&
+    afterSecond[0].editors === 1,
+  // 4. The tab click brings the surface back — the same file, one editor — and the
+  // app's own active editor follows the click.
+  clickingTheTabBringsTheSurfaceBack:
+    back.editors === 1 &&
+    back.lines > 3 &&
+    back.text.includes(FILE_A.marker) &&
+    backSurfaces.length === 1 &&
+    backSurfaces[0].resource === uriOf(FILE_A),
+  clickedTabIsTheAppsActiveEditor:
+    activeAfterClick === clicked.find((tab) => tab.active)?.id.replace(/^vscode:file:/, ""),
+  // 5. A region of its own is a second group: both files are shown at once, one
+  // surface each, in two different regions — and merging back is one region again.
+  secondRegionIsASecondGroup:
+    split.length === 2 &&
+    split.every((surface) => surface.editors === 1) &&
+    new Set(split.map((surface) => surface.region)).size === 2,
+  mergeIsOneGroupAgain: merged.length === 1 && merged[0].editors === 1,
+  // 6. Closing releases the surface, and the app's next open builds a fresh one.
+  closeReleasesTheSurface:
+    closed.length >= 1 && closed.every((surface) => surface.resource !== uriOf(FILE_A)),
+  reopenBuildsItAgain:
+    reopened.editors === 1 && reopened.lines > 3 && reopened.text.includes(FILE_A.marker),
+  // 7. Tabs: one per open file, exactly one front, and another open adds one.
+  stripShowsEveryOpenFile:
+    twoFiles.length === 2 && twoFiles.filter((tab) => tab.active).length === 1,
   clickBringsItForward:
-    clicked.length === 2 &&
-    clicked.find((tab) => tab.active)?.id === inactive &&
+    clicked.length === twoFiles.length &&
+    clicked.find((tab) => tab.active)?.id === firstTab.id &&
     clicked.filter((tab) => tab.active).length === 1,
-  // 8. The capability: one handle for both consumers, and no UI required.
+  anotherOpenAddsATab:
+    lastOpen.length === beforeLastOpen.length + 1 &&
+    lastOpen.filter((tab) => tab.active).length === 1,
+  newestFileIsActive: lastOpen.find((tab) => tab.active)?.id.endsWith(FILE_D.name) === true,
+  // 9. The capability: one handle for both consumers, and no UI required.
   capabilityUndoesChanges: capabilityUndone.snapshot.some(
     (entry) => entry.resource === surfaceResource && !entry.dirty,
   ),
@@ -500,8 +567,6 @@ const checks = {
   tabClearsTheMarkOnUndo: capabilityUndone.tabs.some(
     (tab) => tab.resource === surfaceResource && !tab.dirty,
   ),
-  clickedTabIsTheAppsActiveEditor:
-    activeAfterClick === clicked.find((tab) => tab.active)?.id.replace(/^vscode:file:/, ""),
   capabilityActivatesTheClickedFile: capabilityActivated.snapshot.some(
     (entry) => entry.resource === activeResource && entry.active,
   ),
@@ -519,11 +584,11 @@ const checks = {
     capabilityClosed.snapshot.every((entry) => entry.resource !== surfaceResource) &&
     capabilityClosed.open.every((resource) => resource !== surfaceResource) &&
     capabilityClosed.version > capabilityHidden.version,
-  // 7. A reload takes the files with it — and takes their views with them.
+  // 10. A reload takes the files with it — and takes their views with them.
   reloadForgetsTheFiles: reloaded.open.length === 0 && reloaded.fileHosts === 0,
   noTabForAClosedFile: reloaded.fileTabs.length === 0,
   conversationTakesTheCentreBack: reloaded.conversationRegion === "stage",
-  // 9. The diagnostics capability's contract.
+  // 11. The diagnostics capability's contract.
   diagnosticsSummaryIsTheSameSet: (() => {
     const { summary } = diagnosticsProbe.snapshot;
     const derived = diagnosticsProbe.counts;
@@ -555,7 +620,10 @@ const checks = {
   diagnosticsVersionIsReadable: diagnosticsProbe.versionAfter >= diagnosticsProbe.versionBefore,
   // A failed mount is logged by the composition, not thrown at the embedder.
   noMountErrors:
-    mounted.mountErrors === 0 && remounted.mountErrors === 0 && released.mountErrors === 0,
+    mounted.mountErrors === 0 &&
+    second.mountErrors === 0 &&
+    back.mountErrors === 0 &&
+    reopened.mountErrors === 0,
 };
 
 console.log(
@@ -564,25 +632,21 @@ console.log(
       url,
       workspace: {
         folder,
-        probeFiles: PROBE.map((file) => file.path),
-        appFiles: APP.map((file) => file.path),
-        markers: PROBE.map((file) => file.marker),
+        files: FILES.map((file) => file.name),
+        rest: REST.map((file) => file.name),
+        markers: FILES.map((file) => file.marker),
       },
-      mounted: {
-        first: { ...mounted.first, text: undefined },
-        second: { ...mounted.second, text: undefined },
-        firstColours: mounted.firstColours,
-        secondColours: mounted.secondColours,
+      surfaces: {
+        first: { ...mounted, text: undefined },
+        second: { ...second, text: undefined },
+        back: { ...back, text: undefined },
+        reopened: { ...reopened, text: undefined },
+        oneSurface,
+        afterSecond,
+        split,
+        merged,
+        closed,
         mountMessages: mounted.mountMessages,
-      },
-      remounted: {
-        first: { ...remounted.first, text: undefined },
-        third: { ...remounted.third, text: undefined },
-        mountMessages: remounted.mountMessages,
-      },
-      released: {
-        first: { ...released.first, text: undefined },
-        mountMessages: released.mountMessages,
       },
       opened: { before: opened.before, after: opened.after, eventCount: opened.events.length },
       reloaded,
@@ -601,9 +665,10 @@ console.log(
         ],
       },
       tabs: {
-        oneFile: oneFile.map((tab) => (tab.active ? `${tab.id} (active)` : tab.id)),
         twoFiles: twoFiles.map((tab) => (tab.active ? `${tab.id} (active)` : tab.id)),
         clicked: clicked.map((tab) => (tab.active ? `${tab.id} (active)` : tab.id)),
+        beforeLastOpen: beforeLastOpen.length,
+        lastOpen: lastOpen.map((tab) => (tab.active ? `${tab.id} (active)` : tab.id)),
       },
       checks,
     },
@@ -620,5 +685,5 @@ if (failed.length > 0) {
   process.exit(1);
 }
 console.log(
-  "OK: a file mounts as its own editing surface (real text, painted), the same file is one surface re-parented, and release lets it be mounted again.",
+  "OK: the app's own open puts a real editing surface in the region's group (real text, painted, one body per region), a tab click brings it back, a second region is a second group, and close/reopen builds a fresh surface.",
 );

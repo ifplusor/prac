@@ -23,6 +23,7 @@
  */
 import { createRequire } from "node:module";
 import { installDeepDom } from "./deep-dom.mjs";
+import { writeFixtures } from "./gate-fixtures.mjs";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -246,11 +247,16 @@ await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeo
 
 // Open one file: the arrangement puts it in the centre and sends the conversation
 // to the track. This is the model's factory shape, so it is where the gate starts.
-const folder = await page.evaluate(
-  () => (globalThis.__vscodeEmbed.face.workspaceInfo().folders ?? [])[0] ?? null,
-);
-if (!folder) throw new Error("the workbench has no workspace folder");
-await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), `${folder}/package.json`);
+// The gate's own file, opened by URI: the app's folder is DSH's last-used workspace,
+// which is not this repository (see `gate-fixtures.mjs`).
+const [PROBE] = writeFixtures("layout", url, [
+  {
+    name: "probe.txt",
+    body: (token) =>
+      `the layout probe ${token}\nsecond line\nthird line\nfourth line\nfifth line\nsixth line\nseventh line\neighth line\n`,
+  },
+]);
+await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), PROBE.uri);
 await page.waitForSelector("[data-vscode-embed-file] .monaco-editor", { timeout: 60_000 });
 await page.waitForTimeout(3000);
 

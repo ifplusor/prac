@@ -41,6 +41,7 @@
  */
 import { createRequire } from "node:module";
 import { installDeepDom, waitDeep } from "./deep-dom.mjs";
+import { writeFixtures } from "./gate-fixtures.mjs";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -257,11 +258,16 @@ await installDeepDom(page);
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
 
 // Open one file: without one there is no editor view to list or drive.
-const folder = await page.evaluate(
-  () => (globalThis.__vscodeEmbed.face.workspaceInfo().folders ?? [])[0] ?? null,
-);
-if (!folder) throw new Error("the workbench has no workspace folder");
-await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), `${folder}/package.json`);
+// The gate's own file, opened by URI: the app's folder is DSH's last-used workspace,
+// which is not this repository (see `gate-fixtures.mjs`).
+const [PROBE] = writeFixtures("views", url, [
+  {
+    name: "probe.txt",
+    body: (token) =>
+      `the views probe ${token}\nsecond line\nthird line\nfourth line\nfifth line\nsixth line\nseventh line\neighth line\n`,
+  },
+]);
+await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), PROBE.uri);
 await waitDeep(page, `${EDITOR_HOST} .monaco-editor`);
 // Give Monaco a beat to paint after the grid lays it out.
 await page.waitForTimeout(3000);
