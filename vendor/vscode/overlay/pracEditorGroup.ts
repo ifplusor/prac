@@ -101,6 +101,9 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
   /** The group's element; the embedder mounts it into a prac region. */
   readonly element: HTMLElement;
 
+  /** The element prac mounted this group into, once it has (see `create`). */
+  host: HTMLElement | undefined;
+
   /** Where `EditorPanes` puts each pane's container (`.editor-instance`). */
   private readonly editorContainer: HTMLElement;
 
@@ -602,7 +605,9 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
    * @param parent - the host element.
    */
   create(parent: HTMLElement): void {
+    this.host = parent;
     parent.append(this.element);
+    this.relayout();
   }
 
   focus(): void {

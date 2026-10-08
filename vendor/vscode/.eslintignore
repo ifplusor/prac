@@ -7,3 +7,4 @@
 overlay/embeddedWorkbench.ts
 overlay/embeddedWebMain.ts
 overlay/pracEditorGroup.ts
+overlay/pracEditorHost.ts

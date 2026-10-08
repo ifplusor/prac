@@ -27,7 +27,7 @@ const repoRoot = resolve(packageDir, "../..");
 const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
 
 /** The overlay files that live on the tree (`overlay/<x>.ts` → `src/vs/workbench/browser/<x>.ts`). */
-const FILES = ["pracEditorGroup"];
+const FILES = ["pracEditorGroup", "pracEditorHost"];
 
 const config = {
   extends: "./src/tsconfig.base.json",
