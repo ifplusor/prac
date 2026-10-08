@@ -58,10 +58,42 @@ export function apply(ctx: Context): void {
   // about files.
   ctx.effect(() => {
     const editors = host.capabilities.editors;
+    /**
+     * The file resources prac currently shows: the front view of **every** region.
+     *
+     * A region renders its front view, so this is "the files on screen" — the fact the
+     * reconciliation below needs, because prac can show two files at once (one per
+     * region) and only one of them can be the app's active editor.
+     */
+    const shownFiles = (): Set<string> => {
+      const front = new Map<string, { order: number; view: string }>();
+      for (const entry of layout.listViews()) {
+        if (entry.region === null || entry.hidden) continue;
+        const order = entry.order ?? Number.MAX_SAFE_INTEGER;
+        const best = front.get(entry.region);
+        if (best === undefined || order < best.order)
+          front.set(entry.region, { order, view: entry.id });
+      }
+      const resources = new Set<string>();
+      for (const { view } of front.values()) {
+        const resource = host.fileResource(view);
+        if (resource !== undefined) resources.add(resource);
+      }
+      return resources;
+    };
     /** Push one view's chrome and, for the active one, tell the app to match. */
     const sync = (): void => {
       const entries = new Map(editors.snapshot().map((entry) => [entry.resource, entry] as const));
       const active = layout.activeView();
+      const shown = shownFiles();
+      // The app's current editor is a file prac **shows**, so the two already agree
+      // that a file is current; *which* region holds it is prac's business, and
+      // `focusFile` keeps that side in step. Activating the centre's front view here
+      // instead is what made two regions each showing a file fight forever: measured,
+      // `focusFile` (the region the person is in) and this loop alternated thousands
+      // of times a second until the page's main thread stopped answering.
+      const current = [...entries.values()].find((entry) => entry.active)?.resource;
+      const agreed = current !== undefined && shown.has(current);
       for (const { view } of fileEntries()) {
         const resource = host.fileResource(view);
         if (resource === undefined) continue;
@@ -70,10 +102,10 @@ export function apply(ctx: Context): void {
           dirty: entry?.dirty === true,
           preview: entry?.preview === true,
         });
-        // prac's active view and the app's active editor are two states; this package
-        // is where they meet. Guarded on the app's own answer, so the two
-        // subscriptions cannot ping-pong.
-        if (view === active && entry !== undefined && !entry.active) {
+        // prac's front view and the app's active editor are two states; this package is
+        // where they meet, and this is the one direction that travels: prac's front
+        // view pulls the app when the app is not already showing a file.
+        if (!agreed && view === active && entry !== undefined && !entry.active) {
           editors.actions.activate(resource);
         }
       }

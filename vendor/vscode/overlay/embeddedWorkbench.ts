@@ -936,6 +936,12 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    * @param resource - the file's resource string, as {@link mountFileInto} took it.
    */
   focusFile(resource: string): void {
+    // A focus event the mechanism caused itself is not the person choosing a region:
+    // opening an editor focuses its pane, and reading that as "work here" is what made
+    // this fight the client's activate reconciliation forever (see `noteSelfFocus`).
+    if ((this.editorGroupService as unknown as { isSelfFocus?: () => boolean }).isSelfFocus?.()) {
+      return;
+    }
     try {
       const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
         ? URI.parse(resource)

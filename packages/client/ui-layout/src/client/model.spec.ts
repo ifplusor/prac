@@ -129,6 +129,23 @@ describe("placement", () => {
     expect(visibleViews(current, "left")).toEqual(["b", "a"]);
   });
 
+  it("is a no-op when the view already holds the region's front", () => {
+    const current = place(state(), "a", "left");
+    // The very same state object: a caller reacting to a change must not be able to
+    // produce a change of its own by asking for what already holds.
+    expect(place(current, "a", "left")).toBe(current);
+    // …while placing the *other* view, or the same view elsewhere, still moves.
+    const other = place(current, "b", "left");
+    expect(place(other, "a", "left")).not.toBe(other);
+    expect(place(other, "a", "right").views.a?.region).toBe("right");
+    // A hidden view is not "already there": placing it shows it again.
+    const hidden = {
+      ...current,
+      views: { ...current.views, a: { ...current.views.a!, hidden: true } },
+    };
+    expect(place(hidden, "a", "left").views.a).toMatchObject({ hidden: false });
+  });
+
   it("keeps a view's header cost invisible until a second one arrives", () => {
     const one = place(state(), "dsh:sidebar", "left");
     expect(isStacked(one, findRegion(one.tree, "left")!)).toBe(false);

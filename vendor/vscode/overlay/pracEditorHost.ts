@@ -164,6 +164,34 @@ export class PracEditorHost
     return this._groups.length;
   }
 
+  /** Until when the host itself is moving focus (see {@link noteSelfFocus}). */
+  private selfFocusUntil = 0;
+
+  /**
+   * Note that the host is moving focus itself, right now.
+   *
+   * Opening an editor focuses its pane, and that focus is not the person choosing a
+   * region — but it does raise `focusin` on whatever element the pane sits in, which
+   * the embedder reads as "the person is working here" and turns into `focusFile`.
+   * Measured: that made `focusFile` and the client's activate reconciliation fight
+   * forever when a file was closed and re-opened (the page's main thread never came
+   * back). A short window is enough: the focus event follows the call.
+   *
+   * @param durationMs - how long the window lasts.
+   */
+  noteSelfFocus(durationMs = 500): void {
+    this.selfFocusUntil = Date.now() + durationMs;
+  }
+
+  /**
+   * Whether a focus event arriving now is the host's own making.
+   *
+   * @returns whether {@link noteSelfFocus} was called within its window.
+   */
+  isSelfFocus(): boolean {
+    return Date.now() < this.selfFocusUntil;
+  }
+
   get groups(): IEditorGroupView[] {
     return this._groups;
   }

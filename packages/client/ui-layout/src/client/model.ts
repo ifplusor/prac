@@ -324,11 +324,35 @@ export function ensureView(state: LayoutState, viewId: string): ViewRecord {
  * The placed view takes the front of its region: `place` is "show it here",
  * and a region renders the front of its visible list.
  *
+ * **Placing what is already there is a no-op**, and returns the state itself. `place`
+ * is a request about a *result* — "this view is the one its region shows" — so when
+ * that already holds (visible, front of its visible list, its region revealed) there
+ * is nothing to change. Without this the call always bumped the order, so a caller
+ * that places *in reaction to a change* produced a fresh change every time, and two
+ * such callers never settled: measured, the arrangement (which follows the app's
+ * active editor) and the editor plugin (which follows prac's front view) sent the
+ * page into an endless place/activate loop — thousands per second, until the main
+ * thread stopped answering.
+ *
  * @param state - current state.
  * @param viewId - the view identity.
  * @param regionId - the destination region.
  */
 export function place(state: LayoutState, viewId: string, regionId: string): LayoutState {
+  const current = state.views[viewId];
+  if (current !== undefined && !current.hidden) {
+    // The landing region is where routing would put it — a container shows a child
+    // of its own, not the view directly.
+    const landing = landingRegion(state.tree, regionId, viewId).region;
+    const front = visibleViews(state, landing)[0];
+    if (
+      current.region === landing &&
+      front === viewId &&
+      revealRegion(state.tree, landing) === state.tree
+    ) {
+      return state;
+    }
+  }
   const next = placeQuietly(state, viewId, regionId);
   // Placing into a container shows that container: the selector ancestors are
   // what decide which child is on screen. The *landing* region is the one to

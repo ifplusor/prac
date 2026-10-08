@@ -392,7 +392,13 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
       }
       const pane = (result.pane ?? undefined) as IVisibleEditorPane | undefined;
       this.activePane = pane;
-      if (options?.preserveFocus !== true) pane?.focus();
+      if (options?.preserveFocus !== true) {
+        // The focus this raises is ours, not the person's: say so, because the
+        // embedder turns `focusin` on a file's host into "the person is working in
+        // this region" (`focusFile`).
+        (this.groupsView as unknown as { noteSelfFocus?: () => void }).noteSelfFocus?.();
+        pane?.focus();
+      }
       return pane;
     } catch (error) {
       this.logService.error("vscode-embed: failed to open an editor in a prac group", error);
