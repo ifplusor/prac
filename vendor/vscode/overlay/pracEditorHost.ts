@@ -284,6 +284,19 @@ export class PracEditorHost
     return this._groups.find((group) => this._regions.get(group.id) === region);
   }
 
+  /**
+   * The prac region a group belongs to.
+   *
+   * The reverse of {@link groupForRegion}, for a caller that holds the group and needs
+   * to name the region (removing it, laying it out, reporting it).
+   *
+   * @param group - the group.
+   * @returns the region id, or `undefined` for a group that is not registered.
+   */
+  regionOf(group: PracEditorGroup): string | undefined {
+    return this._regions.get(group.id);
+  }
+
   getGroups(order: GroupsOrder = GroupsOrder.CREATION_TIME): IEditorGroupView[] {
     if (order === GroupsOrder.MOST_RECENTLY_ACTIVE) {
       return [

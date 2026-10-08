@@ -839,6 +839,30 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
           this.observeHost(element);
           return;
         }
+        // The file may already live in **another** region: its view moved, and the
+        // editor moves with it (upstream's `moveEditor` — open in the target, close in
+        // the source). Opening a second one instead left the old region holding a copy
+        // nothing shows (measured: the `editors` capability listing one file once per
+        // group). The search is over the groups rather than over this composition's
+        // bookkeeping, because the bookkeeping is released whenever a view stops being
+        // shown — a tab switch is not a move.
+        const elsewhere = (host.groups as PracEditorGroup[]).find(
+          (candidate) => candidate !== group && candidate.findEditors(uri).length > 0,
+        );
+        const moved = elsewhere?.findEditors(uri)[0];
+        if (elsewhere !== undefined && moved !== undefined) {
+          if (this.closingFiles.has(resource)) return;
+          elsewhere.moveEditor(moved, group, { pinned: true, preserveFocus: true });
+          if (elsewhere.isEmpty) {
+            const left = host.regionOf(elsewhere);
+            if (left !== undefined) host.removeGroupByRegion(left);
+          }
+          host.activateGroup(group.id);
+          this.mountedFiles.set(resource, { group, element });
+          this.layoutGroup(group, element);
+          this.observeHost(element);
+          return;
+        }
         const editor =
           held ??
           (
@@ -1279,17 +1303,24 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    *
    * Two of the editor service's events can mean "the set changed" (activate,
    * close) and neither *is* the set, so the set is compared here: the listener
-   * hears exactly when the list it would read differs from the one it last saw.
+   * hears exactly when the set it would read differs from the one it last saw.
    * `onDidVisibleEditorsChange` is deliberately not used — the editor part may
    * never be mounted in this composition, so "visible" is not ours to rely on.
+   *
+   * The comparison is over a **set**, not over a list: `listOpenFiles` enumerates the
+   * groups in order, so moving an editor from one region to another reorders it without
+   * changing what is open. Reporting that as a change made the app's arrangement treat
+   * the moved file as newly opened and pull its view back to the centre — measured, a
+   * split into a second region undid itself a moment later.
    *
    * @param listener - called when the open-file set changed.
    * @returns a function that unsubscribes.
    */
   onDidChangeOpenFiles(listener: () => void): () => void {
-    let last = this.listOpenFiles().join("\n");
+    const snapshot = (): string => [...this.listOpenFiles()].sort().join("\n");
+    let last = snapshot();
     const notify = (): void => {
-      const next = this.listOpenFiles().join("\n");
+      const next = snapshot();
       if (next === last) return;
       last = next;
       listener();

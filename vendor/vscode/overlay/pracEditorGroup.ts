@@ -40,7 +40,11 @@ import { ProgressBar } from "../../base/browser/ui/progressbar/progressbar.js";
 import { MenuId } from "../../platform/actions/common/actions.js";
 import { IContextKeyService } from "../../platform/contextkey/common/contextkey.js";
 import { EditorActivation, IEditorOptions } from "../../platform/editor/common/editor.js";
-import { ConfirmResult, IFileDialogService } from "../../platform/dialogs/common/dialogs.js";
+import {
+  ConfirmResult,
+  IDialogService,
+  IFileDialogService,
+} from "../../platform/dialogs/common/dialogs.js";
 import { IEditorProgressService } from "../../platform/progress/common/progress.js";
 import { defaultProgressBarStyles } from "../../platform/theme/browser/defaultStyles.js";
 import { IInstantiationService } from "../../platform/instantiation/common/instantiation.js";
@@ -98,11 +102,7 @@ import { URI } from "../../base/common/uri.js";
  * separate decision (James 2026-10-07), so the group refuses and logs instead of
  * pretending.
  */
-export const UNSUPPORTED_GROUP_OPERATIONS = [
-  "moveEditor/moveEditors — mapping a file between prac regions",
-  "copyEditor/copyEditors",
-  "replaceEditors",
-] as const;
+export const UNSUPPORTED_GROUP_OPERATIONS = ["replaceEditors"] as const;
 
 /**
  * prac's editor group: an `IEditorGroupView` whose DOM belongs to a prac region.
@@ -727,6 +727,11 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
     return this.instantiationService.invokeFunction((accessor) => accessor.get(IFileDialogService));
   }
 
+  /** The dialog service, which reports a move the editor itself refuses. */
+  private get dialogService(): IDialogService {
+    return this.instantiationService.invokeFunction((accessor) => accessor.get(IDialogService));
+  }
+
   /** The files configuration service, which says whether auto-save is on. */
   private get filesConfigurationService(): IFilesConfigurationService {
     return this.instantiationService.invokeFunction((accessor) =>
@@ -734,43 +739,141 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
     );
   }
 
-  //#region Group-level grid operations: refused, with a log line
+  //#region Moving an editor between prac groups (regions)
 
-  moveEditor(_editor: EditorInput, _target: IEditorGroup, _options?: IEditorOptions): boolean {
-    this.logService.info(
-      `vscode-embed: unsupported group operation — ${UNSUPPORTED_GROUP_OPERATIONS[0]}`,
-    );
-    return false;
+  /**
+   * Move one editor into another group — upstream's semantics
+   * (`editorGroupView.ts:1420-1510`): inside one group it is an order change, and
+   * across groups it is "open in the target, then close here".
+   *
+   * This is what makes an editor *leave* a region when the file's view moves to
+   * another one, instead of the region keeping a copy nobody shows.
+   *
+   * @param editor - the editor to move.
+   * @param target - the group to move it to.
+   * @param options - open options for the target.
+   * @returns whether the move happened.
+   */
+  moveEditor(editor: EditorInput, target: IEditorGroup, options?: IEditorOptions): boolean {
+    if (target === this) return this.moveEditorInsideGroup(editor, options);
+    return this.doMoveOrCopyAcrossGroups(editor, target as PracEditorGroup, options, false);
   }
 
+  /**
+   * Move several editors into another group.
+   *
+   * @param editors - the editors with their options.
+   * @param target - the group to move them to.
+   * @returns whether every editor moved.
+   */
   moveEditors(
-    _editors: { editor: EditorInput; options?: IEditorOptions }[],
-    _target: IEditorGroup,
+    editors: { editor: EditorInput; options?: IEditorOptions }[],
+    target: IEditorGroup,
   ): boolean {
-    this.logService.info(
-      `vscode-embed: unsupported group operation — ${UNSUPPORTED_GROUP_OPERATIONS[0]}`,
-    );
-    return false;
+    let moved = true;
+    for (const { editor, options } of editors) {
+      moved = this.moveEditor(editor, target, options) && moved;
+    }
+    return moved;
   }
 
-  copyEditor(_editor: EditorInput, _target: IEditorGroup, _options?: IEditorOptions): void {
-    this.logService.info(
-      `vscode-embed: unsupported group operation — ${UNSUPPORTED_GROUP_OPERATIONS[1]}`,
-    );
+  /**
+   * Copy one editor into another group.
+   *
+   * A copy into the **same** group is a no-op here, and that is a deliberate
+   * difference: prac keeps one editor per resource per group (see `openEditor`), so
+   * the same file cannot appear twice side by side in one region.
+   *
+   * @param editor - the editor to copy.
+   * @param target - the group to copy it to.
+   * @param options - open options for the target.
+   */
+  copyEditor(editor: EditorInput, target: IEditorGroup, options?: IEditorOptions): void {
+    if (target === this) return;
+    this.doMoveOrCopyAcrossGroups(editor, target as PracEditorGroup, options, true);
   }
 
+  /**
+   * Copy several editors into another group.
+   *
+   * @param editors - the editors with their options.
+   * @param target - the group to copy them to.
+   */
   copyEditors(
-    _editors: { editor: EditorInput; options?: IEditorOptions }[],
-    _target: IEditorGroup,
+    editors: { editor: EditorInput; options?: IEditorOptions }[],
+    target: IEditorGroup,
   ): void {
-    this.logService.info(
-      `vscode-embed: unsupported group operation — ${UNSUPPORTED_GROUP_OPERATIONS[1]}`,
-    );
+    for (const { editor, options } of editors) this.copyEditor(editor, target, options);
   }
+
+  /**
+   * Reorder an editor inside this group (upstream `doMoveEditorInsideGroup`).
+   *
+   * @param editor - the editor to move.
+   * @param options - the target index.
+   * @returns whether anything changed.
+   */
+  private moveEditorInsideGroup(editor: EditorInput, options?: IEditorOptions): boolean {
+    const index = options?.index;
+    if (typeof index !== "number") return true; // nothing asked for: a no-op, not a failure
+    const current = this.model.indexOf(editor);
+    if (current === -1) return false;
+    if (current !== index) {
+      this.model.moveEditor(editor, index);
+      this.model.pin(editor);
+    }
+    if (options?.sticky) this.stickEditor(editor);
+    return true;
+  }
+
+  /**
+   * The across-groups half of move and copy (upstream
+   * `doMoveOrCopyEditorAcrossGroups`).
+   *
+   * @param editor - the editor to move or copy.
+   * @param target - the destination group.
+   * @param options - open options.
+   * @param keepCopy - whether the source keeps its editor.
+   * @returns whether it happened.
+   */
+  private doMoveOrCopyAcrossGroups(
+    editor: EditorInput,
+    target: PracEditorGroup,
+    options: IEditorOptions | undefined,
+    keepCopy: boolean,
+  ): boolean {
+    if (!keepCopy || editor.hasCapability(EditorInputCapabilities.Singleton)) {
+      const veto = editor.canMove(this.id, target.id);
+      if (typeof veto === "string") {
+        // The editor refuses (a dirty diff editor, say): say so instead of moving
+        // something the editor itself says cannot move.
+        void this.dialogService.error(veto);
+        return false;
+      }
+    }
+    if (!keepCopy) {
+      this._onWillMoveEditor.fire({ groupId: this.id, editor, target: target.id });
+    }
+    void target.openEditor(keepCopy ? editor.copy() : editor, {
+      ...options,
+      // A moved editor is pinned (upstream does the same): it is not a preview that
+      // the next single click may replace.
+      pinned: true,
+      sticky: options?.sticky ?? (!keepCopy && this.model.isSticky(editor)),
+    });
+    if (!keepCopy) {
+      // Close here without promoting a neighbour into focus: the editor did not close,
+      // it moved, and the target is where it went.
+      void this.doCloseEditor(editor, { preserveFocus: true });
+    }
+    return true;
+  }
+
+  //#region Still refused, with a log line
 
   async replaceEditors(_editors: IEditorReplacement[]): Promise<void> {
     this.logService.info(
-      `vscode-embed: unsupported group operation — ${UNSUPPORTED_GROUP_OPERATIONS[2]}`,
+      `vscode-embed: unsupported group operation — ${UNSUPPORTED_GROUP_OPERATIONS[0]}`,
     );
   }
 
