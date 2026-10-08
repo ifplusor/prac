@@ -39,7 +39,7 @@ import { mainWindow } from "../../base/browser/window.js";
 import { ProgressBar } from "../../base/browser/ui/progressbar/progressbar.js";
 import { MenuId } from "../../platform/actions/common/actions.js";
 import { IContextKeyService } from "../../platform/contextkey/common/contextkey.js";
-import { IEditorOptions } from "../../platform/editor/common/editor.js";
+import { EditorActivation, IEditorOptions } from "../../platform/editor/common/editor.js";
 import { IEditorProgressService } from "../../platform/progress/common/progress.js";
 import { defaultProgressBarStyles } from "../../platform/theme/browser/defaultStyles.js";
 import { IInstantiationService } from "../../platform/instantiation/common/instantiation.js";
@@ -402,6 +402,25 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
         active: this.count === 0 || !options?.inactive,
         supportSideBySide: internalOptions?.supportSideBySide,
       };
+      // Which group the workbench should make *current* — upstream's three explicit
+      // requests plus the default below (`editorGroupView.ts:1234-1245`). prac keeps
+      // "the current region" in the host's active group, so honouring these is what
+      // makes a command or an extension able to bring a region forward.
+      let activateGroup = false;
+      let restoreGroup = false;
+      if (options?.activation === EditorActivation.ACTIVATE) {
+        activateGroup = true;
+      } else if (options?.activation === EditorActivation.RESTORE) {
+        restoreGroup = true;
+      } else if (options?.activation === EditorActivation.PRESERVE) {
+        activateGroup = false;
+        restoreGroup = false;
+      } else if (openOptions.active) {
+        // Only an editor opening as the active one moves the group, and preserving focus
+        // means restating the group without taking focus to it.
+        activateGroup = options?.preserveFocus !== true;
+        restoreGroup = !activateGroup;
+      }
       if (
         !openOptions.active &&
         !openOptions.pinned &&
@@ -434,6 +453,11 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
       // provide outline information." until another file was opened.
       if (result.changed === true) {
         this._onDidActiveEditorChange.fire({ editor: target, isExplicit: options?.isExplicit });
+      }
+      if (activateGroup) {
+        this.groupsView.activateGroup(this);
+      } else if (restoreGroup) {
+        this.groupsView.restoreGroup(this);
       }
       if (options?.preserveFocus !== true) {
         // The focus this raises is ours, not the person's: say so, because the
