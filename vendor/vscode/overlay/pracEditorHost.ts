@@ -208,7 +208,13 @@ export class PracEditorHost
     const existing = this._groups.find((group) => this._regions.get(group.id) === region);
     if (existing !== undefined) return existing;
     const group = this._register(
-      new PracEditorGroup(this, this.instantiationService, this.logService, label, this._groups.length),
+      new PracEditorGroup(
+        this,
+        this.instantiationService,
+        this.logService,
+        label,
+        this._groups.length,
+      ),
     );
     this._regions.set(group.id, region);
     this._groups.push(group);
@@ -289,8 +295,7 @@ export class PracEditorHost
   }
 
   activateGroup(group: IEditorGroup | GroupIdentifier): IEditorGroupView {
-    const resolved =
-      typeof group === "number" ? this.getGroup(group) : (group as PracEditorGroup);
+    const resolved = typeof group === "number" ? this.getGroup(group) : (group as PracEditorGroup);
     if (resolved === undefined) return this._requireActiveGroup();
     this.setActiveGroup(resolved as PracEditorGroup, true);
     return resolved;
@@ -300,7 +305,10 @@ export class PracEditorHost
     return this.activateGroup(group);
   }
 
-  addGroup(_location: IEditorGroupView | GroupIdentifier, _direction: GroupDirection): IEditorGroupView {
+  addGroup(
+    _location: IEditorGroupView | GroupIdentifier,
+    _direction: GroupDirection,
+  ): IEditorGroupView {
     // Real for prac: the embedder creates a group per region, and a "split" is a new
     // region. There is therefore nothing to add here — the region's creation drives it.
     this.logService.info(
@@ -310,9 +318,9 @@ export class PracEditorHost
   }
 
   removeGroup(group: IEditorGroupView | GroupIdentifier): void {
-    const resolved = (
-      typeof group === "number" ? this.getGroup(group) : group
-    ) as PracEditorGroup | undefined;
+    const resolved = (typeof group === "number" ? this.getGroup(group) : group) as
+      | PracEditorGroup
+      | undefined;
     if (resolved === undefined) return;
     const index = this._groups.indexOf(resolved);
     if (index >= 0) this._groups.splice(index, 1);
@@ -433,7 +441,9 @@ export class PracEditorHost
   }
 
   private refuse(index: number): void {
-    this.logService.info(`vscode-embed: unsupported editor host operation — ${UNSUPPORTED_HOST_OPERATIONS[index]}`);
+    this.logService.info(
+      `vscode-embed: unsupported editor host operation — ${UNSUPPORTED_HOST_OPERATIONS[index]}`,
+    );
   }
 
   //#endregion
@@ -451,7 +461,9 @@ export class PracEditorHost
   }
 
   async createAuxiliaryEditorPart(
-    _options?: IEditorPartCreationOptions | { bounds?: unknown; compact?: boolean; alwaysOnTop?: boolean },
+    _options?:
+      | IEditorPartCreationOptions
+      | { bounds?: unknown; compact?: boolean; alwaysOnTop?: boolean },
   ): Promise<IAuxiliaryEditorPart> {
     this.refuse(2);
     throw new Error("prac has no auxiliary editor parts");
@@ -525,9 +537,7 @@ export class PracEditorHost
     contextKey: RawContextKey<T>,
     group: IEditorGroupView,
   ): IContextKey<T> {
-    return contextKey.bindTo(
-      (group as PracEditorGroup).scopedContextKeyService,
-    ) as IContextKey<T>;
+    return contextKey.bindTo((group as PracEditorGroup).scopedContextKeyService) as IContextKey<T>;
   }
 
   //#endregion
