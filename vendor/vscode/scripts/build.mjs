@@ -179,6 +179,7 @@ const OVERLAY = [
   // checkout had just been cleaned (2026-09-16).
   { from: "overlay/extensionsGallery.ts", to: "src/vs/workbench/browser/extensionsGallery.ts" },
   { from: "overlay/embeddedWorkbench.ts", to: "src/vs/workbench/browser/embeddedWorkbench.ts" },
+  { from: "overlay/pracEditorGroup.ts", to: "src/vs/workbench/browser/pracEditorGroup.ts" },
   { from: "overlay/embeddedWebMain.ts", to: "src/vs/workbench/browser/embeddedWebMain.ts" },
 ];
 
