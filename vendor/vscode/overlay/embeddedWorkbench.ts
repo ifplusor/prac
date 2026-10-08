@@ -989,6 +989,12 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       // the same open after any read succeeded.
       void this.fileService
         .canHandleResource(uri)
+        // `pinned: true` is prac's decision, not upstream's default: the app's open set
+        // **is** prac's tab set (decision 17), so a file the app opened is a permanent
+        // tab rather than VS Code's italic preview that the next single click replaces
+        // (measured on the rig: the capability never reports `preview` for an app-opened
+        // file). Editors the *workbench* opens — a command, an extension — follow
+        // upstream's derivation, `enablePreview` included, in `PracEditorGroup.openEditor`.
         .then(() => this.editorService.openEditor({ resource: uri, options: { pinned: true } }))
         .catch((error) => {
           this.logService.error(`vscode-embed: openFile failed for ${resource}`, error);

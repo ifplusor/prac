@@ -62,6 +62,7 @@ import {
   IEditorReplacement,
 } from "../services/editor/common/editorGroupsService.js";
 import {
+  EditorInputCapabilities,
   EditorsOrder,
   GroupIdentifier,
   IActiveEditorChangeEvent,
@@ -74,7 +75,11 @@ import {
   IUntypedEditorInput,
   IVisibleEditorPane,
 } from "../common/editor.js";
-import { EditorGroupModel, IGroupModelChangeEvent } from "../common/editor/editorGroupModel.js";
+import {
+  EditorGroupModel,
+  IGroupModelChangeEvent,
+  IEditorOpenOptions,
+} from "../common/editor/editorGroupModel.js";
 import { EditorInput } from "../common/editor/editorInput.js";
 import { EditorPanes } from "./parts/editor/editorPanes.js";
 import { URI } from "../../base/common/uri.js";
@@ -370,16 +375,44 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
     const target = held ?? editor;
     this._onWillOpenEditor.fire({ editor: target, groupId: this.id });
     try {
-      this.model.openEditor(target, {
-        pinned: options?.pinned,
-        sticky: options?.sticky,
-        transient: options?.transient,
+      // **The preview/pinned derivation is upstream's** (`editorGroupView.ts:1201-1232`),
+      // not a pass-through: `pinned` is what decides whether the editor the person opens
+      // next *replaces* this one, and the part option `enablePreview` is the user's say
+      // in it. Passing the caller's `pinned` straight through made every editor pinned,
+      // so VS Code's preview semantics (the italic tab that the next single click
+      // replaces) never happened.
+      const openOptions: IEditorOpenOptions = {
+        index: options ? options.index : undefined,
+        pinned:
+          options?.sticky === true ||
+          (!this.groupsView.partOptions.enablePreview && !options?.transient) ||
+          target.isDirty() ||
+          (options?.pinned ?? typeof options?.index === "number") ||
+          (typeof options?.index === "number" && this.model.isSticky(options.index)) ||
+          target.hasCapability(EditorInputCapabilities.Scratchpad),
+        sticky:
+          options?.sticky === true ||
+          (typeof options?.index === "number" && this.model.isSticky(options.index)),
+        transient: !!options?.transient,
+        inactiveSelection: internalOptions?.inactiveSelection,
         // Active unless the caller asked otherwise — the same intent the workbench's
         // group has. Without this the model only reports "editor opened", never
         // "active editor changed", and everything that follows the active editor (the
         // editor service's own events, the Outline, the Timeline) stays silent.
-        active: options?.inactive !== true,
-      });
+        active: this.count === 0 || !options?.inactive,
+        supportSideBySide: internalOptions?.supportSideBySide,
+      };
+      if (
+        !openOptions.active &&
+        !openOptions.pinned &&
+        this.model.activeEditor &&
+        !this.model.isPinned(this.model.activeEditor)
+      ) {
+        // Upstream's special case: opening inactive and unpinned while the active editor
+        // is *also* unpinned means this editor will replace it, so it can only be active.
+        openOptions.active = true;
+      }
+      this.model.openEditor(target, openOptions);
       const result = await this.editorPanes.openEditor(
         target,
         options,
