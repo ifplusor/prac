@@ -28,6 +28,7 @@ import { mainWindow } from "../../base/browser/window.js";
 import { IInstantiationService } from "../../platform/instantiation/common/instantiation.js";
 import { InstantiationService } from "../../platform/instantiation/common/instantiationService.js";
 import { ServiceCollection } from "../../platform/instantiation/common/serviceCollection.js";
+import { SyncDescriptor } from "../../platform/instantiation/common/descriptors.js";
 import { getSingletonServiceDescriptors } from "../../platform/instantiation/common/extensions.js";
 import { ILayoutOffsetInfo, ILayoutService } from "../../platform/layout/browser/layoutService.js";
 import { ILogService } from "../../platform/log/common/log.js";
@@ -38,6 +39,7 @@ import { IHostService } from "../services/host/browser/host.js";
 import { INotificationService } from "../../platform/notification/common/notification.js";
 import { ICommandService } from "../../platform/commands/common/commands.js";
 import { IEditorService } from "../services/editor/common/editorService.js";
+import { IEditorResolverService } from "../services/editor/common/editorResolverService.js";
 import { IUntitledTextEditorService } from "../services/untitled/common/untitledTextEditorService.js";
 import { URI } from "../../base/common/uri.js";
 import { IEditorGroupsService } from "../services/editor/common/editorGroupsService.js";
@@ -60,13 +62,10 @@ import { onUnexpectedError } from "../../base/common/errors.js";
 import { Direction, Grid, ISerializableView, IViewSize } from "../../base/browser/ui/grid/grid.js";
 import { Part } from "./part.js";
 import { ViewPane } from "./parts/views/viewPane.js";
-import { CodeEditorWidget } from "../../editor/browser/widget/codeEditor/codeEditorWidget.js";
-import { ITextModelService } from "../../editor/common/services/resolverService.js";
+import { PracEditorHost } from "./pracEditorHost.js";
+import type { PracEditorGroup } from "./pracEditorGroup.js";
 import { IMarkerService, MarkerSeverity } from "../../platform/markers/common/markers.js";
 import type { IMarker } from "../../platform/markers/common/markers.js";
-import type { IResolvedTextEditorModel } from "../../editor/common/services/resolverService.js";
-import type { ICodeEditor } from "../../editor/browser/editorBrowser.js";
-import type { IReference } from "../../base/common/lifecycle.js";
 import {
   IWorkbenchLayoutService,
   IPartVisibilityChangeEvent,
@@ -88,7 +87,12 @@ import { setBaseLayerHoverDelegate } from "../../base/browser/ui/hover/hoverDele
 // The embed bridge contract. `embedBridge.ts` is staged into this tree by this
 // package's build (`vendor/vscode/scripts/build.mjs`) from
 // `vendor/vscode/overlay/embedBridge.ts`, so both sides read one definition.
-import { PART_HOST_ATTR, readEmbedBridge, type ViewCatalogueEntry } from "./embedBridge.js";
+import {
+  PART_HOST_ATTR,
+  readEmbedBridge,
+  type EmbedBridge,
+  type ViewCatalogueEntry,
+} from "./embedBridge.js";
 import { IHoverService, WorkbenchHoverDelegate } from "../../platform/hover/browser/hover.js";
 import { IMarkdownRendererService } from "../../platform/markdown/browser/markdownRenderer.js";
 import { EditorMarkdownCodeBlockRenderer } from "../../editor/browser/widget/markdownRenderer/browser/editorMarkdownCodeBlockRenderer.js";
@@ -98,6 +102,15 @@ import "./style.js";
 export interface IEmbeddedWorkbenchOptions {
   /** Extra classes on the root container. */
   extraClasses?: string[];
+  /**
+   * The embedder's bridge, read where the construction options are still whole.
+   *
+   * It has to travel here rather than be read from `environmentService.options`
+   * during service setup: that field is assigned in `initLayout`, which runs *after*
+   * `initServices` — and the service registration (who owns the editor) has to be
+   * decided inside `initServices`.
+   */
+  embedBridge?: EmbedBridge;
 }
 
 export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutService {
@@ -248,9 +261,17 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    * The reference is what keeps the workbench's text model alive while this
    * surface shows it; releasing it lets the model go when nothing else holds it.
    */
+  /**
+   * One editing surface per resource, and the group showing it.
+   *
+   * The surface is the workbench's own editor pane (created by the region's group),
+   * not a second widget over the same model — that is the whole point of prac's
+   * editor host: the language service, the commands and the person all look at the
+   * same editor.
+   */
   private readonly mountedFiles = new Map<
     string,
-    { readonly editor: ICodeEditor; readonly reference: IReference<IResolvedTextEditorModel> }
+    { readonly group: PracEditorGroup; readonly element: HTMLElement }
   >();
   /** One single-view grid per mounted part; the grid supplies part positioning. */
   private readonly grids = new Map<string, Grid<ISerializableView>>();
@@ -371,9 +392,8 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
         // this face gets back to it — see `embedBridge.ts`.
         const bridge = readEmbedBridge(this.environmentService?.options);
         if (bridge?.deferParts) {
-          // The editor service needs its part to exist even though the embedder
-          // renders files itself; it is created off-screen and never hosted.
-          this.createDetachedPart("workbench.parts.editor");
+          // No detached editor part: prac *is* the host (registered above), and the
+          // embedder mounts each region's group where the region is.
           bridge.publish({
             mountPartInto: (partId: string, element: HTMLElement) =>
               this.mountPartInto(partId, element),
@@ -442,6 +462,22 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
 
     for (const [id, descriptor] of getSingletonServiceDescriptors()) {
       serviceCollection.set(id, descriptor);
+    }
+
+    // prac's shell owns the editor: **prac is the editor host** (see
+    // `pracEditorHost.ts`), so the workbench's own editor parts manager is replaced
+    // rather than created off-screen. Overriding after the singleton descriptors is
+    // what makes the later registration win.
+    //
+    // The bridge is read from the **constructor** options, not from
+    // `this.environmentService`: that field is only assigned in `initLayout`, which
+    // runs after this method — reading it here silently skipped the override and left
+    // the workbench's own parts manager in place (measured: `openFile` then failed in
+    // `doFindGroup` with `activeGroup` undefined, because that manager's part is never
+    // hosted any more).
+    const embedBridge = this.options?.embedBridge ?? readEmbedBridge(this.environmentService?.options);
+    if (embedBridge?.deferParts) {
+      serviceCollection.set(IEditorGroupsService, new SyncDescriptor(PracEditorHost));
     }
 
     const instantiationService = new InstantiationService(serviceCollection, true);
@@ -736,30 +772,30 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   //#endregion
 
   /**
-   * Mount one file's editing surface into an external host element.
+   * Mount one file's editing surface into the element prac prepared for its view.
    *
-   * The unit is the **file**, because the embedder owns which files are open,
-   * their grouping and their tab strip. What the workbench contributes is the
-   * editing surface itself, built the way the workbench builds it
-   * (`TextCodeEditor.createEditorControl`): a `CodeEditorWidget` over the
-   * workbench's own text model for the resource, so language features, markers,
-   * undo/redo and saving are the real ones rather than a re-implementation.
+   * The unit is prac's **region**: a region that holds files owns one
+   * {@link PracEditorGroup}, the group's element is mounted into the region's view
+   * host, and the file is opened as an editor *in that group*. So the surface a
+   * person sees is the pane the workbench's editor service knows about — its
+   * language features, markers, view state, commands, breadcrumbs and peek included
+   * — instead of a look-alike widget beside an off-screen pane.
    *
-   * The resource may arrive as a full URI string (`vscode-remote://…`, which is
-   * what the app's own workspace folders look like) or as a bare path; the
-   * embedder cannot construct a `URI` instance, so the string is parsed here —
-   * the same reason `openWorkspaceFolder` takes a string.
+   * The resource may arrive as a full URI string (`vscode-remote://…`, which is what
+   * the app's own workspace folders look like) or as a bare path; the embedder cannot
+   * construct a `URI` instance, so the string is parsed here — the same reason
+   * `openWorkspaceFolder` takes a string.
    *
-   * Model loading is asynchronous, so this registers the element first and
-   * fills it in when the model resolves; a failed load is reported and leaves
-   * the host empty rather than half-mounted.
+   * @param resource - the file's URI, as a string.
+   * @param element - the element the embedder rendered for the file's view.
    */
   mountFileInto(resource: string, element: HTMLElement): void {
     const mounted = this.mountedFiles.get(resource);
     if (mounted) {
-      // One surface per file: the same file asked for twice is the same editor,
-      // re-parented — a second editor would be a second view of one model.
-      element.replaceChildren(mounted.editor.getDomNode() ?? element);
+      // One surface per file: the same file asked for twice is the same pane,
+      // shown in the element that is on screen now.
+      mounted.group.create(element);
+      this.layoutGroup(mounted.group, element);
       return;
     }
     const instantiationService = this.instantiationService;
@@ -772,25 +808,26 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       : URI.file(resource);
     void instantiationService
       .invokeFunction(async (accessor) => {
-        const textModelService = accessor.get(ITextModelService);
-        const reference = await textModelService.createModelReference(uri);
-        // Mirrors the options `BaseTextEditor` hands its control, plus
-        // `automaticLayout`: the embedder's regions resize, and nothing here
-        // would otherwise tell the widget to lay out again.
-        const editor = instantiationService.createInstance(
-          CodeEditorWidget,
-          element,
-          {
-            automaticLayout: true,
-            fixedOverflowWidgets: true,
-            renderValidationDecorations: "on",
-          },
-          Object.create(null),
-        ) as unknown as ICodeEditor;
-        editor.setModel(reference.object.textEditorModel);
-        this.mountedFiles.set(resource, { editor, reference });
-        this._register(editor as unknown as IDisposable);
-        this._register(reference);
+        const host = accessor.get(IEditorGroupsService) as unknown as PracEditorHost;
+        const resolver = accessor.get(IEditorResolverService);
+        // The region is read from the DOM the frame rendered ("the adaptor
+        // recognises its root from elements"): the view host sits inside its region.
+        // A host with no region ancestor (a probe mounting a file straight into an
+        // element) is a region of its own — one host, one group — so two hosts never
+        // fight over the same group element.
+        const region =
+          element.closest("[data-prac-region]")?.getAttribute("data-prac-region") ??
+          this.hostRegion(element);
+        const group = host.ensureGroup(region, region);
+        group.create(element);
+        const resolved = await resolver.resolveEditor({ resource: uri });
+        const editor = (resolved as { editor?: EditorInput }).editor;
+        if (!editor) throw new Error(`no editor for ${resource}`);
+        await group.openEditor(editor, { pinned: true, preserveFocus: true });
+        host.activateGroup(group.id);
+        this.mountedFiles.set(resource, { group, element });
+        this.layoutGroup(group, element);
+        this.observeHost(element);
       })
       .catch((error) => {
         this.logService.error(`vscode-embed: failed to mount file ${resource}`, error);
@@ -798,31 +835,54 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   }
 
   /**
-   * Dispose the editing surface for a file, so it can be mounted again.
+   * Forget a file's surface.
    *
-   * The text model is not the embedder's to destroy: the reference taken by
-   * {@link mountFileInto} is released, and the model goes when nothing else
-   * holds it (another surface, or a dirty buffer).
+   * The **editor stays open**: it is still open in the workbench, and the file view
+   * may come back (switching tabs, moving the view). Only the embedder's bookkeeping
+   * goes; the group keeps the pane.
+   *
+   * @param resource - the file's resource string.
    */
   releaseFile(resource: string): void {
-    const mounted = this.mountedFiles.get(resource);
-    if (!mounted) return;
     this.mountedFiles.delete(resource);
-    mounted.editor.dispose();
-    mounted.reference.dispose();
+  }
+
+  /** Region ids handed to hosts that carry no `[data-prac-region]` ancestor. */
+  private readonly adhocRegions = new WeakMap<HTMLElement, string>();
+  private adhocRegionCount = 0;
+
+  /**
+   * The region id for a host element that is not inside a region.
+   *
+   * @param element - the host element.
+   * @returns a stable id for that element.
+   */
+  private hostRegion(element: HTMLElement): string {
+    const existing = this.adhocRegions.get(element);
+    if (existing !== undefined) return existing;
+    const created = `host:${this.adhocRegionCount++}`;
+    this.adhocRegions.set(element, created);
+    return created;
+  }
+
+  /**
+   * Lay one group out in the box of the element showing it.
+   *
+   * @param group - the group.
+   * @param element - the element the group is shown in.
+   */
+  private layoutGroup(group: PracEditorGroup, element: HTMLElement): void {
+    const box = element.getBoundingClientRect();
+    group.layout(Math.round(box.width), Math.round(box.height), 0, 0);
   }
 
   /**
    * Make one mounted file the app's active editor.
    *
    * The embedder calls this when its region for the file takes focus. The workbench
-   * follows *its* active editor — the Outline, the Timeline and every command read
-   * it — and the embedder is the only side that knows which region a person is
-   * working in, so focus has to travel up. Without it the app keeps describing
-   * whichever file was opened last.
-   *
-   * Activation only: the surface a person sees is the embedder's own widget, so
-   * this moves the workbench's notion of "current" and nothing else.
+   * follows *its* active editor — the Outline, the Timeline and every command read it
+   * — and the embedder is the only side that knows which region a person is working
+   * in, so focus has to travel up.
    *
    * @param resource - the file's resource string, as {@link mountFileInto} took it.
    */
@@ -831,12 +891,15 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
         ? URI.parse(resource)
         : URI.file(resource);
-      const identifier = this.editorService.findEditors(uri)[0];
-      if (!identifier) return;
-      // `preserveFocus` because the person's focus is already where it should be;
-      // this only tells the workbench which editor is current.
-      void identifier.group.openEditor(identifier.editor, { preserveFocus: true });
-      this.editorGroupService.activateGroup(identifier.group);
+      // Iterate prac's own groups: an editor lives in exactly one of them, and the
+      // group is what has to become (and be) active.
+      for (const group of this.editorGroupService.groups) {
+        const editor = group.findEditors(uri)[0];
+        if (editor === undefined) continue;
+        void group.openEditor(editor, { preserveFocus: true });
+        this.editorGroupService.activateGroup(group);
+        return;
+      }
     } catch (error) {
       this.logService.error(`vscode-embed: failed to focus file ${resource}`, error);
     }
@@ -1160,34 +1223,6 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    * part registers. This is the seam the embedder's shell uses to place a part
    * in its own layout region.
    */
-  /**
-   * Create a part into a hidden container the frame never shows.
-   *
-   * Some services need their part to *exist* — the editor service opens editors
-   * through the editor part's groups — while the embedder renders those files
-   * itself as views (decision 17). Measured: with the editor part never created,
-   * `openEditor` throws `Cannot read properties of undefined (reading
-   * 'isLocked')` and no file ever opens, so "retire the part" has to mean
-   * "create it, never host it" rather than "never create it".
-   *
-   * The part is registered as mounted, so a later `mountPartInto` *moves* this
-   * same instance instead of creating a second one.
-   *
-   * @param partId - the workbench part id.
-   */
-  private createDetachedPart(partId: string): void {
-    const element = mainWindow.document.querySelector<HTMLElement>("[data-vscode-embed-detached]");
-    const host =
-      element ??
-      (() => {
-        const created = mainWindow.document.createElement("div");
-        created.setAttribute("data-vscode-embed-detached", partId);
-        created.style.cssText = "position:absolute;left:-100000px;top:0;width:800px;height:600px";
-        mainWindow.document.body.append(created);
-        return created;
-      })();
-    this.mountPartInto(partId, host);
-  }
 
   mountPartInto(partId: string, element: HTMLElement): void {
     if (this.mountedParts.has(partId)) {
@@ -1450,6 +1485,14 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
         pane.layout(height);
       } catch (error) {
         this.logService.error(`vscode-embed: failed to layout view ${id}`, error);
+      }
+    }
+
+    for (const { group, element } of this.mountedFiles.values()) {
+      try {
+        this.layoutGroup(group, element);
+      } catch (error) {
+        this.logService.error("vscode-embed: failed to layout a prac editor group", error);
       }
     }
 

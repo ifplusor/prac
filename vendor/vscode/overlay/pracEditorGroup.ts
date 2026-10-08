@@ -170,7 +170,16 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
     this.editorContainer.classList.add("editor-container");
     this.element.append(this.editorContainer);
 
-    // The group's own scope, exactly as the workbench's group builds it.
+    // The model first: everything below (the group's events, the progress
+    // indicator's listeners, the panes) reads the model while it is being built, so
+    // it has to exist — and its event has to be exposed — before they are.
+    this.model = this._register(
+      this.instantiationService.createInstance(EditorGroupModel, undefined),
+    );
+    this.onDidModelChange = this.model.onDidModelChange;
+    this._register(this.model.onDidModelChange((event) => this.onModelChanged(event)));
+
+    // Then the group's own scope, exactly as the workbench's group builds it.
     this.progressBar = this._register(new ProgressBar(this.element, defaultProgressBarStyles));
     this.progressBar.hide();
     this.scopedContextKeyService = this._register(
@@ -190,11 +199,6 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
       ),
     );
 
-    this.model = this._register(
-      this.instantiationService.createInstance(EditorGroupModel, undefined),
-    );
-    this.onDidModelChange = this.model.onDidModelChange;
-    this._register(this.model.onDidModelChange((event) => this.onModelChanged(event)));
     this.editorPanes = this._register(
       scoped.createInstance(EditorPanes, this.element, this.editorContainer, this),
     );
@@ -356,7 +360,11 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
         pinned: options?.pinned,
         sticky: options?.sticky,
         transient: options?.transient,
-        active: options?.inactive === true ? false : undefined,
+        // Active unless the caller asked otherwise — the same intent the workbench's
+        // group has. Without this the model only reports "editor opened", never
+        // "active editor changed", and everything that follows the active editor (the
+        // editor service's own events, the Outline, the Timeline) stays silent.
+        active: options?.inactive !== true,
       });
       const result = await this.editorPanes.openEditor(
         editor,

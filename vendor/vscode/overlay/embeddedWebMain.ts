@@ -10,6 +10,7 @@
 import { ServiceCollection } from "../../platform/instantiation/common/serviceCollection.js";
 import { ILogService } from "../../platform/log/common/log.js";
 import { BrowserMain, IBrowserMainWorkbench } from "./web.main.js";
+import { readEmbedBridge } from "./embedBridge.js";
 import { EmbeddedWorkbench } from "./embeddedWorkbench.js";
 
 export class EmbeddedBrowserMain extends BrowserMain {
@@ -31,7 +32,12 @@ export class EmbeddedBrowserMain extends BrowserMain {
   ): IBrowserMainWorkbench {
     return new EmbeddedWorkbench(
       domElement,
-      { configuration: this.configuration },
+      {
+        configuration: this.configuration,
+        // `this.configuration` *is* the environment service's `options` (the same
+        // object), and it is whole here — so this is where the bridge is read.
+        embedBridge: readEmbedBridge(this.configuration),
+      },
       serviceCollection,
       logService,
     ) as unknown as IBrowserMainWorkbench;

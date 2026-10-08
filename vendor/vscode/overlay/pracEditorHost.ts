@@ -177,10 +177,10 @@ export class PracEditorHost
   }
 
   constructor(
-    private readonly instantiationService: IInstantiationService,
-    private readonly configurationService: IConfigurationService,
-    private readonly themeService: IThemeService,
-    private readonly logService: ILogService,
+    @IInstantiationService private readonly instantiationService: IInstantiationService,
+    @IConfigurationService private readonly configurationService: IConfigurationService,
+    @IThemeService private readonly themeService: IThemeService,
+    @ILogService private readonly logService: ILogService,
   ) {
     super();
     this._partOptions = getEditorPartOptions(this.configurationService, this.themeService);
@@ -190,6 +190,14 @@ export class PracEditorHost
       }),
     );
     this._register(this.themeService.onDidColorThemeChange(() => this.updatePartOptions()));
+
+    // The editor area always has **one** group, created here rather than on first
+    // use: the editor service registers its per-group listeners while restoring
+    // (`onEditorGroupsReady` walks the groups it sees) and only picks up later ones
+    // through `onDidAddGroup`. A group created lazily *after* that walk is therefore
+    // never listened to — measured: opening a file then changed nothing any observer
+    // could see (no `onDidChangeOpenFiles`, so prac never placed a file view).
+    this._activeGroup = this.ensureGroup("stage", "stage");
   }
 
   //#region The group registry (real)

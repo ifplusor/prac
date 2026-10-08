@@ -136,6 +136,10 @@ await page.evaluate(
     const host = (id) => {
       const element = document.createElement("div");
       element.id = id;
+      // The frame hands the adaptor a host **inside a region**; the adaptor reads the
+      // region from the DOM to pick the editor group that shows the file, so the probe
+      // hosts carry a region of their own.
+      element.setAttribute("data-prac-region", `probe:${id}`);
       element.style.cssText =
         "position:fixed;z-index:99999;width:620px;height:360px;left:20px;background:#1e1e1e";
       element.style.top = id === "prac-file-a" ? "20px" : id === "prac-file-b" ? "400px" : "780px";
