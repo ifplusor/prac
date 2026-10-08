@@ -392,6 +392,17 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
       }
       const pane = (result.pane ?? undefined) as IVisibleEditorPane | undefined;
       this.activePane = pane;
+      // The model reported the new active editor **before its pane existed**
+      // (`model.openEditor` fires while `editorPanes.openEditor` is still running), so
+      // a listener that asked for the pane at that moment got nothing and had no reason
+      // to ask again. The Outline is exactly such a listener — measured, the first file
+      // of a session kept "The active editor cannot provide outline information."
+      // forever while every later file was fine (the group still held the previous
+      // pane, so `activeEditorPane` was merely stale rather than empty). The fact is
+      // true now, so it is announced now.
+      if (pane !== undefined && options?.inactive !== true) {
+        this._onDidActiveEditorChange.fire({ editor: target });
+      }
       if (options?.preserveFocus !== true) {
         // The focus this raises is ours, not the person's: say so, because the
         // embedder turns `focusin` on a file's host into "the person is working in
