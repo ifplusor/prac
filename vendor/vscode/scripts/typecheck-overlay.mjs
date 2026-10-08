@@ -27,7 +27,12 @@ const repoRoot = resolve(packageDir, "../..");
 const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
 
 /** The overlay files that live on the tree (`overlay/<x>.ts` → `src/vs/workbench/browser/<x>.ts`). */
-const FILES = ["pracEditorGroup", "pracEditorHost"];
+// `embeddedWorkbench.ts` / `embeddedWebMain.ts` are deliberately not listed yet:
+// adding them surfaces ~20 **pre-existing** type errors from a file that has only
+// ever been transpiled (unused injected fields, an incomplete `IWorkbenchLayoutService`
+// implementation, `ServicesAccessorLike`). Fixing those is its own task; until then
+// they would drown out the errors this script exists to catch.
+const FILES = ["pracEditorGroup", "pracEditorHost", "embedBridge"];
 
 const config = {
   extends: "./src/tsconfig.base.json",
