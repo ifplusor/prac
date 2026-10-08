@@ -202,6 +202,14 @@ export interface VscodeEditorEntry {
   readonly dirty: boolean;
   /** Whether the editor is in preview mode. */
   readonly preview: boolean;
+  /**
+   * The group holding this editor and the prac region it belongs to.
+   *
+   * The same file in two regions is two entries: a consumer that gives each open
+   * editor its own view keys them by `group`, and places each one in `region`.
+   */
+  readonly group: number;
+  readonly region: string | null;
 }
 
 /**

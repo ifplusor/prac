@@ -267,6 +267,15 @@ export interface EditorEntry {
   readonly dirty: boolean;
   /** Whether the editor is in preview mode (replaced by the next preview open). */
   readonly preview: boolean;
+  /**
+   * The group holding this editor, and the prac region that group belongs to.
+   *
+   * One entry per group, so a file open in two regions appears twice — which is what
+   * lets a consumer give each of them its own view. A group that no prac region owns
+   * yet reports `null` for the region.
+   */
+  readonly group: number;
+  readonly region: string | null;
 }
 
 /** What a consumer may do to the editor set. */

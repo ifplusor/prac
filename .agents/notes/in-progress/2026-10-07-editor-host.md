@@ -25,6 +25,8 @@ status: in-progress
 3. **我们要写的**：`IEditorGroupView`（= `IEditorGroup`，51 个成员，其中绝大多数是对 `EditorGroupModel` 的转发）+ 宿主三接口的最小集（`IEditorGroupsService` 15 / `IEditorPart` 8 + `IEditorGroupsView` 18 / `IEditorPartsView` 10）。需要真行为的十余个：组注册与查表、活动组与激活事件、加/删组、`partOptions`、可见性、layout 事件、上下文键的 `bind`。
 4. **多组 + 分栏 = prac 的区域树**：一个载文件的区域 = 一个组（`stage` 是默认那个），拆区域 = 新组（与"分栏是区域的性质"一致）；只放侧栏 / 面板的区域没有组。
 5. **目录与落位**：`listOpenFiles()` 照旧读编辑器服务的打开集合；文件在哪个区域 = 它在哪个组，"把文件搬去另一个区域" = 编辑器在组之间搬（`moveEditors`）。**文件不再由 frame 给每个文件一个宿主**——那是组的活；prac 的 tab 条仍然描述这个区域里的视图顺序。
+6. **一个文件可以同时住在多个区域**（VS Code 的 Split Editor 语义）：所以**身份是 (文件, 组)**，不是文件。能力按组报条目（`resource / group / region / active / dirty / preview`），同一个文件在两处就是两条；prac 侧为每条建自己的视图，视图 id 由 (组, 资源) 决定，落位由条目给的 `region` 决定——**框的位置由工作台决定，形状由 frame 决定**。编辑器在组间的搬/复制（工作台的 move/copy、Split Editor）就是"条目多一条/少一条"，视图跟着来去。
+7. **`findGroup` 的位置语义**：FIRST / LAST / NEXT / PREVIOUS 是**顺序型**（组列表的两端与相邻），照上游 `editorPart.ts:385-412` 实现；LEFT / RIGHT / UP / DOWN 是**方向型**，要 prac 区域树的几何，只属于 frame，宿主同步答不出来 ⇒ 不答（调用方于是走 `addGroup`）。`addGroup` 反过来要"创建一个区域"，是 host → app 的请求 + 区域 id 由宿主指定，属未落地的一步。
 
 ## Alternatives（放弃了什么）
 
@@ -36,11 +38,10 @@ status: in-progress
 
 ## Open questions
 
-- **组的可见性还要不要 adaptor 参与**：按"一个区域 = 一个组"，组的"一次一个"与区域的 tab 语义一致，原则上**可见性完全归 frame**；要核的是组在"没有活动编辑器"时渲染什么（水印/空 tab 条）与 prac 的空区域渲染是否打架。
-- **组级的网格动作**（split / move / copy / merge group、maximize、arrange）：其中 **split 天然映射到"拆一个区域"**（`stage` 分栏 = 新组），其余（move/copy group、merge、maximize、arrange）与 prac 的区域层级没有对位 ⇒ 倾向**先明确不支持**，在启动日志与一条门里列出。
 - **组头**（tab 条 + 面包屑）：tab 按决定 17 归 prac（区域的 tab 条已有），**面包屑挂在组头上**——是先让 prac 的 tab 条只做 tab、把组头其余部分搬进来，还是另行处理，单独裁一次。
-- **组的 DOM 挂在哪个宿主上**：**区域级宿主**（机制给区域一个内容宿主，组画在里面，文件的视图宿主闲置）还是**跟随该区域当前活动的文件视图**（组 DOM 搬进那个视图的宿主，与今天搬 part/view 同一套）。倾向后者——它与现有机制一致，也让"文件视图"这个名字仍然名副其实。
 - **未支持清单的表达**：放在启动日志、一条活体门，还是两者都要。
+- **身份改造落在 app 侧的两步**（机制侧已经能按 (组, 资源) 报条目）：① `prac-client-vscode-host` 的目录从"每个打开文件一条"变成"每条目一条"，视图 id 由 (组, 资源) 决定（现在是资源的函数，所以一个文件只能有一个视图）；② `prac-client-ui-vscode-editor` / arrangement 按条目给的 `region` 落位（现在是"新打开的文件进中间"）。随之要重定的是 tab 条（一个文件可能在两处出现两个 tab）、"当前文件"的概念，以及关闭/脏标记按条目算还是按文件算。
+- **`addGroup` 的落地形状**：host → app 的一条请求（"为这个组创建一个区域"）+ `layout.splitView` 接受宿主指定的 region id（现在自己生成），否则 `addGroup` 返回的组与真实区域对不上。`findGroup` 的方向型位置（LEFT/RIGHT/UP/DOWN）同样等这条通道：几何只有 frame 有。
 
 ## 侦察结果（2026-10-07，探针跑在真 rig 上）
 

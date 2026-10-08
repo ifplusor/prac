@@ -79,7 +79,7 @@ import {
   IWorkbenchContributionsRegistry,
   Extensions as WorkbenchExtensions,
 } from "../common/contributions.js";
-import { IEditorFactoryRegistry, EditorExtensions } from "../common/editor.js";
+import { EditorExtensions, EditorsOrder, IEditorFactoryRegistry } from "../common/editor.js";
 import { WorkbenchContextKeysHandler } from "./contextkeys.js";
 import { setARIAContainer } from "../../base/browser/ui/aria/aria.js";
 import { setHoverDelegateFactory } from "../../base/browser/ui/hover/hoverDelegateFactory.js";
@@ -1103,17 +1103,34 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       this.watchDirty(dirtyListeners, notify);
       for (const listener of [...listeners]) listener();
     };
-    const entryOf = (editor: EditorInput, previews: ReadonlySet<EditorInput>) => ({
-      resource: editor.resource?.toString() ?? "",
-      active: editor === this.editorService.activeEditor,
-      dirty: editor.isDirty(),
-      preview: previews.has(editor),
-    });
-    const visibleEditors = (): EditorInput[] => {
-      return this.editorService.editors.filter(
-        (editor) => editor.resource !== undefined && this.fileService.hasProvider(editor.resource),
-      );
+    const entryOf = (
+      editor: EditorInput,
+      groupId: GroupIdentifier,
+      previews: ReadonlySet<EditorInput>,
+    ) => {
+      const group = this.editorGroupService.getGroup(groupId) as PracEditorGroup | undefined;
+      return {
+        resource: editor.resource?.toString() ?? "",
+        active: editor === this.editorService.activeEditor,
+        dirty: editor.isDirty(),
+        preview: previews.has(editor),
+        // The group and its region travel with the entry: a file open in two regions is
+        // two entries, and each one's consumer needs to know *which* region to show it
+        // in. `getEditors` is what pairs the editor with its group — the flat `editors`
+        // list does not say where each one lives.
+        group: groupId,
+        region: (group === undefined ? undefined : this.editorGroupService.regionOf(group)) ?? null,
+      };
     };
+    /** One entry per (group, editor): the same file in two regions is two of these. */
+    const visibleEditors = (): { editor: EditorInput; groupId: GroupIdentifier }[] =>
+      this.editorService
+        .getEditors(EditorsOrder.SEQUENTIAL)
+        .filter(
+          ({ editor }) =>
+            editor.resource !== undefined && this.fileService.hasProvider(editor.resource),
+        )
+        .map(({ editor, groupId }) => ({ editor, groupId }));
     const previewsOf = (): Set<EditorInput> => {
       const previews = new Set<EditorInput>();
       for (const group of this.editorGroupService.groups) {
@@ -1126,7 +1143,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     return {
       snapshot: () => {
         const previews = previewsOf();
-        return visibleEditors().map((editor) => entryOf(editor, previews));
+        return visibleEditors().map(({ editor, groupId }) => entryOf(editor, groupId, previews));
       },
       subscribe: (listener: () => void) => {
         listeners.add(listener);

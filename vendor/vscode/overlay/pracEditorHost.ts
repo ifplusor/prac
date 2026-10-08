@@ -61,6 +61,7 @@ import {
   GroupDirection,
   GroupOrientation,
   GroupsArrangement,
+  GroupLocation,
   GroupsOrder,
   IEditorDropTargetDelegate,
   IEditorGroup,
@@ -404,10 +405,50 @@ export class PracEditorHost
     if (explicit) this._onDidActivateGroup.fire({ group, reason: GroupActivationReason.DEFAULT });
   }
 
+  /**
+   * Find a group by location, the way upstream's part does
+   * (`editorPart.ts:385-412`).
+   *
+   * **Order-based locations are real**: FIRST/LAST are the ends of the group list and
+   * NEXT/PREVIOUS step through it, which is what the workbench's "move/split editor into
+   * the next group" commands ask for. Directional lookups (LEFT/RIGHT/UP/DOWN) need the
+   * *geometry* of prac's region tree, which belongs to the frame and cannot be read
+   * synchronously here — those return `undefined`, so a caller that wanted a new group
+   * falls back to `addGroup`, which is accounted for separately.
+   *
+   * @param scope - what to look for.
+   * @param source - the group to look from; the active one by default.
+   * @param wrap - whether NEXT/PREVIOUS wrap around the ends.
+   * @returns the group, or `undefined`.
+   */
   findGroup(
-    _scope: IFindGroupScope,
+    scope: IFindGroupScope,
     source?: IEditorGroup | GroupIdentifier,
+    wrap?: boolean,
   ): IEditorGroupView | undefined {
+    const groups = this.getGroups(GroupsOrder.GRID_APPEARANCE);
+    if (scope.location === GroupLocation.FIRST) return groups[0];
+    if (scope.location === GroupLocation.LAST) return groups[groups.length - 1];
+    if (scope.location === GroupLocation.NEXT || scope.location === GroupLocation.PREVIOUS) {
+      const from =
+        source === undefined
+          ? this._activeGroup
+          : typeof source === "number"
+            ? this.getGroup(source)
+            : (source as IEditorGroupView);
+      const index = from === undefined ? -1 : groups.indexOf(from);
+      if (index === -1) return undefined;
+      const step = scope.location === GroupLocation.NEXT ? 1 : -1;
+      const found = groups[index + step];
+      if (found !== undefined) return found;
+      return wrap === true ? (step === 1 ? groups[0] : groups[groups.length - 1]) : undefined;
+    }
+    if (typeof scope.direction === "number") {
+      this.logService.info(
+        `vscode-embed: directional group lookup (${scope.direction}) needs the region tree's geometry; not answered`,
+      );
+      return undefined;
+    }
     if (source === undefined) return this._requireActiveGroup();
     return typeof source === "number" ? this.getGroup(source) : (source as IEditorGroupView);
   }
