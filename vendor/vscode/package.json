@@ -25,6 +25,7 @@
     "vscode:verify-file": "node scripts/verify-file.mjs",
     "vscode:verify-extension": "node scripts/verify-extension.mjs",
     "vscode:verify-outline": "node scripts/verify-outline.mjs",
+    "vscode:verify-close": "node scripts/verify-close.mjs",
     "vscode:verify-views": "node scripts/verify-views.mjs",
     "vscode:inspect-region": "node scripts/inspect-region.mjs",
     "vscode:screenshot": "node scripts/screenshot.mjs",

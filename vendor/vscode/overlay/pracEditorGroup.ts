@@ -40,6 +40,7 @@ import { ProgressBar } from "../../base/browser/ui/progressbar/progressbar.js";
 import { MenuId } from "../../platform/actions/common/actions.js";
 import { IContextKeyService } from "../../platform/contextkey/common/contextkey.js";
 import { EditorActivation, IEditorOptions } from "../../platform/editor/common/editor.js";
+import { ConfirmResult, IFileDialogService } from "../../platform/dialogs/common/dialogs.js";
 import { IEditorProgressService } from "../../platform/progress/common/progress.js";
 import { defaultProgressBarStyles } from "../../platform/theme/browser/defaultStyles.js";
 import { IInstantiationService } from "../../platform/instantiation/common/instantiation.js";
@@ -72,6 +73,7 @@ import {
   IEditorWillOpenEvent,
   IFindEditorOptions,
   IMatchEditorOptions,
+  SaveReason,
   IUntypedEditorInput,
   IVisibleEditorPane,
 } from "../common/editor.js";
@@ -82,6 +84,10 @@ import {
 } from "../common/editor/editorGroupModel.js";
 import { EditorInput } from "../common/editor/editorInput.js";
 import { EditorPanes } from "./parts/editor/editorPanes.js";
+import {
+  AutoSaveMode,
+  IFilesConfigurationService,
+} from "../services/filesConfiguration/common/filesConfigurationService.js";
 import { URI } from "../../base/common/uri.js";
 
 /**
@@ -491,7 +497,30 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
   }
 
   /**
-   * Close one editor.
+   * Close one editor, asking first when there is something to lose.
+   *
+   * The confirmation is upstream's shape (`editorGroupView.ts:1560-1580`): an editor
+   * that cannot close is refused outright, a dirty one goes through
+   * {@link handleCloseConfirmation}, and only then does the close happen. Without it a
+   * dirty editor was closed silently — measured on the rig: typed into a file, called
+   * the close action, and the file was gone with no dialog and no veto.
+   *
+   * @param editor - the editor to close; the active one when omitted.
+   * @param options - close options (`force` skips the question).
+   * @returns whether an editor was closed.
+   */
+  async closeEditor(editor?: EditorInput, options?: ICloseEditorOptions): Promise<boolean> {
+    const candidate = editor ?? this.activeEditor ?? undefined;
+    if (!candidate) return false;
+    if (options?.force !== true && candidate.hasCapability(EditorInputCapabilities.CannotClose)) {
+      return false;
+    }
+    if (await this.handleCloseConfirmation([candidate])) return false; // vetoed
+    return this.doCloseEditor(candidate, options);
+  }
+
+  /**
+   * The close itself, once nothing vetoes it.
    *
    * Mirrors the shipped group's order, because the order is load-bearing: the **model**
    * goes first, and only then the pane. Closing the active editor is not "dispose its
@@ -501,13 +530,14 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
    * the group showing nothing). Upstream `EditorGroupView.doCloseActiveEditor` is the
    * reference this follows.
    *
-   * @param editor - the editor to close; the active one when omitted.
-   * @param options - close options (only `force` is meaningful here).
-   * @returns whether an editor was closed.
+   * @param candidate - the editor to close.
+   * @param options - close options.
+   * @returns whether the editor was closed.
    */
-  async closeEditor(editor?: EditorInput, options?: ICloseEditorOptions): Promise<boolean> {
-    const candidate = editor ?? this.activeEditor;
-    if (!candidate) return false;
+  private async doCloseEditor(
+    candidate: EditorInput,
+    options?: ICloseEditorOptions,
+  ): Promise<boolean> {
     const wasActive = this.model.isActive(candidate);
     const event = { editor: candidate, groupId: this.id } as unknown as IEditorCloseEvent;
     this._onWillCloseEditor.fire(event);
@@ -554,15 +584,24 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
     options?: ICloseEditorOptions,
   ): Promise<boolean> {
     const list = Array.isArray(editors) ? editors : this.model.getEditors(EditorsOrder.SEQUENTIAL);
+    // Upstream asks about the whole list **before** closing any of it
+    // (`editorGroupView.ts:1906-1922`), so a person answers the questions while
+    // everything is still on screen.
+    const closable = list.filter(
+      (editor) =>
+        options?.force === true || !editor.hasCapability(EditorInputCapabilities.CannotClose),
+    );
+    if (closable.length === 0) return true;
+    if (await this.handleCloseConfirmation(closable.slice())) return false; // vetoed
     // Inactive editors first, the active one last — upstream's order
     // (`editorGroupView.ts:1953-1967`), and it is not cosmetic: closing the active
     // editor reveals the *next* one, so a list that still contains the editors being
     // closed must not have them re-shown on the way out.
-    const inactive = list.filter((editor) => !this.model.isActive(editor));
-    const active = list.filter((editor) => this.model.isActive(editor));
+    const inactive = closable.filter((editor) => !this.model.isActive(editor));
+    const active = closable.filter((editor) => this.model.isActive(editor));
     let closed = true;
     for (const editor of [...inactive, ...active]) {
-      closed = (await this.closeEditor(editor, options)) && closed;
+      closed = (await this.doCloseEditor(editor, options)) && closed;
     }
     return closed;
   }
@@ -586,6 +625,114 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
   }
 
   //#endregion
+
+  /** One in-flight confirmation per editor, so two closes never ask twice at once. */
+  private readonly pendingConfirmations = new Map<EditorInput, Promise<boolean>>();
+
+  /**
+   * Ask about every editor that would lose something, one at a time.
+   *
+   * Upstream's shape (`editorGroupView.ts:1707-1730`), including the pending map: a
+   * second close arriving while a dialog is open joins the first answer instead of
+   * stacking a second dialog.
+   *
+   * @param editors - the editors about to close.
+   * @returns whether any of them vetoed the close.
+   */
+  private async handleCloseConfirmation(editors: EditorInput[]): Promise<boolean> {
+    if (editors.length === 0) return false; // no veto
+    const [editor, ...rest] = editors as [EditorInput, ...EditorInput[]];
+    let pending = this.pendingConfirmations.get(editor);
+    if (pending === undefined) {
+      pending = this.doHandleCloseConfirmation(editor);
+      this.pendingConfirmations.set(editor, pending);
+    }
+    let veto = false;
+    try {
+      veto = await pending;
+    } finally {
+      this.pendingConfirmations.delete(editor);
+    }
+    // Stop at the first veto: a cancelled close must not go on asking.
+    return veto ? true : this.handleCloseConfirmation(rest);
+  }
+
+  /**
+   * One editor's question: save it, discard it, or leave it open.
+   *
+   * @param editor - the editor about to close.
+   * @returns whether the close is vetoed.
+   */
+  private async doHandleCloseConfirmation(editor: EditorInput): Promise<boolean> {
+    if (!this.shouldConfirmClose(editor)) return false; // no veto
+    // Auto-save on focus change saves instead of asking, because a dialog would itself
+    // steal focus (upstream `editorGroupView.ts:1781-1790`). prac bridges the user's
+    // configuration, so the setting means the same thing here. The window-change case
+    // upstream also handles is native-only and cannot arise in the browser.
+    if (
+      this.filesConfigurationService.getAutoSaveMode(editor).mode === AutoSaveMode.ON_FOCUS_CHANGE
+    ) {
+      await editor.save(this.id, { reason: SaveReason.FOCUS_CHANGE });
+      return editor.isDirty();
+    }
+    // Show the editor being asked about, so the dialog refers to what is on screen
+    // (upstream does the same before showing the dialog).
+    if (this.activeEditor?.matches(editor) !== true) {
+      await this.openEditor(editor, { preserveFocus: true });
+    }
+    const confirmation = await this.fileDialogService.showSaveConfirm([editor.getName()]);
+    switch (confirmation) {
+      case ConfirmResult.SAVE: {
+        // `EditorInput.save` resolves to the saved input (not a boolean): the question
+        // "did it work" is the same one the close asks — is it still dirty.
+        await editor.save(this.id, { reason: SaveReason.EXPLICIT });
+        return editor.isDirty(); // veto if it is still dirty
+      }
+      case ConfirmResult.DONT_SAVE: {
+        try {
+          await editor.revert(this.id);
+          return editor.isDirty();
+        } catch (error) {
+          this.logService.error(error);
+          // A soft revert still lets the editor close when reverting failed: the
+          // person asked to discard, and refusing to close would trap the file.
+          await editor.revert(this.id, { soft: true });
+          return editor.isDirty();
+        }
+      }
+      default:
+        return true; // CANCEL vetoes
+    }
+  }
+
+  /**
+   * Whether closing this editor needs a question first.
+   *
+   * @param editor - the editor about to close.
+   * @returns whether to ask.
+   */
+  private shouldConfirmClose(editor: EditorInput): boolean {
+    if (editor.closeHandler) {
+      try {
+        return editor.closeHandler.showConfirm(); // the editor's own say
+      } catch (error) {
+        this.logService.error(error);
+      }
+    }
+    return editor.isDirty() && !editor.isSaving();
+  }
+
+  /** The file dialog service, which shows the save confirmation. */
+  private get fileDialogService(): IFileDialogService {
+    return this.instantiationService.invokeFunction((accessor) => accessor.get(IFileDialogService));
+  }
+
+  /** The files configuration service, which says whether auto-save is on. */
+  private get filesConfigurationService(): IFilesConfigurationService {
+    return this.instantiationService.invokeFunction((accessor) =>
+      accessor.get(IFilesConfigurationService),
+    );
+  }
 
   //#region Group-level grid operations: refused, with a log line
 

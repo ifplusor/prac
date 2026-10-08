@@ -332,7 +332,9 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    * The root is click-through so the embedder's frame stays usable, which means
    * every float has to opt back in. The list is a **list, not a wildcard**: these
    * are the containers this side creates for global surfaces (quick input, the
-   * context-view container — menus and dialogs — hover, notifications). Anything
+   * context-view container — menus — hover, notifications, and the modal block the
+   * workbench's own dialogs live in: the save-on-close question is one, and without
+   * it the dialog would be visible but not clickable). Anything
    * else the app puts in the root stays click-through, so a part that was never
    * given a host cannot quietly start swallowing the frame's clicks.
    */
@@ -344,7 +346,8 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
 .monaco-workbench > .context-view,
 .monaco-workbench > .monaco-hover,
 .monaco-workbench > .notifications-toasts,
-.monaco-workbench > .notifications-center { pointer-events: auto; }
+.monaco-workbench > .notifications-center,
+.monaco-workbench > .monaco-dialog-modal-block { pointer-events: auto; }
 `;
     mainWindow.document.head.appendChild(style);
   }
