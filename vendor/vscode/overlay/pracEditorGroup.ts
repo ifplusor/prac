@@ -69,6 +69,7 @@ import {
 import {
   EditorInputCapabilities,
   EditorsOrder,
+  GroupModelChangeKind,
   GroupIdentifier,
   IActiveEditorChangeEvent,
   IEditorCloseEvent,
@@ -83,10 +84,11 @@ import {
 } from "../common/editor.js";
 import {
   EditorGroupModel,
-  IGroupModelChangeEvent,
   IEditorOpenOptions,
+  IGroupModelChangeEvent,
 } from "../common/editor/editorGroupModel.js";
 import { EditorInput } from "../common/editor/editorInput.js";
+import { EditorHeaderControl } from "./parts/editor/editorHeaderControl.js";
 import { EditorPanes } from "./parts/editor/editorPanes.js";
 import {
   AutoSaveMode,
@@ -110,6 +112,17 @@ export const UNSUPPORTED_GROUP_OPERATIONS = ["replaceEditors"] as const;
 export class PracEditorGroup extends Disposable implements IEditorGroupView {
   /** The group's element; the embedder mounts it into a prac region. */
   readonly element: HTMLElement;
+  /** The title area above the editor: breadcrumbs, and the place actions would go. */
+  private readonly titleElement: HTMLElement;
+  /**
+   * The workbench's own header control: breadcrumbs (and, upstream, title actions).
+   *
+   * Created on the **first layout**, not in the constructor: the breadcrumbs pull in
+   * services that need `IEditorService`, and this group is built *while* that service is
+   * being constructed — creating it eagerly threw `illegal state - RECURSIVELY
+   * instantiating service 'editorService'` and took the whole boot down.
+   */
+  private header: EditorHeaderControl | undefined;
 
   /** The element prac mounted this group into, once it has (see `create`). */
   host: HTMLElement | undefined;
@@ -175,9 +188,16 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
 
     this.element = document.createElement("div");
     this.element.classList.add("editor-group-container", "prac-editor-group");
+    // The title area (the part above the editor): breadcrumbs live here, and this is
+    // what upstream's `EditorTitleControl` composes. prac draws its own **tabs** in the
+    // region's strip, so the workbench's tab control is deliberately not created — but
+    // the rest of the title area is, because without it the editor has no breadcrumbs
+    // (measured: no `.monaco-breadcrumbs` in the group at all, and `titleHeight` 0).
+    this.titleElement = document.createElement("div");
+    this.titleElement.classList.add("prac-editor-title");
     this.editorContainer = document.createElement("div");
     this.editorContainer.classList.add("editor-container");
-    this.element.append(this.editorContainer);
+    this.element.append(this.titleElement, this.editorContainer);
 
     // The model first: everything below (the group's events, the progress
     // indicator's listeners, the panes) reads the model while it is being built, so
@@ -279,7 +299,11 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
 
   /** prac draws the region's chrome (its tab strip), so the group has no title. */
   get titleHeight(): IEditorGroupTitleHeight {
-    return { total: 0, offset: 0 };
+    // Upstream's shape (`editorTitleControl.ts:197-204`): `total` is what the editor is
+    // inset by, `offset` is where the progress bar sits. prac has no workbench tabs, so
+    // the offset is 0 and the breadcrumbs are the whole title.
+    const total = this.header?.height ?? 0;
+    return { total, offset: 0 };
   }
 
   get disposed(): boolean {
@@ -460,6 +484,13 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
       if (result.changed === true) {
         this._onDidActiveEditorChange.fire({ editor: target, isExplicit: options?.isExplicit });
       }
+      // Now that an editor is showing, the title area can be built: breadcrumbs decide
+      // their visibility from the *active editor*, so creating it before there is one
+      // left them hidden for good (measured: `.monaco-breadcrumbs` present with height 0
+      // and no items).
+      this.ensureHeader();
+      this.header?.handleEditorsChange(true);
+      this.relayout();
       if (activateGroup) {
         this.groupsView.activateGroup(this);
       } else if (restoreGroup) {
@@ -957,9 +988,41 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
    */
   layout(width: number, height: number, top: number, left: number): void {
     this._dimension = new Dimension(width, height);
-    // prac owns the region chrome, so the content starts at the top of the box.
-    this.editorPanes.layout({ width, height, top, left });
+    // The title spans the full width; the editor follows it (upstream
+    // `editorGroupView.ts:2232-2252`).
+    // The header is created when the first editor opens (see `ensureHeader`), so a group
+    // that is laid out before that simply has no title yet.
+    this.header?.layout(width);
+    const titleHeight = this.titleHeight.total;
+    this.titleElement.style.height = `${titleHeight}px`;
+    this.progressBar.getContainer().style.top = `${Math.max(this.titleHeight.offset - 2, 0)}px`;
+    const editorHeight = Math.max(0, height - titleHeight);
+    this.editorContainer.style.height = `${editorHeight}px`;
+    this.editorPanes.layout({ width, height: editorHeight, top: top + titleHeight, left });
     this._onDidChange.fire({ width, height });
+  }
+
+  /**
+   * The title area's control, created when the first editor is shown.
+   *
+   * `showHeader: false` means "breadcrumbs below the tabs, no title actions": prac has
+   * no workbench tabs — the region's strip is the tab strip — so the header carries only
+   * what belongs to the editor itself.
+   *
+   * @returns the header control.
+   */
+  private ensureHeader(): EditorHeaderControl {
+    this.header ??= this._register(
+      this.instantiationService.createInstance(
+        EditorHeaderControl,
+        this.titleElement,
+        this,
+        this.groupsView,
+        undefined,
+        false,
+      ),
+    );
+    return this.header;
   }
 
   /** Re-run the last layout (the embedder calls this when its host resizes). */
@@ -1032,7 +1095,9 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
 
   //#endregion
 
-  private onModelChanged(_event: IGroupModelChangeEvent): void {
+  private onModelChanged(event: IGroupModelChangeEvent): void {
+    // The title area follows the model the same way upstream's title control does.
+    this.header?.handleEditorsChange(event.kind !== GroupModelChangeKind.EDITOR_ACTIVE);
     // Nothing to do: the model's changes reach the outside through `onDidModelChange`
     // (the editor service subscribes to it), and the **active editor** is announced by
     // `openEditor`/`closeEditor` once the pane exists — the order upstream uses.
