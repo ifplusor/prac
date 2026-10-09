@@ -326,7 +326,7 @@ export function ensureView(state: LayoutState, viewId: string): ViewRecord {
  *
  * **Placing what is already there is a no-op**, and returns the state itself. `place`
  * is a request about a *result* — "this view is the one its region shows" — so when
- * that already holds (visible, front of its visible list, its region revealed) there
+ * that already holds (visible, the region's front, its region revealed) there
  * is nothing to change. Without this the call always bumped the order, so a caller
  * that places *in reaction to a change* produced a fresh change every time, and two
  * such callers never settled: measured, the arrangement (which follows the app's
@@ -344,7 +344,7 @@ export function place(state: LayoutState, viewId: string, regionId: string): Lay
     // The landing region is where routing would put it — a container shows a child
     // of its own, not the view directly.
     const landing = landingRegion(state.tree, regionId, viewId).region;
-    const front = visibleViews(state, landing)[0];
+    const front = frontView(state, landing);
     if (
       current.region === landing &&
       front === viewId &&
@@ -375,19 +375,41 @@ export function place(state: LayoutState, viewId: string, regionId: string): Lay
  */
 export function placeQuietly(state: LayoutState, viewId: string, regionId: string): LayoutState {
   const view = ensureView(state, viewId);
-  const front = Math.min(0, ...Object.values(state.views).map((entry) => entry.order)) - 1;
+  // Open order: a view that is new to this region goes to the **end** of its strip
+  // (VS Code appends tabs), and a view that already lives here keeps its place — a
+  // placement brings it to the front without moving it.
+  const arriving = state.views[viewId] === undefined || state.views[viewId]?.region !== regionId;
   // A region that selects among children shows none of its own views, so a
   // direct placement into it lands in a child of its own — "a container with
   // one view", the shape the design gives a view that stands alone.
   const landing = landingRegion(state.tree, regionId, viewId);
-  return {
-    ...state,
-    tree: landing.tree,
-    views: {
-      ...state.views,
-      [viewId]: { ...view, region: landing.region, hidden: false, order: front },
-    },
-  };
+  // A view arriving in the region goes after the ones already there; one that is
+  // already there keeps its order (so activating never moves a tab).
+  const order = arriving ? maxOrder(state, landing.region) + 1 : view.order;
+  const views = { ...state.views };
+  // At most one front per region: bringing this view forward takes the marker from
+  // whichever view held it.
+  for (const [id, record] of Object.entries(views)) {
+    if (id !== viewId && record.region === landing.region && record.front === true) {
+      views[id] = { ...record, front: false };
+    }
+  }
+  views[viewId] = { ...view, region: landing.region, hidden: false, order, front: true };
+  return { ...state, tree: landing.tree, views };
+}
+
+/**
+ * One past the last tab position in a region.
+ *
+ * @param state - current state.
+ * @param regionId - the region.
+ * @returns the order a newly arriving view takes.
+ */
+function maxOrder(state: LayoutState, regionId: string): number {
+  const orders = Object.entries(state.views)
+    .filter(([, view]) => view.region === regionId)
+    .map(([, view]) => view.order);
+  return orders.length === 0 ? -1 : Math.max(...orders);
 }
 
 /** A view id's tail, as a child region's name when nothing better is known. */
@@ -438,7 +460,28 @@ function landingRegion(
  * @returns the front view id, or undefined when the region shows nothing.
  */
 export function frontView(state: LayoutState, regionId: string): string | undefined {
-  return visibleViews(state, regionId)[0];
+  const views = visibleViews(state, regionId);
+  return views.find((id) => state.views[id]?.front === true) ?? views[0];
+}
+
+/**
+ * Make one view the front of its region, without moving it in the strip.
+ *
+ * @param state - current state.
+ * @param viewId - the view to bring to the front.
+ * @returns the next state, or the same one when it is already front.
+ */
+export function setFront(state: LayoutState, viewId: string): LayoutState {
+  const view = state.views[viewId];
+  if (view === undefined || view.front === true) return state;
+  const views = { ...state.views };
+  for (const [id, record] of Object.entries(views)) {
+    if (record.region === view.region && record.front === true) {
+      views[id] = { ...record, front: false };
+    }
+  }
+  views[viewId] = { ...view, front: true };
+  return { ...state, views };
 }
 
 /**

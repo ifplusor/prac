@@ -44,8 +44,10 @@ import {
   findRegion,
   findSplit,
   isPresent,
+  frontView,
   isStacked,
   resolveSizes,
+  setFront,
   sashSizes,
   selectChild,
   setRegionSize,
@@ -608,7 +610,7 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
      * @param views - the region's visible views, in order.
      */
     const tabStrip = (views: readonly string[], regionId: string): ReactElement => {
-      const active = views[0];
+      const active = frontView(state, regionId) ?? views[0];
       return createElement(
         "div",
         {
@@ -640,19 +642,10 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
                 if (!dragged) return;
                 store.update((current) => reorderTab(current, regionId, dragged, viewId));
               },
-              onClick: () =>
-                store.update((current) => {
-                  const order = Math.min(
-                    0,
-                    ...Object.values(current.views).map((entry) => entry.order),
-                  );
-                  const view = current.views[viewId];
-                  if (!view || view.order === order) return current;
-                  return {
-                    ...current,
-                    views: { ...current.views, [viewId]: { ...view, order: order - 1 } },
-                  };
-                }),
+              // **A click changes which tab is front, never the strip's order**: VS Code's
+              // tabs stay where they were opened, and merging the two made prac's strip
+              // MRU (the activated tab jumped to the first position and stayed there).
+              onClick: () => store.update((current) => setFront(current, viewId)),
               "data-prac-tab-dirty": state.views[viewId]?.flags?.dirty === true ? "true" : "false",
               "data-prac-tab-preview":
                 state.views[viewId]?.flags?.preview === true ? "true" : "false",
@@ -784,7 +777,7 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
           style: regionStyle(node, dir, fill),
         },
         showsTabStrip(state, node)
-          ? [tabStrip(views, node.id), viewBody(views[0] ?? "", box)]
+          ? [tabStrip(views, node.id), viewBody(frontView(state, node.id) ?? views[0] ?? "", box)]
           : stacked
             ? views.map((viewId) => stackEntry(viewId, box))
             : views.slice(0, 1).map((viewId) => viewBody(viewId, box)),

@@ -147,6 +147,15 @@ export interface ViewRecord {
   collapsed?: boolean;
   /** Chrome the view's declarer set on it (tab dot, preview italic). */
   flags?: ViewFlags;
+  /**
+   * Whether this view is the one its region renders.
+   *
+   * **Separate from `order` on purpose**: `order` is the tab strip's position (open
+   * order, changed by dragging a tab) and this is what "active" means (changed by
+   * clicking a tab or by placing a view). VS Code keeps the two apart — its tabs do not
+   * move when the active editor changes — and merging them made the strip MRU.
+   */
+  front?: boolean;
 }
 
 /** The whole layout store state (replaced immutably on every update). */

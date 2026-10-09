@@ -21,6 +21,7 @@ import {
   place,
   regionInfos,
   regionNode,
+  setFront,
   resolveSizes,
   sashSizes,
   selectChild,
@@ -98,12 +99,13 @@ describe("defaultTree", () => {
 });
 
 describe("placement", () => {
-  it("places a view visibly at the front of its region", () => {
+  it("places a view visibly as its region's front", () => {
     const next = place(state(), "dsh:sidebar", "left");
     expect(next.views["dsh:sidebar"]).toMatchObject({
       region: "left",
-      order: -1,
+      order: 0,
       hidden: false,
+      front: true,
     });
   });
 
@@ -123,10 +125,22 @@ describe("placement", () => {
     expect(frontView(current, "right")).toBeUndefined();
   });
 
-  it("fronts the most recently placed view", () => {
+  it("appends a new placement and makes it the front", () => {
     let current = place(state(), "a", "left");
     current = place(current, "b", "left");
-    expect(visibleViews(current, "left")).toEqual(["b", "a"]);
+    // The strip is **open order** (VS Code appends tabs); "who is shown" is the front
+    // marker, so placing `b` does not move `a`.
+    expect(visibleViews(current, "left")).toEqual(["a", "b"]);
+    expect(frontView(current, "left")).toBe("b");
+  });
+
+  it("changes the front without reordering the strip", () => {
+    let current = place(state(), "a", "left");
+    current = place(current, "b", "left");
+    const clicked = setFront(current, "a");
+    expect(visibleViews(clicked, "left")).toEqual(["a", "b"]);
+    expect(frontView(clicked, "left")).toBe("a");
+    expect(clicked.views.a?.order).toBe(current.views.a?.order);
   });
 
   it("is a no-op when the view already holds the region's front", () => {
