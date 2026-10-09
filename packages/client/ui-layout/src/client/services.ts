@@ -70,7 +70,11 @@ export interface LayoutServices {
  * @param store - the layout store the faces read and update.
  * @returns the two faces and the panel hook.
  */
-export function createServices(ctx: Context, store: LayoutStore): LayoutServices {
+export function createServices(
+  ctx: Context,
+  store: LayoutStore,
+  closeListeners: Set<(viewId: string) => void>,
+): LayoutServices {
   /** The arrangement's role bindings (empty until it binds them). */
   const roles: RoleBindings = {};
 
@@ -264,6 +268,10 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
      * A no-op when nothing changes, by identity: a UI that re-syncs flags on every
      * layout change (the editor package does) must not wake the store in a loop.
      */
+    onDidRequestCloseView(listener: (viewId: string) => void): () => void {
+      closeListeners.add(listener);
+      return () => closeListeners.delete(listener);
+    },
     setViewFlags(viewId: string, flags: ViewFlags): void {
       store.update((state) => {
         const view = state.views[viewId];
@@ -271,7 +279,8 @@ export function createServices(ctx: Context, store: LayoutStore): LayoutServices
         const next = { ...view.flags, ...flags };
         const same =
           (next.dirty ?? false) === (view.flags?.dirty ?? false) &&
-          (next.preview ?? false) === (view.flags?.preview ?? false);
+          (next.preview ?? false) === (view.flags?.preview ?? false) &&
+          (next.closable ?? false) === (view.flags?.closable ?? false);
         return same
           ? state
           : { ...state, views: { ...state.views, [viewId]: { ...view, flags: next } } };

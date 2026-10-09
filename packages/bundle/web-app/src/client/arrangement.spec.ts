@@ -99,6 +99,7 @@ function recordingFace(views: LayoutState["views"] = {}): {
     bindTrack: record("bindTrack"),
     setViewFlags: record("setViewFlags"),
     activeView: () => null,
+    onDidRequestCloseView: () => () => {},
   } satisfies PracLayoutFace;
   return { face, calls, children };
 }

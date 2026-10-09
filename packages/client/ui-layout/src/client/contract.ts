@@ -183,6 +183,15 @@ export interface ViewFlags {
   readonly dirty?: boolean;
   /** Preview: the label is italic, the way VS Code marks a preview tab. */
   readonly preview?: boolean;
+  /**
+   * Whether the view can be closed from its own chrome (a close button on its tab).
+   *
+   * The declarer's word, like the other flags: the mechanism renders the button and
+   * reports the request through {@link PracLayoutFace.onDidRequestCloseView} — it never
+   * closes anything itself, because what "closed" means belongs to whoever declared the
+   * view (for a file, the app's open set).
+   */
+  readonly closable?: boolean;
 }
 
 /** A resolved region box for one viewport. */
@@ -408,6 +417,17 @@ export interface PracLayoutFace {
    * @param flags - the flags to merge into the view's record.
    */
   setViewFlags(viewId: string, flags: ViewFlags): void;
+  /**
+   * Subscribe to "the person asked to close this view".
+   *
+   * Raised by the chrome's close affordance; the declarer decides what closing means and
+   * does it (a file's declarer closes the app's editor, which retracts the view). The
+   * frame never removes a view on its own: `hide` exists for taking one off screen.
+   *
+   * @param listener - called with the view id.
+   * @returns a function that unsubscribes.
+   */
+  onDidRequestCloseView(listener: (viewId: string) => void): () => void;
   /**
    * The view the mechanism considers active: the front view of the centre region.
    *

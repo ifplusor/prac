@@ -245,6 +245,17 @@ const TAB_STYLE: StyleObject = {
 };
 
 /** The unsaved marker inside a tab. */
+/** The close affordance on a tab whose declarer allows closing. */
+const TAB_CLOSE_STYLE: StyleObject = {
+  fontSize: "11px",
+  lineHeight: "1",
+  marginLeft: "6px",
+  padding: "0 2px",
+  borderRadius: "3px",
+  opacity: 0.75,
+  cursor: "pointer",
+};
+
 const TAB_DIRTY_STYLE: StyleObject = {
   fontSize: "9px",
   marginRight: "5px",
@@ -605,6 +616,28 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
               ? [createElement("span", { key: "dirty", style: TAB_DIRTY_STYLE }, "\u25cf")]
               : []),
             viewLabel(viewId),
+            // The close affordance the view's declarer asked for. The frame reports the
+            // request and nothing else: what "closed" means is the declarer's (for a
+            // file, closing the app's editor retracts its view).
+            ...(state.views[viewId]?.flags?.closable === true
+              ? [
+                  createElement(
+                    "span",
+                    {
+                      key: "close",
+                      "data-prac-tab-close": viewId,
+                      title: "Close",
+                      style: TAB_CLOSE_STYLE,
+                      onClick: (event: MouseEvent) => {
+                        // The tab itself fronts its view on click; closing must not.
+                        event.stopPropagation();
+                        store.requestCloseView(viewId);
+                      },
+                    },
+                    "\u00d7",
+                  ),
+                ]
+              : []),
           ),
         ),
         createElement("span", { key: "filler", style: { flex: "1 1 auto" } }),

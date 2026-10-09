@@ -101,6 +101,9 @@ export function apply(ctx: Context): void {
         layout.setViewFlags(view, {
           dirty: entry?.dirty === true,
           preview: entry?.preview === true,
+          // A file can be closed from its tab: this package owns what that means (the
+          // app's editor closes, and the view retracts with it).
+          closable: true,
         });
         // prac's front view and the app's active editor are two states; this package is
         // where they meet, and this is the one direction that travels: prac's front
@@ -112,12 +115,19 @@ export function apply(ctx: Context): void {
     };
     sync();
     const stopEditors = editors.subscribe(sync);
+    // The tab's close button asks; this package closes the app's editor, which is what
+    // takes the view away (the mechanism never removes a view on its own).
+    const stopClose = layout.onDidRequestCloseView((view) => {
+      const resource = host.fileResource(view);
+      if (resource !== undefined) editors.actions.close(resource);
+    });
     // prac's own front view changes without the app knowing (a tab click), so the
     // layout is a source too.
     const stopLayout = layout.subscribe(sync);
     return () => {
       stopLayout();
       stopEditors();
+      stopClose();
     };
   }, "prac-client-ui-vscode-editor: chrome + active editor");
   ctx.effect(

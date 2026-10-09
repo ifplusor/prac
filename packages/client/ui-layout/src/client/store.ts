@@ -57,6 +57,15 @@ export interface LayoutStore {
    * @param updater - returns the next state, or the same reference to skip.
    */
   update: (updater: (state: LayoutState) => LayoutState) => void;
+  /**
+   * Report that the person asked to close a view (its tab's close button).
+   *
+   * The store is what the frame holds, so the report travels through it to the face's
+   * subscribers — the frame itself must not decide what closing means.
+   *
+   * @param viewId - the view whose chrome was used.
+   */
+  requestCloseView: (viewId: string) => void;
 }
 
 /**
@@ -66,7 +75,7 @@ export interface LayoutStore {
  * placement, so the arrangement is what puts `dsh:*` and `vscode:*` views into
  * regions.
  */
-export function createStore(): LayoutStore {
+export function createStore(onRequestCloseView: (viewId: string) => void = () => {}): LayoutStore {
   const initial: LayoutState = {
     viewportWidth: 0,
     viewportHeight: 0,
@@ -84,6 +93,7 @@ export function createStore(): LayoutStore {
     persist: { name: STATE_KEY },
   });
   return {
+    requestCloseView: onRequestCloseView,
     get: () => snapshot.getSnapshot(),
     subscribe: (listener: () => void): (() => void) => snapshot.subscribe(listener),
     /** Replace the state through a pure updater. */

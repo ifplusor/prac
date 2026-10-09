@@ -82,8 +82,13 @@ export type { PracLayoutFace, RegionInfo, ViewInfo };
  */
 export function apply(ctx: Context): void {
   ensureStyles();
-  const store = createStore();
-  const { layout, pracLayout, panelInfo } = createServices(ctx, store);
+  // The frame reports a close request through the store; this set is what carries it to
+  // whoever declared the view (the face's `onDidRequestCloseView`).
+  const closeListeners = new Set<(viewId: string) => void>();
+  const store = createStore((viewId) => {
+    for (const listener of [...closeListeners]) listener(viewId);
+  });
+  const { layout, pracLayout, panelInfo } = createServices(ctx, store, closeListeners);
 
   ctx.effect(() => {
     // A view may already have registered (activation order is not ours to
