@@ -25,7 +25,10 @@ status: in-progress
 3. **我们要写的**：`IEditorGroupView`（= `IEditorGroup`，51 个成员，其中绝大多数是对 `EditorGroupModel` 的转发）+ 宿主三接口的最小集（`IEditorGroupsService` 15 / `IEditorPart` 8 + `IEditorGroupsView` 18 / `IEditorPartsView` 10）。需要真行为的十余个：组注册与查表、活动组与激活事件、加/删组、`partOptions`、可见性、layout 事件、上下文键的 `bind`。
 4. **多组 + 分栏 = prac 的区域树**：一个载文件的区域 = 一个组（`stage` 是默认那个），拆区域 = 新组（与"分栏是区域的性质"一致）；只放侧栏 / 面板的区域没有组。
 5. **目录与落位**：`listOpenFiles()` 照旧读编辑器服务的打开集合；文件在哪个区域 = 它在哪个组，"把文件搬去另一个区域" = 编辑器在组之间搬（`moveEditors`）。**文件不再由 frame 给每个文件一个宿主**——那是组的活；prac 的 tab 条仍然描述这个区域里的视图顺序。
-6. **一个文件可以同时住在多个区域**（VS Code 的 Split Editor 语义）：所以**身份是 (文件, 组)**，不是文件。能力按组报条目（`resource / group / region / active / dirty / preview`），同一个文件在两处就是两条；prac 侧为每条建自己的视图，视图 id 由 (组, 资源) 决定，落位由条目给的 `region` 决定——**框的位置由工作台决定，形状由 frame 决定**。编辑器在组间的搬/复制（工作台的 move/copy、Split Editor）就是"条目多一条/少一条"，视图跟着来去。
+6. **一个文件可以同时住在多个区域**（VS Code 的 Split Editor 语义）：所以**身份是"放置"，不是文件**。能力按组报条目（`resource / group / region / active / dirty / preview`），同一个文件在两处就是两条；prac 侧为每条建自己的视图，落位由条目给的 `region` 决定。两条由此确立的边界：
+   - **视图 id 的键是区域（放置），不是组**。prac 里组是区域的（一个区域一个组），而视图可以在区域之间移动；用组做键时，同一文件的两次放置会共用一个组、其中一个视图拿不到面（实测：`a.txt@stage` 与 `a.txt@region-2` 两个视图，只有一个有面）。用区域做键则"移动"就是旧视图消失、新视图出现，宿主那边"把编辑器搬过去"才有唯一判据。
+   - **放置权在工作台/组，注意力只管前后**。工作台说"这个文件的编辑器住在区域 X"，而 arrangement 的注意力模型说"当前文件占中间、另一个停到轨道"——一个文件一个视图时两者不冲突（arrangement 搬视图、编辑器跟着搬），多个放置之下必须收敛为：**文件住哪个区域由组决定；注意力只决定哪个区域在前**（落位用 `placeQuietly`，只有"当前放置"才前置）。
+   编辑器在组间的搬/复制（工作台的 move/copy、Split Editor）就是"条目多一条/少一条"，视图跟着来去。
 7. **`findGroup` 的位置语义**：FIRST / LAST / NEXT / PREVIOUS 是**顺序型**（组列表的两端与相邻），照上游 `editorPart.ts:385-412` 实现；LEFT / RIGHT / UP / DOWN 是**方向型**，要 prac 区域树的几何，只属于 frame，宿主同步答不出来 ⇒ 不答（调用方于是走 `addGroup`）。`addGroup` 反过来要"创建一个区域"，是 host → app 的请求 + 区域 id 由宿主指定，属未落地的一步。
 
 ## Alternatives（放弃了什么）
@@ -40,7 +43,7 @@ status: in-progress
 
 - **组头**（tab 条 + 面包屑）：tab 按决定 17 归 prac（区域的 tab 条已有），**面包屑挂在组头上**——是先让 prac 的 tab 条只做 tab、把组头其余部分搬进来，还是另行处理，单独裁一次。
 - **未支持清单的表达**：放在启动日志、一条活体门，还是两者都要。
-- **身份改造落在 app 侧的两步**（机制侧已经能按 (组, 资源) 报条目）：① `prac-client-vscode-host` 的目录从"每个打开文件一条"变成"每条目一条"，视图 id 由 (组, 资源) 决定（现在是资源的函数，所以一个文件只能有一个视图）；② `prac-client-ui-vscode-editor` / arrangement 按条目给的 `region` 落位（现在是"新打开的文件进中间"）。随之要重定的是 tab 条（一个文件可能在两处出现两个 tab）、"当前文件"的概念，以及关闭/脏标记按条目算还是按文件算。
+- **身份改造是一整块，四件必须一起动**（机制侧已经能按放置报条目；这四件分着改会留下半迁移）：① 视图 id 改成 **(区域, 资源)**；② `prac-client-vscode-host` 的目录从"每个打开文件一条"变成"每个放置一条"（数据源换成 `capabilities.editors.snapshot()`，条目带 `region`；`onDidChangeCatalogue` 还要订阅 editors 能力，否则"同一集合里换组"不发事件）；③ arrangement 按条目给的 `region` **安静落位**，注意力不再搬文件视图（见 Proposal 第 6 条的第二条边界）；④ 宿主区分"第二个放置"与"视图搬家"：前者**不许**动另一个组里的编辑器，后者要搬——判据是"这个文件还有没有别的放置"，那在客户端。随之要重定的是 tab 条（一个文件可能在两处出现两个 tab）、"当前文件"的概念，以及关闭/脏标记按放置算还是按文件算。
 - **`addGroup` 的落地形状**：host → app 的一条请求（"为这个组创建一个区域"）+ `layout.splitView` 接受宿主指定的 region id（现在自己生成），否则 `addGroup` 返回的组与真实区域对不上。`findGroup` 的方向型位置（LEFT/RIGHT/UP/DOWN）同样等这条通道：几何只有 frame 有。
 
 ## 侦察结果（2026-10-07，探针跑在真 rig 上）
