@@ -54,6 +54,7 @@ import {
   visibleViews,
 } from "./model.js";
 import { type LayoutStore, useLayout } from "./store.js";
+import type { LayoutState } from "./contract.js";
 
 /** A minimal pointer event, as the sash drag machine reads it. */
 interface PointerDragEvent {
@@ -262,6 +263,41 @@ const TAB_DIRTY_STYLE: StyleObject = {
   verticalAlign: "middle",
   opacity: 0.9,
 };
+
+/**
+ * Move one view's tab to another tab's place in the same region.
+ *
+ * Orders are only compared **within** a region (`visibleViews` sorts by them), so the
+ * region's visible list is renumbered after the move — and the drag is a reorder, not a
+ * placement: nothing else about the view changes.
+ *
+ * @param state - the current layout state.
+ * @param regionId - the region whose tabs were dragged in.
+ * @param dragged - the view that was dragged.
+ * @param target - the view it was dropped on.
+ * @returns the next state, or the same one when nothing moves.
+ */
+function reorderTab(
+  state: LayoutState,
+  regionId: string,
+  dragged: string,
+  target: string,
+): LayoutState {
+  if (dragged === target) return state;
+  const list = visibleViews(state, regionId);
+  const from = list.indexOf(dragged);
+  const to = list.indexOf(target);
+  if (from === -1 || to === -1) return state;
+  const next = [...list];
+  next.splice(from, 1);
+  next.splice(to, 0, dragged);
+  const views = { ...state.views };
+  next.forEach((id, index) => {
+    const record = views[id];
+    if (record !== undefined) views[id] = { ...record, order: index };
+  });
+  return { ...state, views };
+}
 
 /** The active tab, which is the view the region renders. */
 const TAB_ACTIVE_STYLE: StyleObject = {
@@ -571,7 +607,7 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
      *
      * @param views - the region's visible views, in order.
      */
-    const tabStrip = (views: readonly string[]): ReactElement => {
+    const tabStrip = (views: readonly string[], regionId: string): ReactElement => {
       const active = views[0];
       return createElement(
         "div",
@@ -588,6 +624,22 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
               type: "button",
               "data-prac-tab": viewId,
               "data-prac-tab-active": viewId === active ? "true" : "false",
+              // Tabs reorder by dragging one onto another, the way VS Code's do. The
+              // drag carries the view id; the drop renumbers the region's visible list.
+              draggable: true,
+              onDragStart: (event: DragEvent) => {
+                event.dataTransfer?.setData("text/plain", viewId);
+              },
+              onDragOver: (event: DragEvent) => {
+                // A drop target has to refuse the default to be droppable at all.
+                event.preventDefault();
+              },
+              onDrop: (event: DragEvent) => {
+                event.preventDefault();
+                const dragged = event.dataTransfer?.getData("text/plain");
+                if (!dragged) return;
+                store.update((current) => reorderTab(current, regionId, dragged, viewId));
+              },
               onClick: () =>
                 store.update((current) => {
                   const order = Math.min(
@@ -732,7 +784,7 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
           style: regionStyle(node, dir, fill),
         },
         showsTabStrip(state, node)
-          ? [tabStrip(views), viewBody(views[0] ?? "", box)]
+          ? [tabStrip(views, node.id), viewBody(views[0] ?? "", box)]
           : stacked
             ? views.map((viewId) => stackEntry(viewId, box))
             : views.slice(0, 1).map((viewId) => viewBody(viewId, box)),
