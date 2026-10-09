@@ -37,7 +37,15 @@ import { Disposable, DisposableStore } from "../../base/common/lifecycle.js";
 import { Dimension } from "../../base/browser/dom.js";
 import { mainWindow } from "../../base/browser/window.js";
 import { ProgressBar } from "../../base/browser/ui/progressbar/progressbar.js";
-import { MenuId } from "../../platform/actions/common/actions.js";
+import { IMenuChangeEvent, IMenuService, MenuId } from "../../platform/actions/common/actions.js";
+import {
+  getActionBarActions,
+  PrimaryAndSecondaryActions,
+} from "../../platform/actions/browser/menuEntryActionViewItem.js";
+import { ToolBar } from "../../base/browser/ui/toolbar/toolbar.js";
+import { IContextMenuService } from "../../platform/contextview/browser/contextView.js";
+import { Separator, SubmenuAction } from "../../base/common/actions.js";
+import { ICommandService } from "../../platform/commands/common/commands.js";
 import { IContextKeyService } from "../../platform/contextkey/common/contextkey.js";
 import { EditorActivation, IEditorOptions } from "../../platform/editor/common/editor.js";
 import {
@@ -46,6 +54,8 @@ import {
   IFileDialogService,
 } from "../../platform/dialogs/common/dialogs.js";
 import { IEditorProgressService } from "../../platform/progress/common/progress.js";
+import { IEditorService } from "../services/editor/common/editorService.js";
+import { IEditorResolverService } from "../services/editor/common/editorResolverService.js";
 import { defaultProgressBarStyles } from "../../platform/theme/browser/defaultStyles.js";
 import { IInstantiationService } from "../../platform/instantiation/common/instantiation.js";
 import { ServiceCollection } from "../../platform/instantiation/common/serviceCollection.js";
@@ -89,7 +99,12 @@ import {
 } from "../common/editor/editorGroupModel.js";
 import { EditorInput } from "../common/editor/editorInput.js";
 import { EditorHeaderControl } from "./parts/editor/editorHeaderControl.js";
+import { EditorPane } from "./parts/editor/editorPane.js";
 import { EditorPanes } from "./parts/editor/editorPanes.js";
+import {
+  createEditorTypeActions,
+  getAvailableEditorTypes,
+} from "./parts/editor/editorTypePicker.js";
 import {
   AutoSaveMode,
   IFilesConfigurationService,
@@ -123,6 +138,12 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
    * instantiating service 'editorService'` and took the whole boot down.
    */
   private header: EditorHeaderControl | undefined;
+  /** The editor actions toolbar in the title row (the workbench's own actions). */
+  private actionsBar: ToolBar | undefined;
+  /** The element the actions toolbar renders into. */
+  private actionsElement: HTMLElement | undefined;
+  /** What the actions toolbar's menu subscriptions are bound to. */
+  private readonly actionsDisposables = this._register(new DisposableStore());
 
   /** The element prac mounted this group into, once it has (see `create`). */
   host: HTMLElement | undefined;
@@ -951,11 +972,96 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
    * @param _menuId - ignored.
    * @returns an empty action set that never changes.
    */
-  createEditorActions(_disposables: DisposableStore, _menuId?: MenuId): IActiveEditorActions {
-    this.logService.info(
-      "vscode-embed: unsupported group operation — editor title actions (prac draws the tabs)",
+  /**
+   * The workbench's editor actions for this group's active editor.
+   *
+   * Upstream's own body (`editorGroupView.ts:2134-2176`): the `MenuId.EditorTitle` menu,
+   * read for the active resource, plus the "Reopen Editor With" submenu. prac renders
+   * these in the group header (see `ensureHeader`), which is where a person finds them
+   * without upstream's tab bar.
+   *
+   * @param disposables - where the menu subscription lives.
+   * @param menuId - the menu to read; `MenuId.EditorTitle` by default.
+   * @returns the primary/secondary actions and a change event.
+   */
+  createEditorActions(
+    disposables: DisposableStore,
+    menuId: MenuId = MenuId.EditorTitle,
+  ): IActiveEditorActions {
+    let actions: PrimaryAndSecondaryActions = { primary: [], secondary: [] };
+    let onDidChange: Event<IMenuChangeEvent | void> | undefined;
+    const activeEditorPane = this.activeEditorPane;
+    if (activeEditorPane instanceof EditorPane) {
+      const contextKeyService =
+        activeEditorPane.scopedContextKeyService ?? this.scopedContextKeyService;
+      const menuService = this.instantiationService.invokeFunction((accessor) =>
+        accessor.get(IMenuService),
+      );
+      const editorTitleMenu = disposables.add(
+        menuService.createMenu(menuId, contextKeyService, {
+          emitEventsForSubmenuChanges: true,
+          eventDebounceDelay: 0,
+        }),
+      );
+      onDidChange = editorTitleMenu.onDidChange;
+      const shouldInlineGroup = (action: SubmenuAction, group: string) =>
+        group === "navigation" && action.actions.length <= 1;
+      actions = getActionBarActions(
+        editorTitleMenu.getActions({
+          arg: this.activeEditor?.resource,
+          shouldForwardArgs: true,
+          renderShortTitle: true,
+        }),
+        "navigation",
+        shouldInlineGroup,
+      );
+      if (menuId === MenuId.EditorTitle) {
+        const resolver = this.instantiationService.invokeFunction((accessor) =>
+          accessor.get(IEditorResolverService),
+        );
+        const available = getAvailableEditorTypes(this.activeEditor, resolver);
+        if (available) {
+          const commands = this.instantiationService.invokeFunction((accessor) =>
+            accessor.get(ICommandService),
+          );
+          const editorService = this.instantiationService.invokeFunction((accessor) =>
+            accessor.get(IEditorService),
+          );
+          const editorTypeActions = createEditorTypeActions(
+            available,
+            resolver,
+            commands,
+            editorService,
+          );
+          const reopenWithSubmenu = new SubmenuAction(
+            "editor.reopenWith",
+            "Reopen Editor With",
+            editorTypeActions,
+          );
+          if (actions.secondary.length) actions.secondary.push(new Separator());
+          actions.secondary.push(reopenWithSubmenu);
+        }
+      }
+    } else {
+      const onDidChangeEmitter = disposables.add(new Emitter<void>());
+      onDidChange = onDidChangeEmitter.event;
+      disposables.add(this.onDidActiveEditorChange(() => onDidChangeEmitter.fire()));
+    }
+    return { actions, onDidChange };
+  }
+
+  /** Re-read the editor actions for the active editor into the toolbar. */
+  private updateEditorActions(): void {
+    if (this.actionsBar === undefined) return;
+    this.actionsDisposables.clear();
+    const { actions, onDidChange } = this.createEditorActions(
+      this.actionsDisposables,
+      MenuId.EditorTitle,
     );
-    return { actions: { primary: [], secondary: [] }, onDidChange: Event.None };
+    this.actionsBar.setActions(actions.primary, actions.secondary);
+    if (onDidChange !== undefined) {
+      this.actionsDisposables.add(onDidChange(() => this.updateEditorActions()));
+    }
   }
 
   //#endregion
@@ -992,7 +1098,10 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
     // `editorGroupView.ts:2232-2252`).
     // The header is created when the first editor opens (see `ensureHeader`), so a group
     // that is laid out before that simply has no title yet.
-    this.header?.layout(width);
+    // The breadcrumbs take the room the actions leave them: upstream lays them out over
+    // the full width because its tab bar holds the actions, while here they share the row.
+    const actionsWidth = this.actionsElement?.offsetWidth ?? 0;
+    this.header?.layout(Math.max(0, width - actionsWidth));
     const titleHeight = this.titleHeight.total;
     this.titleElement.style.height = `${titleHeight}px`;
     this.progressBar.getContainer().style.top = `${Math.max(this.titleHeight.offset - 2, 0)}px`;
@@ -1012,16 +1121,36 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
    * @returns the header control.
    */
   private ensureHeader(): EditorHeaderControl {
-    this.header ??= this._register(
-      this.instantiationService.createInstance(
-        EditorHeaderControl,
-        this.titleElement,
-        this,
-        this.groupsView,
-        undefined,
-        false,
-      ),
-    );
+    if (this.header === undefined) {
+      this.header = this._register(
+        this.instantiationService.createInstance(
+          EditorHeaderControl,
+          this.titleElement,
+          this,
+          this.groupsView,
+          undefined,
+          false,
+        ),
+      );
+      // The editor actions (split, pin, close, `…`) belong to the tab bar upstream
+      // (`editorTabsControl.ts:391` renders them into `.editor-actions`); prac's tab bar
+      // is the frame's, so they live at the **right end of the group header** instead of
+      // being absent. The actions themselves are the workbench's — `MenuId.EditorTitle`,
+      // the same menu — so what appears is VS Code's own list.
+      this.actionsElement = document.createElement("div");
+      this.actionsElement.classList.add("prac-editor-actions");
+      this.actionsElement.style.cssText =
+        "display:flex;flex:0 0 auto;align-items:center;padding-left:6px";
+      this.titleElement.style.cssText = "display:flex;align-items:center;position:relative";
+      this.titleElement.append(this.actionsElement);
+      const contextMenu = this.instantiationService.invokeFunction((accessor) =>
+        accessor.get(IContextMenuService),
+      );
+      this.actionsBar = this._register(
+        new ToolBar(this.actionsElement, contextMenu, { ariaLabel: "Editor actions" }),
+      );
+      this.updateEditorActions();
+    }
     return this.header;
   }
 
@@ -1098,6 +1227,7 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
   private onModelChanged(event: IGroupModelChangeEvent): void {
     // The title area follows the model the same way upstream's title control does.
     this.header?.handleEditorsChange(event.kind !== GroupModelChangeKind.EDITOR_ACTIVE);
+    if (event.kind === GroupModelChangeKind.EDITOR_ACTIVE) this.updateEditorActions();
     // Nothing to do: the model's changes reach the outside through `onDidModelChange`
     // (the editor service subscribes to it), and the **active editor** is announced by
     // `openEditor`/`closeEditor` once the pane exists — the order upstream uses.
