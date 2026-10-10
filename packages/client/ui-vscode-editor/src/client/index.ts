@@ -59,42 +59,29 @@ export function apply(ctx: Context): void {
   ctx.effect(() => {
     const editors = host.capabilities.editors;
     /**
-     * The file resources prac currently shows: the front view of **every** region.
+     * The two facts this package keeps in step, as the last sync saw them.
      *
-     * A region renders its front view, so this is "the files on screen" — the fact the
-     * reconciliation below needs, because prac can show two files at once (one per
-     * region) and only one of them can be the app's active editor.
+     * The reconciliation needs to know **which side moved** since the last sync: a
+     * layout that moved is a person using prac's chrome (the app follows), and an app
+     * that moved is a command, a jump or the app's own UI (prac follows). Neither
+     * direction can win unconditionally — insisting on either undoes the other (measured
+     * both ways: always-app-follows erased a tab click; always-prac-follows erased a
+     * command).
      */
-    const shownFiles = (): Set<string> => {
-      const front = new Map<string, { order: number; view: string }>();
-      for (const entry of layout.listViews()) {
-        if (entry.region === null || entry.hidden) continue;
-        const order = entry.order ?? Number.MAX_SAFE_INTEGER;
-        const best = front.get(entry.region);
-        if (best === undefined || order < best.order)
-          front.set(entry.region, { order, view: entry.id });
-      }
-      const resources = new Set<string>();
-      for (const { view } of front.values()) {
-        const resource = host.fileResource(view);
-        if (resource !== undefined) resources.add(resource);
-      }
-      return resources;
-    };
-    /** Push one view's chrome and, for the active one, tell the app to match. */
+    let lastFront: string | null = null;
+    let lastAppActive: string | null = null;
+
+    /** Push one view's chrome, and keep prac's front and the app's active editor aligned. */
     const sync = (): void => {
       const entries = new Map(editors.snapshot().map((entry) => [entry.resource, entry] as const));
       const active = layout.activeView();
-      const shown = shownFiles();
-      // The app's current editor is a file prac **shows**, so the two already agree
-      // that a file is current; *which* region holds it is prac's business, and
-      // `focusFile` keeps that side in step. Activating the centre's front view here
-      // instead is what made two regions each showing a file fight forever: measured,
-      // `focusFile` (the region the person is in) and this loop alternated thousands
-      // of times a second until the page's main thread stopped answering.
-      const current = [...entries.values()].find((entry) => entry.active)?.resource;
-      const agreed = current !== undefined && shown.has(current);
-      for (const { view } of fileEntries()) {
+      const files = fileEntries();
+      /** The view showing one resource, when prac has a placement for it. */
+      const viewOf = (resource: string | null | undefined): string | undefined =>
+        resource === null || resource === undefined
+          ? undefined
+          : files.find(({ view }) => host.fileResource(view) === resource)?.view;
+      for (const { view } of files) {
         const resource = host.fileResource(view);
         if (resource === undefined) continue;
         const entry = entries.get(resource);
@@ -105,13 +92,30 @@ export function apply(ctx: Context): void {
           // app's editor closes, and the view retracts with it).
           closable: true,
         });
-        // prac's front view and the app's active editor are two states; this package is
-        // where they meet, and this is the one direction that travels: prac's front
-        // view pulls the app when the app is not already showing a file.
-        if (!agreed && view === active && entry !== undefined && !entry.active) {
-          editors.actions.activate(resource);
-        }
       }
+      const current = [...entries.values()].find((entry) => entry.active)?.resource ?? null;
+      const frontResource =
+        active === null || active === undefined ? null : (host.fileResource(active) ?? null);
+      const frontMoved = active !== lastFront;
+      const appMoved = current !== lastAppActive;
+      lastFront = active;
+      lastAppActive = current;
+      if (frontResource === current) return; // already in step
+      // **Whoever moved wins.** prac's chrome moving means a person clicked a tab, so the
+      // app follows the front; the app moving means a command, a jump or the app's own UI,
+      // so prac follows the app. Both moving (or neither — a boot) leaves it to the app,
+      // which is the source of truth for which file is current.
+      const followFront = (): void => {
+        if (frontResource !== null) editors.actions.activate(frontResource);
+      };
+      const followApp = (): void => {
+        const view = viewOf(current);
+        if (view !== undefined) layout.setFront(view);
+        else followFront();
+      };
+      if (frontMoved && !appMoved) followFront();
+      else if (appMoved && !frontMoved) followApp();
+      else followApp();
     };
     sync();
     const stopEditors = editors.subscribe(sync);

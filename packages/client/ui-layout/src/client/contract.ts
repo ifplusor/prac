@@ -371,6 +371,16 @@ export interface PracLayoutFace {
    */
   show(viewId: string): void;
   /**
+   * Make a view the front of its region, **without moving it in the strip**.
+   *
+   * The channel a consumer uses to say "the app's current file is this one": the tab
+   * strip keeps its open order (VS Code's do) while what the region renders follows.
+   * Idempotent, so a consumer may call it whenever it syncs.
+   *
+   * @param viewId - the view to bring to the front.
+   */
+  setFront(viewId: string): void;
+  /**
    * Hide a view without moving it.
    *
    * @param viewId - the view identity.

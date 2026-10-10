@@ -100,6 +100,7 @@ function recordingFace(views: LayoutState["views"] = {}): {
     setViewFlags: record("setViewFlags"),
     activeView: () => null,
     onDidRequestCloseView: () => () => {},
+    setFront: () => {},
   } satisfies PracLayoutFace;
   return { face, calls, children };
 }

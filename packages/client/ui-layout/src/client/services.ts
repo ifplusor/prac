@@ -47,6 +47,7 @@ import {
   regionInfos,
   regionNode,
   setCollapsed,
+  setFront,
   setRegionChildren,
   setRegionSize,
   splitRegionWith,
@@ -211,6 +212,9 @@ export function createServices(
     regionChildren(regionId: string): RegionChild[] {
       const node = findRegion(store.get().tree, regionId);
       return (node?.children ?? []).map((child) => ({ id: child.id, label: child.label }));
+    },
+    setFront(viewId: string): void {
+      store.update((state) => setFront(state, viewId));
     },
     /** Show/hide a view without moving it. */
     show(viewId: string): void {
