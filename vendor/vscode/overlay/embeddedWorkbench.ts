@@ -1167,7 +1167,22 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
           const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
             ? URI.parse(resource)
             : URI.file(resource);
-          void this.editorService.openEditor({ resource: uri });
+          // **Find the editor, do not re-open by description.** Opening an untyped
+          // `{resource}` goes through the editor resolver, whose options can leave the
+          // editor inactive (`active: this.count === 0 || !options?.inactive`) — measured:
+          // `activate(A)` with A already open did nothing at all, not even a transient
+          // change. Naming the editor the group already holds activates it for sure, which
+          // is what this action promises.
+          const identifiers = this.editorService.findEditors(uri);
+          if (identifiers.length === 0) {
+            void this.editorService.openEditor({ resource: uri });
+            return;
+          }
+          for (const { groupId, editor } of identifiers) {
+            this.editorGroupService.activateGroup(groupId);
+            const group = this.editorGroupService.getGroup(groupId);
+            if (group !== undefined) void group.openEditor(editor, { preserveFocus: true });
+          }
         },
         close: (resource: string) => {
           const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
