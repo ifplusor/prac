@@ -165,9 +165,26 @@ export function apply(ctx: Context): void {
   /** The view id for one app resource. */
   const fileViewId = (resource: string): string => `${FILE_VIEW_PREFIX}${resource}`;
 
-  /** The app resource behind a file view id, or undefined for any other view. */
-  const resourceOfFileView = (view: string): string | undefined =>
-    view.startsWith(FILE_VIEW_PREFIX) ? view.slice(FILE_VIEW_PREFIX.length) : undefined;
+  /**
+   * The app resource behind a file view id, or undefined for any other view.
+   *
+   * **Both shapes are accepted**: `vscode:file:<resource>` (one view per file) and
+   * `vscode:file:<group>:<resource>` (one view per **placement**, which the workbench
+   * needs to show one file in two regions). The parse looks for a leading integer — a URI
+   * scheme cannot start with digits, so the two are unambiguous — which means the id
+   * convention can change in one place without every consumer changing with it.
+   *
+   * @param view - the view id.
+   */
+  const resourceOfFileView = (view: string): string | undefined => {
+    if (!view.startsWith(FILE_VIEW_PREFIX)) return undefined;
+    const rest = view.slice(FILE_VIEW_PREFIX.length);
+    const separator = rest.indexOf(":");
+    if (separator > 0 && /^\d+$/.test(rest.slice(0, separator))) {
+      return rest.slice(separator + 1);
+    }
+    return rest;
+  };
 
   /**
    * The view-id prefix for one view the app's view registry reports.
