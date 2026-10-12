@@ -103,7 +103,9 @@ const checks = {
   // one the command added. (The editors capability's `active` is per group and cannot say this.)
   focusLeftLandsInTheOldRegion: focused.left === before.regions[0],
   focusRightLandsInTheNewRegion:
-    focused.right !== null && after.regions.includes(focused.right) && focused.right !== focused.left,
+    focused.right !== null &&
+    after.regions.includes(focused.right) &&
+    focused.right !== focused.left,
   noEmbedErrors: consoleErrors.filter((line) => line.includes("vscode-embed:")).length === 0,
 };
 
