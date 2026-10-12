@@ -20,6 +20,7 @@
     "vscode:smoke": "node scripts/smoke.mjs",
     "vscode:verify-layout": "node scripts/verify-layout.mjs",
     "vscode:verify-focus": "node scripts/verify-focus.mjs",
+    "vscode:verify-group": "node scripts/verify-group.mjs",
     "vscode:verify-editor": "node scripts/verify-editor.mjs",
     "vscode:verify-view": "node scripts/verify-view.mjs",
     "vscode:verify-file": "node scripts/verify-file.mjs",

@@ -43,6 +43,7 @@ const KNOWN_NOISE = [
   "Failed to load resource",
   "reading the Cordis inventory failed",
   "spdlog",
+  "Could not locate the bindings file",
   "native-watchdog",
   "fs-copyfile",
   "vsda",
