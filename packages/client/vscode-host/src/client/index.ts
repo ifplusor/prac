@@ -33,6 +33,9 @@ import type { Context } from "@deepseek-ai/cordis";
 // Type-only: loads the `ctx.uiSession` augmentation without emitting a runtime import
 // (a value import here would inline DSH's session client into this bundle).
 import type {} from "@deepseek-ai/dsh-client-ui-session/client";
+// Type-only, for prac's own Context merge (`ctx.pracLayout`), which is the face that owns
+// the region tree `addGroup` asks about.
+import type {} from "prac-client-ui-layout/client";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { ILayout } from "@deepseek-ai/dsh-client-ui-layout/client";
@@ -138,6 +141,10 @@ export function apply(ctx: Context): void {
     // has none, and without it the product's own install path cannot work.
     extensionsGallery: { ...EXTENSIONS_GALLERY },
   });
+
+  // The workbench's `addGroup` needs prac's region tree: a group is a region, so the frame
+  // makes the region (synchronously) and the host binds the group to the id it returns.
+  embed.setGroupRegionFactory((region, side) => ctx.pracLayout.createRegionBeside(region, side));
 
   /** Boot the app for the active workspace; true once it is running. */
   const boot = (): boolean => {
@@ -314,4 +321,4 @@ export const name = "prac-client-vscode-host";
  * consumer packages. It does register into the frame's floating layer, which is
  * where the app's own root is mounted.
  */
-export const inject = ["workspaces", "sessions", "uiSession", "slots", "layout"];
+export const inject = ["workspaces", "sessions", "uiSession", "slots", "layout", "pracLayout"];

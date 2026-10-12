@@ -123,11 +123,11 @@ export function setGroupRegionFactory(
 /** prac's split side for an upstream group direction. */
 function sideOfDirection(direction: GroupDirection): "left" | "right" | "up" | "down" {
   switch (direction) {
-    case GroupDirection.Left:
+    case GroupDirection.LEFT:
       return "left";
-    case GroupDirection.Right:
+    case GroupDirection.RIGHT:
       return "right";
-    case GroupDirection.Up:
+    case GroupDirection.UP:
       return "up";
     default:
       return "down";
@@ -433,7 +433,7 @@ export class PracEditorHost
     const source =
       typeof location === "number" ? this.getGroup(location) : (location as PracEditorGroup);
     const from = source ?? this._activeGroup;
-    const region = from === undefined ? undefined : this.regionOf(from);
+    const region = from === undefined ? undefined : this.regionOf(from as PracEditorGroup);
     const side = sideOfDirection(direction);
     const created =
       region === undefined || groupRegionFactory === undefined

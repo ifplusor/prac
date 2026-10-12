@@ -72,6 +72,11 @@ export interface VscodeEmbedPage {
   error?: string;
   /** The app's part-hosting face, once its service graph has restored. */
   face?: PartHostFace;
+  /** The app's region channel, kept until the workbench publishes a face to hand it to. */
+  groupRegionFactory?: (
+    region: string,
+    side: "left" | "right" | "up" | "down",
+  ) => string | undefined;
   /** The element hosting each part, by part id, across all consumers. */
   readonly hosts: Map<string, HTMLElement>;
   /** The element hosting each view, by view id, across all consumers. */
@@ -277,6 +282,16 @@ export interface VscodeEmbedHandle {
    * in one group; the same file in two groups is two of these.
    */
   placements(): readonly FilePlacement[];
+  /**
+   * Install the app's region channel for the workbench's `addGroup`: in prac a group *is* a
+   * region, so the frame makes the region (synchronously) and the host binds the group to
+   * the id it returns.
+   *
+   * @param factory - the frame's split, as a synchronous question.
+   */
+  setGroupRegionFactory(
+    factory: (region: string, side: "left" | "right" | "up" | "down") => string | undefined,
+  ): void;
   /**
    * Subscribe to changes in the placement set.
    *
@@ -496,6 +511,11 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
               deferParts: true,
               publish: (face: PartHostFace) => {
                 record.face = face;
+                // The app may install the region channel before the workbench publishes its
+                // face (it boots asynchronously); hand it over then.
+                if (record.groupRegionFactory !== undefined) {
+                  face.setGroupRegionFactory(record.groupRegionFactory);
+                }
                 for (const [partId, element] of record.hosts) face.movePartInto(partId, element);
                 for (const [viewId, element] of record.viewHosts)
                   face.mountViewInto(viewId, element);
@@ -793,6 +813,12 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
     file,
     capabilities: { editors, diagnostics },
     placements: () => record.face?.listPlacements() ?? [],
+    setGroupRegionFactory: (
+      factory: (region: string, side: "left" | "right" | "up" | "down") => string | undefined,
+    ): void => {
+      record.groupRegionFactory = factory;
+      record.face?.setGroupRegionFactory(factory);
+    },
     onDidChangePlacements: (listener: () => void): (() => void) => {
       const detach = record.face?.onDidChangePlacements(listener);
       record.placementListeners.set(listener, detach);

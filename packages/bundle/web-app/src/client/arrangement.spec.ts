@@ -101,6 +101,9 @@ function recordingFace(views: LayoutState["views"] = {}): {
     setViewFlags: record("setViewFlags"),
     activeView: () => null,
     onDidRequestCloseView: () => () => {},
+    // The frame owns the region tree: `addGroup` asks it for a region and binds the group to
+    // the id it returns. A test double that never splits answers `undefined`.
+    createRegionBeside: () => undefined,
     setFront: () => {},
   } satisfies PracLayoutFace;
   return { face, calls, children };
