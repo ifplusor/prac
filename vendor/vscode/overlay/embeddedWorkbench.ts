@@ -63,6 +63,7 @@ import { Direction, Grid, ISerializableView, IViewSize } from "../../base/browse
 import { Part } from "./part.js";
 import { ViewPane } from "./parts/views/viewPane.js";
 import { PracEditorHost, setGroupRegionChannel } from "./pracEditorHost.js";
+import { ITimelineService } from "../../workbench/contrib/timeline/common/timeline.js";
 import type { GroupRegionChannel } from "./pracEditorHost.js";
 import type { PracEditorGroup } from "./pracEditorGroup.js";
 import { IMarkerService, MarkerSeverity } from "../../platform/markers/common/markers.js";
@@ -274,6 +275,41 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   private readonly deferredHosts = new Map<string, HTMLElement>();
   /** Kept for runtime service access (`openWorkspaceFolder`). */
   private instantiationService: InstantiationService | undefined;
+  /** The gate-only timeline provider's registration, so enabling twice is harmless. */
+  private timelineProbe: { dispose(): void } | undefined;
+
+  /**
+   * Register the gate-only timeline provider (see the face's doc).
+   *
+   * This is not a product feature: prac's embed has no timeline source, and a Timeline pane
+   * with nothing to show cannot be told apart from a broken one. The provider answers with one
+   * deterministic entry per resource, labelled as a gate's.
+   */
+  private enableTimelineProbe(): void {
+    const service = this.instantiationService;
+    if (service === undefined || this.timelineProbe !== undefined) return;
+    service.invokeFunction((accessor) => {
+      const timeline = accessor.get(ITimelineService);
+      this.timelineProbe = timeline.registerTimelineProvider({
+        id: "prac-gate-timeline",
+        label: "prac gate",
+        scheme: "vscode-remote",
+        dispose: () => {},
+        provideTimeline: async (uri: URI) => ({
+          source: "prac-gate-timeline",
+          items: [
+            {
+              handle: `${uri.toString()}#prac-gate`,
+              source: "prac-gate-timeline",
+              id: "prac-gate-1",
+              label: `prac gate entry for ${uri.path.split("/").pop() ?? uri.path}`,
+              timestamp: Date.now() - 60_000,
+            },
+          ],
+        }),
+      });
+    });
+  }
   /**
    * The editing surface the embedder mounted, by **placement**.
    *
@@ -482,6 +518,14 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
              * the app to make the region a new group will live in.
              */
             setGroupRegionChannel: (channel: GroupRegionChannel) => setGroupRegionChannel(channel),
+            /**
+             * Gate-only: register a deterministic timeline provider through the workbench's
+             * own `ITimelineService`, so a gate can assert the Timeline pane is upstream's
+             * panel, driven by upstream's service, and that it follows the active file. The
+             * embedder ships no timeline source of its own — this is a probe, and the entries
+             * say so in their label.
+             */
+            enableTimelineProbe: () => this.enableTimelineProbe(),
             listPlacements: () => this.listPlacements(),
             onDidChangePlacements: (listener: () => void) => this.onDidChangePlacements(listener),
             listOpenFiles: () => this.listOpenFiles(),

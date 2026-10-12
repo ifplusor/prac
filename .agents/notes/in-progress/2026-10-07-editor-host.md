@@ -72,6 +72,6 @@ status: in-progress
 ## 判据（这一轮怎么算成立）
 
 1. **编辑器动作落在可见的那块面上**：转到符号 / 定义（以及任何编辑动作）动的必须是 prac 展示的那份。**已锁，两个手势**：`vendor:verify-editor` 先在**转到符号**的快选里按下符号行（可见面的渲染行从 `// top-<token>` 变成 `// filler 182…`），再用**文件内查找**把它带回文件头（渲染行变回 `// top-<token>`），两次都断言宿主元素与区域不变。
-2. **Outline / Timeline 与上游一致**（同一份模型、同一个面板）。Outline **已锁**（`vendor:verify-outline`：符号、跟随下一个文件、跟随取得焦点的区域、排在面板内）；**Timeline 未锁**——它需要一条 provider（git / 本地历史）才有内容可比，属未做。
+2. **Outline / Timeline 与上游一致**（同一份模型、同一个面板）。**两条都锁了**：`vendor:verify-outline`（符号、跟随下一个文件、跟随取得焦点的区域、排在面板内）与 `vendor:verify-timeline`（面板是上游的、条目来自 `ITimelineService`、行里是当前文件的名字、换文件就换行、面板仍在自己区域内）。Timeline 的条目由一条**只给门用**的 provider 提供（这个嵌入不带 timeline 源；空面板与坏面板分不出来），经 `__vscodeEmbed.face.enableTimelineProbe()` 打开。
 3. **DOM 里不存在离屏部件**（`[data-vscode-embed-detached]` 消失），app 的打开路径（树点击 / 快速打开 / `openFile`）照常。**已锁**：`vendor:verify-editor` 断言 `[data-vscode-embed-detached]` 与 `[data-vscode-embed-part-host]` 计数为 0，同一文件的编辑面**恰好一个**。
 4. **门全绿**：vendor `editor / file / views / outline / focus / tabs / close / layout / view` + prac `stack / split / containers / bottom / persistence`。过期的 `vendor:verify-regions`（断言"离屏部件存在"）**退役**：它的第 1 条并入 `verify-editor`，第 2–3 条（view host 落在区域内、pane 不越宽）并入 `verify-view`。

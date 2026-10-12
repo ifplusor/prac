@@ -220,6 +220,11 @@ export interface PartHostFace {
    */
   listPlacements: () => readonly FilePlacement[];
   /**
+   * Register a deterministic timeline provider (a **gate's** hook, not a product feature): a
+   * Timeline pane with nothing in it cannot be told apart from a broken one.
+   */
+  enableTimelineProbe: () => void;
+  /**
    * Install the app's region channel: given a region and a side, the frame splits it and
    * returns the new region's id (or undefined). The workbench needs it for `addGroup`, where
    * a group cannot exist before the region that renders it does.

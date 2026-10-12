@@ -283,6 +283,10 @@ export interface VscodeEmbedHandle {
    */
   placements(): readonly FilePlacement[];
   /**
+   * Register the gate-only timeline provider (see the workbench's face doc).
+   */
+  enableTimelineProbe(): void;
+  /**
    * Install the app's region channel for the workbench's `addGroup`: in prac a group *is* a
    * region, so the frame makes the region (synchronously) and the host binds the group to
    * the id it returns.
@@ -814,6 +818,9 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
     file,
     capabilities: { editors, diagnostics },
     placements: () => record.face?.listPlacements() ?? [],
+    enableTimelineProbe: (): void => {
+      record.face?.enableTimelineProbe();
+    },
     setGroupRegionChannel: (channel: {
       createRegionBeside(
         region: string,

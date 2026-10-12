@@ -70,6 +70,10 @@ export interface PracVscodeFace {
    *
    * @param view - any view id.
    */
+  /**
+   * Register the gate-only timeline provider (a probe, not a product feature).
+   */
+  enableTimelineProbe(): void;
   filePlacement(view: string): { placement: string; resource: string } | undefined;
   /**
    * The app resource behind a view id, or `undefined` when the id is not a file

@@ -259,6 +259,11 @@ export function apply(ctx: Context): void {
       const vscodeView = vscodeViewIdOf(view);
       return vscodeView === undefined ? () => null : embed.view(vscodeView);
     },
+    /**
+     * Register the gate-only timeline provider (see the workbench's face doc): a Timeline pane
+     * with nothing in it cannot be told apart from a broken one.
+     */
+    enableTimelineProbe: () => embed.enableTimelineProbe(),
     filePlacement: (view: string) => placementOfFileView(view),
     fileResource: (view: string): string | undefined => placementOfFileView(view)?.resource,
     capabilities: {
