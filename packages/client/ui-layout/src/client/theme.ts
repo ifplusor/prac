@@ -41,7 +41,7 @@ export class ThemePresenter {
     const body = document.body;
     if (scheme === "dark") body.setAttribute(DARK_ATTRIBUTE, "");
     else body.removeAttribute(DARK_ATTRIBUTE);
-    body.style.setProperty(CONTENT_FONT_SIZE_VARIABLE, `${snapshot.fontSize}px`);
+    body.style.setProperty(CONTENT_FONT_SIZE_VARIABLE, `${snapshot.fontSizes.text}px`);
     for (const name of this.appliedTokens) body.style.removeProperty(name);
     this.appliedTokens = [];
     for (const [name, value] of Object.entries(snapshot.active.tokens)) {

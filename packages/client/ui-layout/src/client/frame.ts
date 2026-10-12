@@ -13,7 +13,14 @@
  * @module prac-client-ui-layout/client/frame
  */
 
-import { createElement, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  createElement,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import type { ReactElement, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { UsePanelInfo } from "@deepseek-ai/dsh-client-ui-layout/client";
@@ -472,6 +479,20 @@ function splitStyle(node: SplitNode): StyleObject {
   };
 }
 
+/**
+ * The session currently on screen, as DSH publishes it.
+ *
+ * It used to be a member of the session **list** state (`list.current`); in the shell this
+ * repository runs, navigation moved out of the controller ("navigation belongs to view
+ * owners") and the current binding is published as its own source
+ * (`ctx.uiSession.adapter.current`). Structural here on purpose: the frame needs
+ * `getSnapshot`/`subscribe`, nothing about sessions.
+ */
+export interface CurrentSessionSource {
+  getSnapshot(): { readonly key?: string };
+  subscribe(listener: () => void): () => void;
+}
+
 /** Props DSH hands the root slot component. */
 interface FrameProps {
   renderSlot: RenderSlot;
@@ -487,7 +508,10 @@ interface FrameProps {
  *
  * @param store - the layout store this frame renders.
  */
-export function createFrame(store: LayoutStore): (props: FrameProps) => ReactElement {
+export function createFrame(
+  store: LayoutStore,
+  sources: { readonly currentSession: CurrentSessionSource },
+): (props: FrameProps) => ReactElement {
   return function PracFrame({ renderSlot, useSessions, usePanelInfo }: FrameProps): ReactElement {
     const state = useLayout(store);
     const frameRef = useRef<HTMLDivElement | null>(null);
@@ -844,7 +868,12 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
           overflow: "hidden",
         },
       },
-      createElement(DocumentTitle, { productTitle: PRODUCT_TITLE, useSessions, usePanelInfo }),
+      createElement(DocumentTitle, {
+        productTitle: PRODUCT_TITLE,
+        useSessions,
+        usePanelInfo,
+        currentSession: sources.currentSession,
+      }),
       renderNode(state.tree, "row"),
       // The overlay layer: above every region, click-through until an
       // entry opts into pointer events (see FRAME_STYLES).
@@ -871,6 +900,7 @@ const PRODUCT_TITLE = document.title;
 interface DocumentTitleProps {
   useSessions: UseSessions;
   usePanelInfo: UsePanelInfo;
+  currentSession: CurrentSessionSource;
   productTitle: string;
 }
 
@@ -879,13 +909,23 @@ interface DocumentTitleProps {
  *
  * @param props - the session/panel hooks and the product title to fall back to.
  */
-function DocumentTitle({ useSessions, usePanelInfo, productTitle }: DocumentTitleProps): null {
+function DocumentTitle({
+  useSessions,
+  usePanelInfo,
+  currentSession,
+  productTitle,
+}: DocumentTitleProps): null {
+  const sessionKey = useSyncExternalStore(
+    (listener) => currentSession.subscribe(listener),
+    () => currentSession.getSnapshot().key,
+  );
   const showSessionTitle = usePanelInfo((info) => info.activePanelId === null);
   const title = useSessions((sessionState) => {
-    const current = sessionState.current;
-    return !showSessionTitle || current === undefined
-      ? undefined
-      : sessionState.byId[current]?.title;
+    if (!showSessionTitle || sessionKey === undefined) return undefined;
+    // The list's `byId` is keyed by the branded session id, and this key is that id: the
+    // index is read through a plain-string view of the same table.
+    const rows = sessionState.byId as Readonly<Record<string, { readonly title?: string }>>;
+    return rows[sessionKey]?.title;
   });
   useEffect(() => {
     document.title = title === undefined ? productTitle : `${title} — ${productTitle}`;

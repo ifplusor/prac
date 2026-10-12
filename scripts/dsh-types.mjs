@@ -22,7 +22,7 @@
  * see the note `2026-09-13-vs-concept-boundary.md`.
  *
  * The checkout defaults to prac dev's **anchor worktree**
- * (`../../deepseek-harness/dsh-dev`, the branch `james-dev`), overridable with
+ * (`../../deepseek-harness/dsh-prac-dev`, the branch `prac-dev`), overridable with
  * `--checkout <path>` or `DSH_CHECKOUT`. A machine without that worktree skips the
  * comparison with a note — the pins stay what makes this repository portable.
  *
@@ -228,7 +228,7 @@ function compare(checkout) {
 }
 
 /** prac dev's anchor worktree, relative to this repository's root. */
-const ANCHOR = "../../deepseek-harness/dsh-dev";
+const ANCHOR = "../../deepseek-harness/dsh-prac-dev";
 
 if (!process.argv.includes("--compare")) {
   console.log("usage: node scripts/dsh-types.mjs --compare [--checkout <path>]");

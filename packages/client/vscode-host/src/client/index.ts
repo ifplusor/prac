@@ -30,6 +30,9 @@
 
 import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
+// Type-only: loads the `ctx.uiSession` augmentation without emitting a runtime import
+// (a value import here would inline DSH's session client into this bundle).
+import type {} from "@deepseek-ai/dsh-client-ui-session/client";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { ILayout } from "@deepseek-ai/dsh-client-ui-layout/client";
@@ -99,7 +102,9 @@ function viewLocation(location: string): VscodeCatalogueEntry["location"] {
 function activeWorkspace(ctx: Context): WorkspaceLaunch | undefined {
   try {
     const items = ctx.workspaces.list.getSnapshot().items;
-    const current = ctx.sessions.list.getSnapshot().current;
+    // Navigation left the session *list* in the shell this repository runs; the current
+    // session's identity is published by the session adapter.
+    const current = ctx.uiSession.adapter.current.getSnapshot().key;
     if (current !== undefined) {
       const owning = items.find((item) => item.sessionIds.includes(current));
       if (owning !== undefined) return { path: owning.path };
@@ -308,4 +313,4 @@ export const name = "prac-client-vscode-host";
  * consumer packages. It does register into the frame's floating layer, which is
  * where the app's own root is mounted.
  */
-export const inject = ["workspaces", "sessions", "slots", "layout"];
+export const inject = ["workspaces", "sessions", "uiSession", "slots", "layout"];

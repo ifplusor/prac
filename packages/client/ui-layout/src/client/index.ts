@@ -107,7 +107,11 @@ export function apply(ctx: Context): void {
           "prac.view": { kind: "list", scope: "root" },
         },
       },
-      createFrame(store),
+      // The current session is the frame's business (it titles the page): the source comes
+      // from the session adapter, which is where this shell keeps navigation now.
+      createFrame(store, {
+        currentSession: ctx.uiSession.adapter.current,
+      }),
     );
     const disposePanelInfo = ctx.slots.provideRoot({ hooks: { panelInfo } });
     // The faces other plugins consume, on the documented service channel
@@ -172,4 +176,4 @@ export function apply(ctx: Context): void {
 export const name = "prac-client-ui-layout";
 
 /** The DSH services this plugin needs: the slot registry and the theme service. */
-export const inject = ["slots", "theme"];
+export const inject = ["slots", "theme", "uiSession"];
