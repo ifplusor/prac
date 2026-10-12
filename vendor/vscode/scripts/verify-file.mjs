@@ -301,10 +301,12 @@ const merged = await liveSurfaces();
 // Closing the file releases its surface *and* its tab, and the app's next open builds
 // a fresh one. A surface left behind after a close would be an editor nobody owns.
 step("close file");
-await page.evaluate(
-  (resource) => globalThis.__vscodeEmbed.face.capabilities.editors.actions.close(resource),
-  uriOf(FILE_A),
-);
+await page.evaluate((resource) => {
+  const placement = globalThis.__vscodeEmbed.face
+    .listPlacements()
+    .find((p) => p.resource === resource);
+  globalThis.__vscodeEmbed.face.capabilities.editors.actions.close(placement.placement, resource);
+}, uriOf(FILE_A));
 await page.waitForFunction(
   (uri) => globalThis.__deep.all(`[data-vscode-embed-file="${uri}"]`).length === 0,
   uriOf(FILE_A),
@@ -451,10 +453,12 @@ await page.evaluate((resource) => {
 await page.waitForTimeout(1500);
 const capabilityHidden = await capability();
 // Closing the editor is an action of the capability, and the view follows.
-await page.evaluate(
-  (resource) => globalThis.__vscodeEmbed.face.capabilities.editors.actions.close(resource),
-  surfaceResource,
-);
+await page.evaluate((resource) => {
+  const placement = globalThis.__vscodeEmbed.face
+    .listPlacements()
+    .find((p) => p.resource === resource);
+  globalThis.__vscodeEmbed.face.capabilities.editors.actions.close(placement.placement, resource);
+}, surfaceResource);
 await page.waitForTimeout(2500);
 const capabilityClosed = await capability();
 
@@ -586,6 +590,29 @@ const copied = await page.evaluate(
   uriOf(FILE_A),
 );
 
+// Closing a tab closes **that placement**, not the resource: the app's own semantics
+// (upstream closes one group's editor instance and leaves the other group's alone), and the
+// reason `close` takes a placement rather than a URI.
+step("close one of the two placements");
+const closedOne = await page.evaluate(async (resource) => {
+  const face = globalThis.__vscodeEmbed.face;
+  const [first] = face.listPlacements().filter((placement) => placement.resource === resource);
+  face.capabilities.editors.actions.close(first.placement, resource);
+  await new Promise((resolve) => setTimeout(resolve, 2500));
+  return {
+    closed: first.placement,
+    placements: face
+      .listPlacements()
+      .filter((placement) => placement.resource === resource)
+      .map((placement) => placement.placement),
+    surfaces: globalThis.__deep.all(`[data-vscode-embed-file="${resource}"]`).map((element) => ({
+      placement: element.getAttribute("data-vscode-embed-placement"),
+      lines: element.querySelectorAll(".view-line").length,
+    })),
+    openFiles: face.listOpenFiles(),
+  };
+}, uriOf(FILE_A));
+
 await browser.close();
 
 const painted = (colours) => typeof colours === "number" && colours > 4;
@@ -712,6 +739,15 @@ const checks = {
   // 11. Split editor: one file, two placements, two views, two surfaces. The app
   // reports the *placement* (a file in a group), prac gives each its own view, and
   // each view gets its own editing surface — the same file, twice.
+  // 12. Closing one placement leaves the other one open, with its own surface: the tab asked
+  // about one editor instance, and the resource is still open in the app afterwards.
+  onePlacementClosedNotTheResource:
+    closedOne.placements.length === 1 &&
+    closedOne.placements[0] !== closedOne.closed &&
+    closedOne.surfaces.length === 1 &&
+    closedOne.surfaces[0].placement === closedOne.placements[0] &&
+    closedOne.surfaces[0].lines > 0 &&
+    closedOne.openFiles.includes(uriOf(FILE_A)),
   splitEditorCopiesThePlacement:
     splitRan === "ran" &&
     copied.placements.length === 2 &&
@@ -742,6 +778,7 @@ console.log(
         oneSurface,
         afterSecond,
         split,
+        closedOne,
         merged,
         closed,
         mountMessages: mounted.mountMessages,

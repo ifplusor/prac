@@ -115,11 +115,12 @@ export interface PracVscodeFace {
          */
         activate(resource: string): void;
         /**
-         * Close a file's editor.
+         * Close one placement's editor.
          *
+         * @param placement - the placement whose editor should close.
          * @param resource - the app's URI for the file.
          */
-        close(resource: string): void;
+        close(placement: string, resource: string): void;
       };
     };
     /**

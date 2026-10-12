@@ -47,11 +47,11 @@ status: in-progress
 
 - **组头**（tab 条 + 面包屑）：tab 按决定 17 归 prac（区域的 tab 条已有），**面包屑挂在组头上**——是先让 prac 的 tab 条只做 tab、把组头其余部分搬进来，还是另行处理，单独裁一次。
 - **未支持清单的表达**：放在启动日志、一条活体门，还是两者都要。
-- **身份改造落地之后仍要重定的三件事**（见 Proposal 第 6 条）——**证据已量齐，待裁决**：
-  - **tab**：已经是按放置（一个放置一个 `vscode:file:<placement>:<resource>` view，tab 由它所在的区域渲染）⇒ 不改。
-  - **脏标记**：按**模型**（资源），不按放置。VS Code 的脏是 `ITextFileEditorModel` 的属性，两个放置共享同一个模型 ⇒ 两个 tab 必须显示同一个脏点；按放置算会是假信息。
-  - **关闭**：现状是**按资源** —— tab × → `layout.requestCloseView(viewId)` → `ui-vscode-editor` 取 `host.fileResource(view)` → `editors.actions.close(resource)` → `embeddedWorkbench` 用 `findEditors(uri)` **拿到该资源的全部编辑器**并 `closeEditors(identifiers)`，于是关一个 tab 会把另一个区域里的同一文件一起关掉，而问的其实只是那一个 view。上游 VS Code 按编辑器实例（即我们的"放置"）关：同一文件在两个组里，关一个组不动另一个。**建议按放置**：`close` 接一个放置（`host.filePlacement(view)` 已在手上），在 `findEditors` 的结果里取 `groupId === placement.group` 的那一个实例；代价是 capability 的签名动一次，`verify-close`（单放置）与 `verify-file`（两个放置/两个面）跟着改。
-  - **"当前文件"**：定义为"最前区域里处于 `activeEditor` 的那个**放置**"（区域的最前由 prac 的 front 决定，组内 active 由 `EditorGroupModel` 决定）——给这个组合一个名字（如 `currentPlacement`），而不是"一个资源"；`web-app` 现有的 `currentFile` 重挑就是它在用。
+- **身份改造之后的三件事已定**（tab / 脏标记 / 关闭，"按放置"这一句裁决落在关闭上）：
+  - **tab**：按放置（一个放置一个 `vscode:file:<placement>:<resource>` view，tab 由它所在的区域渲染）。
+  - **脏标记**：按**模型**（资源）。VS Code 的脏是 `ITextFileEditorModel` 的属性，两个放置共享同一个模型 ⇒ 两个 tab 显示同一个脏点；按放置算会是假信息。
+  - **关闭**：按**放置**。`close(placement, resource)` 一直接到 capability 上（`embeddedWorkbench` 在 `findEditors(uri)` 的结果里只取 `groupId === placement` 的那一个实例），tab 的 × 用 `host.filePlacement(view)` 报名。在飞行中的护栏也改成按放置（`closingFiles` 用 `placementKey`），只有"这个资源的每个放置都在关闭"才拦住 `activate`（`isClosingEverywhere`）——文件还在另一个区域里开着时，激活它是正当的。上游语义一致：关一个组不动另一个组。
+  - **"当前文件"**：是"最前区域里处于 `activeEditor` 的那个**放置**"（区域最前由 prac 的 front 决定，组内 active 由 `EditorGroupModel` 决定）；`web-app` 现有的 `currentFile` 重挑就是它在用。
 - **零延迟的 down+up 会让工作台的确认框重问一次**（2026-10-12 实测）：`mousedown` 落在按钮上、对话框随即消失，`mouseup` 落在编辑器上，`click` 从未到达按钮，随后问询被重新发起。人的按法（按下停 120ms 以上）不会遇到，所以门按人的节奏按；但"谁在重问"没查（VS Code 的问询还挂着，还是对账里某次 `close` 重发？）——它是一个"手速快的用户可能看到对话框闪一下"的候选，留待复现再查。
 - **`addGroup` 的落地形状**：host → app 的一条请求（"为这个组创建一个区域"）+ `layout.splitView` 接受宿主指定的 region id（现在自己生成），否则 `addGroup` 返回的组与真实区域对不上；这条通道缺席时，应用的 `Split Editor into Next Group` 在没有第二个组的情况下什么也不做（实测：日志里只有拒绝行）。`findGroup` 的方向型位置（LEFT/RIGHT/UP/DOWN）同样等这条通道：几何只有 frame 有。
 - **浮层可交互，但门的"瞬时点击"不行**（2026-10-12 量清）：应用自己的浮层（快选、菜单、通知、模态）**是能点的** —— 转到符号的行用"按下 → 停 120ms → 抬起"能选中并让编辑器滚到目标行，脏文件关不掉的确认框同理（Cancel / Don't Save 都生效）。而 Playwright 默认的**零延迟** down+up 不给按钮 `click`（实测：对话框按下即消失、抬起落在编辑器上，随后对话框被重新问一次）。⇒ 这是**门的输入**问题，不是产品缺陷：门要按人的节奏按（已写进 `verify-close` 与 `verify-editor` 的注释）。此前一轮把 `document.elementFromPoint` 的结果读成"穿透到 body"是误判——它对影子树内容返回的是**宿主**，而"点不动"的真因是 DSH 那条 Preview Notice 的全屏 mask + `#root` 的 `inert`（见下一条）。

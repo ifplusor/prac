@@ -259,7 +259,8 @@ export function apply(ctx: Context): void {
         version: () => embed.capabilities.editors.version(),
         actions: {
           activate: (resource: string) => embed.capabilities.editors.actions.activate(resource),
-          close: (resource: string) => embed.capabilities.editors.actions.close(resource),
+          close: (placement: string, resource: string) =>
+            embed.capabilities.editors.actions.close(placement, resource),
         },
       },
       diagnostics: {

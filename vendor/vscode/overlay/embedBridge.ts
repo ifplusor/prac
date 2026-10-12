@@ -345,7 +345,15 @@ export interface EditorsActions {
    *
    * @param resource - the file's URI, as a string.
    */
-  close(resource: string): void;
+  /**
+   * Close one **placement**: the same file may be open in another region, and closing a tab
+   * is about the editor instance it names, not about the resource everywhere (upstream's own
+   * semantics: closing a group's editor leaves the other group's).
+   *
+   * @param placement - the placement whose editor should close.
+   * @param resource - the app's URI for the file.
+   */
+  close(placement: string, resource: string): void;
   /**
    * Make a file's editor the app's active one.
    *

@@ -129,8 +129,10 @@ export function apply(ctx: Context): void {
     // The tab's close button asks; this package closes the app's editor, which is what
     // takes the view away (the mechanism never removes a view on its own).
     const stopClose = layout.onDidRequestCloseView((view) => {
-      const resource = host.fileResource(view);
-      if (resource !== undefined) editors.actions.close(resource);
+      // The tab names one **placement**: the same file may be open in another region, and
+      // that region's editor is not what this × asks about.
+      const placement = host.filePlacement(view);
+      if (placement !== undefined) editors.actions.close(placement.placement, placement.resource);
     });
     // prac's own front view changes without the app knowing (a tab click), so the
     // layout is a source too.

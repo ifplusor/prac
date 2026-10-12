@@ -337,8 +337,13 @@ export interface VscodeEmbedHandle {
       readonly actions: {
         /** Make a file's editor the app's active one. */
         activate(resource: string): void;
-        /** Close a file's editor. */
-        close(resource: string): void;
+        /**
+         * Close one placement's editor.
+         *
+         * @param placement - the placement whose editor should close.
+         * @param resource - the app's URI for the file.
+         */
+        close(placement: string, resource: string): void;
       };
     };
     /**
@@ -748,8 +753,8 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
       activate: (resource: string): void => {
         record.face?.capabilities.editors.actions.activate(resource);
       },
-      close: (resource: string): void => {
-        record.face?.capabilities.editors.actions.close(resource);
+      close: (placement: string, resource: string): void => {
+        record.face?.capabilities.editors.actions.close(placement, resource);
       },
     },
   };

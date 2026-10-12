@@ -304,12 +304,33 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   /** The next placement token (never reused: a stale id must stay unknown). */
   private placementCount = 0;
   /**
-   * Files whose close is in flight, by resource string.
+   * Closes in flight, by {@link placementKey}.
    *
-   * A mount that lands while its file is being closed must not open it again — the
-   * app has already decided the file is gone.
+   * A mount that lands while *its* placement's file is being closed must not open it again —
+   * the app has already decided that placement is gone. Keyed by placement rather than by
+   * resource because the same file can stay open in another region.
    */
   private readonly closingFiles = new Set<string>();
+
+  /**
+   * Whether a resource is leaving the app entirely (every placement of it is mid-close).
+   *
+   * The activation path names only a resource, so it cannot ask about one placement; what it
+   * must not do is put back a file the app has decided is gone. A *per-placement* close does
+   * not qualify — the other region keeps its editor, so activating the file stays legitimate.
+   *
+   * @param resource - the app's URI for the file.
+   * @returns true when the resource has placements and all of them are closing.
+   */
+  private isClosingEverywhere(resource: string): boolean {
+    let placements = 0;
+    for (const [placement, pair] of this.placements) {
+      if (pair.resource !== resource) continue;
+      placements += 1;
+      if (!this.closingFiles.has(placementKey(placement, resource))) return false;
+    }
+    return placements > 0;
+  }
   /** One single-view grid per mounted part; the grid supplies part positioning. */
   private readonly grids = new Map<string, Grid<ISerializableView>>();
   /**
@@ -896,7 +917,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
         if (!editor) throw new Error(`no editor for ${resource}`);
         // Re-checked here rather than at entry: resolving the editor is asynchronous,
         // and a close can land while it is in flight.
-        if (this.closingFiles.has(resource)) return;
+        if (this.closingFiles.has(placementKey(placement, resource))) return;
         await group.openEditor(editor, { pinned: true, preserveFocus: true });
         host.activateGroup(group.id);
         this.mountedFiles.set(placementKey(placement, resource), {
@@ -1360,7 +1381,10 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     subscribe: (listener: () => void) => () => void;
     settled: () => Promise<void>;
     version: () => number;
-    actions: { activate: (resource: string) => void; close: (resource: string) => void };
+    actions: {
+      activate: (resource: string) => void;
+      close: (placement: string, resource: string) => void;
+    };
   } {
     let revision = 0;
     const listeners = new Set<() => void>();
@@ -1439,7 +1463,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
           // disagree for a moment — prac still shows the file, the app has moved on —
           // so the honest answer is to let the close finish (measured: four
           // activations arriving mid-close left the file open again).
-          if (this.closingFiles.has(resource)) return;
+          if (this.isClosingEverywhere(resource)) return;
           const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
             ? URI.parse(resource)
             : URI.file(resource);
@@ -1460,22 +1484,28 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
             if (group !== undefined) void group.openEditor(editor, { preserveFocus: true });
           }
         },
-        close: (resource: string) => {
+        close: (placement: string, resource: string) => {
           const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
             ? URI.parse(resource)
             : URI.file(resource);
           // The close is asynchronous, and a **mount** can be in flight while it runs
           // (the frame re-renders the view list in the same layout change). Marking the
-          // file for the duration is what keeps that mount from putting the file back:
-          // measured, closing a file whose view was re-rendered in the same tick left
-          // it open, because the mount's `openEditor` landed after the close.
-          this.closingFiles.add(resource);
-          const identifiers = this.editorService.findEditors(uri);
+          // *placement* for the duration is what keeps that mount from putting the file
+          // back: measured, closing a file whose view was re-rendered in the same tick
+          // left it open, because the mount's `openEditor` landed after the close.
+          const key = placementKey(placement, resource);
+          this.closingFiles.add(key);
+          // **One placement, not the resource.** A tab names one editor instance; the same
+          // file may be open in another region and keeps its own instance there.
+          const group = this.placements.get(placement)?.group;
+          const identifiers = this.editorService
+            .findEditors(uri)
+            .filter((identifier) => identifier.groupId === group);
           const closed =
             identifiers.length > 0
               ? this.editorService.closeEditors(identifiers)
               : Promise.resolve();
-          void closed.finally(() => this.closingFiles.delete(resource));
+          void closed.finally(() => this.closingFiles.delete(key));
         },
       },
     };

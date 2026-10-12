@@ -145,10 +145,10 @@ await makeDirty();
 const dirty = await state();
 
 step("close it");
-await page.evaluate(
-  (uri) => globalThis.__vscodeEmbed.face.capabilities.editors.actions.close(uri),
-  DIRTY.uri,
-);
+await page.evaluate((uri) => {
+  const placement = globalThis.__vscodeEmbed.face.listPlacements().find((p) => p.resource === uri);
+  globalThis.__vscodeEmbed.face.capabilities.editors.actions.close(placement.placement, uri);
+}, DIRTY.uri);
 await page.waitForTimeout(2000);
 const asked = await state();
 
@@ -158,10 +158,10 @@ await page.waitForTimeout(1500);
 const afterCancel = await state();
 
 step("close again and discard");
-await page.evaluate(
-  (uri) => globalThis.__vscodeEmbed.face.capabilities.editors.actions.close(uri),
-  DIRTY.uri,
-);
+await page.evaluate((uri) => {
+  const placement = globalThis.__vscodeEmbed.face.listPlacements().find((p) => p.resource === uri);
+  globalThis.__vscodeEmbed.face.capabilities.editors.actions.close(placement.placement, uri);
+}, DIRTY.uri);
 await page.waitForTimeout(2000);
 const askedAgain = await state();
 const discarded = await clickButton("Don't Save");
