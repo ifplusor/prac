@@ -477,6 +477,17 @@ export interface PracLayoutFace {
    */
   createRegionBeside(regionId: string, side: Side): string | undefined;
   /**
+   * The region adjacent to another one in a direction, or undefined when there is none.
+   *
+   * The frame owns the region tree, so this is where a directional question ("the group to
+   * the left") can be answered at all; the workbench's directional `findGroup` asks through it.
+   *
+   * @param regionId - the region to look from.
+   * @param side - the direction to look in.
+   * @returns the neighbouring region's id.
+   */
+  regionInDirection(regionId: string, side: Side): string | undefined;
+  /**
    * Set (merge) the chrome flags of a view.
    *
    * The declarer's channel: the mechanism renders a tab dot for `dirty` and an

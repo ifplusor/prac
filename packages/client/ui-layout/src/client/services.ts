@@ -41,6 +41,7 @@ import {
   ensureView,
   findRegion,
   freshNodeId,
+  regionInDirection as findRegionInDirection,
   firstRegionId,
   frontView,
   place,
@@ -308,6 +309,9 @@ export function createServices(
      * placed, so the new region starts empty and becomes visible when the app puts a view
      * there (which is exactly what the workbench's move/open into the new group produces).
      */
+    regionInDirection(regionId: string, side: Side): string | undefined {
+      return findRegionInDirection(store.get().tree, regionId, side);
+    },
     createRegionBeside(regionId: string, side: Side): string | undefined {
       let created: string | undefined;
       store.update((state) => {

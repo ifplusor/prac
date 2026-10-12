@@ -837,6 +837,73 @@ export function sideGeometry(side: Side): SideGeometry {
  * @param splitId - id for the replacement split.
  * @param newRegionId - id for the new region.
  */
+/** One step on the way from the root to a region. */
+interface RegionAncestryStep {
+  readonly split: SplitNode;
+  readonly index: number;
+}
+
+/**
+ * The path from the root down to a region, outermost first.
+ *
+ * @param tree - the node to search.
+ * @param regionId - the region to find.
+ * @returns the steps, or undefined when the region is not in this subtree.
+ */
+function regionAncestry(tree: LayoutNode, regionId: string): RegionAncestryStep[] | undefined {
+  if (tree.type === "region") return tree.id === regionId ? [] : undefined;
+  for (let index = 0; index < tree.children.length; index += 1) {
+    const below = regionAncestry(tree.children[index], regionId);
+    if (below !== undefined) return [{ split: tree, index }, ...below];
+  }
+  return undefined;
+}
+
+/**
+ * The region a subtree shows nearest one of its edges.
+ *
+ * @param node - the subtree.
+ * @param edge - which edge.
+ * @returns the region id at that edge.
+ */
+function edgeRegionId(node: LayoutNode, edge: "first" | "last"): string {
+  if (node.type === "region") return node.id;
+  const children = edge === "first" ? node.children : [...node.children].reverse();
+  return edgeRegionId(children[0], edge);
+}
+
+/**
+ * The region adjacent to another one in a direction, from the tree's own geometry.
+ *
+ * A directional `findGroup` (LEFT/RIGHT/UP/DOWN) can only be answered where the tree is: walk
+ * up from the source region to the nearest ancestor split on that direction's axis which has a
+ * sibling on that side, then down that sibling to the region nearest the shared edge. A nearer
+ * ancestor without such a sibling does not answer, so the walk continues upward — the
+ * neighbour may be an uncle's child.
+ *
+ * @param tree - the tree to search.
+ * @param regionId - the region to look from.
+ * @param side - the direction to look in.
+ * @returns the neighbouring region's id, or undefined when there is none.
+ */
+export function regionInDirection(
+  tree: LayoutNode,
+  regionId: string,
+  side: Side,
+): string | undefined {
+  const path = regionAncestry(tree, regionId);
+  if (path === undefined) return undefined;
+  const { dir, before } = sideGeometry(side);
+  for (let step = path.length - 1; step >= 0; step -= 1) {
+    const { split, index } = path[step];
+    if (split.dir !== dir) continue;
+    const neighbour = split.children[index + (before ? -1 : 1)];
+    if (neighbour === undefined) continue;
+    return edgeRegionId(neighbour, before ? "last" : "first");
+  }
+  return undefined;
+}
+
 export function splitRegionWith(
   state: LayoutState,
   regionId: string,
