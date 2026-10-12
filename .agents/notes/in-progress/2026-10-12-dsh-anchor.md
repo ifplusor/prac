@@ -13,7 +13,7 @@ prac 的类型检查用 **npm 上发布的** DSH 包，而 app 跑的是某个 c
 - **锚点是一个 worktree**：`../../deepseek-harness/dsh-dev`（分支 `james-dev`，版本 `0.1.5-rc.1`）。prac dev 的 rig 从这里启动，类型也以它为基准 —— 同一个 DSH，两个用途。
 - **catalog 精确 pin 锚点的发布版本**（`0.1.5-rc.1`；`latest` 指向很旧的 release，所以范围会解析错）。
 - **一道门**：`scripts/dsh-types.mjs --compare` 在 `pnpm check` 里逐字节比较**已安装的** `lib/types` 与锚点（默认锚点路径，`--checkout` / `DSH_CHECKOUT` 可覆盖；机器上没有锚点时跳过并说明，pin 仍让仓库可移植）。这正是漂移的防线，也报告"哪个包根本没构建过"（`dsh-dev` 的三个包曾如此；重建后 11 个包全部逐字节相同）。
-- **前进是三步一起**：更新锚点 worktree（`pnpm install && pnpm build`）→ 改 catalog 的版本 → 跑 `pnpm check`（比较）。只做其中一步不算前进。
+- **前进是"clean 再 build"，然后三步一起**：更新锚点 worktree 的源码 → **`pnpm run clean && pnpm build`**（增量构建会留下上一版产物与陈旧 `lib/types`；实测 `dsh-dev` 有三个包的构建早于源码，clean 一次删掉 284 条路径）→ 改 catalog 的版本 → 跑 `pnpm check`（比较）。只做其中一步不算前进。
 - **下一站的 worktree 已备好**：`../../deepseek-harness/dsh-prac-dev`（分支 `prac-dev`，从 `master` 起，`0.2.1-alpha.2`）已 install + build 过；它对应的 rig 上 14 道门全绿。
 
 ## 已知的边界（实测）

@@ -97,5 +97,6 @@ cd /Volumes/Dev/prac
 git status                 # 当前状态
 # prac dev 的 DSH 锚点：一个 worktree（dsh-dev），rig 与类型都从这里来
 cd ../deepseek-harness/dsh-dev && pnpm dsh --profile prac-dev "<task>"
-# 锚点前进 = 三步一起：worktree 更新构建 → 改 catalog 的 pin → pnpm check（含 dsh-types 比较）
+# 锚点前进：worktree 更新后先 `pnpm run clean && pnpm build`（增量构建会留陈旧 lib/types）
+#            → 改 catalog 的 pin → pnpm check（含 dsh-types 逐字节比较）
 ```
