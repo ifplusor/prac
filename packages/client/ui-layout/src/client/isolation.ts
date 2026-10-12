@@ -11,6 +11,11 @@
  * - **Style sheets** live in `document.head`; document rules do not apply inside
  *   a shadow tree, so every root keeps a **live copy** of them. "Live" matters
  *   because VS Code's theme sheet is rewritten *in place* on a theme switch.
+ *   The copy is made **once per source** and refreshed only when that source
+ *   actually changed: a sync that re-clones every sheet costs a re-parse of the
+ *   whole shell CSS in every root, which a person sees as every pane flashing —
+ *   measured, one opened file re-created 672 `<style>` nodes in a single root,
+ *   and the sync runs on every mount and every render of a view host.
  * - **Attribute-selected rules** (`[data-ds-dark-theme] …`, `.dark …`) select on
  *   an ancestor **outside** the root, which a shadow tree cannot see, so a
  *   wrapper inside the root mirrors the document's own attributes.
@@ -52,8 +57,20 @@ const ROOT_STYLES = `
 [${CONTENT_ATTRIBUTE}] > * { flex: 1 1 auto; min-width: 0; min-height: 0; pointer-events: auto; }
 `;
 
+/** One mirrored source and the node that stands for it inside a root. */
+interface Mirror {
+  readonly source: Element;
+  readonly node: Element;
+  /** The source's revision when `node` was last copied from it. */
+  revision: number;
+}
+
 /** Every root this module keeps in sync. */
 const roots = new Set<ShadowRoot>();
+/** What each root currently mirrors, in source order. */
+const mirrors = new WeakMap<ShadowRoot, Mirror[]>();
+/** How many times a source's own content changed (see {@link bumpRevision}). */
+const revisions = new WeakMap<Element, number>();
 /** The head/attribute observers, installed on first use. */
 let observers: MutationObserver[] | undefined;
 /** Whether a sync is already queued for this task. */
@@ -62,6 +79,28 @@ let queued = false;
 /** The head nodes a root mirrors, in document order. */
 function sources(): readonly Element[] {
   return [...document.head.querySelectorAll("style, link[rel=stylesheet]")];
+}
+
+/** A source's content revision; a mirror holding this number is current. */
+function revisionOf(source: Element): number {
+  return revisions.get(source) ?? 0;
+}
+
+/**
+ * Note that one source's content changed.
+ *
+ * A `<style>` element is rewritten **in place** (VS Code's theme swap does exactly that), so
+ * the mutation's target is a text node or the element itself rather than a new element: the
+ * revision is what lets a sync refresh that one copy instead of re-cloning everything.
+ *
+ * @param target - the mutation's target.
+ */
+function bumpRevision(target: Node): void {
+  const element =
+    target.nodeType === 1 ? (target as Element) : (target.parentElement as Element | null);
+  if (element !== null && element !== undefined) {
+    revisions.set(element, revisionOf(element) + 1);
+  }
 }
 
 /**
@@ -82,8 +121,23 @@ function schedule(): void {
 /** Install the observers that keep roots current (once per page). */
 function observe(): void {
   if (observers) return;
-  const head = new MutationObserver(() => schedule());
-  head.observe(document.head, { childList: true, subtree: true, characterData: true });
+  const head = new MutationObserver((records) => {
+    for (const record of records) {
+      if (record.type === "childList") {
+        for (const node of record.addedNodes) bumpRevision(node);
+        for (const node of record.removedNodes) bumpRevision(node);
+      } else {
+        bumpRevision(record.target);
+      }
+    }
+    schedule();
+  });
+  head.observe(document.head, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+  });
   const attributes = new MutationObserver(() => schedule());
   for (const element of [document.documentElement, document.body]) {
     attributes.observe(element, { attributes: true });
@@ -113,25 +167,71 @@ function mirrorAttributes(wrapper: Element): void {
   }
 }
 
+/** The root's own size/fill sheet, made once. */
+function rootStyle(root: ShadowRoot): HTMLStyleElement {
+  const existing = root.querySelector<HTMLStyleElement>(`style[${ROOT_STYLE_ATTRIBUTE}]`);
+  if (existing !== null) return existing;
+  const style = document.createElement("style");
+  style.setAttribute(ROOT_STYLE_ATTRIBUTE, "");
+  style.textContent = ROOT_STYLES;
+  root.prepend(style);
+  return style;
+}
+
+/** Refresh one copy from its source, when the source's revision moved on. */
+function refresh(mirror: Mirror): void {
+  const revision = revisionOf(mirror.source);
+  if (mirror.revision === revision) return;
+  mirror.revision = revision;
+  // The copy's own marker attribute is ours; everything else comes from the source.
+  const wanted = [...mirror.source.attributes].filter(
+    (attribute) => attribute.name !== MIRROR_ATTRIBUTE,
+  );
+  for (let i = mirror.node.attributes.length - 1; i >= 0; i -= 1) {
+    const name = mirror.node.attributes[i]?.name;
+    if (name !== undefined && name !== MIRROR_ATTRIBUTE && !wanted.some((a) => a.name === name)) {
+      mirror.node.removeAttribute(name);
+    }
+  }
+  for (const attribute of wanted) mirror.node.setAttribute(attribute.name, attribute.value);
+  if (mirror.node.textContent !== mirror.source.textContent) {
+    mirror.node.textContent = mirror.source.textContent;
+  }
+}
+
 /** Bring one root's mirrored sheets and attributes up to date. */
 function syncRoot(root: ShadowRoot): void {
   if (!root.host.isConnected) {
     roots.delete(root);
     return;
   }
-  let style = root.querySelector<HTMLStyleElement>(`style[${ROOT_STYLE_ATTRIBUTE}]`);
-  if (!style) {
-    style = document.createElement("style");
-    style.setAttribute(ROOT_STYLE_ATTRIBUTE, "");
-    style.textContent = ROOT_STYLES;
-    root.prepend(style);
-  }
-  for (const node of root.querySelectorAll(`[${MIRROR_ATTRIBUTE}]`)) node.remove();
+  rootStyle(root);
+  const previous = mirrors.get(root) ?? [];
+  const next: Mirror[] = [];
   for (const source of sources()) {
-    const copy = source.cloneNode(true) as Element;
-    copy.setAttribute(MIRROR_ATTRIBUTE, "");
-    root.insertBefore(copy, style);
+    const held = previous.find((mirror) => mirror.source === source);
+    if (held === undefined) {
+      const node = source.cloneNode(true) as Element;
+      node.setAttribute(MIRROR_ATTRIBUTE, "");
+      next.push({ source, node, revision: revisionOf(source) });
+    } else {
+      refresh(held);
+      next.push(held);
+    }
   }
+  // Reconcile **in place**: move a node only when it is not already where it belongs, and
+  // remove only the ones that are gone. Re-inserting a sheet re-applies it, which is the
+  // flash this pass exists to avoid.
+  const kept = new Set(next.map((mirror) => mirror.node));
+  for (const mirror of previous) {
+    if (!kept.has(mirror.node)) mirror.node.remove();
+  }
+  let cursor: Node | null = root.firstChild;
+  for (const mirror of next) {
+    if (mirror.node !== cursor) root.insertBefore(mirror.node, cursor);
+    cursor = mirror.node.nextSibling;
+  }
+  mirrors.set(root, next);
   const wrapper = root.querySelector(`[${ATTRIBUTE_MIRROR}]`);
   if (wrapper) mirrorAttributes(wrapper);
 }
