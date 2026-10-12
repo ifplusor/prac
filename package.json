@@ -6,7 +6,7 @@
   "scripts": {
     "build": "vp run -r build",
     "test": "vp run -r test --passWithNoTests",
-    "check": "vp check .",
+    "check": "vp check . && node scripts/dsh-types.mjs --compare",
     "dsh-types": "node scripts/dsh-types.mjs",
     "verify:stack": "node tests/gates/verify-stack.mjs",
     "verify:bottom": "node tests/gates/verify-bottom.mjs",

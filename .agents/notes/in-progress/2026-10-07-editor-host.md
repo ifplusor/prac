@@ -51,7 +51,7 @@ status: in-progress
 - **零延迟的 down+up 会让工作台的确认框重问一次**（2026-10-12 实测）：`mousedown` 落在按钮上、对话框随即消失，`mouseup` 落在编辑器上，`click` 从未到达按钮，随后问询被重新发起。人的按法（按下停 120ms 以上）不会遇到，所以门按人的节奏按；但"谁在重问"没查（VS Code 的问询还挂着，还是对账里某次 `close` 重发？）——它是一个"手速快的用户可能看到对话框闪一下"的候选，留待复现再查。
 - **`addGroup` 的落地形状**：host → app 的一条请求（"为这个组创建一个区域"）+ `layout.splitView` 接受宿主指定的 region id（现在自己生成），否则 `addGroup` 返回的组与真实区域对不上；这条通道缺席时，应用的 `Split Editor into Next Group` 在没有第二个组的情况下什么也不做（实测：日志里只有拒绝行）。`findGroup` 的方向型位置（LEFT/RIGHT/UP/DOWN）同样等这条通道：几何只有 frame 有。
 - **浮层可交互，但门的"瞬时点击"不行**（2026-10-12 量清）：应用自己的浮层（快选、菜单、通知、模态）**是能点的** —— 转到符号的行用"按下 → 停 120ms → 抬起"能选中并让编辑器滚到目标行，脏文件关不掉的确认框同理（Cancel / Don't Save 都生效）。而 Playwright 默认的**零延迟** down+up 不给按钮 `click`（实测：对话框按下即消失、抬起落在编辑器上，随后对话框被重新问一次）。⇒ 这是**门的输入**问题，不是产品缺陷：门要按人的节奏按（已写进 `verify-close` 与 `verify-editor` 的注释）。此前一轮把 `document.elementFromPoint` 的结果读成"穿透到 body"是误判——它对影子树内容返回的是**宿主**，而"点不动"的真因是 DSH 那条 Preview Notice 的全屏 mask + `#root` 的 `inert`（见下一条）。
-- **本仓库类型检查的 DSH 版本与运行的 DSH 不是同一个**：`pnpm-workspace.yaml` 的 catalog 把 `@deepseek-ai/dsh-*` 钉在**已发布**的 `0.1.5-rc.1`，而 app 跑的是 checkout（`0.2.1-alpha.2`）。后果是**上游给 shim 的接口加成员时我们不会红**（见「侦察结果」第 4 条：`layout.panelInfo`）。把消费口径对齐（钉新版本或 `link:` 到 checkout）之后，才可能在发布点写一句 `satisfies ILayout` 把这类漂移变成类型错误。
+- ~~本仓库类型检查的 DSH 版本与运行的 DSH 不是同一个~~ **已定**：prac dev 的 DSH 锚点是一个 worktree（`../../deepseek-harness/dsh-prac-dev`），catalog 精确 pin 它的发布版本，`pnpm check` 里的逐字节比较与发布点的 `satisfies ILayout` 是两道防线 —— 见 `2026-10-12-dsh-anchor.md`。（这一条原本是「侦察结果」第 4 条那个 `panelInfo` 漂移的成因。）
 
 ## 侦察结果（2026-10-07，探针跑在真 rig 上）
 

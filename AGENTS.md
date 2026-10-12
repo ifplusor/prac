@@ -95,6 +95,7 @@ Conventional Commits：`feat:` `fix:` `refactor:` `docs:` `test:` `chore:`
 ```bash
 cd /Volumes/Dev/prac
 git status                 # 当前状态
-# DSH 相关（在 /Volumes/Dev/deepseek-harness 下）：
-cd ../deepseek-harness && pnpm build && pnpm dsh --profile headless "task"
+# prac dev 的 DSH 锚点：一个 worktree（dsh-dev），rig 与类型都从这里来
+cd ../deepseek-harness/dsh-dev && pnpm dsh --profile prac-dev "<task>"
+# 锚点前进 = 三步一起：worktree 更新构建 → 改 catalog 的 pin → pnpm check（含 dsh-types 比较）
 ```

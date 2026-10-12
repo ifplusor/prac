@@ -21,8 +21,14 @@
  * *resolution* (node_modules links / an install-time override), not file paths;
  * see the note `2026-09-13-vs-concept-boundary.md`.
  *
+ * The checkout defaults to prac dev's **anchor worktree**
+ * (`../../deepseek-harness/dsh-dev`, the branch `james-dev`), overridable with
+ * `--checkout <path>` or `DSH_CHECKOUT`. A machine without that worktree skips the
+ * comparison with a note — the pins stay what makes this repository portable.
+ *
  * Usage:
- *   node scripts/dsh-types.mjs --compare --checkout /path/to/dsh-master
+ *   node scripts/dsh-types.mjs --compare
+ *   node scripts/dsh-types.mjs --compare --checkout /path/to/dsh-worktree
  *
  * Exits non-zero when any compared file differs, so it can sit in a check task.
  *
@@ -221,11 +227,19 @@ function compare(checkout) {
   return drifted + stale;
 }
 
-const checkout = flagValue("checkout");
-if (!process.argv.includes("--compare") || checkout === undefined) {
-  console.log("usage: node scripts/dsh-types.mjs --compare --checkout <path>");
+/** prac dev's anchor worktree, relative to this repository's root. */
+const ANCHOR = "../../deepseek-harness/dsh-dev";
+
+if (!process.argv.includes("--compare")) {
+  console.log("usage: node scripts/dsh-types.mjs --compare [--checkout <path>]");
   process.exit(1);
 }
-const checkoutRoot = resolve(checkout);
-if (!existsSync(checkoutRoot)) throw new Error(`no such checkout: ${checkoutRoot}`);
+const checkoutRoot = resolve(root, flagValue("checkout") ?? process.env.DSH_CHECKOUT ?? ANCHOR);
+if (!existsSync(checkoutRoot)) {
+  console.log(
+    `dsh-types: no anchor worktree at ${checkoutRoot} — skipped ` +
+      "(point --checkout or DSH_CHECKOUT at the DSH checkout this machine runs)",
+  );
+  process.exit(0);
+}
 process.exit(compare(checkoutRoot) === 0 ? 0 : 1);
