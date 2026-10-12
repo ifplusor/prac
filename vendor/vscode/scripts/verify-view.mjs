@@ -113,6 +113,11 @@ async function sample() {
         region:
           globalThis.__deep.closest(host, "[data-prac-region]")?.getAttribute("data-prac-region") ??
           null,
+        // The region that holds the host, and the view's own pane inside it: what the
+        // retired `verify-regions` gate's surviving claim was about (a view host is laid
+        // out by the region that holds it, and the pane does not exceed it).
+        regionBox: box(globalThis.__deep.closest(host, "[data-prac-region]")),
+        pane: box(host?.querySelector(".pane") ?? null),
         panes: host?.querySelectorAll(".pane").length ?? 0,
         headerTitle: host?.querySelector(".pane-header .title")?.textContent?.trim() ?? null,
         listRows: host?.querySelectorAll(".monaco-list-row").length ?? 0,
@@ -156,12 +161,26 @@ const moved = await sample();
 await browser.close();
 
 const painted = (facts) => facts.paint !== null && facts.paint.distinctColours > 4;
+/** Whether a box sits inside another, with a pixel of slack for rounding. */
+const inside = (box, outer) =>
+  box !== null &&
+  outer !== null &&
+  box.x >= outer.x - 1 &&
+  box.y >= outer.y - 1 &&
+  box.x + box.w <= outer.x + outer.w + 1 &&
+  box.y + box.h <= outer.y + outer.h + 1;
+/** Whether a pane is laid out within its host's width, starting at the host's edge. */
+const fitsWidth = (pane, host) =>
+  pane !== null && host !== null && pane.w > 0 && pane.w <= host.w + 1 && pane.x >= host.x - 1;
 const checks = {
   // The view renders, as its own pane, with the workbench's own header.
   viewHostPresent: placed.host !== null && placed.panes >= 1,
   viewHeaderRendered: placed.headerTitle !== null,
   // It is a view, not the part: no sidebar part host anywhere on the page.
   noSidebarPart: placed.sidebarPartHosts === 0 && moved.sidebarPartHosts === 0,
+  // The region that holds it is what sizes it, and the view's own pane stays inside.
+  viewHostFitsItsRegion: placed.region !== null && inside(placed.host, placed.regionBox),
+  paneFitsItsHostWidth: fitsWidth(placed.pane, placed.host),
   // Structurally present is not enough — it has to have pixels.
   viewPainted: painted(placed),
   // Release + recreate: the seat moved regions, so the view was created twice.

@@ -22,6 +22,8 @@
  * @module prac/vendor/vscode/scripts/deep-dom
  */
 
+import { installShellModalAccommodation } from "../../../scripts/shell-modal.mjs";
+
 /** Page-side source of the walker. Kept as a string: Playwright serializes functions, not closures. */
 const WALKER = `(() => {
   const roots = () => {
@@ -65,6 +67,7 @@ const WALKER = `(() => {
     String(view)
       .replace(/^vscode:file:/, "")
       .replace(/^p\\d+:/, "");
+
 })()`;
 
 /**
@@ -80,6 +83,9 @@ const WALKER = `(() => {
 export async function installDeepDom(page) {
   await page.addInitScript(WALKER);
   await page.evaluate(WALKER);
+  // The DSH shell's own full-page notice, which is not what any gate is about and which
+  // makes the whole app inert while it is up (see `scripts/shell-modal.mjs`).
+  await installShellModalAccommodation(page);
 }
 
 /**

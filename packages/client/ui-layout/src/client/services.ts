@@ -110,8 +110,27 @@ export function createServices(
   const hasMainPanel = (id: string): boolean =>
     ctx.slots.entries("main").some((entry) => entry.options.key === id);
 
+  // The `panelInfo` shared source: part of the published face, and the root hook
+  // (`usePanelInfo`) that any panel-aware component reads.
+  //
+  // The snapshot is cached: `useSyncExternalStore` compares by identity and
+  // loops forever (or drops every update) if `getSnapshot` mints a fresh
+  // object on each call.
+  let panelSnapshot: PanelInfo = { activePanelId: null };
+  const panelInfo: HostObservable<PanelInfo> = {
+    getSnapshot: () => panelSnapshot,
+    subscribe: (listener: () => void) =>
+      store.subscribe(() => {
+        const next = store.get().activePanelId;
+        if (next === panelSnapshot.activePanelId) return;
+        panelSnapshot = { activePanelId: next as MainPanelId | null };
+        listener();
+      }),
+  };
+
   let navigation = new AbortController();
   const layout: LayoutFace = {
+    panelInfo,
     selectPanel(panelId: string | null): void {
       if (panelId !== null && !hasMainPanel(panelId)) {
         throw new Error(`layout.selectPanel: main panel "${panelId}" is not registered`);
@@ -319,24 +338,6 @@ export function createServices(
     bindTrack(regionId: string): void {
       trackRegion = regionId;
     },
-  };
-
-  // The `panelInfo` root hook: the active main panel drives the document
-  // title and any panel-aware component.
-  //
-  // The snapshot is cached: `useSyncExternalStore` compares by identity and
-  // loops forever (or drops every update) if `getSnapshot` mints a fresh
-  // object on each call.
-  let panelSnapshot: PanelInfo = { activePanelId: null };
-  const panelInfo: HostObservable<PanelInfo> = {
-    getSnapshot: () => panelSnapshot,
-    subscribe: (listener: () => void) =>
-      store.subscribe(() => {
-        const next = store.get().activePanelId;
-        if (next === panelSnapshot.activePanelId) return;
-        panelSnapshot = { activePanelId: next as MainPanelId | null };
-        listener();
-      }),
   };
 
   return { layout, pracLayout, panelInfo };

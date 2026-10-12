@@ -13,6 +13,7 @@
  * @module prac/tests/gates/harness
  */
 import { chromium } from "@playwright/test";
+import { installShellModalAccommodation } from "../../scripts/shell-modal.mjs";
 
 /**
  * The live DSH page to drive, from `URL` (token included), as every gate takes it.
@@ -81,6 +82,9 @@ export async function openPrac(url, options = {}) {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => consoleErrors.push(String(error)));
+  // Before the shell settles: its own full-page notice (a preview modal) marks the app root
+  // `inert`, which would make every click and every drag below land nowhere.
+  await installShellModalAccommodation(page);
   await page.goto(url, { waitUntil: "load", timeout: 60_000 });
   await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
   await page.waitForFunction(() => !!globalThis.__pracLayout, null, { timeout: 60_000 });

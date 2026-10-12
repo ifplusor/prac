@@ -241,6 +241,18 @@ export const BOTTOM_REGION = "bottom";
 
 export interface LayoutFace {
   /**
+   * The selected global central panel — the same source the `panelInfo` root hook reads.
+   *
+   * Upstream's `ILayout` carries it, and its plugins reach for it through `ctx.layout`
+   * (measured: `@deepseek-ai/dsh-client-ui-sidebar-right` reads
+   * `layout.panelInfo.getSnapshot().activePanelId` while it activates, and this face
+   * without it took the whole shell down — 12 entries failed to activate).
+   */
+  readonly panelInfo: {
+    getSnapshot(): { readonly activePanelId: string | null };
+    subscribe(listener: () => void): () => void;
+  };
+  /**
    * Select a global central panel.
    *
    * The chosen view goes where the arrangement placed *it* (its own region), or

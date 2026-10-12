@@ -49,6 +49,8 @@ status: in-progress
 - **未支持清单的表达**：放在启动日志、一条活体门，还是两者都要。
 - **身份改造落地之后仍要重定的三件事**（见 Proposal 第 6 条）：tab 条（一个文件在两处就是两个 tab，它们各自属于所在的区域）、"当前文件"的概念（注意力停在哪一个放置上）、以及关闭与脏标记按放置算还是按文件算。三件都还没有裁决。
 - **`addGroup` 的落地形状**：host → app 的一条请求（"为这个组创建一个区域"）+ `layout.splitView` 接受宿主指定的 region id（现在自己生成），否则 `addGroup` 返回的组与真实区域对不上；这条通道缺席时，应用的 `Split Editor into Next Group` 在没有第二个组的情况下什么也不做（实测：日志里只有拒绝行）。`findGroup` 的方向型位置（LEFT/RIGHT/UP/DOWN）同样等这条通道：几何只有 frame 有。
+- **应用自己的浮层（快选、菜单、通知、模态）不可交互**：`shell.overlay` 里的**应用根**落在两处 `pointer-events: none` 的祖先之下，因此点击穿透到 `body`（实测：`elementFromPoint` 在快选的行上返回 `body`，`document.elementFromPoint` 点不到行），`focus()` 也落不下去（`root.activeElement` 不变成输入框）。这条边界当初是**验过**的（命令面板可以打字过滤），所以现在是一处**回归或边界位移**，不在编辑器宿主这一轮里，需单独立项。
+- **本仓库类型检查的 DSH 版本与运行的 DSH 不是同一个**：`pnpm-workspace.yaml` 的 catalog 把 `@deepseek-ai/dsh-*` 钉在**已发布**的 `0.1.5-rc.1`，而 app 跑的是 checkout（`0.2.1-alpha.2`）。后果是**上游给 shim 的接口加成员时我们不会红**（见「侦察结果」第 4 条：`layout.panelInfo`）。把消费口径对齐（钉新版本或 `link:` 到 checkout）之后，才可能在发布点写一句 `satisfies ILayout` 把这类漂移变成类型错误。
 
 ## 侦察结果（2026-10-07，探针跑在真 rig 上）
 
@@ -58,9 +60,13 @@ status: in-progress
 
 ⇒ 下一步就是写这个类（`PracEditorGroup`），第一批成员先覆盖"能开一个文件并画出来"：`windowId` / `element` / `container` / `openEditor` / `closeEditor` / `isEmpty` / `isPinned` / `contains` / `activeEditor` / `activeEditorPane` / `onDidModelChange` / `onDidActiveEditorChange` / `layout` / `setVisible` / `focus`，其余按最小实现并进"未支持"清单。
 
+4. **`ctx.layout` 是 prac 手抄的上游契约，上游加成员时我们静默地坏**（2026-10-12 实测）：上游的 `ui-sidebar-right` 在激活时读 `layout.panelInfo.getSnapshot().activePanelId`，而 prac 的 `LayoutFace` 没有发布 `panelInfo`（它只做了 `provideRoot({ hooks: { panelInfo } })`，没进 face）⇒ 该插件激活失败，**12 个条目不激活**（`sidebar-right` failed，其余 pending 在 `sidebarRight` / `sidebarRightTabs` 上），整个外壳起不来；唯一的报错是 `Cannot read properties of undefined (reading 'getSnapshot')`。修法：把它发布进 face。**为什么没有更早红**：本仓库的类型检查用的是已发布的 `0.1.5-rc.1`，而 app 跑的是 checkout（见 Open questions 最后一条）——两个 `ILayout` 不是同一个类型，`satisfies` 也就写不成。
+
+5. **DSH 0.2 的「Preview Notice」会把整页 `inert`**（2026-10-12 实测）：它渲染在自己的 body root 里（全屏 mask），并把 `#root` 标成 `inert`，于是 prac 的界面**既不能点也不能聚焦**（`elementFromPoint` 落在 `body`；Playwright 的 actionability 检查报 `<body> intercepts pointer events`）。它不是任何门的题目，而"确认"是一次**持久的宿主设置**（属于人的 onboarding），所以门在跑的时候把那层 modal root 藏掉并清掉 `inert`（`deep-dom.mjs` 的 `__pracHideModalRoots`），不代替人点确认。
+
 ## 判据（这一轮怎么算成立）
 
-1. 转到符号 / 定义时，**可见编辑器真的动**（今天是离屏那份动）。
-2. Outline、Timeline 与上游一致（同一份模型、同一个面板）。
-3. **DOM 里不存在离屏部件**（`[data-vscode-embed-detached]` 消失），app 的打开路径（树点击 / 快速打开 / `openFile`）照常。
-4. 现有五道 vendor 门 + 五道 prac 门全绿。
+1. **编辑器动作落在可见的那块面上**：转到符号 / 定义（以及任何编辑动作）动的必须是 prac 展示的那份。**已锁**：`vendor:verify-editor` 用「文件内查找」走真实按键 —— 查找回车后可见面的渲染行从文件头变成命中行（`// filler 182…`），宿主元素不变。**转到符号本身还没被锁**：它的快选浮层当前不可交互（见 Open questions），等浮层修好再把它补进门。
+2. **Outline / Timeline 与上游一致**（同一份模型、同一个面板）。Outline **已锁**（`vendor:verify-outline`：符号、跟随下一个文件、跟随取得焦点的区域、排在面板内）；**Timeline 未锁**——它需要一条 provider（git / 本地历史）才有内容可比，属未做。
+3. **DOM 里不存在离屏部件**（`[data-vscode-embed-detached]` 消失），app 的打开路径（树点击 / 快速打开 / `openFile`）照常。**已锁**：`vendor:verify-editor` 断言 `[data-vscode-embed-detached]` 与 `[data-vscode-embed-part-host]` 计数为 0，同一文件的编辑面**恰好一个**。
+4. **门全绿**：vendor `editor / file / views / outline / focus / tabs / close / layout / view` + prac `stack / split / containers / bottom / persistence`。过期的 `vendor:verify-regions`（断言"离屏部件存在"）**退役**：它的第 1 条并入 `verify-editor`，第 2–3 条（view host 落在区域内、pane 不越宽）并入 `verify-view`。

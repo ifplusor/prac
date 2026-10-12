@@ -113,6 +113,16 @@ export function apply(ctx: Context): void {
     // The faces other plugins consume, on the documented service channel
     // (`ctx.provide`, the same registry `Service`'s constructor registers
     // through — see `dsh.d.ts`).
+    //
+    // This face is a **hand-written mirror** of DSH's `ILayout` (the doc comments explain
+    // prac's deviations), and a mirror loses members silently: measured, upstream's
+    // `ui-sidebar-right` reads `layout.panelInfo`, this face did not publish it, and the
+    // whole shell stopped activating — 12 entries failed, the only error a `getSnapshot` of
+    // undefined. A `satisfies ILayout` guard here would catch the next one, but it cannot
+    // be stated today: this repository type-checks against the **published** DSH
+    // (`0.1.5-rc.1`, see the catalog) while the app runs the checkout's packages, so the
+    // two `ILayout`s are different types. Aligning that consumption is what makes the
+    // guard possible — see the note in `2026-10-07-editor-host.md`.
     const disposeLayout = ctx.provide("layout", layout);
     const disposePracLayout = ctx.provide("pracLayout", pracLayout);
     // The catalogue's live sources. `listViews()` reads the registry on every
