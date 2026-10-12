@@ -302,6 +302,25 @@ export function createServices(
       });
     },
     /**
+     * Split a region in two without moving a view into it (see the face's doc).
+     *
+     * The tree edit is the same one `splitView` makes; what differs is that no view is
+     * placed, so the new region starts empty and becomes visible when the app puts a view
+     * there (which is exactly what the workbench's move/open into the new group produces).
+     */
+    createRegionBeside(regionId: string, side: Side): string | undefined {
+      let created: string | undefined;
+      store.update((state) => {
+        const splitId = nextNodeId("split", state);
+        const newRegionId = nextNodeId("region", state);
+        const next = splitRegionWith(state, regionId, side, splitId, newRegionId);
+        if (next === state) return state;
+        created = newRegionId;
+        return next;
+      });
+      return created;
+    },
+    /**
      * Merge chrome flags into a view's record.
      *
      * A no-op when nothing changes, by identity: a UI that re-syncs flags on every

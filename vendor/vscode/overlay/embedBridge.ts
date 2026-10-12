@@ -220,6 +220,16 @@ export interface PartHostFace {
    */
   listPlacements: () => readonly FilePlacement[];
   /**
+   * Install the app's region channel: given a region and a side, the frame splits it and
+   * returns the new region's id (or undefined). The workbench needs it for `addGroup`, where
+   * a group cannot exist before the region that renders it does.
+   *
+   * @param factory - the frame's split, as a synchronous question.
+   */
+  setGroupRegionFactory: (
+    factory: (region: string, side: "left" | "right" | "up" | "down") => string | undefined,
+  ) => void;
+  /**
    * Subscribe to changes in the placement set.
    *
    * Fires after the set actually changed (not on every editor activation, and not

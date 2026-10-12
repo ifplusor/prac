@@ -96,6 +96,44 @@ export const UNSUPPORTED_HOST_OPERATIONS = [
 /**
  * prac's editor host: the editor service, its part, and the hosts a group asks for.
  */
+/**
+ * The app's region channel, installed by the embedder once prac's frame is up.
+ *
+ * `addGroup` is synchronous and the workbench asks for a group before any view exists for it,
+ * so the answer has to come back in the same tick: the frame's tree is a store update, and it
+ * hands the new region's id back. The channel lives at module scope because there is exactly
+ * one embedded workbench per page and the host is built through the service collection, which
+ * has no seam for an app-supplied callback.
+ */
+let groupRegionFactory:
+  | ((region: string, side: "left" | "right" | "up" | "down") => string | undefined)
+  | undefined;
+
+/**
+ * Install the app's region channel (see {@link groupRegionFactory}).
+ *
+ * @param factory - splits a region and returns the new region's id, or undefined when it cannot.
+ */
+export function setGroupRegionFactory(
+  factory: (region: string, side: "left" | "right" | "up" | "down") => string | undefined,
+): void {
+  groupRegionFactory = factory;
+}
+
+/** prac's split side for an upstream group direction. */
+function sideOfDirection(direction: GroupDirection): "left" | "right" | "up" | "down" {
+  switch (direction) {
+    case GroupDirection.Left:
+      return "left";
+    case GroupDirection.Right:
+      return "right";
+    case GroupDirection.Up:
+      return "up";
+    default:
+      return "down";
+  }
+}
+
 export class PracEditorHost
   extends Disposable
   implements IEditorGroupsService, IEditorGroupsView, IEditorPartsView, IEditorPart
@@ -386,15 +424,28 @@ export class PracEditorHost
   }
 
   addGroup(
-    _location: IEditorGroupView | GroupIdentifier,
-    _direction: GroupDirection,
+    location: IEditorGroupView | GroupIdentifier,
+    direction: GroupDirection,
   ): IEditorGroupView {
-    // Real for prac: the embedder creates a group per region, and a "split" is a new
-    // region. There is therefore nothing to add here — the region's creation drives it.
-    this.logService.info(
-      "vscode-embed: addGroup — prac creates a group per region; the embedder adds it when the region does",
-    );
-    return this._requireActiveGroup();
+    // In prac a group *is* a region, so adding a group means asking the frame for a region
+    // in that direction and binding the group to it. The channel is the app's (the frame owns
+    // the tree); without it there is nothing to add and the active group is the honest answer.
+    const source =
+      typeof location === "number" ? this.getGroup(location) : (location as PracEditorGroup);
+    const from = source ?? this._activeGroup;
+    const region = from === undefined ? undefined : this.regionOf(from);
+    const side = sideOfDirection(direction);
+    const created =
+      region === undefined || groupRegionFactory === undefined
+        ? undefined
+        : groupRegionFactory(region, side);
+    if (created === undefined) {
+      this.logService.info(
+        "vscode-embed: addGroup — no app region channel (or no source region); the active group is returned",
+      );
+      return this._requireActiveGroup();
+    }
+    return this.ensureGroup(created, created);
   }
 
   removeGroup(group: IEditorGroupView | GroupIdentifier): void {

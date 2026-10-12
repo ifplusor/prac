@@ -463,6 +463,20 @@ export interface PracLayoutFace {
    */
   splitView(viewId: string, side: Side): void;
   /**
+   * Split a region in two **without moving a view into it**, and report the new region's id.
+   *
+   * This is the workbench's channel for `addGroup`: VS Code's editor part asks for a *group*
+   * in a direction, and in prac a group is a region, so the group cannot exist before the
+   * region does. The id is handed back synchronously (the frame's tree is a store update) so
+   * the caller can bind the group it is about to create to the region that now renders it —
+   * the file view the app places there mounts into that same region and finds that group.
+   *
+   * @param regionId - the region to split.
+   * @param side - which side of it the new region goes on.
+   * @returns the new region's id, or undefined when the region is unknown or the split is a no-op.
+   */
+  createRegionBeside(regionId: string, side: Side): string | undefined;
+  /**
    * Set (merge) the chrome flags of a view.
    *
    * The declarer's channel: the mechanism renders a tab dot for `dirty` and an
