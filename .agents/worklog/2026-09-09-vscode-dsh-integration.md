@@ -460,3 +460,5 @@ API，应用不启动（probe 卡在 waitDeep）。API 两端一起改时必须 
 findGroup({direction})，下一步分辨。
 
 overlay typecheck 只剩 4 条既有上游错误；vp check 0 错误；单测 58/24/49/9。" 2>&1 | tail -2
+| 2026-10-12 | **更正上一条：方向几何是通的，"没移动"是观测信号选错了**。上游 `workbench.action.focus*Group` 确实走 `IEditorGroupsService.findGroup({ direction }, activeGroup, wrap=true)`（`.build/vscode/src/.../editorActions.ts` 的 `AbstractFocusGroupAction`），所以我的方向分支会被碰到。经 face 直接量：开出两个区域后 `__pracLayout.regionInDirection("stage","right") === "region-2"`、`("region-2","left") === "stage"` ✓；而之前用的"活动放置"信号是错的 —— capability snapshot 的 `active` 是**每组的活动编辑器**（`active: ["p0","p1"]` 两个都为真），拿 `find(e => e.active)` 只能读到第一个，根本区分不出焦点去了哪里。⇒ 方向型验收需要换信号（frame 的 front 区域，或给 capability 加"哪个组是活动的"），不是修几何。 | `exp142`：`fromStageRight: "region-2"`、`fromRegion2Left: "stage"` |EOF
+git add -A && git commit -m "docs(worklog): 更正——方向几何是通的（regionInDirection 实测有值），此前'没移动'是观测信号选错" 2>&1 | tail -2
