@@ -10,13 +10,12 @@
  *
  *  1. **there is no second world** — no off-screen part element, no part host anywhere on
  *     the page, and the file's text rendered in exactly **one** editing surface;
- *  2. **a workbench action lands on the visible editor** — find-in-file is driven by real
- *     keys through the workbench's own find widget, and the surface that *prac shows* is the
- *     one that moves: its rendered lines change (the editor scrolls to the match), in the
- *     same host element, with the workbench still agreeing that this file is its active
- *     editor. 转到符号 would be the other path, and it is **unreachable in this
- *     composition** (the float layer takes neither pointer events nor focus), so it belongs
- *     to the float-layer work rather than here.
+ *  2. **a workbench action lands on the visible editor** — twice, with different gestures:
+ *     转到符号 is pressed in the workbench's own quick input (a float prac hosts), and then
+ *     find-in-file is driven by real keys in the editor's own widget. Both have to move the
+ *     surface *prac shows*: the rendered lines change (the view scrolls to the symbol, then
+ *     back to the top of the file), in the same host element, with the workbench still
+ *     agreeing that this file is its active editor.
  *
  * The fixtures are written by the gate and opened by URI, so it depends on neither the
  * folder the app happens to have open nor on this repository's contents. The symbol has to
@@ -143,22 +142,60 @@ async function sample() {
 
 const before = await sample();
 
-step("move the editor through the workbench's own UI");
-// **Find in file**, driven by real keys: Ctrl/Cmd+F opens the workbench's own find widget
-// *inside the editor pane*, the symbol's name is typed into it, and Enter finds it — which
-// makes the editor reveal (and therefore scroll to) that line. It is the person's gesture
-// on the workbench's own UI, and what it moves has to be the surface prac shows.
+step("jump through 转到符号");
+// **转到符号**, the criterion's own gesture: the workbench's command opens its own quick input
+// (which prac hosts in the frame's float layer), the symbol's row is pressed, and the editor
+// reveals — which is what has to move the surface prac shows.
 //
-// The two other candidates are deliberately not the path here. 转到符号 (the quick input) is
-// **unreachable in this composition**: the workbench's float layer takes no pointer events
-// (`elementFromPoint` at a picker row returns `body`) and no focus, so that is a finding of
-// its own — the float-layer work, not this gate. Clicking a symbol in the Outline does work
-// as a gesture, but the reveal it performs is deferred (measured: the row selects and the
-// editor does not scroll), so it would test the wrong thing here.
+// Pressed the way a hand presses (`down`, a beat, `up`). An **instant** synthetic down+up is
+// not the same gesture here: measured, a zero-delay click on the workbench's own dialog
+// button produced no `click` at all (the dialog came back re-asked) while a 120ms press
+// closed it. That is a property of the gates' input, not of the app — so the gates press.
+await page.evaluate(() =>
+  globalThis.__vscodeEmbed.commands.executeCommand("workbench.action.gotoSymbol"),
+);
+await waitDeep(page, ".quick-input-widget .monaco-list-row");
+await page.waitForFunction(
+  () =>
+    globalThis.__deep
+      .all(".quick-input-widget .monaco-list-row")
+      .some((row) => (row.textContent ?? "").includes("GateTarget")),
+  null,
+  { timeout: 60_000 },
+);
+await page.waitForTimeout(500);
+const symbolRow = await page.evaluate(() => {
+  const row = globalThis.__deep
+    .all(".quick-input-widget .monaco-list-row")
+    .find((element) => (element.textContent ?? "").includes("GateTarget"));
+  if (row === null || row === undefined) return null;
+  const box = row.getBoundingClientRect();
+  return {
+    x: Math.round(box.x + box.width / 2),
+    y: Math.round(box.y + box.height / 2),
+    w: Math.round(box.width),
+    h: Math.round(box.height),
+    text: (row.textContent ?? "").trim(),
+  };
+});
+if (symbolRow === null || symbolRow.w < 2 || symbolRow.h < 2) {
+  throw new Error("the symbol picker has no visible GateTarget row to press");
+}
+await page.mouse.move(symbolRow.x, symbolRow.y);
+await page.mouse.down();
+await page.waitForTimeout(120);
+await page.mouse.up();
+await page.waitForTimeout(3000);
+const jumped = await sample();
+
+step("come back with find in file");
+// The return leg, with a different workbench gesture: the find widget lives *inside* the
+// editor pane, so between them the two legs cover a float hosted by the frame and a widget
+// owned by the editor itself.
 await page.keyboard.press("ControlOrMeta+F");
 await waitDeep(page, ".find-widget");
 await page.waitForTimeout(500);
-await page.keyboard.type("GateTarget");
+await page.keyboard.type(`top-${PROBE.token}`);
 await page.waitForTimeout(500);
 await page.keyboard.press("Enter");
 await page.waitForTimeout(3000);
@@ -173,19 +210,27 @@ const checks = {
   noOffScreenPart: before.detachedParts === 0 && after.detachedParts === 0,
   noPartHosted: before.partHosts === 0 && after.partHosts === 0,
   oneSurfaceForTheFile: before.mySurfaces === 1 && after.mySurfaces === 1,
-  // 2. The action landed on the visible editor: the revealed symbol's text is rendered, the
+  // 2. The jump landed on the visible editor: the revealed symbol's text is rendered, the
   // top of the file no longer is (so the view scrolled rather than the text changing), the
   // same host element is still the one showing it, and it stayed in its region.
-  symbolIsRendered: after.text.includes("GateTarget") && after.text.includes("return 7;"),
+  symbolIsRendered: jumped.text.includes("GateTarget") && jumped.text.includes("return 7;"),
   viewScrolledToIt:
     before.text.includes(`top-${PROBE.token}`) &&
     before.text.includes("GateTarget") === false &&
-    after.text.includes(`top-${PROBE.token}`) === false,
+    jumped.text.includes(`top-${PROBE.token}`) === false,
   sameSurfaceMoved:
+    jumped.placement !== null &&
+    jumped.placement === before.placement &&
+    jumped.region === before.region,
+  stillAPaintedEditor: jumped.renderedLines > 2,
+  // 2b. And back again — the second gesture moves the *same* surface, so neither the command
+  // nor the widget is driving some other editor.
+  findBroughtItBack:
+    after.text.includes(`top-${PROBE.token}`) && after.text.includes("GateTarget") === false,
+  backOnTheSameSurface:
     after.placement !== null &&
     after.placement === before.placement &&
     after.region === before.region,
-  stillAPaintedEditor: after.renderedLines > 2,
   // 3. The two halves still agree about which file is current — the workbench did the work,
   // and prac's surface is showing the result.
   appStillHasTheFileActive: after.appActive === PROBE.uri,
@@ -199,7 +244,9 @@ console.log(
       url,
       fixture: { name: PROBE.name, token: PROBE.token },
       before: { ...before, text: before.text.split("\n").slice(0, 3) },
+      jumped: { ...jumped, text: jumped.text.split("\n").slice(0, 3) },
       after: { ...after, text: after.text.split("\n").slice(0, 3) },
+      symbolRow,
       checks,
     },
     null,
@@ -215,5 +262,5 @@ if (failed.length > 0) {
   process.exit(1);
 }
 console.log(
-  "OK: no off-screen editor and no part host exist, the file has exactly one editing surface, and a workbench action (find in file) moves the surface prac shows — in place, with the workbench still on the same file.",
+  "OK: no off-screen editor and no part host exist, the file has exactly one editing surface, and the workbench's own actions (转到符号 in its quick input, then find in file) move the surface prac shows — in place, with the workbench still on the same file.",
 );

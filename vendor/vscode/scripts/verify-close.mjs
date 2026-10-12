@@ -109,7 +109,14 @@ async function clickButton(label) {
     return { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) };
   }, label);
   if (spot === null) return false;
-  await page.mouse.click(spot.x, spot.y);
+  // A **person-like press**: the dialog closes on the button's own `click`, and an instant
+  // synthetic down+up does not produce one — measured, with no delay between them the
+  // dialog came back re-asked while a 120ms press closed it. The gate clicks the way a hand
+  // does rather than asserting something about zero-length clicks.
+  await page.mouse.move(spot.x, spot.y);
+  await page.mouse.down();
+  await page.waitForTimeout(120);
+  await page.mouse.up();
   return true;
 }
 
