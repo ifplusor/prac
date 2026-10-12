@@ -28,6 +28,7 @@
 import { createRequire } from "node:module";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { installDeepDom } from "./deep-dom.mjs";
 
 const packageDir = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageDir, "../..");
@@ -78,6 +79,9 @@ page.on("console", (message) => {
 page.on("pageerror", (error) => consoleErrors.push(String(error)));
 
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
+// The shared page-side vocabulary: the prac view-id helpers this gate reads a fixture's
+// view through (a file view's id carries its placement, so it cannot be rebuilt here).
+await installDeepDom(page);
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
 // The phase is scheduled 2.5s after restore and then runs when the window is idle,
@@ -168,34 +172,40 @@ async function opened(fixture) {
  * @returns the outline facts after focusing the first fixture's region.
  */
 async function focusFirstFixture() {
-  const viewOf = (fixture) => `vscode:file:${uriOf(fixture)}`;
+  // Read out of the live layout, one page query at a time: a file's view id carries
+  // the placement (the app's group showing it), so a gate cannot rebuild it.
+  const viewOf = (fixture) =>
+    page.evaluate((resource) => globalThis.__pracFileView(resource), uriOf(fixture));
   const fileViews = () =>
     globalThis.__pracLayout
       .listViews()
       .filter((entry) => entry.id.startsWith("vscode:file:"))
-      .map((entry) => `${entry.id.slice("vscode:file:".length).split("/").pop()} @${entry.region}`);
+      .map(
+        (entry) => `${globalThis.__pracFileResource(entry.id).split("/").pop()} @${entry.region}`,
+      );
   const before = await page.evaluate(fileViews);
   // Every other fixture leaves the first one's region: they are tabs of one region
   // otherwise, and clicking a region shows its **front** tab — the click would land
   // on whichever file was opened last and prove nothing.
-  await page.evaluate(
-    (views) => {
-      for (const view of views) globalThis.__pracLayout.place(view, "right");
-    },
-    [viewOf(FIXTURES.delta), viewOf(FIXTURES.typescript)],
-  );
+  const others = [await viewOf(FIXTURES.delta), await viewOf(FIXTURES.typescript)];
+  await page.evaluate((views) => {
+    for (const view of views) globalThis.__pracLayout.place(view, "right");
+  }, others);
   await page.waitForTimeout(3000);
-  const spot = await page.evaluate((view) => {
-    const region = globalThis.__pracLayout.listViews().find((entry) => entry.id === view)?.region;
-    const host = region
-      ? document.querySelector(`[data-prac-region="${region}"] [data-prac-view-host]`)
-      : null;
-    if (!host) return null;
-    const box = host.getBoundingClientRect();
-    // The centre, not a corner: the top of a region holds the frame's tab strip and
-    // the pane's own header, and a click there focuses chrome rather than the editor.
-    return { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) };
-  }, viewOf(FIXTURES.alpha));
+  const spot = await page.evaluate(
+    (view) => {
+      const region = globalThis.__pracLayout.listViews().find((entry) => entry.id === view)?.region;
+      const host = region
+        ? document.querySelector(`[data-prac-region="${region}"] [data-prac-view-host]`)
+        : null;
+      if (!host) return null;
+      const box = host.getBoundingClientRect();
+      // The centre, not a corner: the top of a region holds the frame's tab strip and
+      // the pane's own header, and a click there focuses chrome rather than the editor.
+      return { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) };
+    },
+    await viewOf(FIXTURES.alpha),
+  );
   focusSetup = { before, after: await page.evaluate(fileViews), spot };
   if (!spot) return null;
   // Retried, not done once: an editor that was just opened can activate after the

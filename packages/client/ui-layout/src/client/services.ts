@@ -40,11 +40,13 @@ import type { RegionInfo, ViewInfo } from "./catalogue.js";
 import {
   ensureView,
   findRegion,
+  freshNodeId,
   firstRegionId,
   frontView,
   place,
   placeQuietly,
   regionInfos,
+  removeView,
   regionNode,
   setCollapsed,
   setFront,
@@ -88,7 +90,17 @@ export function createServices(
 
   /** Monotonic ids for regions and splits created after boot. */
   let nodeSeq = 0;
-  const nextNodeId = (kind: string): string => `${kind}-${++nodeSeq}`;
+  /**
+   * The next id for a new region or split.
+   *
+   * The counter restarts every page load while the tree does not, so an id is only usable
+   * when the restored tree has not taken it (see `freshNodeId`).
+   *
+   * @param kind - the id's prefix.
+   * @param state - the state the new node will join.
+   */
+  const nextNodeId = (kind: string, state: LayoutState): string =>
+    freshNodeId(state.tree, kind, () => (nodeSeq += 1));
 
   /**
    * Whether the `main` slot currently has an entry under this key.
@@ -196,6 +208,10 @@ export function createServices(
     placeQuietly(viewId: string, regionId: string): void {
       store.update((state) => placeQuietly(state, viewId, regionId));
     },
+    /** Forget a view's placement record (see the face's own note). */
+    removeView(viewId: string): void {
+      store.update((state) => removeView(state, viewId));
+    },
     /** Give a region its child regions — the container shape. */
     setRegionChildren(regionId: string, children: readonly RegionChild[], label?: string): void {
       store.update((state) => {
@@ -256,11 +272,11 @@ export function createServices(
      * region that no longer exists is not a split target: both are no-ops.
      */
     splitView(viewId: string, side: Side): void {
-      const splitId = nextNodeId("split");
-      const newRegionId = nextNodeId("region");
       store.update((state) => {
         const record: ViewRecord | undefined = state.views[viewId];
         if (record === undefined) return state;
+        const splitId = nextNodeId("split", state);
+        const newRegionId = nextNodeId("region", state);
         const next = splitRegionWith(state, record.region, side, splitId, newRegionId);
         if (next === state) return state;
         return place(next, viewId, newRegionId);

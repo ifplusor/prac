@@ -596,12 +596,18 @@ export function apply(ctx: Context): void {
   arrange(layout);
 
   /**
-   * The file view attention currently rests on, and every file view the app has
-   * open. The set is what makes "is this a file?" a membership question rather
-   * than a prefix test in this file: the id convention belongs to the host.
+   * The file view attention currently rests on, every file view the app has open, and
+   * the file **resources** behind them.
+   *
+   * Two sets because they answer two questions: a *view* is a placement (a file in one
+   * region, so the app splitting a file makes a second one), while a *resource* is a
+   * file — and "the app opened a file" is the event that pulls attention back to the
+   * editor. Reading the placement set for that pulled attention back every time the app
+   * showed an already-open file somewhere else (a split), which undid the split.
    */
   let currentFile: string | null = null;
   let fileViews = new Set<string>();
+  let fileResources = new Set<string>();
 
   // Attention moved: derive the placement. With several files open, "the editor"
   // means the one attention last rested on.
@@ -616,24 +622,28 @@ export function apply(ctx: Context): void {
     const sync = (): void => {
       const catalogue = vscode.catalogue();
       const files = catalogue.filter((entry) => entry.source === "file");
+      const resources = new Set(files.map((entry) => entry.appId));
+      const appeared = [...resources].filter((resource) => !fileResources.has(resource));
       fileViews = new Set(files.map((entry) => entry.view));
+      fileResources = resources;
       // Views the app offers get their default region here; the ones already
-      // placed (or excluded) are left where they are.
+      // placed (or excluded) are left where they are. A file placement's default is
+      // the region the app reports, or — when the app has not shown it yet — the
+      // centre, or beside the file's other placement.
       placeCatalogue(layout, catalogue);
-      // Files the app no longer has open stop being shown: their records outlive
-      // them (the frame persists), and a stale record renders a tab for a file
-      // nobody has open and holds a region with an empty view.
+      // Files the app no longer has open are **forgotten**: their record is what the
+      // frame persists, a placement is named by the host (so the next open mints a fresh
+      // name), and a record left behind would both render a tab for a file nobody has open
+      // and block the new placement from being shown.
       const records = layout.getState().views;
-      let hidAFileView = false;
+      let leftTheScreen = false;
       for (const view of staleFileViews(records, fileViews, (id) => vscode.fileResource(id))) {
-        if (records[view]?.hidden === true) continue;
-        layout.hide(view);
-        hidAFileView = true;
+        if (records[view]?.hidden !== true) leftTheScreen = true;
+        layout.removeView(view);
       }
-      const newest = files[files.length - 1];
-      if (newest === undefined) {
+      if (files.length === 0) {
         currentFile = null;
-        if (hidAFileView) {
+        if (leftTheScreen) {
           // The editor surface just *left*: attention returns to the conversation
           // and the centre is the conversation's again. Gated on that event
           // deliberately — a frame that merely boots with no file open must not
@@ -645,11 +655,20 @@ export function apply(ctx: Context): void {
         }
         return;
       }
+      // The view attention rests on: the first placement of the file the app just
+      // opened. A file that merely gained a second placement (a split) is not a file
+      // it just opened, and the new view must not take attention from the one the
+      // person is working in.
+      if (currentFile === null || !fileViews.has(currentFile)) {
+        currentFile = files[0]?.view ?? null;
+      }
+      const opened = files.find((entry) => appeared.includes(entry.appId));
+      if (opened === undefined) return;
       // A file the app opened comes forward, and **attention follows it**: the
       // strip must not read "conversation" while a file holds the centre (and
       // with attention already claimed to be on the conversation, pressing that
       // very key would do nothing, since `focus` ignores a no-op change).
-      currentFile = newest.view;
+      currentFile = opened.view;
       const surface = focus.state().current;
       focus.focus(VSCODE_SURFACE);
       if (focus.state().current === surface) {

@@ -39,7 +39,7 @@ interface Call {
   readonly args: readonly unknown[];
 }
 
-/** A file view, as the host names them (`vscode:file:<resource>`). */
+/** A file view, as the host names them (`vscode:file:<placement>:<resource>`). */
 const FILE_VIEW = "vscode:file:vscode-remote://127.0.0.1:3084/workspace/file.ts";
 
 /** The state the policy reads; `arrange` only ever looks at `views`. */
@@ -81,6 +81,7 @@ function recordingFace(views: LayoutState["views"] = {}): {
     listRegions: () => [],
     place: record("place"),
     placeQuietly: record("placeQuietly"),
+    removeView: record("removeView"),
     setRegionChildren: (
       regionId: string,
       list: readonly { id: string; label?: string }[],
@@ -343,10 +344,76 @@ describe("placeCatalogue", () => {
     ]);
   });
 
-  it("leaves the catalogue's other source alone: files are placed by opening, not by location", () => {
+  it("places a file placement in the region the app says it is shown in", () => {
     const { face, calls } = recordingFace();
     placeCatalogue(face, [
-      entry({ view: "vscode:file:x", appId: "x", source: "file", location: "stage" }),
+      entry({
+        view: "vscode:file:p1:x",
+        appId: "x",
+        source: "file",
+        location: "stage",
+        region: "right",
+      }),
+    ]);
+    expect(shapes(calls)).toEqual([["placeQuietly", "vscode:file:p1:x", "right"]]);
+  });
+
+  it("gives a file placement the app has not shown yet the centre", () => {
+    const { face, calls } = recordingFace();
+    placeCatalogue(face, [
+      entry({
+        view: "vscode:file:p1:x",
+        appId: "x",
+        source: "file",
+        location: "stage",
+        region: null,
+      }),
+    ]);
+    expect(shapes(calls)).toEqual([["placeQuietly", "vscode:file:p1:x", STAGE]]);
+  });
+
+  it("splits a file's second placement out beside the one already on screen", () => {
+    // The app copied the editor into another group (Split Editor): the file already has
+    // a view, and the new placement goes **beside** it rather than on top of it.
+    const { face, calls } = recordingFace({
+      "vscode:file:p1:x": { region: STAGE, order: 0, hidden: false },
+    });
+    placeCatalogue(face, [
+      entry({
+        view: "vscode:file:p1:x",
+        appId: "x",
+        source: "file",
+        location: "stage",
+        region: STAGE,
+      }),
+      entry({
+        view: "vscode:file:p2:x",
+        appId: "x",
+        source: "file",
+        location: "stage",
+        region: null,
+      }),
+    ]);
+    expect(shapes(calls)).toEqual([
+      ["placeQuietly", "vscode:file:p2:x", STAGE],
+      ["splitView", "vscode:file:p2:x", "right"],
+    ]);
+  });
+
+  it("leaves a file placement the frame already knows where it is", () => {
+    // The person may have moved it, and the catalogue is not more authoritative about
+    // placement than they are.
+    const { face, calls } = recordingFace({
+      "vscode:file:p1:x": { region: "right", order: 0, hidden: false },
+    });
+    placeCatalogue(face, [
+      entry({
+        view: "vscode:file:p1:x",
+        appId: "x",
+        source: "file",
+        location: "stage",
+        region: STAGE,
+      }),
     ]);
     expect(shapes(calls)).toEqual([]);
   });

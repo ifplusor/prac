@@ -120,7 +120,8 @@ const viewLabel = (viewId: string): string =>
   (viewId.split(":").pop() ?? viewId).replace(/[-_]/g, " ");
 
 /**
- * Place the app's views into **named container children**, by their own location.
+ * Place the app's views into **named container children**, by their own location, and
+ * its **file placements** into the region the app reports.
  *
  * This is where a borrowed *container* becomes a prac shape: the region stops
  * holding views directly and instead **selects among** one child per container
@@ -187,6 +188,56 @@ export function placeCatalogue(layout: PracLayout, entries: readonly VscodeCatal
       }
     }
   }
+  placeFileEntries(layout, entries);
+}
+
+/**
+ * Place the app's **file placements**.
+ *
+ * A file view exists because the app has that file open in one of its editor groups,
+ * and each placement is a view of its own — so one file can hold two views in two
+ * regions, each showing its own surface. Two rules, in this order:
+ *
+ * - **the app's region wins** when it reports one: the group's home is where the file
+ *   lives, and the arrangement follows it (quietly — placing is not fronting);
+ * - otherwise the placement is one the app has not shown yet: the first placement of a
+ *   file takes the centre, and a *second* placement of a file already on screen splits
+ *   out beside it, which is what "split editor" means.
+ *
+ * A view that already has a record is left where it is: it may have been moved by the
+ * person, and the catalogue is not more authoritative about placement than they are.
+ * That is also what keeps a move from undoing itself — the app reports the region it
+ * had *before* the move for as long as the frame takes to render the new one.
+ *
+ * @param layout - the mechanism's placement face.
+ * @param entries - the app's catalogue.
+ */
+function placeFileEntries(layout: PracLayout, entries: readonly VscodeCatalogueEntry[]): void {
+  const files = entries.filter((entry) => entry.source === "file");
+  if (files.length === 0) return;
+  /** Every placement of one resource, so a second one can find the first. */
+  const siblings = new Map<string, string[]>();
+  for (const entry of files) {
+    siblings.set(entry.appId, [...(siblings.get(entry.appId) ?? []), entry.view]);
+  }
+  for (const entry of files) {
+    const known = layout.getState().views;
+    if (known[entry.view] !== undefined) continue;
+    const shown = (siblings.get(entry.appId) ?? [])
+      .filter((view) => view !== entry.view)
+      .map((view) => known[view])
+      .find((record) => record !== undefined && record.region !== null && !record.hidden);
+    if (entry.region !== null && entry.region !== undefined) {
+      layout.placeQuietly(entry.view, entry.region);
+    } else if (shown?.region !== undefined) {
+      // The same file already holds a region: this placement is the app showing it a
+      // second time, so it goes beside that one rather than on top of it.
+      layout.placeQuietly(entry.view, shown.region);
+      layout.splitView(entry.view, "right");
+    } else {
+      layout.placeQuietly(entry.view, STAGE);
+    }
+  }
 }
 
 /**
@@ -249,19 +300,19 @@ export function openFileInto(layout: PracLayout, view: string): void {
 /**
  * The file views the frame should stop showing.
  *
- * A file view exists because the **app** has that file open. When it no longer
- * does — a closed editor, or a page reload whose app state is gone — the view has
- * no subject, but its placement record outlives it (decision 16 persists the
- * frame). Left alone it renders a tab for a file nobody has open and holds a
- * region with an empty view, which is exactly what a reload used to look like.
+ * A file view exists because the **app** has that file open. When it no longer does — a
+ * closed editor, or a page reload whose app state is gone — the view has no subject left.
  *
- * They are *hidden* rather than removed: the record keeps the placement for when
- * the same file is opened again (`place` shows it there).
+ * What the caller does with them is **forget**, not hide: a hidden view is one the person
+ * put away and can bring back, while this one has nothing to come back to. A remembered
+ * record is also actively in the way — a placement is named by the host, the next open of
+ * the same file mints a fresh name, and a record left under it would keep the new
+ * placement from being shown.
  *
  * @param records - the frame's view table.
  * @param openFiles - the file views the app currently reports.
  * @param resourceOf - the host's file-view test (`undefined` for anything else).
- * @returns the file views to hide.
+ * @returns the file views with no subject left.
  */
 export function staleFileViews(
   records: Readonly<Record<string, ViewRecord>>,

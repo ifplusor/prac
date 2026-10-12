@@ -113,6 +113,24 @@ export interface IEmbeddedWorkbenchOptions {
   embedBridge?: EmbedBridge;
 }
 
+/**
+ * The key one mounted surface is held under: the placement, not the file.
+ *
+ * `\u0000` cannot appear in a placement token or in a resource string, so the two
+ * halves cannot be confused for one another however the resource is spelled.
+ *
+ * @param placement - the placement token.
+ * @param resource - the file's URI, as a string.
+ */
+function placementKey(placement: string, resource: string): string {
+  return `${placement}\u0000${resource}`;
+}
+
+/** The key one open editor is looked up under while placements are reconciled. */
+function editorKey(resource: string, group: number): string {
+  return `${resource}\u0000${group}`;
+}
+
 export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutService {
   declare readonly _serviceBrand: undefined;
 
@@ -256,23 +274,35 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   /** Kept for runtime service access (`openWorkspaceFolder`). */
   private instantiationService: InstantiationService | undefined;
   /**
-   * One editing surface per resource, mounted by the embedder.
+   * The editing surface the embedder mounted, by **placement**.
    *
-   * The reference is what keeps the workbench's text model alive while this
-   * surface shows it; releasing it lets the model go when nothing else holds it.
-   */
-  /**
-   * One editing surface per resource, and the group showing it.
-   *
-   * The surface is the workbench's own editor pane (created by the region's group),
-   * not a second widget over the same model — that is the whole point of prac's
-   * editor host: the language service, the commands and the person all look at the
-   * same editor.
+   * The key is `(group, resource)`, because that is what the embedder renders one view
+   * for: the same file open in two groups is two surfaces, and the group is what tells
+   * them apart. The value carries the group (whose element the surface lives in) and
+   * the host element the embedder rendered (whose box the group is laid out in).
    */
   private readonly mountedFiles = new Map<
     string,
-    { readonly group: PracEditorGroup; readonly element: HTMLElement }
+    {
+      readonly placement: string;
+      readonly resource: string;
+      readonly group: PracEditorGroup;
+      readonly element: HTMLElement;
+    }
   >();
+  /**
+   * The live placements, by token: what the embedder quotes back when it mounts.
+   *
+   * A placement is a file in one group, and the **token** is its identity, not the
+   * group: a placement moves between groups (the embedder moved its view, or the
+   * workbench's own move command ran), and a consumer holding the token — a view id,
+   * a tab record — must not be left with a stale one. So the token is minted once per
+   * placement and only retargeted when the same file turns up in another group in the
+   * same reconciliation (see {@link updatePlacements}).
+   */
+  private placements = new Map<string, { readonly resource: string; readonly group: number }>();
+  /** The next placement token (never reused: a stale id must stay unknown). */
+  private placementCount = 0;
   /**
    * Files whose close is in flight, by resource string.
    *
@@ -414,17 +444,19 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
             releaseView: (viewId: string) => this.releaseView(viewId),
             listViews: () => this.listViews(),
             onDidChangeViews: (listener: () => void) => this.onDidChangeViews(listener),
-            mountFileInto: (resource: string, element: HTMLElement) =>
-              this.mountFileInto(resource, element),
-            focusFile: (resource: string) => this.focusFile(resource),
-            releaseFile: (resource: string) => this.releaseFile(resource),
+            mountFileInto: (placement: string, resource: string, element: HTMLElement) =>
+              this.mountFileInto(placement, resource, element),
+            focusFile: (placement: string, resource: string) => this.focusFile(placement, resource),
+            releaseFile: (placement: string, resource: string) =>
+              this.releaseFile(placement, resource),
             openFile: (resource: string) => this.openFile(resource),
             capabilities: {
               editors: this.createEditorsCapability(),
               diagnostics: this.createDiagnosticsCapability(),
             },
+            listPlacements: () => this.listPlacements(),
+            onDidChangePlacements: (listener: () => void) => this.onDidChangePlacements(listener),
             listOpenFiles: () => this.listOpenFiles(),
-            onDidChangeOpenFiles: (listener: () => void) => this.onDidChangeOpenFiles(listener),
             openUntitled: (path?: string) => this.openUntitled(path),
             openWorkspaceFolder: (folderUri: string) => this.openWorkspaceFolder(folderUri),
             workspaceInfo: () => this.workspaceInfo(),
@@ -783,24 +815,34 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   //#endregion
 
   /**
-   * Mount one file's editing surface into the element prac prepared for its view.
+   * Mount one **placement's** editing surface into the element prac prepared for it.
    *
-   * The unit is prac's **region**: a region that holds files owns one
-   * {@link PracEditorGroup}, the group's element is mounted into the region's view
-   * host, and the file is opened as an editor *in that group*. So the surface a
-   * person sees is the pane the workbench's editor service knows about — its
-   * language features, markers, view state, commands, breadcrumbs and peek included
-   * — instead of a look-alike widget beside an off-screen pane.
+   * The unit is the placement, and {@link FilePlacement.placement} is what the embedder
+   * names. That is what lets one file live in two regions: each placement gets its own
+   * host element, and each element is filled by *its* editor, so the two surfaces are
+   * two editors of one model rather than one editor fighting for two boxes.
+   *
+   * The element's region is where the placement is *shown*, so a mount that arrives in
+   * another region is a **move**: the editor travels (or the whole group does, when the
+   * file is alone in it), and the placement keeps its token. Measured the other way —
+   * a view id carrying the group, with every move opening the editor in the
+   * destination's group — one move changed the file's name, and every consumer holding
+   * it (the tab, the recall row, the gate) was left with a stale one.
+   *
+   * The surface a person sees is the pane the workbench's editor service knows about
+   * — its language features, markers, view state, commands, breadcrumbs and peek
+   * included — instead of a look-alike widget beside an off-screen pane.
    *
    * The resource may arrive as a full URI string (`vscode-remote://…`, which is what
    * the app's own workspace folders look like) or as a bare path; the embedder cannot
    * construct a `URI` instance, so the string is parsed here — the same reason
    * `openWorkspaceFolder` takes a string.
    *
+   * @param placement - the placement token.
    * @param resource - the file's URI, as a string.
    * @param element - the element the embedder rendered for the file's view.
    */
-  mountFileInto(resource: string, element: HTMLElement): void {
+  mountFileInto(placement: string, resource: string, element: HTMLElement): void {
     const instantiationService = this.instantiationService;
     if (!instantiationService) {
       this.logService.error(`vscode-embed: cannot mount file ${resource} before startup`);
@@ -819,7 +861,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
         // region of its own — one host, one group — so two hosts never fight over the
         // same group element.
         const region = this.regionOf(element) ?? this.hostRegion(element);
-        const group = host.ensureGroup(region, region);
+        const group = this.groupForMount(host, placement, uri, region);
         group.create(element);
         // The file the **group already holds** is the editor to show: the app
         // reaches the workbench through `IEditorService.openEditor`, which builds
@@ -834,31 +876,12 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
           // moving into the host the frame rendered — not an open. Opening again would
           // be redundant work on every re-render of the frame's view list.
           host.activateGroup(group.id);
-          this.mountedFiles.set(resource, { group, element });
-          this.layoutGroup(group, element);
-          this.observeHost(element);
-          return;
-        }
-        // The file may already live in **another** region: its view moved, and the
-        // editor moves with it (upstream's `moveEditor` — open in the target, close in
-        // the source). Opening a second one instead left the old region holding a copy
-        // nothing shows (measured: the `editors` capability listing one file once per
-        // group). The search is over the groups rather than over this composition's
-        // bookkeeping, because the bookkeeping is released whenever a view stops being
-        // shown — a tab switch is not a move.
-        const elsewhere = (host.groups as PracEditorGroup[]).find(
-          (candidate) => candidate !== group && candidate.findEditors(uri).length > 0,
-        );
-        const moved = elsewhere?.findEditors(uri)[0];
-        if (elsewhere !== undefined && moved !== undefined) {
-          if (this.closingFiles.has(resource)) return;
-          elsewhere.moveEditor(moved, group, { pinned: true, preserveFocus: true });
-          if (elsewhere.isEmpty) {
-            const left = host.regionOf(elsewhere);
-            if (left !== undefined) host.removeGroupByRegion(left);
-          }
-          host.activateGroup(group.id);
-          this.mountedFiles.set(resource, { group, element });
+          this.mountedFiles.set(placementKey(placement, resource), {
+            placement,
+            resource,
+            group,
+            element,
+          });
           this.layoutGroup(group, element);
           this.observeHost(element);
           return;
@@ -876,7 +899,12 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
         if (this.closingFiles.has(resource)) return;
         await group.openEditor(editor, { pinned: true, preserveFocus: true });
         host.activateGroup(group.id);
-        this.mountedFiles.set(resource, { group, element });
+        this.mountedFiles.set(placementKey(placement, resource), {
+          placement,
+          resource,
+          group,
+          element,
+        });
         this.layoutGroup(group, element);
         this.observeHost(element);
       })
@@ -886,16 +914,71 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   }
 
   /**
-   * Forget a file's surface.
+   * The group a placement's surface belongs in, when the frame renders it in a region.
+   *
+   * Three cases, and they are the whole of "where does a file live":
+   *
+   * 1. the placement's group is *already* shown here — a tab switch, or a re-render of
+   *    the frame's view list: nothing moves, the group's element is re-parented into
+   *    the host the frame rendered (that is what `create` does);
+   * 2. the placement's group holds **only this file** and the region has no group yet:
+   *    the group itself moves (one group, one file, one region — nothing else can be
+   *    disturbed, and the editor keeps its pane);
+   * 3. otherwise the region has a group of its own (or this file shares its group with
+   *    others), so the *editor* moves — upstream's `moveEditor`, open in the target and
+   *    close in the source — and the views left behind keep their surfaces. The
+   *    placement is retargeted to the new group on the next
+   *    {@link updatePlacements}, so its token (and the embedder's view id) is
+   *    unchanged either way.
+   *
+   * @param host - prac's editor host.
+   * @param placement - the placement token.
+   * @param uri - the file's URI.
+   * @param region - the region the frame rendered this placement in.
+   */
+  private groupForMount(
+    host: PracEditorHost,
+    placement: string,
+    uri: URI,
+    region: string,
+  ): PracEditorGroup {
+    const record = this.updatePlacements().get(placement);
+    const named = record === undefined ? undefined : host.groupById(record.group);
+    if (named === undefined) {
+      // A placement the workbench does not know (a probe, or a view persisted from a
+      // page whose editors are gone): the region's own group, made if needed.
+      return host.ensureGroup(region, region);
+    }
+    if (host.regionOf(named) === region) return named;
+    const resident = host.groupForRegion(region);
+    if (named.count === 1 && named.findEditors(uri).length === 1 && resident === undefined) {
+      host.rehomeGroup(named, region);
+      return named;
+    }
+    const target = resident ?? host.ensureGroup(region, region);
+    const editor = named.findEditors(uri)[0];
+    if (editor !== undefined) {
+      // The editor's home moves; the source group keeps whatever else it holds.
+      named.moveEditor(editor, target, { pinned: true, preserveFocus: true });
+      this.updatePlacements();
+      const left = host.regionOf(named);
+      if (named.isEmpty && left !== undefined) host.removeGroupByRegion(left);
+    }
+    return target;
+  }
+
+  /**
+   * Forget one placement's surface.
    *
    * The **editor stays open**: it is still open in the workbench, and the file view
    * may come back (switching tabs, moving the view). Only the embedder's bookkeeping
    * goes; the group keeps the pane.
    *
+   * @param placement - the placement token.
    * @param resource - the file's resource string.
    */
-  releaseFile(resource: string): void {
-    this.mountedFiles.delete(resource);
+  releaseFile(placement: string, resource: string): void {
+    this.mountedFiles.delete(placementKey(placement, resource));
   }
 
   /** Region ids handed to hosts that carry no `[data-prac-region]` ancestor. */
@@ -953,16 +1036,19 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   }
 
   /**
-   * Make one mounted file the app's active editor.
+   * Make one placement's file the app's active editor.
    *
-   * The embedder calls this when its region for the file takes focus. The workbench
+   * The embedder calls this when its view for the placement takes focus. The workbench
    * follows *its* active editor — the Outline, the Timeline and every command read it
    * — and the embedder is the only side that knows which region a person is working
-   * in, so focus has to travel up.
+   * in, so focus has to travel up. The group is named rather than searched for: the
+   * same file can sit in two groups, and only the embedder knows which of them the
+   * person is in.
    *
+   * @param placement - the placement token.
    * @param resource - the file's resource string, as {@link mountFileInto} took it.
    */
-  focusFile(resource: string): void {
+  focusFile(placement: string, resource: string): void {
     // A focus event the mechanism caused itself is not the person choosing a region:
     // opening an editor focuses its pane, and reading that as "work here" is what made
     // this fight the client's activate reconciliation forever (see `noteSelfFocus`).
@@ -973,15 +1059,34 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
         ? URI.parse(resource)
         : URI.file(resource);
-      // Iterate prac's own groups: an editor lives in exactly one of them, and the
-      // group is what has to become (and be) active.
-      for (const group of this.editorGroupService.groups) {
+      // The named placement's group when it is ours, otherwise whichever holds the
+      // file: the same file can sit in two groups, and only the embedder knows which
+      // of them the person is in.
+      const named = (this.editorGroupService as unknown as PracEditorHost).groupById(
+        this.updatePlacements().get(placement)?.group ?? -1,
+      );
+      const groups =
+        named === undefined
+          ? this.editorGroupService.groups
+          : [named, ...this.editorGroupService.groups.filter((group) => group !== named)];
+      for (const group of groups) {
         const editor = group.findEditors(uri)[0];
         if (editor === undefined) continue;
+        // A group shows whichever of its files was **last activated**, and the event that
+        // arrived here may be the focus that activation raised (opening an editor focuses
+        // its pane) while the frame still shows the previous view's host element — the
+        // focus then bubbles out of *that* element, so it is attributed to the placement
+        // the frame was showing, not the one it is switching to. Measured on a reopen:
+        // the file that took the centre was activated, its pane focus was read as
+        // "the person works in the old region", the app was dragged back to the file that
+        // had just given up the centre, and the new file's view ended up with no surface.
+        // An event only speaks for a placement whose file is what the group is showing.
+        const shown = group.activeEditor?.resource?.toString();
+        if (shown !== undefined && shown !== uri.toString()) return;
         this.editorGroupService.activateGroup(group);
         // The group already shows this editor: focus travelling up must not re-open
         // what is already open (a mount/re-parent is not an open).
-        if (group.activeEditor?.resource?.toString() === uri.toString()) return;
+        if (shown === uri.toString()) return;
         void group.openEditor(editor, { preserveFocus: true });
         return;
       }
@@ -1071,6 +1176,168 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   }
 
   /**
+   * The file-capable editors the workbench holds, as `(resource, group)` pairs.
+   *
+   * Only what the embedder can actually render as a *file*: an editor input can carry a
+   * resource and still not be one — the getting-started page (`walkThrough:`) has no
+   * text model, and an untitled buffer (`untitled:`) has a model but no file system
+   * provider, so reading it as a file fails (`createModelReference` goes through the
+   * file service). The provider test is what both of those fail.
+   *
+   * @returns one pair per open editor, in the workbench's order.
+   */
+  private openEditors(): { resource: string; group: number }[] {
+    if (!this.instantiationService) return [];
+    try {
+      return this.editorService
+        .getEditors(EditorsOrder.SEQUENTIAL)
+        .filter(
+          ({ editor }) =>
+            editor.resource !== undefined && this.fileService.hasProvider(editor.resource),
+        )
+        .map(({ editor, groupId }) => ({
+          resource: editor.resource?.toString() ?? "",
+          group: groupId,
+        }));
+    } catch (error) {
+      this.logService.error("vscode-embed: failed to read the open editors", error);
+      return [];
+    }
+  }
+
+  /**
+   * Reconcile the placement tokens against the editors that are open right now.
+   *
+   * The token is the placement's identity, so the one thing this must never do is mint a
+   * new one for a placement that merely **moved**: a view whose editor went to another
+   * group is the same placement, and every consumer's view id, tab record and recall row
+   * quotes the token. So the pass is:
+   *
+   * 1. a `(resource, group)` pair that still exists keeps its token — the common case;
+   * 2. an open pair with no token of its own **adopts** the token of a placement of the
+   *    same file that is gone — that is a move (the embedder moved the view, or the
+   *    workbench's own move ran), and the two are one placement;
+   * 3. anything left is genuinely new (a file just opened, or a split: the same file in
+   *    a second group) and gets a fresh token.
+   *
+   * Called before every read and after every mount that moves an editor, so it is
+   * idempotent and cheap: the pair set is the editor service's own.
+   *
+   * @returns the live placements by token.
+   */
+  private updatePlacements(): Map<string, { readonly resource: string; readonly group: number }> {
+    const open = this.openEditors();
+    const openKeys = new Set(open.map(({ resource, group }) => editorKey(resource, group)));
+    const next = new Map<string, { readonly resource: string; readonly group: number }>();
+    const surviving = new Set<string>();
+    for (const [token, value] of this.placements) {
+      if (!openKeys.has(editorKey(value.resource, value.group))) continue;
+      next.set(token, value);
+      surviving.add(token);
+    }
+    const claimed = new Set(next.values().map(({ resource, group }) => editorKey(resource, group)));
+    const adopted = new Set<string>();
+    for (const pair of open) {
+      const key = editorKey(pair.resource, pair.group);
+      if (claimed.has(key)) continue;
+      const moved = [...this.placements].find(
+        ([token, value]) =>
+          value.resource === pair.resource && !surviving.has(token) && !adopted.has(token),
+      );
+      if (moved === undefined) {
+        next.set(`p${this.placementCount++}`, pair);
+      } else {
+        next.set(moved[0], pair);
+        adopted.add(moved[0]);
+      }
+      claimed.add(key);
+    }
+    this.placements = next;
+    return next;
+  }
+
+  /** The token of one `(resource, group)` pair, by pair key. */
+  private placementTokens(): Map<string, string> {
+    const tokens = new Map<string, string>();
+    for (const [token, value] of this.updatePlacements()) {
+      tokens.set(editorKey(value.resource, value.group), token);
+    }
+    return tokens;
+  }
+
+  /**
+   * The file **placements** the workbench has open: one entry per file-in-a-group.
+   *
+   * The same file open in two groups is two entries — that is what the embedder needs to
+   * give each of them its own view. {@link FilePlacement.placement} is the entry's
+   * identity and {@link FilePlacement.region} is where the embedder is showing it, so a
+   * consumer can place a view without knowing anything about editor groups.
+   *
+   * @returns one entry per file-in-a-group, in the workbench's order.
+   */
+  listPlacements(): {
+    placement: string;
+    resource: string;
+    group: number;
+    region: string | null;
+  }[] {
+    if (!this.instantiationService) return [];
+    try {
+      const tokens = this.placementTokens();
+      return this.openEditors().map(({ resource, group: groupId }) => {
+        const group = this.editorGroupService.getGroup(groupId) as PracEditorGroup | undefined;
+        return {
+          placement: tokens.get(editorKey(resource, groupId)) ?? "",
+          resource,
+          group: groupId,
+          region:
+            (group === undefined ? undefined : this.editorGroupService.regionOf(group)) ?? null,
+        };
+      });
+    } catch (error) {
+      this.logService.error("vscode-embed: failed to list file placements", error);
+      return [];
+    }
+  }
+
+  /**
+   * Subscribe to changes in the placement set.
+   *
+   * Two of the editor service's events can mean "the set changed" (activate, close) and
+   * neither *is* the set, so the set is compared here: the listener hears exactly when
+   * the set it would read differs from the one it last saw. The comparison is over the
+   * **placements** — the token, plus the resource, group and region each one names — so
+   * moving an editor from one group to another reads as a change (the view has to
+   * follow) while activating, editing or dirtying a file does not. Reporting those would
+   * put the embedder's arrangement on the editor's change stream: measured, a catalogue
+   * wired that way re-synced ~300 000 times a second and took the page down.
+   *
+   * @param listener - called when the placement set changed.
+   * @returns a function that unsubscribes.
+   */
+  onDidChangePlacements(listener: () => void): () => void {
+    const snapshot = (): string =>
+      this.listPlacements()
+        .map(
+          ({ placement, resource, group, region }) =>
+            `${placement}\u0000${resource}\u0000${group}\u0000${region ?? ""}`,
+        )
+        .join("\n");
+    let last = snapshot();
+    const notify = (): void => {
+      const next = snapshot();
+      if (next === last) return;
+      last = next;
+      listener();
+    };
+    const store = new DisposableStore();
+    store.add(this.editorService.onDidActiveEditorChange(notify));
+    store.add(this.editorService.onDidCloseEditor(notify));
+    store.add(this.editorService.onDidEditorsChange(notify));
+    return () => store.dispose();
+  }
+
+  /**
    * The editor set as a capability: the same handle the UI renders and the agent
    * reads.
    *
@@ -1086,6 +1353,9 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       active: boolean;
       dirty: boolean;
       preview: boolean;
+      placement: string;
+      group: number;
+      region: string | null;
     }[];
     subscribe: (listener: () => void) => () => void;
     settled: () => Promise<void>;
@@ -1107,17 +1377,20 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       editor: EditorInput,
       groupId: GroupIdentifier,
       previews: ReadonlySet<EditorInput>,
+      tokens: ReadonlyMap<string, string>,
     ) => {
       const group = this.editorGroupService.getGroup(groupId) as PracEditorGroup | undefined;
+      const resource = editor.resource?.toString() ?? "";
       return {
-        resource: editor.resource?.toString() ?? "",
+        resource,
         active: editor === this.editorService.activeEditor,
         dirty: editor.isDirty(),
         preview: previews.has(editor),
-        // The group and its region travel with the entry: a file open in two regions is
-        // two entries, and each one's consumer needs to know *which* region to show it
-        // in. `getEditors` is what pairs the editor with its group — the flat `editors`
-        // list does not say where each one lives.
+        // The placement this entry is, and the group and region it currently sits in: a
+        // file open in two groups is two entries, and a consumer gives each of them its
+        // own view. `getEditors` is what pairs the editor with its group — the flat
+        // `editors` list does not say where each one lives.
+        placement: tokens.get(editorKey(resource, groupId)) ?? "",
         group: groupId,
         region: (group === undefined ? undefined : this.editorGroupService.regionOf(group)) ?? null,
       };
@@ -1143,7 +1416,10 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     return {
       snapshot: () => {
         const previews = previewsOf();
-        return visibleEditors().map(({ editor, groupId }) => entryOf(editor, groupId, previews));
+        const tokens = this.placementTokens();
+        return visibleEditors().map(({ editor, groupId }) =>
+          entryOf(editor, groupId, previews, tokens),
+        );
       },
       subscribe: (listener: () => void) => {
         listeners.add(listener);
@@ -1328,39 +1604,6 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     for (const editor of this.editorService.editors) {
       store.add(editor.onDidChangeDirty(() => notify()));
     }
-  }
-
-  /**
-   * Subscribe to changes in the open-file set.
-   *
-   * Two of the editor service's events can mean "the set changed" (activate,
-   * close) and neither *is* the set, so the set is compared here: the listener
-   * hears exactly when the set it would read differs from the one it last saw.
-   * `onDidVisibleEditorsChange` is deliberately not used — the editor part may
-   * never be mounted in this composition, so "visible" is not ours to rely on.
-   *
-   * The comparison is over a **set**, not over a list: `listOpenFiles` enumerates the
-   * groups in order, so moving an editor from one region to another reorders it without
-   * changing what is open. Reporting that as a change made the app's arrangement treat
-   * the moved file as newly opened and pull its view back to the centre — measured, a
-   * split into a second region undid itself a moment later.
-   *
-   * @param listener - called when the open-file set changed.
-   * @returns a function that unsubscribes.
-   */
-  onDidChangeOpenFiles(listener: () => void): () => void {
-    const snapshot = (): string => [...this.listOpenFiles()].sort().join("\n");
-    let last = snapshot();
-    const notify = (): void => {
-      const next = snapshot();
-      if (next === last) return;
-      last = next;
-      listener();
-    };
-    const store = new DisposableStore();
-    store.add(this.editorService.onDidActiveEditorChange(notify));
-    store.add(this.editorService.onDidCloseEditor(notify));
-    return () => store.dispose();
   }
 
   /**

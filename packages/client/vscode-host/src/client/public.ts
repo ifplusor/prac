@@ -60,12 +60,23 @@ export interface PracVscodeFace {
    */
   hostFor(view: string): () => ReactElement | null;
   /**
+   * The app's **placement** behind a view id, or `undefined` when the id is not a
+   * file view.
+   *
+   * A placement is a file in one of the app's editor groups, named by the app's own
+   * token. The id convention belongs to this package, so a consumer that has to pair a
+   * view with the app's own state (the `editors` capability reports one entry per
+   * placement) asks here rather than parsing the id itself.
+   *
+   * @param view - any view id.
+   */
+  filePlacement(view: string): { placement: string; resource: string } | undefined;
+  /**
    * The app resource behind a view id, or `undefined` when the id is not a file
    * view.
    *
-   * The id convention (`vscode:file:<resource>`) belongs to this package, so a
-   * consumer that needs to recognise a file view asks here rather than matching a
-   * prefix itself.
+   * The id convention belongs to this package, so a consumer that only needs to
+   * recognise a file view asks here rather than matching a prefix itself.
    *
    * @param view - any view id.
    */
@@ -203,10 +214,17 @@ export interface VscodeEditorEntry {
   /** Whether the editor is in preview mode. */
   readonly preview: boolean;
   /**
+   * The placement this entry is: the app's name for a file in one of its editor groups.
+   *
+   * One entry per group, so the same file open in two groups is two entries — and this is
+   * what tells them apart (the resource alone cannot, and the group number changes when the
+   * placement moves). A consumer keys its own state by it.
+   */
+  readonly placement: string;
+  /**
    * The group holding this editor and the prac region it belongs to.
    *
-   * The same file in two regions is two entries: a consumer that gives each open
-   * editor its own view keys them by `group`, and places each one in `region`.
+   * A group that no prac region owns yet reports `null` for the region.
    */
   readonly group: number;
   readonly region: string | null;
@@ -225,8 +243,9 @@ export interface VscodeCatalogueEntry {
   /**
    * The prac view id.
    *
-   * `vscode:file:<resource>` for an open file, `vscode:view:<viewId>` for a view
-   * the app's view registry reports. The convention belongs to this package.
+   * `vscode:file:<placement>:<resource>` for a file the app has open, in the placement
+   * the app reports it as; `vscode:view:<viewId>` for a view the app's view registry
+   * reports. The convention belongs to this package.
    */
   readonly view: string;
   /**
@@ -246,6 +265,14 @@ export interface VscodeCatalogueEntry {
    * `stage` for an open file, otherwise the container's location.
    */
   readonly location: "stage" | "sidebar" | "panel" | "auxiliarybar";
+  /**
+   * For `file` entries: the prac region the app's group for this placement is shown
+   * in, or `null` while nothing shows it yet.
+   *
+   * A **default** placement, like {@link location}: the app says where its editor is,
+   * and the arrangement decides whether to honour it.
+   */
+  readonly region?: string | null;
   /** For `view` entries: the container the view is registered in. */
   readonly containerId?: string;
   /** For `view` entries: the container's display name, for grouping. */

@@ -296,8 +296,21 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
     return this.model.getEditors(EditorsOrder.SEQUENTIAL);
   }
 
+  /**
+   * The editors the person has selected.
+   *
+   * prac's chrome has no multi-select — a region shows one editor, and the frame's tab
+   * strip has no shift-click — so the model's selection stays empty unless something sets
+   * it, while the workbench's own commands read this member to decide *what* to copy,
+   * move or close. Here the selection **is** the active editor. Measured without the
+   * fallback: `workbench.action.splitEditorToNextGroup` found nothing to copy and did
+   * nothing at all, so VS Code's split editor was dead in prac.
+   */
   get selectedEditors(): EditorInput[] {
-    return this.model.selectedEditors;
+    const selected = this.model.selectedEditors;
+    if (selected.length > 0) return selected;
+    const active = this.model.activeEditor;
+    return active === null ? [] : [active];
   }
 
   get previewEditor(): EditorInput | null {

@@ -11,6 +11,14 @@
  * and installed **after** the page has settled, so the application's own
  * `document.querySelector` calls keep their exact semantics.
  *
+ * The same install also puts prac's **view-id helpers** in the page
+ * (`__pracFileViews`, `__pracFileView`, `__pracFileResource`): a gate that has a
+ * fixture file's URI and wants the view standing for it must read that from the live
+ * layout rather than spell the id convention out. A file has one view per
+ * **placement** (a file in one of the app's editor groups), so the id carries the
+ * group — and a gate that rebuilds `vscode:file:<uri>` is asserting against a shape
+ * that is not what the app produces.
+ *
  * @module prac/vendor/vscode/scripts/deep-dom
  */
 
@@ -44,6 +52,19 @@ const WALKER = `(() => {
       }
     },
   };
+  // Every prac view standing for one file, in layout order: one per **placement**
+  // (the same file open in two editor groups is two views).
+  globalThis.__pracFileViews = (resource) =>
+    (globalThis.__pracLayout?.listViews() ?? [])
+      .map((view) => view.id)
+      .filter((id) => id.startsWith("vscode:file:") && id.endsWith(resource));
+  globalThis.__pracFileView = (resource) => globalThis.__pracFileViews(resource)[0] ?? null;
+  // The file behind a view id: the id is vscode:file:<placement>:<resource>, and a
+  // placement token is p<digits> (which no URI scheme looks like).
+  globalThis.__pracFileResource = (view) =>
+    String(view)
+      .replace(/^vscode:file:/, "")
+      .replace(/^p\\d+:/, "");
 })()`;
 
 /**
@@ -72,4 +93,21 @@ export async function waitDeep(page, selector, timeout = 60_000) {
   await page.waitForFunction((query) => globalThis.__deep?.all(query).length > 0, selector, {
     timeout,
   });
+}
+
+/**
+ * The file behind a prac file-view id — the gate-side half of `__pracFileResource`.
+ *
+ * An assertion written in Node (a `checks` object) cannot call the page's helpers, so
+ * the one rule the id carries is spelled twice: here and in the walker. It is one
+ * `replace`, and the alternative — a gate that rebuilds the id — is what made the
+ * placement change look like a regression.
+ *
+ * @param view - a `vscode:file:…` view id.
+ * @returns the file's URI.
+ */
+export function resourceOfFileView(view) {
+  return String(view)
+    .replace(/^vscode:file:/, "")
+    .replace(/^p\d+:/, "");
 }

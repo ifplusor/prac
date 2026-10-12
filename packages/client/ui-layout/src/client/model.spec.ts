@@ -14,6 +14,7 @@ import {
   defaultTree,
   findRegion,
   findSplit,
+  freshNodeId,
   frontView,
   isPresent,
   isStacked,
@@ -21,6 +22,7 @@ import {
   place,
   regionInfos,
   regionNode,
+  removeView,
   setFront,
   resolveSizes,
   sashSizes,
@@ -179,6 +181,40 @@ describe("placement", () => {
   it("never calls a non-stack region stacked, even with two views", () => {
     const two = place(place(state(), "a", CENTER_REGION), "b", CENTER_REGION);
     expect(isStacked(two, findRegion(two.tree, CENTER_REGION)!)).toBe(false);
+  });
+
+  it("forgets a view's record entirely, and the child it had of its own", () => {
+    // A file view whose file the app no longer has open has nothing to come back to; the
+    // record is what the frame persists, and a fresh placement of that file is named
+    // again — so a remembered one would block it.
+    const one = place(state(), "vscode:file:p1:x", "left");
+    expect(one.views["vscode:file:p1:x"]).toBeDefined();
+    const forgotten = removeView(one, "vscode:file:p1:x");
+    expect(forgotten.views["vscode:file:p1:x"]).toBeUndefined();
+    // A view that is not there is not a change: a caller re-running its sync must not
+    // wake the store.
+    expect(removeView(forgotten, "vscode:file:p1:x")).toBe(forgotten);
+    // A selector region's child exists for one view, so it goes with it.
+    const selector = setRegionChildren(one.tree, "left", [
+      regionNode("left/keep", 0, { stack: true }),
+    ]);
+    const held = { ...one, tree: selectChild(selector, "left", "left/keep") };
+    const placed = place(held, "vscode:file:p2:y", "left");
+    expect(findRegion(placed.tree, "left/vscode:file:p2:y")).not.toBeNull();
+    expect(
+      findRegion(removeView(placed, "vscode:file:p2:y").tree, "left/vscode:file:p2:y"),
+    ).toBeNull();
+  });
+
+  it("mints node ids the restored tree has not taken", () => {
+    // The counter restarts every page load while the tree persists, so a split after a
+    // reload used to be able to reuse a restored region's id — and two regions with one id
+    // are rendered twice, with the views in them mounted twice.
+    const restored = splitRegionWith(state(), CENTER_REGION, "right", "split-1", "region-1");
+    let seq = 0;
+    // A fresh counter's very first candidate is the id the restored tree already carries.
+    expect(freshNodeId(restored.tree, "region", () => (seq += 1))).toBe("region-2");
+    expect(findRegion(restored.tree, "region-2")).toBeNull();
   });
 });
 

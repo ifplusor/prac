@@ -147,40 +147,52 @@ export interface PartHostFace {
    */
   onDidChangeViews: (listener: () => void) => () => void;
   /**
-   * Mount **one file's editing surface** into an external host element.
+   * Mount **one placement's editing surface** into an external host element.
    *
-   * The unit is the file, not the editor part: the embedder decides which files
-   * are open, groups them, and draws the tab strip, so what it needs from the
-   * workbench is a single file's editing control — the workbench's own text
-   * model (so language features, undo/redo and saving are the real ones) in a
-   * `CodeEditorWidget`, which is how the workbench itself builds an editor
-   * control (`TextCodeEditor.createEditorControl`). No editor part, no editor
-   * group, no tab strip: those are the embedder's composition.
+   * The unit is the placement — a file in one editor group — not the file and not
+   * the editor part: the embedder decides which files are open, groups them, and
+   * draws the tab strip, so what it needs from the workbench is a single file's
+   * editing control — the workbench's own text model (so language features,
+   * undo/redo and saving are the real ones) in a `CodeEditorWidget`, which is how
+   * the workbench itself builds an editor control
+   * (`TextCodeEditor.createEditorControl`). No editor part, no tab strip: those
+   * are the embedder's composition.
+   *
+   * {@link FilePlacement.placement} is what makes the unit the placement rather than
+   * the file: the same resource may be open in two groups (VS Code's split editor),
+   * and the token says *which* of them this host is showing. It is also what decides
+   * where the editor goes — the element's region does not, so a host rendered in
+   * another region **moves** that placement's editor there rather than opening a
+   * second one, and the token survives the move (see
+   * {@link PartHostFace.listPlacements}).
    *
    * The resource is the workbench's own URI as a string
    * (`vscode-remote://<authority>/<path>`, or a bare path for a local file) —
    * the same vocabulary {@link PartHostFace.openWorkspaceFolder} takes, because
    * the embedder cannot construct a `URI` instance.
    *
-   * One editing surface per resource: mounting a resource that is already
-   * mounted re-parents it (a file has one model, and a second editor for it
-   * would be a second view of the same text).
-   *
+   * @param placement - the placement token, from {@link PartHostFace.listPlacements}.
    * @param resource - the file's URI, as a string.
    * @param element - the host element the embedder rendered for it.
    */
-  mountFileInto: (resource: string, element: HTMLElement) => void;
-  /** Make one mounted file the app's active editor (its region took focus). */
-  focusFile: (resource: string) => void;
+  mountFileInto: (placement: string, resource: string, element: HTMLElement) => void;
   /**
-   * Dispose the editing surface created by {@link PartHostFace.mountFileInto},
-   * so the same file can be mounted again (elsewhere, or after its host went
-   * away). The workbench's text model survives while anything else references
-   * it.
+   * Make one placement's file the app's active editor (its region took focus).
    *
+   * @param placement - the placement token.
    * @param resource - the file's URI, as a string.
    */
-  releaseFile: (resource: string) => void;
+  focusFile: (placement: string, resource: string) => void;
+  /**
+   * Forget one placement's surface, so the same placement can be mounted again
+   * (elsewhere, or after its host went away). The editor **stays open** — the view may
+   * come back — and the workbench's text model survives while anything else references
+   * it.
+   *
+   * @param placement - the placement token.
+   * @param resource - the file's URI, as a string.
+   */
+  releaseFile: (placement: string, resource: string) => void;
   /**
    * Open a file in the workbench, by the same string vocabulary as
    * {@link PartHostFace.mountFileInto}.
@@ -195,27 +207,38 @@ export interface PartHostFace {
    */
   openFile: (resource: string) => void;
   /**
+   * The file **placements** the workbench currently has open, in its own order.
+   *
+   * The embedder owns *rendering* files (see {@link PartHostFace.mountFileInto}),
+   * so it needs to know what the app considers open — opening one from the app's
+   * own UI (an explorer click, a command, a jump) has to become a view, or the
+   * app would be editing files nobody can see. The unit is the placement rather
+   * than the file: the same file in two groups is two of these, and each one is
+   * what a view stands for.
+   *
+   * @returns one entry per file-in-a-group.
+   */
+  listPlacements: () => readonly FilePlacement[];
+  /**
+   * Subscribe to changes in the placement set.
+   *
+   * Fires after the set actually changed (not on every editor activation, and not
+   * when the same file becomes active or dirty), so a listener can re-read
+   * {@link PartHostFace.listPlacements} and reconcile.
+   *
+   * @param listener - called when the placement set changed.
+   * @returns a function that unsubscribes.
+   */
+  onDidChangePlacements: (listener: () => void) => () => void;
+  /**
    * The resources the workbench currently has open, in its own order.
    *
-   * The embedder owns *rendering* files (see
-   * {@link PartHostFace.mountFileInto}), so it needs to know which files the
-   * app considers open — opening one from the app's own UI (an explorer click, a
-   * command, a jump) has to become a view, or the app would be editing files
-   * nobody can see.
+   * The distinct files, for a consumer that only asks *what* is open — placement
+   * is what rendering needs (see {@link PartHostFace.listPlacements}).
    *
    * @returns one URI string per open file.
    */
   listOpenFiles: () => string[];
-  /**
-   * Subscribe to changes in the open-file set.
-   *
-   * Fires after the set actually changed (not on every editor activation), so a
-   * listener can re-read {@link PartHostFace.listOpenFiles} and reconcile.
-   *
-   * @param listener - called when the open-file set changed.
-   * @returns a function that unsubscribes.
-   */
-  onDidChangeOpenFiles: (listener: () => void) => () => void;
   /**
    * Open an untitled editor.
    *
@@ -251,6 +274,37 @@ export interface PartHostFace {
 }
 
 /**
+ * One file the workbench has open, in one of its editor groups.
+ *
+ * This is the **placement**: a file and the editor showing it. prac gives each
+ * placement its own view, so a file open in two groups (VS Code's split editor) is
+ * two views, each showing its own surface.
+ *
+ * `placement` is the placement's **identity**: a resource alone cannot tell two
+ * placements apart, and neither can a group — the same placement moves between groups
+ * (the embedder moved the view's editor, or the workbench's own move command did) and
+ * must keep its name, or every consumer holding that name would be left with a stale
+ * one. The token is opaque to the embedder: it is handed out here, quoted back in
+ * {@link PartHostFace.mountFileInto}, and never interpreted there.
+ */
+export interface FilePlacement {
+  /** The placement's identity. Stable for as long as the placement lives. */
+  readonly placement: string;
+  /** The file's URI, as a string. */
+  readonly resource: string;
+  /** The group currently holding the file, for diagnostics and focus. */
+  readonly group: number;
+  /**
+   * The embedder's region the group is currently hosted in.
+   *
+   * `null` while nothing hosts the group yet: the workbench knows its groups, not
+   * the embedder's regions, so a group the embedder has not rendered is a placement
+   * whose home the embedder still has to decide.
+   */
+  readonly region: string | null;
+}
+
+/**
  * One open editor, as both consumers see it.
  *
  * `resource` is the app's URI as a string (the embedder cannot construct a `URI`);
@@ -268,13 +322,15 @@ export interface EditorEntry {
   /** Whether the editor is in preview mode (replaced by the next preview open). */
   readonly preview: boolean;
   /**
-   * The group holding this editor, and the prac region that group belongs to.
+   * The placement this entry is: one entry per group, so a file open in two groups
+   * appears twice — which is what lets a consumer give each of them its own view.
    *
-   * One entry per group, so a file open in two regions appears twice — which is what
-   * lets a consumer give each of them its own view. A group that no prac region owns
-   * yet reports `null` for the region.
+   * @see FilePlacement
    */
+  readonly placement: string;
+  /** The group holding this editor. */
   readonly group: number;
+  /** The prac region that group belongs to; `null` while nothing hosts it yet. */
   readonly region: string | null;
 }
 

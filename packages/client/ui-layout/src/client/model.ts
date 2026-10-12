@@ -363,6 +363,84 @@ export function place(state: LayoutState, viewId: string, regionId: string): Lay
 }
 
 /**
+ * A node id the tree does not already use.
+ *
+ * The frame **persists its tree** across page loads, while the counter that names new
+ * regions and splits starts over each load — so a split made after a reload can mint the
+ * very id a restored node already has. Two nodes with one id are two regions as far as the
+ * frame is concerned (it keys a region by its id), and the views placed in that region are
+ * mounted in **both** copies: measured, one file's second placement had two hosts, one of
+ * them empty, and the file's view was mounted twice.
+ *
+ * @param tree - the tree the new node will join.
+ * @param kind - the id's prefix (`region`, `split`).
+ * @param next - the counter to advance for each candidate.
+ * @returns an id no node in the tree carries.
+ */
+export function freshNodeId(tree: LayoutNode, kind: string, next: () => number): string {
+  let id = `${kind}-${next()}`;
+  while (nodeWithId(tree, id) !== null) id = `${kind}-${next()}`;
+  return id;
+}
+
+/**
+ * The node carrying an id, anywhere in the tree.
+ *
+ * @param node - the subtree to search.
+ * @param id - the id to look for.
+ */
+function nodeWithId(node: LayoutNode, id: string): LayoutNode | null {
+  if (node.id === id) return node;
+  for (const child of node.children ?? []) {
+    const found = nodeWithId(child, id);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
+/**
+ * Forget a view's placement record entirely.
+ *
+ * The frame persists its arrangement, so a record outlives the page that made it — which
+ * is what makes a *hidden* view mean "the person put this away, and it is still there to
+ * come back to". A **file** view is a different kind of thing: it exists because the app
+ * has that file open, and once the app no longer does, there is no subject left to
+ * remember. Keeping the record is not just dead weight — the id is reused the next time
+ * the app opens that file (placements are named by the host, and a placement is new
+ * again), so a remembered record would **block** the new placement from being shown.
+ *
+ * A selector region that exists only to hold this view is dropped with it.
+ *
+ * @param state - current state.
+ * @param viewId - the view to forget.
+ * @returns the next state, or the same one when there was nothing to forget.
+ */
+export function removeView(state: LayoutState, viewId: string): LayoutState {
+  if (state.views[viewId] === undefined) return state;
+  const views = { ...state.views };
+  delete views[viewId];
+  return { ...state, views, tree: dropOwnChild(state.tree, viewId) };
+}
+
+/**
+ * Drop the child region a selector region created for one view (`landingRegion`).
+ *
+ * @param tree - the tree to update.
+ * @param viewId - the view whose child is going.
+ */
+function dropOwnChild(tree: LayoutNode, viewId: string): LayoutNode {
+  if (tree.type === "split") {
+    const children = tree.children.map((child) => dropOwnChild(child, viewId));
+    return children.some((child, index) => child !== tree.children[index])
+      ? { ...tree, children }
+      : tree;
+  }
+  if (tree.children === undefined) return tree;
+  const kept = tree.children.filter((child) => child.id !== `${tree.id}/${viewId}`);
+  return kept.length === tree.children.length ? tree : { ...tree, children: kept };
+}
+
+/**
  * Place a view **without** changing which child its region shows.
  *
  * The arrangement's bulk sync uses this: the source catalogue is the truth about
@@ -769,7 +847,15 @@ export function splitRegionWith(
   const node = findRegion(state.tree, regionId);
   if (!node) return state;
   const { dir, before } = sideGeometry(side);
-  const fresh = regionNode(newRegionId, 0, { flex: true, min: DEFAULT_MIN });
+  const fresh = regionNode(newRegionId, 0, {
+    flex: true,
+    min: DEFAULT_MIN,
+    // A split is a second area of the **same kind**: it shows the chrome the region it
+    // came from shows. The centre carries `tabs: "multiple"`, so a region split off it
+    // has a tab strip for the views it holds — which is what a person expects of an
+    // editor group they just created.
+    ...(node.tabs === undefined ? {} : { tabs: node.tabs }),
+  });
   const replacement: SplitNode = {
     type: "split",
     id: splitId,

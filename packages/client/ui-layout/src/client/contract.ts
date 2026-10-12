@@ -341,6 +341,18 @@ export interface PracLayoutFace {
    */
   placeQuietly(viewId: string, regionId: string): void;
   /**
+   * Forget a view's placement record.
+   *
+   * The difference between **hiding** a view and forgetting it is who still owns the
+   * subject: a hidden view is one the person put away and can bring back, while a
+   * forgotten one has nothing left to come back to (a file view whose file the app no
+   * longer has open). The record is what the frame persists, so a stale one is also what
+   * would block the same view id from being placed again.
+   *
+   * @param viewId - the view identity.
+   */
+  removeView(viewId: string): void;
+  /**
    * Give a region its child regions — the **container** shape.
    *
    * A region whose children are regions shows one of them at a time (see

@@ -1,13 +1,14 @@
 /**
  * prac-client-ui-vscode-editor — the editor package.
  *
- * Declares **one `prac.view` entry per open file** (decision 17): the app
- * contributes a file's editing surface, and this package turns the app's open-file
- * set into views. Which files are open comes from the app's own editor service
- * (an explorer click, a command, a go-to-definition); the mechanism publishes
- * that as the catalogue's `source: "file"` entries, and this package takes those —
- * the view id is `vscode:file:<resource>`, and the mapping between id and
- * resource belongs to `prac-client-vscode-host`.
+ * Declares **one `prac.view` entry per placement** (decision 17, made precise by split
+ * editors): a placement is a file in one of the app's editor groups, the app contributes
+ * that file's editing surface there, and this package turns the app's placements into
+ * views. Which files are open comes from the app's own editor service (an explorer
+ * click, a command, a go-to-definition); the mechanism publishes that as the
+ * catalogue's `source: "file"` entries, and this package takes those — the view id is
+ * `vscode:file:<placement>:<resource>`, and the mapping between id and placement belongs to
+ * `prac-client-vscode-host`.
  *
  * The mechanism arrives as an injected **service** (`ctx.pracVscode`) rather than
  * as an import, because each client plugin is bundled and inlined on its own: an
@@ -73,18 +74,23 @@ export function apply(ctx: Context): void {
 
     /** Push one view's chrome, and keep prac's front and the app's active editor aligned. */
     const sync = (): void => {
-      const entries = new Map(editors.snapshot().map((entry) => [entry.resource, entry] as const));
-      const active = layout.activeView();
       const files = fileEntries();
-      /** The view showing one resource, when prac has a placement for it. */
-      const viewOf = (resource: string | null | undefined): string | undefined =>
-        resource === null || resource === undefined
-          ? undefined
-          : files.find(({ view }) => host.fileResource(view) === resource)?.view;
+      /**
+       * The app's state by **placement** — a file in one editor group.
+       *
+       * The same file open in two regions is two entries there and two views here, so
+       * neither the resource nor the group can be the key: the resource would let one
+       * view read the other's active flag and dirty dot, and the group changes when the
+       * placement moves. The app's own token is what a placement is called.
+       */
+      const entries = new Map(editors.snapshot().map((entry) => [entry.placement, entry] as const));
+      const placementOfView = (view: string | null | undefined): string | null => {
+        if (view === null || view === undefined) return null;
+        return host.filePlacement(view)?.placement ?? null;
+      };
+      const active = layout.activeView();
       for (const { view } of files) {
-        const resource = host.fileResource(view);
-        if (resource === undefined) continue;
-        const entry = entries.get(resource);
+        const entry = entries.get(placementOfView(view) ?? "");
         layout.setViewFlags(view, {
           dirty: entry?.dirty === true,
           preview: entry?.preview === true,
@@ -93,29 +99,30 @@ export function apply(ctx: Context): void {
           closable: true,
         });
       }
-      const current = [...entries.values()].find((entry) => entry.active)?.resource ?? null;
-      const frontResource =
-        active === null || active === undefined ? null : (host.fileResource(active) ?? null);
+      const current = [...entries.values()].find((entry) => entry.active)?.placement ?? null;
+      const front = placementOfView(active);
       const frontMoved = active !== lastFront;
       const appMoved = current !== lastAppActive;
       lastFront = active;
       lastAppActive = current;
-      if (frontResource === current) return; // already in step
+      if (front === current) return; // already in step
       // **Whoever moved wins.** prac's chrome moving means a person clicked a tab, so the
       // app follows the front; the app moving means a command, a jump or the app's own UI,
       // so prac follows the app. Both moving (or neither — a boot) leaves it to the app,
       // which is the source of truth for which file is current.
-      const followFront = (): void => {
-        if (frontResource !== null) editors.actions.activate(frontResource);
-      };
       const followApp = (): void => {
-        const view = viewOf(current);
+        const view = files.find(({ view }) => placementOfView(view) === current)?.view;
         if (view !== undefined) layout.setFront(view);
-        else followFront();
       };
-      if (frontMoved && !appMoved) followFront();
-      else if (appMoved && !frontMoved) followApp();
-      else followApp();
+      // "prac moved alone" is deliberately **not** answered with an `activate` call: the
+      // frame renders a region's front view and nothing else, so a front change remounts
+      // the view, and that mount is the activation — it opens the file in its group.
+      // Activating from here instead was measured wrong: the pane focus that follows
+      // landed while the region still showed the **previous** file's host element, whose
+      // `focusin` reads as "the person works here" — so the app was pulled back to the
+      // file that was just giving up the centre, prac followed it, and the file that took
+      // the centre was left with no surface at all.
+      if (!(frontMoved && !appMoved)) followApp();
     };
     sync();
     const stopEditors = editors.subscribe(sync);

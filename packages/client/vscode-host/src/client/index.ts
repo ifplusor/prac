@@ -156,34 +156,38 @@ export function apply(ctx: Context): void {
   /**
    * The view-id prefix for one open file.
    *
-   * The *file* is the unit (decision 17), so the resource is the identity: a view
-   * id carries it, and the host — not the consumer and not the frame — is where the
-   * two vocabularies meet.
+   * The *placement* is the unit — a file in one of the app's editor groups (VS Code's
+   * split editor makes the same file two of them) — so the id carries both halves:
+   * `vscode:file:<placement>:<resource>`. The token is what tells two views of one file
+   * apart, and the resource is what a consumer recognises the file by.
    */
   const FILE_VIEW_PREFIX = "vscode:file:";
 
-  /** The view id for one app resource. */
-  const fileViewId = (resource: string): string => `${FILE_VIEW_PREFIX}${resource}`;
+  /** The view id for one placement. */
+  const fileViewId = (placement: string, resource: string): string =>
+    `${FILE_VIEW_PREFIX}${placement}:${resource}`;
 
   /**
-   * The app resource behind a file view id, or undefined for any other view.
+   * The placement behind a file view id, or undefined for any other view.
    *
-   * **Both shapes are accepted**: `vscode:file:<resource>` (one view per file) and
-   * `vscode:file:<group>:<resource>` (one view per **placement**, which the workbench
-   * needs to show one file in two regions). The parse looks for a leading integer — a URI
-   * scheme cannot start with digits, so the two are unambiguous — which means the id
+   * **Both id shapes are read**: `vscode:file:<resource>` (one view per file, the shape
+   * the frame's persisted records may still carry) and
+   * `vscode:file:<placement>:<resource>`. A placement token is `p<digits>` and a URI
+   * scheme cannot look like that, so the two are unambiguous — which means the id
    * convention can change in one place without every consumer changing with it.
    *
    * @param view - the view id.
    */
-  const resourceOfFileView = (view: string): string | undefined => {
+  const placementOfFileView = (
+    view: string,
+  ): { placement: string; resource: string } | undefined => {
     if (!view.startsWith(FILE_VIEW_PREFIX)) return undefined;
     const rest = view.slice(FILE_VIEW_PREFIX.length);
     const separator = rest.indexOf(":");
-    if (separator > 0 && /^\d+$/.test(rest.slice(0, separator))) {
-      return rest.slice(separator + 1);
+    if (separator > 0 && /^p\d+$/.test(rest.slice(0, separator))) {
+      return { placement: rest.slice(0, separator), resource: rest.slice(separator + 1) };
     }
-    return rest;
+    return { placement: "", resource: rest };
   };
 
   /**
@@ -204,12 +208,16 @@ export function apply(ctx: Context): void {
 
   const face: PracVscodeFace = {
     catalogue: (): readonly VscodeCatalogueEntry[] => {
-      const files: VscodeCatalogueEntry[] = embed.openFiles().map((resource) => ({
-        view: fileViewId(resource),
-        appId: resource,
-        title: fileTitle(resource),
+      const files: VscodeCatalogueEntry[] = embed.placements().map((placement) => ({
+        view: fileViewId(placement.placement, placement.resource),
+        appId: placement.resource,
+        title: fileTitle(placement.resource),
         source: "file",
         location: "stage",
+        // Where the app's group for this placement is shown right now (`null` until
+        // the frame renders it) — the arrangement's default placement, not a decision
+        // this package makes.
+        region: placement.region,
       }));
       const views: VscodeCatalogueEntry[] = embed.views().map((entry) => ({
         view: viewViewId(entry.id),
@@ -223,20 +231,21 @@ export function apply(ctx: Context): void {
       return [...files, ...views];
     },
     onDidChangeCatalogue: (listener: () => void) => {
-      const stopFiles = embed.onDidChangeOpenFiles(listener);
+      const stopPlacements = embed.onDidChangePlacements(listener);
       const stopViews = embed.onDidChangeViews(listener);
       return () => {
-        stopFiles();
+        stopPlacements();
         stopViews();
       };
     },
     hostFor: (view: string): (() => ReactElement | null) => {
-      const resource = resourceOfFileView(view);
-      if (resource !== undefined) return embed.file(resource);
+      const placement = placementOfFileView(view);
+      if (placement !== undefined) return embed.file(placement.placement, placement.resource);
       const vscodeView = vscodeViewIdOf(view);
       return vscodeView === undefined ? () => null : embed.view(vscodeView);
     },
-    fileResource: (view: string): string | undefined => resourceOfFileView(view),
+    filePlacement: (view: string) => placementOfFileView(view),
+    fileResource: (view: string): string | undefined => placementOfFileView(view)?.resource,
     capabilities: {
       editors: {
         snapshot: () => embed.capabilities.editors.snapshot(),

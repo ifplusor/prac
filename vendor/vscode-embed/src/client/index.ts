@@ -33,6 +33,7 @@ import type {
   DiagnosticsSnapshot,
   EditorEntry,
   EmbedBridge,
+  FilePlacement,
   PartHostFace,
   ViewCatalogueEntry,
 } from "prac-vscode";
@@ -75,10 +76,15 @@ export interface VscodeEmbedPage {
   readonly hosts: Map<string, HTMLElement>;
   /** The element hosting each view, by view id, across all consumers. */
   readonly viewHosts: Map<string, HTMLElement>;
-  /** The element hosting each open file, by resource, across all consumers. */
-  readonly fileHosts: Map<string, HTMLElement>;
   /**
-   * Open-file listeners, and the detach the face gave each one.
+   * The element hosting each **file placement**, by placement key, across all consumers.
+   *
+   * The value keeps the group and the resource the key was built from, so the face can
+   * be handed the placement it names rather than a key it would have to parse.
+   */
+  readonly fileHosts: Map<string, FileHost>;
+  /**
+   * Placement listeners, and the detach the face gave each one.
    *
    * The app boots *after* its first consumer, so a consumer can subscribe before
    * there is a face to subscribe to; the listener is recorded here and attached
@@ -86,7 +92,7 @@ export interface VscodeEmbedPage {
    * is not lost). Without this, a subscription made during boot is silently a
    * no-op and the consumer never hears about any file the app opens.
    */
-  readonly openFileListeners: Map<() => void, (() => void) | undefined>;
+  readonly placementListeners: Map<() => void, (() => void) | undefined>;
   /** View-catalogue listeners, recorded until the face arrives (same reason). */
   readonly viewCatalogueListeners: Map<() => void, (() => void) | undefined>;
   /** Subscribers to the `editors` capability, recorded until the face arrives. */
@@ -122,7 +128,7 @@ function page(): VscodeEmbedPage {
     hosts: new Map(),
     viewHosts: new Map(),
     fileHosts: new Map(),
-    openFileListeners: new Map(),
+    placementListeners: new Map(),
     viewCatalogueListeners: new Map(),
     editorsListeners: new Map(),
     diagnosticsListeners: new Map(),
@@ -144,10 +150,38 @@ function mountView(record: VscodeEmbedPage, viewId: string, element: HTMLElement
   record.face?.mountViewInto(viewId, element);
 }
 
-/** Enter one file into the record and, if the face is up, have it mounted here. */
-function mountFile(record: VscodeEmbedPage, resource: string, element: HTMLElement): void {
-  record.fileHosts.set(resource, element);
-  record.face?.mountFileInto(resource, element);
+/** Enter one file placement into the record and, if the face is up, have it mounted. */
+function mountFile(
+  record: VscodeEmbedPage,
+  placement: string,
+  resource: string,
+  element: HTMLElement,
+): void {
+  record.fileHosts.set(placementKey(placement, resource), { placement, resource, element });
+  record.face?.mountFileInto(placement, resource, element);
+}
+
+/** One file placement's host element, as the page record holds it. */
+interface FileHost {
+  /** The placement token, as the workbench handed it out. */
+  readonly placement: string;
+  /** The file's URI, as a string. */
+  readonly resource: string;
+  /** The element the consumer rendered for this placement's view. */
+  readonly element: HTMLElement;
+}
+
+/**
+ * The key one file placement is held under.
+ *
+ * The placement — a file in one group — is what a host element shows, so the file
+ * alone cannot be the key: the same file open in two groups is two hosts at once.
+ *
+ * @param group - the group holding the file.
+ * @param resource - the file's URI, as a string.
+ */
+function placementKey(placement: string, resource: string): string {
+  return `${placement}\u0000${resource}`;
 }
 
 export interface VscodeEmbedOptions {
@@ -219,26 +253,39 @@ export interface VscodeEmbedHandle {
    */
   view(viewId: string): () => ReactElement;
   /**
-   * The seat component for **one open file**.
+   * The seat component for **one file placement**.
    *
-   * The unit is the file (decision 17): the app contributes one file's editing
-   * surface, while which files are open, how they are grouped and what the tab
-   * strip looks like stay the consumer's business. Unmounting releases the
-   * surface, so the same file can be shown again elsewhere.
+   * The unit is the placement — a file in one editor group (decision 17, made precise
+   * by split editors): the app contributes one file's editing surface per group showing
+   * it, while which files are open, how they are grouped and what the tab strip looks
+   * like stay the consumer's business. The token is what tells two placements of the
+   * same file apart, and what decides where the editor goes: the embedder renders one
+   * seat per placement, and a seat rendered in another region moves that placement's
+   * surface there rather than opening a second editor. Unmounting releases the surface,
+   * so the same placement can be shown again elsewhere.
    *
+   * @param placement - the placement token, from the `editors` capability or
+   * {@link placements}.
    * @param resource - the file's URI as the app reports it (`listOpenFiles`).
    * @returns a component rendering the host element the file is mounted into.
    */
-  file(resource: string): () => ReactElement;
-  /** The files the app currently has open, as URI strings. */
-  openFiles(): string[];
+  file(placement: string, resource: string): () => ReactElement;
   /**
-   * Subscribe to changes in the open-file set.
+   * The file placements the app currently has open.
    *
-   * @param listener - called when the set changed; re-read {@link openFiles}.
+   * Read live from the face, so it is empty until the app boots. A placement is a file
+   * in one group; the same file in two groups is two of these.
+   */
+  placements(): readonly FilePlacement[];
+  /**
+   * Subscribe to changes in the placement set.
+   *
+   * @param listener - called when the set changed; re-read {@link placements}.
    * @returns a function that unsubscribes.
    */
-  onDidChangeOpenFiles(listener: () => void): () => void;
+  onDidChangePlacements(listener: () => void): () => void;
+  /** The files the app currently has open, as URI strings (placement-blind). */
+  openFiles(): string[];
   /**
    * The views the app currently offers, across every container.
    *
@@ -447,16 +494,16 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
                 for (const [partId, element] of record.hosts) face.movePartInto(partId, element);
                 for (const [viewId, element] of record.viewHosts)
                   face.mountViewInto(viewId, element);
-                for (const [resource, element] of record.fileHosts)
-                  face.mountFileInto(resource, element);
+                for (const { placement, resource, element } of record.fileHosts.values())
+                  face.mountFileInto(placement, resource, element);
                 // Attach the listeners that arrived before the app did, then let
                 // them read the set once.
-                for (const [listener, detach] of record.openFileListeners) {
+                for (const [listener, detach] of record.placementListeners) {
                   if (detach === undefined) {
-                    record.openFileListeners.set(listener, face.onDidChangeOpenFiles(listener));
+                    record.placementListeners.set(listener, face.onDidChangePlacements(listener));
                   }
                 }
-                for (const listener of record.openFileListeners.keys()) listener();
+                for (const listener of record.placementListeners.keys()) listener();
                 for (const [listener, detach] of record.viewCatalogueListeners) {
                   if (detach === undefined) {
                     record.viewCatalogueListeners.set(listener, face.onDidChangeViews(listener));
@@ -632,26 +679,37 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
     };
   };
 
-  const file = (resource: string): (() => ReactElement) => {
+  const file = (placement: string, resource: string): (() => ReactElement) => {
+    const key = placementKey(placement, resource);
     return function VscodeFileHost(): ReactElement {
       const ref = useRef<HTMLDivElement | null>(null);
       useEffect(() => {
         const element = ref.current;
         if (!element) return undefined;
         const stopTheme = deliverThemeToHost(element);
-        mountFile(record, resource, element);
+        mountFile(record, placement, resource, element);
         // The app follows *its* active editor, and the embedder knows which region
         // the person is working in — so focus has to travel back up. Without this
         // the Outline (and every command) would keep describing whichever file was
-        // mounted last.
-        const onFocusIn = (): void => record.face?.focusFile(resource);
+        // mounted last. The placement, not the file: the same file can be shown in
+        // two regions, and only the focused one is where the person is working.
+        const onFocusIn = (): void => {
+          // A view the frame has **detached** is not where the person is working. While
+          // a region swaps its body, the group's element is re-parented between the two
+          // file hosts, and a pane focus landing inside the detached one raised a
+          // `focusin` that read as "work here" — measured, it pulled the app's active
+          // editor back to the file that was just giving up the centre, and prac then
+          // followed it, leaving the new file's view with no surface.
+          if (!element.isConnected) return;
+          record.face?.focusFile(placement, resource);
+        };
         element.addEventListener("focusin", onFocusIn);
         return () => {
           element.removeEventListener("focusin", onFocusIn);
           stopTheme?.();
-          if (record.fileHosts.get(resource) !== element) return;
-          record.fileHosts.delete(resource);
-          record.face?.releaseFile(resource);
+          if (record.fileHosts.get(key)?.element !== element) return;
+          record.fileHosts.delete(key);
+          record.face?.releaseFile(placement, resource);
         };
       }, []);
       return createElement("div", {
@@ -661,6 +719,7 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
         // the editor chrome's rules are scoped under.
         className: WORKBENCH_CONTEXT,
         "data-vscode-embed-file": resource,
+        "data-vscode-embed-placement": placement,
         style: {
           position: "relative",
           width: "100%",
@@ -728,15 +787,16 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
     view,
     file,
     capabilities: { editors, diagnostics },
-    openFiles: () => record.face?.listOpenFiles() ?? [],
-    onDidChangeOpenFiles: (listener: () => void): (() => void) => {
-      const detach = record.face?.onDidChangeOpenFiles(listener);
-      record.openFileListeners.set(listener, detach);
+    placements: () => record.face?.listPlacements() ?? [],
+    onDidChangePlacements: (listener: () => void): (() => void) => {
+      const detach = record.face?.onDidChangePlacements(listener);
+      record.placementListeners.set(listener, detach);
       return () => {
-        record.openFileListeners.delete(listener);
+        record.placementListeners.delete(listener);
         detach?.();
       };
     },
+    openFiles: () => record.face?.listOpenFiles() ?? [],
     views: () => record.face?.listViews() ?? [],
     onDidChangeViews: (listener: () => void): (() => void) => {
       const detach = record.face?.onDidChangeViews(listener);

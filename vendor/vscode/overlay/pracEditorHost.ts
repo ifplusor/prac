@@ -276,6 +276,36 @@ export class PracEditorHost
   }
 
   /**
+   * The group with this identifier, typed as prac's own group.
+   *
+   * {@link getGroup} answers the interface's question (`IEditorGroupView | undefined`);
+   * a caller that holds an identifier the embedder named wants prac's group, because
+   * that is the object whose element and region the host moves.
+   *
+   * @param identifier - the group's identifier.
+   * @returns the group, or `undefined` when the host never made one.
+   */
+  groupById(identifier: number): PracEditorGroup | undefined {
+    return this._groups.find((group) => group.id === identifier);
+  }
+
+  /**
+   * Record that a group is now shown in another region.
+   *
+   * A group's element moves with its view (see `mountFileInto`): the region is where
+   * the group is *shown*, not what the group is, so a view that moved regions keeps its
+   * group — and therefore its identity — and only this mapping changes. The mapping is
+   * what the `editors` capability reports as a placement's region and what
+   * {@link removeGroupByRegion} looks a group up by, so it has to follow the element.
+   *
+   * @param group - the group that moved.
+   * @param region - the region it is shown in now.
+   */
+  rehomeGroup(group: PracEditorGroup, region: string): void {
+    this._regions.set(group.id, region);
+  }
+
+  /**
    * The group that belongs to a prac region, if that region holds files.
    *
    * @param region - the region id.

@@ -780,7 +780,11 @@ export function createFrame(store: LayoutStore): (props: FrameProps) => ReactEle
           ? [tabStrip(views, node.id), viewBody(frontView(state, node.id) ?? views[0] ?? "", box)]
           : stacked
             ? views.map((viewId) => stackEntry(viewId, box))
-            : views.slice(0, 1).map((viewId) => viewBody(viewId, box)),
+            : // No strip: the region still shows its **front** view. It used to take the
+              // first by order, which is a different question — measured with a region a
+              // view had just been split into: the file that was copied in was front, the
+              // region rendered its neighbour, and the new file's view got no surface.
+              [viewBody(frontView(state, node.id) ?? views[0] ?? "", box)],
       );
     };
 

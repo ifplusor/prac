@@ -1,9 +1,11 @@
 /**
- * Verification of **file-level** hosting: one file's editing surface inside prac's
+ * Verification of **placement-level** hosting: one file's editing surface inside prac's
  * own editor group, in the region the frame renders it in.
  *
- * The unit is the file, because prac owns which files are open, how they are grouped
- * and the tab strip. What this gate refuses to take on faith:
+ * The unit is the **placement** — a file in one of the app's editor groups — because
+ * prac owns which files are open, how they are grouped and the tab strip, while the app
+ * owns how many groups hold each file (VS Code's Split Editor makes that two). What this
+ * gate refuses to take on faith:
  *
  *  1. **a real editing surface** — the workbench's own text model for the file in a
  *     `CodeEditorWidget`: the rendered lines are that file's text, and the
@@ -15,7 +17,10 @@
  *     second group showing its own file;
  *  4. **close + reopen** — closing the file releases the surface, and the app's next
  *     open builds a fresh one, with a failed mount reported rather than thrown at the
- *     embedder.
+ *     embedder;
+ *  5. **one file in two groups** — the app's own split copies the editor into a second
+ *     group, and prac answers with two placements, two views and two surfaces (the same
+ *     text, twice), rather than one view torn between two hosts.
  *
  * The gate writes its own fixture files and opens them by URI, so it depends on
  * neither the folder the app happens to have open nor on this repository's contents.
@@ -23,7 +28,7 @@
  * Usage: URL='http://127.0.0.1:3084/?token=...' node scripts/verify-file.mjs
  */
 import { createRequire } from "node:module";
-import { installDeepDom } from "./deep-dom.mjs";
+import { installDeepDom, resourceOfFileView } from "./deep-dom.mjs";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
@@ -277,8 +282,8 @@ const activeAfterClick = await page.evaluate(
 // one surface each — VS Code's model, with prac's regions as its grid.
 step("split region");
 await page.evaluate(
-  (view) => globalThis.__pracLayout.splitView(view, "right"),
-  `vscode:file:${uriOf(FILE_A)}`,
+  (resource) => globalThis.__pracLayout.splitView(globalThis.__pracFileView(resource), "right"),
+  uriOf(FILE_A),
 );
 await waitForSurface(uriOf(FILE_A));
 await page.waitForTimeout(1500);
@@ -286,8 +291,8 @@ const split = await liveSurfaces();
 // …and moving it back leaves one region, so one group shows it again.
 step("merge region");
 await page.evaluate(
-  (view) => globalThis.__pracLayout.place(view, "stage"),
-  `vscode:file:${uriOf(FILE_A)}`,
+  (resource) => globalThis.__pracLayout.place(globalThis.__pracFileView(resource), "stage"),
+  uriOf(FILE_A),
 );
 await waitForSurface(uriOf(FILE_A));
 await page.waitForTimeout(1500);
@@ -317,9 +322,9 @@ const reopened = await measure(uriOf(FILE_A));
 await page.evaluate((uri) => {
   const face = globalThis.__vscodeEmbed.face;
   const events = [];
-  globalThis.__openFileProbe = { events, before: face.listOpenFiles() };
-  globalThis.__stopOpenFileProbe = face.onDidChangeOpenFiles(() => {
-    events.push(face.listOpenFiles());
+  globalThis.__openFileProbe = { events, before: face.listPlacements() };
+  globalThis.__stopOpenFileProbe = face.onDidChangePlacements(() => {
+    events.push(face.listPlacements());
   });
   face.openFile(uri);
   face.openUntitled();
@@ -329,7 +334,7 @@ step("app opens a file");
 const opened = await page.evaluate(() => ({
   before: globalThis.__openFileProbe.before,
   events: globalThis.__openFileProbe.events,
-  after: globalThis.__vscodeEmbed.face.listOpenFiles(),
+  after: globalThis.__vscodeEmbed.face.listPlacements(),
 }));
 await page.evaluate(() => globalThis.__stopOpenFileProbe?.());
 
@@ -353,7 +358,7 @@ const capability = () =>
     const editors = globalThis.__vscodeEmbed.face.capabilities.editors;
     // The chrome the seat pushes from this capability: a tab's dot.
     const tabs = [...globalThis.__deep.all("[data-prac-tab]")].map((element) => ({
-      resource: element.getAttribute("data-prac-tab")?.replace(/^vscode:file:/, "") ?? null,
+      resource: globalThis.__pracFileResource(element.getAttribute("data-prac-tab") ?? ""),
       dirty: element.getAttribute("data-prac-tab-dirty") === "true",
       preview: element.getAttribute("data-prac-tab-preview") === "true",
     }));
@@ -374,8 +379,8 @@ if (activeResource === null) throw new Error("no active editor to exercise the c
 // `activate`. Both halves matter: prac's front view and the app's active editor are
 // two states, and the UI keeps them in step through this action.
 await page.evaluate(
-  (view) => globalThis.__pracLayout.place(view, "stage"),
-  `vscode:file:${activeResource}`,
+  (resource) => globalThis.__pracLayout.place(globalThis.__pracFileView(resource), "stage"),
+  activeResource,
 );
 await page.waitForTimeout(1500);
 await page.evaluate(
@@ -440,7 +445,9 @@ const capabilityUndone = await capability();
 // The criterion the whole layer rests on: the same answer with the view hidden —
 // which also *releases* that file's surface (the seat unmounts), so the app is the
 // only thing left that knows the file is open.
-await page.evaluate((view) => globalThis.__pracLayout.hide(view), `vscode:file:${surfaceResource}`);
+await page.evaluate((resource) => {
+  globalThis.__pracLayout.hide(globalThis.__pracFileView(resource));
+}, surfaceResource);
 await page.waitForTimeout(1500);
 const capabilityHidden = await capability();
 // Closing the editor is an action of the capability, and the view follows.
@@ -502,6 +509,83 @@ const reloaded = await page.evaluate(() => ({
     globalThis.__pracLayout.getState().views["dsh:main:conversation"]?.region ?? null,
 }));
 
+// The unit of a view is the **placement** — a file in one of the app's editor groups
+// — not the file. VS Code's own split copies the editor into a second group, and prac
+// has to answer with two placements, two views and two surfaces; one view torn between
+// two hosts (or a second view with no surface) is the failure this catches.
+step("split editor");
+await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), uriOf(FILE_A));
+await waitForSurface(uriOf(FILE_A));
+await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), uriOf(FILE_B));
+await waitForSurface(uriOf(FILE_B));
+await page.waitForTimeout(2000);
+// The second group is made the way prac makes one — a region split — and then the app's
+// own command copies the active editor into it. (`addGroup` is deliberately not the way:
+// prac owns the region tree, so a group the workbench makes on its own would have no
+// region until the frame renders a view for it.)
+await page.evaluate(
+  (resource) => globalThis.__pracLayout.splitView(globalThis.__pracFileView(resource), "right"),
+  uriOf(FILE_B),
+);
+await page.waitForTimeout(3000);
+// A comes back to the front of the centre, and a click in its surface makes that region's
+// group the app's **active** one — which is what decides whose editor the command copies
+// (a split copies the active editor, and the split just made the other group active).
+await page.evaluate(
+  (resource) => globalThis.__pracLayout.place(globalThis.__pracFileView(resource), "stage"),
+  uriOf(FILE_A),
+);
+await waitForSurface(uriOf(FILE_A));
+await page.waitForTimeout(2500);
+const centre = await page.evaluate((uri) => {
+  const element = globalThis.__deep.one(`[data-vscode-embed-file="${uri}"]`);
+  const box = element?.getBoundingClientRect();
+  return box === undefined
+    ? null
+    : { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) };
+}, uriOf(FILE_A));
+if (centre === null) throw new Error("the centre shows no surface to click");
+await page.mouse.click(centre.x, centre.y);
+await page.waitForTimeout(2000);
+const splitRan = await page.evaluate(async () => {
+  try {
+    await globalThis.__vscodeEmbed.commands.executeCommand(
+      "workbench.action.splitEditorToNextGroup",
+    );
+    return "ran";
+  } catch (error) {
+    return `threw: ${String(error).slice(0, 120)}`;
+  }
+});
+await page.waitForFunction(
+  (resource) =>
+    globalThis.__vscodeEmbed.face
+      .listPlacements()
+      .filter((placement) => placement.resource === resource).length === 2,
+  uriOf(FILE_A),
+  { timeout: 60_000 },
+);
+await page.waitForTimeout(3000);
+const copied = await page.evaluate(
+  (resource) => ({
+    placements: globalThis.__vscodeEmbed.face
+      .listPlacements()
+      .filter((placement) => placement.resource === resource),
+    views: globalThis.__pracFileViews(resource),
+    surfaces: globalThis.__deep.all(`[data-vscode-embed-file="${resource}"]`).map((element) => ({
+      placement: element.getAttribute("data-vscode-embed-placement"),
+      groups: element.querySelectorAll(".prac-editor-group").length,
+      region:
+        globalThis.__deep
+          .closest(element, "[data-prac-region]")
+          ?.getAttribute("data-prac-region") ?? null,
+      lines: element.querySelectorAll(".view-line").length,
+      text: (element.querySelector(".view-lines")?.textContent ?? "").replace(/\u00a0/g, " "),
+    })),
+  }),
+  uriOf(FILE_A),
+);
+
 await browser.close();
 
 const painted = (colours) => typeof colours === "number" && colours > 4;
@@ -533,7 +617,8 @@ const checks = {
     backSurfaces.length === 1 &&
     backSurfaces[0].resource === uriOf(FILE_A),
   clickedTabIsTheAppsActiveEditor:
-    activeAfterClick === clicked.find((tab) => tab.active)?.id.replace(/^vscode:file:/, ""),
+    activeAfterClick !== null &&
+    activeAfterClick === resourceOfFileView(clicked.find((tab) => tab.active)?.id ?? ""),
   // 5. A region of its own is a second group: both files are shown at once, one
   // surface each, in two different regions — and merging back is one region again.
   secondRegionIsASecondGroup:
@@ -624,6 +709,19 @@ const checks = {
     second.mountErrors === 0 &&
     back.mountErrors === 0 &&
     reopened.mountErrors === 0,
+  // 11. Split editor: one file, two placements, two views, two surfaces. The app
+  // reports the *placement* (a file in a group), prac gives each its own view, and
+  // each view gets its own editing surface — the same file, twice.
+  splitEditorCopiesThePlacement:
+    splitRan === "ran" &&
+    copied.placements.length === 2 &&
+    new Set(copied.placements.map((placement) => placement.group)).size === 2,
+  twoPlacementsAreTwoViews: copied.views.length === 2,
+  twoViewsAreTwoSurfaces:
+    copied.surfaces.length === 2 &&
+    copied.surfaces.every((surface) => surface.lines > 3) &&
+    copied.surfaces.every((surface) => surface.text.includes(FILE_A.marker)) &&
+    new Set(copied.surfaces.map((surface) => surface.region)).size === 2,
 };
 
 console.log(
@@ -649,6 +747,7 @@ console.log(
         mountMessages: mounted.mountMessages,
       },
       opened: { before: opened.before, after: opened.after, eventCount: opened.events.length },
+      copied,
       reloaded,
       diagnostics: diagnosticsProbe,
       capability: {
