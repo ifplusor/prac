@@ -590,6 +590,23 @@ const copied = await page.evaluate(
   uriOf(FILE_A),
 );
 
+// The workbench's directional group lookups are geometry, and the frame owns the tree: asking
+// for the group to the left/right has to land in the region that actually sits there. The
+// signal is the focused element's region — the editors capability's `active` flag is per group
+// and cannot tell them apart (measured: both placements report active).
+step("focus the group to the left and to the right");
+const focusRegion = async (command) => {
+  await page.evaluate((name) => globalThis.__vscodeEmbed.commands.executeCommand(name), command);
+  await page.waitForTimeout(2500);
+  return page.evaluate(() => {
+    const element = document.activeElement;
+    const region = element ? globalThis.__deep.closest(element, "[data-prac-region]") : null;
+    return region?.getAttribute("data-prac-region") ?? null;
+  });
+};
+const focusedLeft = await focusRegion("workbench.action.focusLeftGroup");
+const focusedRight = await focusRegion("workbench.action.focusRightGroup");
+
 // Closing a tab closes **that placement**, not the resource: the app's own semantics
 // (upstream closes one group's editor instance and leaves the other group's alone), and the
 // reason `close` takes a placement rather than a URI.
@@ -741,6 +758,14 @@ const checks = {
   // each view gets its own editing surface — the same file, twice.
   // 12. Closing one placement leaves the other one open, with its own surface: the tab asked
   // about one editor instance, and the resource is still open in the app afterwards.
+  // 11b. Directional focus follows the region tree: LEFT lands in the region the split made on
+  // the left (the one that was already there) and RIGHT in the new one beside it.
+  directionalFocusFollowsTheTree:
+    copied.placements.length === 2 &&
+    focusedLeft === mounted.region &&
+    focusedRight !== null &&
+    focusedRight !== mounted.region &&
+    copied.placements.some((placement) => placement.region === focusedRight),
   onePlacementClosedNotTheResource:
     closedOne.placements.length === 1 &&
     closedOne.placements[0] !== closedOne.closed &&
@@ -779,6 +804,8 @@ console.log(
         afterSecond,
         split,
         closedOne,
+      focusedLeft,
+      focusedRight,
         merged,
         closed,
         mountMessages: mounted.mountMessages,
