@@ -62,7 +62,8 @@ import { onUnexpectedError } from "../../base/common/errors.js";
 import { Direction, Grid, ISerializableView, IViewSize } from "../../base/browser/ui/grid/grid.js";
 import { Part } from "./part.js";
 import { ViewPane } from "./parts/views/viewPane.js";
-import { PracEditorHost, setGroupRegionFactory } from "./pracEditorHost.js";
+import { PracEditorHost, setGroupRegionChannel } from "./pracEditorHost.js";
+import type { GroupRegionChannel } from "./pracEditorHost.js";
 import type { PracEditorGroup } from "./pracEditorGroup.js";
 import { IMarkerService, MarkerSeverity } from "../../platform/markers/common/markers.js";
 import type { IMarker } from "../../platform/markers/common/markers.js";
@@ -477,15 +478,10 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
             },
             /**
              * The app's region channel for `addGroup` (see `pracEditorHost`'s
-             * `setGroupRegionFactory`): prac's frame owns the region tree, so the workbench asks
+             * `setGroupRegionChannel`): prac's frame owns the region tree, so the workbench asks
              * the app to make the region a new group will live in.
              */
-            setGroupRegionFactory: (
-              factory: (
-                region: string,
-                side: "left" | "right" | "up" | "down",
-              ) => string | undefined,
-            ) => setGroupRegionFactory(factory),
+            setGroupRegionChannel: (channel: GroupRegionChannel) => setGroupRegionChannel(channel),
             listPlacements: () => this.listPlacements(),
             onDidChangePlacements: (listener: () => void) => this.onDidChangePlacements(listener),
             listOpenFiles: () => this.listOpenFiles(),

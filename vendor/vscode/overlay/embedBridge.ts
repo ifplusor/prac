@@ -226,9 +226,10 @@ export interface PartHostFace {
    *
    * @param factory - the frame's split, as a synchronous question.
    */
-  setGroupRegionFactory: (
-    factory: (region: string, side: "left" | "right" | "up" | "down") => string | undefined,
-  ) => void;
+  setGroupRegionChannel: (channel: {
+    createRegionBeside(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+    regionInDirection(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+  }) => void;
   /**
    * Subscribe to changes in the placement set.
    *

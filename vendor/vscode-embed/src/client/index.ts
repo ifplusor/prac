@@ -73,10 +73,10 @@ export interface VscodeEmbedPage {
   /** The app's part-hosting face, once its service graph has restored. */
   face?: PartHostFace;
   /** The app's region channel, kept until the workbench publishes a face to hand it to. */
-  groupRegionFactory?: (
-    region: string,
-    side: "left" | "right" | "up" | "down",
-  ) => string | undefined;
+  groupRegionChannel?: {
+    createRegionBeside(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+    regionInDirection(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+  };
   /** The element hosting each part, by part id, across all consumers. */
   readonly hosts: Map<string, HTMLElement>;
   /** The element hosting each view, by view id, across all consumers. */
@@ -289,9 +289,10 @@ export interface VscodeEmbedHandle {
    *
    * @param factory - the frame's split, as a synchronous question.
    */
-  setGroupRegionFactory(
-    factory: (region: string, side: "left" | "right" | "up" | "down") => string | undefined,
-  ): void;
+  setGroupRegionChannel(channel: {
+    createRegionBeside(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+    regionInDirection(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+  }): void;
   /**
    * Subscribe to changes in the placement set.
    *
@@ -513,8 +514,8 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
                 record.face = face;
                 // The app may install the region channel before the workbench publishes its
                 // face (it boots asynchronously); hand it over then.
-                if (record.groupRegionFactory !== undefined) {
-                  face.setGroupRegionFactory(record.groupRegionFactory);
+                if (record.groupRegionChannel !== undefined) {
+                  face.setGroupRegionChannel(record.groupRegionChannel);
                 }
                 for (const [partId, element] of record.hosts) face.movePartInto(partId, element);
                 for (const [viewId, element] of record.viewHosts)
@@ -813,11 +814,15 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
     file,
     capabilities: { editors, diagnostics },
     placements: () => record.face?.listPlacements() ?? [],
-    setGroupRegionFactory: (
-      factory: (region: string, side: "left" | "right" | "up" | "down") => string | undefined,
-    ): void => {
-      record.groupRegionFactory = factory;
-      record.face?.setGroupRegionFactory(factory);
+    setGroupRegionChannel: (channel: {
+      createRegionBeside(
+        region: string,
+        side: "left" | "right" | "up" | "down",
+      ): string | undefined;
+      regionInDirection(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+    }): void => {
+      record.groupRegionChannel = channel;
+      record.face?.setGroupRegionChannel(channel);
     },
     onDidChangePlacements: (listener: () => void): (() => void) => {
       const detach = record.face?.onDidChangePlacements(listener);

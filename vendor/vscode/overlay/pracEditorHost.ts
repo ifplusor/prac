@@ -105,19 +105,26 @@ export const UNSUPPORTED_HOST_OPERATIONS = [
  * one embedded workbench per page and the host is built through the service collection, which
  * has no seam for an app-supplied callback.
  */
-let groupRegionFactory:
-  | ((region: string, side: "left" | "right" | "up" | "down") => string | undefined)
-  | undefined;
+/** prac's split sides, as the workbench's directions map onto them. */
+export type PracSide = "left" | "right" | "up" | "down";
+
+/** What the workbench asks the frame, because the region tree is the frame's. */
+export interface GroupRegionChannel {
+  /** Split a region and return the new region's id, or undefined when it cannot. */
+  createRegionBeside(region: string, side: PracSide): string | undefined;
+  /** The region adjacent to another one in a direction, or undefined when there is none. */
+  regionInDirection(region: string, side: PracSide): string | undefined;
+}
+
+let groupRegionChannel: GroupRegionChannel | undefined;
 
 /**
- * Install the app's region channel (see {@link groupRegionFactory}).
+ * Install the app's region channel (see {@link groupRegionChannel}).
  *
- * @param factory - splits a region and returns the new region's id, or undefined when it cannot.
+ * @param channel - the frame's answers, as synchronous questions.
  */
-export function setGroupRegionFactory(
-  factory: (region: string, side: "left" | "right" | "up" | "down") => string | undefined,
-): void {
-  groupRegionFactory = factory;
+export function setGroupRegionChannel(channel: GroupRegionChannel): void {
+  groupRegionChannel = channel;
 }
 
 /** prac's split side for an upstream group direction. */
@@ -436,9 +443,9 @@ export class PracEditorHost
     const region = from === undefined ? undefined : this.regionOf(from as PracEditorGroup);
     const side = sideOfDirection(direction);
     const created =
-      region === undefined || groupRegionFactory === undefined
+      region === undefined || groupRegionChannel === undefined
         ? undefined
-        : groupRegionFactory(region, side);
+        : groupRegionChannel.createRegionBeside(region, side);
     if (created === undefined) {
       this.logService.info(
         "vscode-embed: addGroup — no app region channel (or no source region); the active group is returned",
@@ -525,10 +532,25 @@ export class PracEditorHost
       return wrap === true ? (step === 1 ? groups[0] : groups[groups.length - 1]) : undefined;
     }
     if (typeof scope.direction === "number") {
-      this.logService.info(
-        `vscode-embed: directional group lookup (${scope.direction}) needs the region tree's geometry; not answered`,
-      );
-      return undefined;
+      // Directional lookups are geometry, and the tree is the frame's (see the channel above).
+      const from =
+        source === undefined
+          ? this._activeGroup
+          : typeof source === "number"
+            ? this.getGroup(source)
+            : (source as IEditorGroupView);
+      const region = from === undefined ? undefined : this.regionOf(from as PracEditorGroup);
+      const neighbour =
+        region === undefined || groupRegionChannel === undefined
+          ? undefined
+          : groupRegionChannel.regionInDirection(region, sideOfDirection(scope.direction));
+      if (neighbour === undefined) {
+        this.logService.info(
+          `vscode-embed: directional group lookup (${scope.direction}) found no neighbour`,
+        );
+        return undefined;
+      }
+      return this.groupForRegion(neighbour);
     }
     if (source === undefined) return this._requireActiveGroup();
     return typeof source === "number" ? this.getGroup(source) : (source as IEditorGroupView);

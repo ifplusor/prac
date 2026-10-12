@@ -144,7 +144,10 @@ export function apply(ctx: Context): void {
 
   // The workbench's `addGroup` needs prac's region tree: a group is a region, so the frame
   // makes the region (synchronously) and the host binds the group to the id it returns.
-  embed.setGroupRegionFactory((region, side) => ctx.pracLayout.createRegionBeside(region, side));
+  embed.setGroupRegionChannel({
+    createRegionBeside: (region, side) => ctx.pracLayout.createRegionBeside(region, side),
+    regionInDirection: (region, side) => ctx.pracLayout.regionInDirection(region, side),
+  });
 
   /** Boot the app for the active workspace; true once it is running. */
   const boot = (): boolean => {
