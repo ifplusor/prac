@@ -24,6 +24,18 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface SlotMap {
     /** prac's slot: a `root`-scoped list slot every prac surface declares one view into. */
     "prac.view": { kind: "list"; scope: "root" };
+    // The child slots of the `root` slot prac registers — declared by their **owner**, which
+    // is the frame (see the `ui-slots` contract: a slot table is merged by the plugin that
+    // owns the slot, and reading entries stays string-keyed and dynamic). prac owns the frame
+    // here: it publishes `ctx.layout` and makes the one `root` registration, so these four
+    // belong in this package rather than being borrowed from DSH's own `ui-layout` — a
+    // consumer that reads a key owned by another package would have to have that package's
+    // declarations in the same module record, which is exactly the kind of coupling this
+    // ownership split removes.
+    sidebar: { kind: "single"; scope: "root" };
+    main: { kind: "keyed"; scope: "root" };
+    rightbar: { kind: "single"; scope: "root" };
+    "shell.overlay": { kind: "list"; scope: "root" };
   }
 }
 

@@ -34,8 +34,12 @@ import { createElement, useEffect, useRef, useState, useSyncExternalStore } from
 import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
-import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
-import type { ILayout } from "@deepseek-ai/dsh-client-ui-layout/client";
+// Type-only, for its declarations: `ui-renderer` owns `Context.slots` (its `SlotRegistry`),
+// and naming the plugin whose service this file drives is what puts that member — and the
+// registration surface hanging off it — in this program. The slot *keys* are declared by
+// whichever package owns them (the mechanism declares the `root` children it registers,
+// including `shell.overlay`), so nothing here re-imports a key's owner for comparison.
+import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { Side } from "prac-client-ui-layout/client";
 // Types only, for its `Context` merge (`ctx.pracVscode`): the arrangement follows
 // the app's open-file set, and naming the face puts that service in this program.
@@ -581,17 +585,13 @@ function RecallSurface({ layout, onFocus }: RecallSurfaceProps): ReactElement | 
  * @param ctx - the Cordis client context.
  */
 export function apply(ctx: Context): void {
-  // The two services this arrangement drives, named through their published
-  // types: the mechanism's placement face and DSH's layout face (which the
-  // mechanism publishes as a compat shim).
+  // The two services this arrangement drives: the mechanism's placement face, and the layout
+  // face it publishes as a compat shim. Both are read off the **augmented `Context`** and
+  // deliberately not re-imported for comparison — a slot table's keys come from the package
+  // that *owns* them (the mechanism declares the `root` children it registers, including
+  // `shell.overlay` below), so this file needs no DSH slot/layout types of its own.
   const layout: PracLayout = ctx.pracLayout;
-  const slots: SlotRegistry = ctx.slots;
-  // The seam this arrangement sits on, stated once: the mechanism publishes DSH's
-  // layout face (the shim DSH's own plugins call), and importing that face is also
-  // what puts DSH's own slot keys in this program — `shell.overlay`, which the two
-  // surfaces below register into. `satisfies` is not erased: the expression is
-  // evaluated, so `layout` is a declared injection below.
-  ctx.layout satisfies ILayout;
+  const slots = ctx.slots;
   const focus = createFocus();
   arrange(layout);
 
