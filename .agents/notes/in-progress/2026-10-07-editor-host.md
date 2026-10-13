@@ -47,6 +47,7 @@ status: in-progress
 
 - **组头**（tab 条 + 面包屑）：tab 按决定 17 归 prac（区域的 tab 条已有），**面包屑挂在组头上**——是先让 prac 的 tab 条只做 tab、把组头其余部分搬进来，还是另行处理，单独裁一次。
 - **未支持清单的表达**：放在启动日志、一条活体门，还是两者都要。
+- **区域的移除是个缺失的能力**（2026-10-13 量清，待裁）：prac 能**建**区域（`createRegionBeside`），却**不能移除**区域 —— `PracEditorHost.removeGroup` 只把组从登记表里摘掉、从不要求 frame 删区域，frame 侧也没有对应的树操作。后果有两层：关掉侧组里最后一个文件后，那个组（与区域）留在屏幕上、只剩一条**没有 `×`** 的占位 tab（上游"关掉最后一个编辑器就移除该组"的 `closeEmptyGroups` 是它自己 `EditorGroupView` 的事，我们的 `PracEditorGroup` 不继承那段）；而那个**空组会占住活动组**，于是 `Open to the Side` 从活动编辑器解析不到资源、**静默什么都不做**（实测：state 零变化、`addGroup` 一次都没被调用）。要补的是一整套：frame 的 `removeRegion`（分裂只剩一个孩子时并回父级）+ 通道 + `removeGroup` 里的调用 + 在 closeEmptyGroups 的位置触发；验收是"关掉侧组最后一个文件 ⇒ 区域消失，随后的 Open to the Side 正常"。
 - **身份改造之后的三件事已定**（tab / 脏标记 / 关闭，"按放置"这一句裁决落在关闭上）：
   - **tab**：按放置（一个放置一个 `vscode:file:<placement>:<resource>` view，tab 由它所在的区域渲染）。
   - **脏标记**：按**模型**（资源）。VS Code 的脏是 `ITextFileEditorModel` 的属性，两个放置共享同一个模型 ⇒ 两个 tab 显示同一个脏点；按放置算会是假信息。
