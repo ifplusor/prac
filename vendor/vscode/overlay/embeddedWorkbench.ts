@@ -1454,7 +1454,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     const entryOf = (
       editor: EditorInput,
       groupId: GroupIdentifier,
-      previews: ReadonlySet<EditorInput>,
+      previews: ReadonlySet<string>,
       tokens: ReadonlyMap<string, string>,
     ) => {
       const group = this.editorGroupService.getGroup(groupId) as PracEditorGroup | undefined;
@@ -1463,7 +1463,11 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
         resource,
         active: editor === this.editorService.activeEditor,
         dirty: editor.isDirty(),
-        preview: previews.has(editor),
+        // **Per group**: a file can be a temporary editor in one group and a pinned one in
+        // another — that is exactly what "Open to the Side" makes — and the flat set this used
+        // to be made both read as temporary (measured: `region-2: preview=true` after the
+        // command, which is what a person reported as "临时打开时 Open to the Side 不好").
+        preview: previews.has(editorKey(resource, groupId)),
         // The placement this entry is, and the group and region it currently sits in: a
         // file open in two groups is two entries, and a consumer gives each of them its
         // own view. `getEditors` is what pairs the editor with its group — the flat
@@ -1482,10 +1486,12 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
             editor.resource !== undefined && this.fileService.hasProvider(editor.resource),
         )
         .map(({ editor, groupId }) => ({ editor, groupId }));
-    const previewsOf = (): Set<EditorInput> => {
-      const previews = new Set<EditorInput>();
+    /** Each group's temporary editor, keyed by group: preview is a per-(group, editor) fact. */
+    const previewsOf = (): Set<string> => {
+      const previews = new Set<string>();
       for (const group of this.editorGroupService.groups) {
-        if (group.previewEditor) previews.add(group.previewEditor);
+        const preview = group.previewEditor;
+        if (preview) previews.add(editorKey(preview.resource?.toString() ?? "", group.id));
       }
       return previews;
     };

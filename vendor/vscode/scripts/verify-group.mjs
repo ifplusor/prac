@@ -117,6 +117,34 @@ await page.evaluate(() =>
 await page.waitForTimeout(3000);
 const splitAgain = await state();
 
+// 2d. A **temporary** (preview) editor is temporary in its own group only. `Open to the Side`
+// makes a pinned copy, and that copy must not read as temporary — the capability computes
+// `preview` per (group, editor). Measured before this: both tabs carried
+// `data-prac-tab-preview="true"`, which a person reports as "临时打开时 Open to the Side 不好".
+await page.evaluate(
+  (uri) => globalThis.__vscodeEmbed.commands.executeCommand("vscode.open", uri, { preview: true }),
+  FILE.uri,
+);
+await page.waitForTimeout(2500);
+const readPreviewTabs = () =>
+  page.evaluate(() =>
+    globalThis.__deep
+      .all("[data-prac-tab]")
+      .map((tab) => {
+        const region = globalThis.__deep.closest(tab, "[data-prac-region]");
+        const id = region?.getAttribute("data-prac-region") ?? "";
+        return { id, preview: tab.getAttribute("data-prac-tab-preview") };
+      })
+      .filter((tab) => /^(stage|region)/.test(tab.id)),
+  );
+const beforeSide = await readPreviewTabs();
+await page.evaluate(
+  (uri) => globalThis.__vscodeEmbed.commands.executeCommand("explorer.openToSide", uri),
+  FILE.uri,
+);
+await page.waitForTimeout(3500);
+const afterSide = await readPreviewTabs();
+
 await browser.close();
 
 const checks = {
@@ -133,6 +161,13 @@ const checks = {
   bothSurfacesShowText: after.lines.length === 2 && after.lines.every((count) => count > 0),
   theNewGroupHoldsTheFocus: focusAndTyping.focusInNewRegion === true,
   // The emptied group takes its region with it, and the next split is not a no-op.
+  // The pinned copy beside a temporary one is not temporary itself: the tab that appeared in a
+  // **new** region reads as pinned, whatever the groups that were already there read as.
+  theSideCopyIsPinned: (() => {
+    const before = new Set(beforeSide.map((tab) => tab.id));
+    const fresh = afterSide.filter((tab) => !before.has(tab.id));
+    return fresh.length > 0 && fresh.every((tab) => tab.preview === "false");
+  })(),
   theEmptiedGroupIsRemoved: emptied.regions.length === 1 && emptied.placements.length === 1,
   splittingAgainStillWorks: splitAgain.regions.length === 2 && splitAgain.placements.length === 2,
   // 3. Directional focus follows the tree: LEFT is the region that was already there, RIGHT the
