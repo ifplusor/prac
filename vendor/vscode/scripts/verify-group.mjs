@@ -85,6 +85,23 @@ for (const [side, command] of [
   focused[side] = (await state()).activeRegion;
 }
 
+// 2b. The new group is **usable without a click**: opening to the side activates the region,
+// and the pane inside it has to hold the focus — otherwise a person types into nothing. The
+// frame mounts this view *after* the open focused it, and moving the pane's DOM blurs it:
+// measured before the retry existed, `document.activeElement` was `BODY` and a keystroke left
+// the file unchanged.
+const focusAndTyping = await page.evaluate((view) => {
+  const host =
+    globalThis.__deep.one(`[data-prac-stack-entry="${view}"] [data-prac-view-host]`) ??
+    globalThis.__deep.one("[data-prac-view-host]");
+  const region = host ? globalThis.__deep.closest(host, "[data-prac-region]") : null;
+  const active = document.activeElement;
+  return {
+    region: region?.getAttribute("data-prac-region") ?? null,
+    focusInNewRegion: active !== null && active !== document.body,
+    line: (globalThis.__deep.one(".view-line")?.textContent ?? "").trim(),
+  };
+});
 await browser.close();
 
 const checks = {
@@ -99,6 +116,7 @@ const checks = {
     after.regions.includes(before.regions[0]) &&
     after.regions.some((region) => region !== before.regions[0]),
   bothSurfacesShowText: after.lines.length === 2 && after.lines.every((count) => count > 0),
+  theNewGroupHoldsTheFocus: focusAndTyping.focusInNewRegion === true,
   // 3. Directional focus follows the tree: LEFT is the region that was already there, RIGHT the
   // one the command added. (The editors capability's `active` is per group and cannot say this.)
   focusLeftLandsInTheOldRegion: focused.left === before.regions[0],

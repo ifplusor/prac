@@ -536,6 +536,23 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
         // this region" (`focusFile`).
         (this.groupsView as unknown as { noteSelfFocus?: () => void }).noteSelfFocus?.();
         pane?.focus();
+        // …and once more after the frame has mounted it. When this open **creates a region**
+        // (Open to the Side), the view host for the new placement is built after this call and
+        // the pane's DOM moves into it — a move blurs the element, so the focus ended up on
+        // `body` and typing went nowhere. Measured: `document.activeElement` was `BODY` after
+        // `explorer.openToSide` and a keystroke left both placements clean. The retry only
+        // fires when nothing else holds the focus: a person's click still wins.
+        const restoreFocus = (): void => {
+          if (this.activeEditorPane !== pane) return;
+          const active = document.activeElement;
+          if (active !== null && active !== document.body) return;
+          pane?.focus();
+        };
+        if (typeof requestAnimationFrame === "function") {
+          requestAnimationFrame(restoreFocus);
+        } else {
+          setTimeout(restoreFocus, 0);
+        }
       }
       return pane;
     } catch (error) {
