@@ -671,17 +671,27 @@ export function createFrame(
         // add up to the stack and no later pass has to clamp anything (upstream's rule, see the
         // worklog: the drag is bounded by the neighbours' own slack).
         const container = event.currentTarget.parentElement;
-        const peers = [...(container?.querySelectorAll("[data-prac-stack-entry]") ?? [])].map(
+        const all = [...(container?.querySelectorAll("[data-prac-stack-entry]") ?? [])].map(
           (node) => ({
             viewId: node.getAttribute("data-prac-stack-entry") ?? "",
             height: Math.round(node.getBoundingClientRect().height),
+            /** A folded entry is a header: it owns no height to give and must not be written to. */
+            folded: node.getAttribute("data-prac-stack-collapsed") === "true",
           }),
         );
+        const self = all.find((entry) => entry.viewId === viewId);
+        // A folded entry has no body to drag, and its height is a header — writing a size for it
+        // is what left an entry stuck at ~18px, unable to unfold again (measured).
+        if (self === undefined || self.folded) return;
+        const peers = all.filter((entry) => !entry.folded);
         const below = peers.slice(peers.findIndex((peer) => peer.viewId === viewId) + 1);
         const slack = below.reduce(
           (total, peer) => total + Math.max(0, peer.height - MIN_ENTRY),
           0,
         );
+        // Nothing below has room to give: the boundary is at its end, so the press belongs to the
+        // view under it, not to a drag that cannot move.
+        if (slack <= 0) return;
         entryDrag = {
           viewId,
           pointerId: event.pointerId,
@@ -725,11 +735,22 @@ export function createFrame(
               store.update((current) => {
                 const view = current.views[viewId];
                 if (!view) return current;
+                const collapsed = view.collapsed !== true;
+                // Unfolding must give a body back: a size that cannot hold one (a header-sized
+                // leftover from an earlier drag) is dropped, so the entry shares the height again
+                // instead of staying stuck at that height for good.
+                const size =
+                  collapsed === false && view.size !== undefined && view.size < MIN_ENTRY
+                    ? undefined
+                    : view.size;
                 return {
                   ...current,
                   views: {
                     ...current.views,
-                    [viewId]: { ...view, collapsed: view.collapsed !== true },
+                    [viewId]:
+                      size === undefined
+                        ? { ...view, collapsed, size: undefined }
+                        : { ...view, collapsed, size },
                   },
                 };
               }),

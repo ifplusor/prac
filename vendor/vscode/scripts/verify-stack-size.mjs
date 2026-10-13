@@ -85,7 +85,9 @@ const measure = (page) =>
       handle: node.getAttribute("data-prac-stack-handle"),
     }));
     const last = entries.at(-1);
-    const region = globalThis.__deep.one('[data-prac-region="left/container:workbench.view.explorer"]');
+    const region = globalThis.__deep.one(
+      '[data-prac-region="left/container:workbench.view.explorer"]',
+    );
     return {
       stackHeight: region ? Math.round(region.getBoundingClientRect().height) : null,
       fileView: height(view),
@@ -170,6 +172,41 @@ await drag(fourth.page, await point(fourth.page, true, true), DRAG);
 const lastAfter = await measure(fourth.page);
 await fourth.page.close();
 
+// 6. Unfolding gives a body back. A folded entry used to have its header height written into the
+// view record by a drag, and unfolding then left it stuck at ~18px for good (measured). Fold it
+// with such a leftover size, click the toggle, and the entry has to come back at a real height.
+const sixth = await open();
+await sixth.page.evaluate(() => {
+  const raw = JSON.parse(localStorage.getItem("prac-layout/v1"));
+  raw.views["vscode:view:outline"] = {
+    ...raw.views["vscode:view:outline"],
+    size: 18,
+    collapsed: true,
+  };
+  localStorage.setItem("prac-layout/v1", JSON.stringify(raw));
+});
+await sixth.page.reload({ waitUntil: "load" });
+await sixth.boot();
+await sixth.show();
+const toggle = await sixth.page.evaluate(() => {
+  const node = globalThis.__deep.one(
+    '[data-prac-stack-entry="vscode:view:outline"] [data-prac-stack-toggle]',
+  );
+  const box = node?.getBoundingClientRect();
+  return box
+    ? { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) }
+    : null;
+});
+if (toggle !== null) {
+  await sixth.page.mouse.move(toggle.x, toggle.y);
+  await sixth.page.mouse.down();
+  await sixth.page.waitForTimeout(120);
+  await sixth.page.mouse.up();
+  await sixth.page.waitForTimeout(1500);
+}
+const unfolded = await measure(sixth.page);
+await sixth.page.close();
+
 await browser.close();
 
 const checks = {
@@ -186,7 +223,9 @@ const checks = {
   // had to be clamped and nothing is left over.
   theEntriesStillAddUpToTheStack:
     dragged.entries.length > 0 &&
-    Math.abs(dragged.entries.reduce((total, entry) => total + entry.height, 0) - dragged.stackHeight) <= 8,
+    Math.abs(
+      dragged.entries.reduce((total, entry) => total + entry.height, 0) - dragged.stackHeight,
+    ) <= 8,
   // Dragging far past what the stack can give still leaves every other entry its floor.
   everyOtherEntryKeepsItsFloor: dragged.entries
     .filter((entry) => entry.view !== FILE_VIEW)
@@ -197,6 +236,8 @@ const checks = {
     lastAfter.lastHeight === lastBefore.lastHeight && lastAfter.lastPersisted === null,
   theSizeIsWritten:
     dragged.persisted !== null && Math.abs(dragged.persisted - dragged.fileView) <= 2,
+  // A folded entry that had a header-sized leftover unfolds into a body, not into 18px.
+  unfoldingGivesABodyBack: (unfolded.neighbour ?? 0) >= FLOOR,
   theMiddleIsNotAHandle: Math.abs((plainAfter.fileView ?? 0) - (plainBefore.fileView ?? 0)) <= 2,
   // The layout is the memory: the size it holds is the size the entry is drawn at.
   aWrittenSizeIsRestored:
