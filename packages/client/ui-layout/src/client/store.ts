@@ -29,16 +29,8 @@ import { useSyncExternalStore } from "react";
 import { type LayoutState } from "./contract.js";
 import { defaultTree } from "./model.js";
 
-/**
- * The persisted state's key. Bump the version when the shape changes.
- *
- * `v3`: a region node gained `embedder` (the mark that tells a region the embedder created for
- * an editor group from the app's own shape). A `v2` payload has no marks, so an empty region in
- * it cannot be told apart from a live one that is merely waiting for its view — and those empty
- * regions are exactly the leftovers a person cannot close. Dropping the old payload is the only
- * unambiguous way to be rid of them.
- */
-export const STATE_KEY = "prac-layout/v3";
+/** The persisted state's key. Bump the version when the shape changes. */
+export const STATE_KEY = "prac-layout/v2";
 
 // ── store ─────────────────────────────────────────────────────────────
 
