@@ -85,7 +85,9 @@ const measure = (page) =>
       handle: node.getAttribute("data-prac-stack-handle"),
     }));
     const last = entries.at(-1);
+    const region = globalThis.__deep.one('[data-prac-region="left/container:workbench.view.explorer"]');
     return {
+      stackHeight: region ? Math.round(region.getBoundingClientRect().height) : null,
       fileView: height(view),
       neighbour: height("vscode:view:outline"),
       persisted: raw?.views?.[view]?.size ?? null,
@@ -173,7 +175,18 @@ await browser.close();
 const checks = {
   draggingTheBottomEdgeGrowsTheEntry:
     (dragged.fileView ?? 0) - (before.fileView ?? 0) >= GREW_ENOUGH,
-  theNeighbourGivesUpRoom: (before.neighbour ?? 0) - (dragged.neighbour ?? 0) > 0,
+  // The boundary sits at the dragged entry's *bottom*: the room comes from the entry below it.
+  theEntryBelowGivesUpRoom: (() => {
+    const at = dragged.entries.findIndex((entry) => entry.view === FILE_VIEW);
+    const beforeBelow = before.entries[at + 1]?.height ?? 0;
+    const afterBelow = dragged.entries[at + 1]?.height ?? 0;
+    return at !== -1 && afterBelow < beforeBelow;
+  })(),
+  // The entries add up to the stack after a drag: the room came from the neighbours, so nothing
+  // had to be clamped and nothing is left over.
+  theEntriesStillAddUpToTheStack:
+    dragged.entries.length > 0 &&
+    Math.abs(dragged.entries.reduce((total, entry) => total + entry.height, 0) - dragged.stackHeight) <= 8,
   // Dragging far past what the stack can give still leaves every other entry its floor.
   everyOtherEntryKeepsItsFloor: dragged.entries
     .filter((entry) => entry.view !== FILE_VIEW)

@@ -335,6 +335,8 @@ let entryDrag: {
   origin: number;
   start: number;
   limit: number;
+  /** Every entry of this stack, top-down: the ones below give up the room a drag takes. */
+  peers: { viewId: string; height: number }[];
 } | null = null;
 
 /** One in-flight sash drag. */
@@ -583,20 +585,9 @@ export function createFrame(
      * @param viewId - the view this entry shows.
      * @param box - the box of the region holding the stack.
      */
-    const stackEntry = (
-      viewId: string,
-      box: Box,
-      handle: { reserve: number } | undefined = undefined,
-    ): ReactElement => {
+    const stackEntry = (viewId: string, box: Box, handle: boolean): ReactElement => {
       const collapsed = state.views[viewId]?.collapsed === true;
       const size = state.views[viewId]?.size;
-      const setEntrySize = (next: number): void => {
-        store.update((state) => {
-          const view = state.views[viewId];
-          if (view === undefined || view.size === next) return state;
-          return { ...state, views: { ...state.views, [viewId]: { ...view, size: next } } };
-        });
-      };
       // The bottom `SASH_SIZE` px of the entry are its resize handle — **no extra element
       // anywhere**, so the stack's children stay exactly its entries and the view body keeps its
       // shape. The listener is on the **capture** phase: the press lands on the view's own DOM
@@ -606,7 +597,7 @@ export function createFrame(
         // Only an entry with an entry **below** it has a boundary to drag: the stack's last
         // entry ends at the stack's own edge, where a drag has nothing to give (and would eat
         // the bottom 5px of the view's content).
-        if (handle === undefined) return;
+        if (!handle) return;
         if (event.button !== 0) return;
         const rect = event.currentTarget.getBoundingClientRect();
         if (event.clientY < rect.bottom - SASH_SIZE) return;
@@ -615,8 +606,58 @@ export function createFrame(
         const move = (moveEvent: PointerEvent): void => {
           if (entryDrag === null || entryDrag.pointerId !== moveEvent.pointerId) return;
           moveEvent.preventDefault();
-          const wanted = Math.round(entryDrag.start + (moveEvent.clientY - entryDrag.origin));
-          setEntrySize(Math.max(MIN_ENTRY, Math.min(entryDrag.limit, wanted)));
+          const drag = entryDrag;
+          const wanted = Math.round(drag.start + (moveEvent.clientY - drag.origin));
+          const target = Math.max(MIN_ENTRY, Math.min(drag.limit, wanted));
+          const delta = target - drag.start;
+          const peers = drag.peers;
+          const at = peers.findIndex((peer) => peer.viewId === drag.viewId);
+          const sizes = new Map(peers.map((peer) => [peer.viewId, peer.height]));
+          if (delta > 0) {
+            // Growing: each entry below gives up what it can spare, top-down.
+            let need = delta;
+            for (const peer of peers.slice(at + 1)) {
+              const room = Math.max(0, (sizes.get(peer.viewId) ?? MIN_ENTRY) - MIN_ENTRY);
+              const take = Math.min(room, need);
+              sizes.set(peer.viewId, (sizes.get(peer.viewId) ?? MIN_ENTRY) - take);
+              need -= take;
+            }
+            sizes.set(drag.viewId, drag.start + (delta - need));
+          } else {
+            // Shrinking: what this entry frees is shared by the entries below, in proportion.
+            const freed = -delta;
+            const below = peers.slice(at + 1);
+            const slack = below.reduce(
+              (total, peer) =>
+                total + Math.max(0, (sizes.get(peer.viewId) ?? MIN_ENTRY) - MIN_ENTRY),
+              0,
+            );
+            sizes.set(drag.viewId, drag.start - freed);
+            if (slack > 0) {
+              for (const peer of below) {
+                const room = Math.max(0, (sizes.get(peer.viewId) ?? MIN_ENTRY) - MIN_ENTRY);
+                sizes.set(
+                  peer.viewId,
+                  (sizes.get(peer.viewId) ?? MIN_ENTRY) + Math.round((freed * room) / slack),
+                );
+              }
+            }
+          }
+          const next = Object.fromEntries(sizes);
+          store.update((state) => {
+            let views = state.views;
+            let changed = false;
+            for (const [id, size] of Object.entries(next)) {
+              const view = views[id];
+              if (view === undefined || view.size === size) continue;
+              if (!changed) {
+                views = { ...views };
+                changed = true;
+              }
+              views[id] = { ...view, size };
+            }
+            return changed ? { ...state, views } : state;
+          });
         };
         const finish = (upEvent: PointerEvent): void => {
           if (entryDrag === null || entryDrag.pointerId !== upEvent.pointerId) return;
@@ -625,15 +666,29 @@ export function createFrame(
           window.removeEventListener("pointerup", finish);
           window.removeEventListener("pointercancel", finish);
         };
+        // Read the stack as it stands: a drag takes room from the entries **below** it, each
+        // down to its floor, and the new sizes are written back together — so the entries always
+        // add up to the stack and no later pass has to clamp anything (upstream's rule, see the
+        // worklog: the drag is bounded by the neighbours' own slack).
+        const container = event.currentTarget.parentElement;
+        const peers = [...(container?.querySelectorAll("[data-prac-stack-entry]") ?? [])].map(
+          (node) => ({
+            viewId: node.getAttribute("data-prac-stack-entry") ?? "",
+            height: Math.round(node.getBoundingClientRect().height),
+          }),
+        );
+        const below = peers.slice(peers.findIndex((peer) => peer.viewId === viewId) + 1);
+        const slack = below.reduce(
+          (total, peer) => total + Math.max(0, peer.height - MIN_ENTRY),
+          0,
+        );
         entryDrag = {
           viewId,
           pointerId: event.pointerId,
           origin: event.clientY,
           start: rect.height,
-          // Every other entry keeps its own floor: the stack's height minus one floor per entry
-          // this one is taking from (measured: reserving a single floor let a drag crush four
-          // neighbours down to a sliver).
-          limit: Math.max(MIN_ENTRY, box.height - handle.reserve),
+          limit: Math.max(MIN_ENTRY, rect.height + slack),
+          peers,
         };
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", finish);
@@ -645,7 +700,7 @@ export function createFrame(
         {
           key: viewId,
           "data-prac-stack-entry": viewId,
-          "data-prac-stack-handle": handle === undefined ? "false" : "true",
+          "data-prac-stack-handle": handle ? "true" : "false",
           onPointerDownCapture,
           "data-prac-stack-collapsed": collapsed ? "true" : "false",
           style: {
@@ -901,15 +956,7 @@ export function createFrame(
         showsTabStrip(state, node)
           ? [tabStrip(views, node.id), viewBody(frontView(state, node.id) ?? views[0] ?? "", box)]
           : stacked
-            ? views.map((viewId, position) =>
-                stackEntry(
-                  viewId,
-                  box,
-                  position < views.length - 1
-                    ? { reserve: Math.max(MIN_ENTRY, (views.length - 1) * MIN_ENTRY) }
-                    : undefined,
-                ),
-              )
+            ? views.map((viewId, position) => stackEntry(viewId, box, position < views.length - 1))
             : // No strip: the region still shows its **front** view. It used to take the
               // first by order, which is a different question — measured with a region a
               // view had just been split into: the file that was copied in was front, the
