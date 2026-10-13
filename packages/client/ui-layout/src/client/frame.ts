@@ -583,7 +583,11 @@ export function createFrame(
      * @param viewId - the view this entry shows.
      * @param box - the box of the region holding the stack.
      */
-    const stackEntry = (viewId: string, box: Box): ReactElement => {
+    const stackEntry = (
+      viewId: string,
+      box: Box,
+      handle: { reserve: number } | undefined = undefined,
+    ): ReactElement => {
       const collapsed = state.views[viewId]?.collapsed === true;
       const size = state.views[viewId]?.size;
       const setEntrySize = (next: number): void => {
@@ -599,6 +603,10 @@ export function createFrame(
       // (the workbench's tree), which is free to `stopPropagation`, and a bubbling listener
       // would never hear about it.
       const onPointerDownCapture = (event: PointerDragEvent): void => {
+        // Only an entry with an entry **below** it has a boundary to drag: the stack's last
+        // entry ends at the stack's own edge, where a drag has nothing to give (and would eat
+        // the bottom 5px of the view's content).
+        if (handle === undefined) return;
         if (event.button !== 0) return;
         const rect = event.currentTarget.getBoundingClientRect();
         if (event.clientY < rect.bottom - SASH_SIZE) return;
@@ -622,7 +630,10 @@ export function createFrame(
           pointerId: event.pointerId,
           origin: event.clientY,
           start: rect.height,
-          limit: Math.max(MIN_ENTRY, box.height - MIN_ENTRY),
+          // Every other entry keeps its own floor: the stack's height minus one floor per entry
+          // this one is taking from (measured: reserving a single floor let a drag crush four
+          // neighbours down to a sliver).
+          limit: Math.max(MIN_ENTRY, box.height - handle.reserve),
         };
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", finish);
@@ -634,6 +645,7 @@ export function createFrame(
         {
           key: viewId,
           "data-prac-stack-entry": viewId,
+          "data-prac-stack-handle": handle === undefined ? "false" : "true",
           onPointerDownCapture,
           "data-prac-stack-collapsed": collapsed ? "true" : "false",
           style: {
@@ -889,7 +901,15 @@ export function createFrame(
         showsTabStrip(state, node)
           ? [tabStrip(views, node.id), viewBody(frontView(state, node.id) ?? views[0] ?? "", box)]
           : stacked
-            ? views.map((viewId) => stackEntry(viewId, box))
+            ? views.map((viewId, position) =>
+                stackEntry(
+                  viewId,
+                  box,
+                  position < views.length - 1
+                    ? { reserve: Math.max(MIN_ENTRY, (views.length - 1) * MIN_ENTRY) }
+                    : undefined,
+                ),
+              )
             : // No strip: the region still shows its **front** view. It used to take the
               // first by order, which is a different question — measured with a region a
               // view had just been split into: the file that was copied in was front, the

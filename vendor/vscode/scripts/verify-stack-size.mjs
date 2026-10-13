@@ -30,9 +30,12 @@ const url = process.env.URL;
 if (!url) throw new Error('URL is required, e.g. URL="http://127.0.0.1:3084/?token=…"');
 
 const FILE_VIEW = "vscode:view:workbench.explorer.fileView";
-const DRAG = 60;
+/** Ask for far more than the stack can give: the floors are what has to hold. */
+const DRAG = 400;
 /** The drag moves the entry by the size of the last step that lands, so ask for less. */
 const GREW_ENOUGH = 30;
+/** The floor the frame keeps for every entry that is not being dragged (`MIN_ENTRY`). */
+const FLOOR = 46;
 const browser = await chromium.launch();
 const consoleErrors = [];
 
@@ -76,17 +79,30 @@ const measure = (page) =>
       return node ? Math.round(node.getBoundingClientRect().height) : null;
     };
     const raw = JSON.parse(localStorage.getItem("prac-layout/v1") ?? "null");
+    const entries = globalThis.__deep.all("[data-prac-stack-entry]").map((node) => ({
+      view: node.getAttribute("data-prac-stack-entry"),
+      height: Math.round(node.getBoundingClientRect().height),
+      handle: node.getAttribute("data-prac-stack-handle"),
+    }));
+    const last = entries.at(-1);
     return {
       fileView: height(view),
       neighbour: height("vscode:view:outline"),
       persisted: raw?.views?.[view]?.size ?? null,
+      lastView: last?.view ?? null,
+      lastHeight: last?.height ?? null,
+      lastHandle: last?.handle ?? null,
+      lastPersisted: last?.view ? (raw?.views?.[last.view]?.size ?? null) : null,
+      entries,
     };
   }, FILE_VIEW);
 
-const point = (page, edge) =>
+const point = (page, edge, last = false) =>
   page.evaluate(
-    ({ view, edge }) => {
-      const node = globalThis.__deep.one(`[data-prac-stack-entry="${view}"]`);
+    ({ view, edge, last }) => {
+      const node = last
+        ? globalThis.__deep.all("[data-prac-stack-entry]").at(-1)
+        : globalThis.__deep.one(`[data-prac-stack-entry="${view}"]`);
       const box = node?.getBoundingClientRect();
       if (!box) return null;
       return {
@@ -94,7 +110,7 @@ const point = (page, edge) =>
         y: Math.round(edge ? box.bottom - 2 : box.top + box.height / 2),
       };
     },
-    { view: FILE_VIEW, edge },
+    { view: FILE_VIEW, edge, last },
   );
 
 /** Four moves with real pauses: the rhythm that was measured to work. */
@@ -103,7 +119,7 @@ const drag = async (page, from, deltaY) => {
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   await page.waitForTimeout(150);
-  for (const step of [10, 25, 40, deltaY]) {
+  for (const step of [10, 40, 120, deltaY]) {
     await page.mouse.move(from.x, from.y + step);
     await page.waitForTimeout(120);
   }
@@ -142,12 +158,30 @@ await third.boot();
 await third.show();
 const restored = await measure(third.page);
 await third.page.close();
+
+// 4. The **last** entry ends at the stack's own edge: that edge is not a boundary, so dragging
+// it must do nothing at all (a person passes there on the way to what is below the stack).
+const fourth = await open();
+await fourth.show();
+const lastBefore = await measure(fourth.page);
+await drag(fourth.page, await point(fourth.page, true, true), DRAG);
+const lastAfter = await measure(fourth.page);
+await fourth.page.close();
+
 await browser.close();
 
 const checks = {
   draggingTheBottomEdgeGrowsTheEntry:
     (dragged.fileView ?? 0) - (before.fileView ?? 0) >= GREW_ENOUGH,
   theNeighbourGivesUpRoom: (before.neighbour ?? 0) - (dragged.neighbour ?? 0) > 0,
+  // Dragging far past what the stack can give still leaves every other entry its floor.
+  everyOtherEntryKeepsItsFloor: dragged.entries
+    .filter((entry) => entry.view !== FILE_VIEW)
+    .every((entry) => entry.height >= FLOOR),
+  // The boundary is *between* entries: the last one has none, so its bottom edge is inert.
+  theLastEntryHasNoHandle: lastBefore.lastHandle === "false",
+  theLastEntryCannotBeDragged:
+    lastAfter.lastHeight === lastBefore.lastHeight && lastAfter.lastPersisted === null,
   theSizeIsWritten:
     dragged.persisted !== null && Math.abs(dragged.persisted - dragged.fileView) <= 2,
   theMiddleIsNotAHandle: Math.abs((plainAfter.fileView ?? 0) - (plainBefore.fileView ?? 0)) <= 2,
@@ -160,7 +194,11 @@ const failed = Object.entries(checks)
   .filter(([, value]) => value !== true)
   .map(([name]) => name);
 console.log(
-  JSON.stringify({ url, before, dragged, plainBefore, plainAfter, restored, checks }, null, 2),
+  JSON.stringify(
+    { url, before, dragged, plainBefore, plainAfter, restored, lastBefore, lastAfter, checks },
+    null,
+    2,
+  ),
 );
 if (failed.length > 0) {
   console.log(`FAILED: ${failed.join(", ")}`);
