@@ -31,7 +31,7 @@ const BOTTOM = "bottom";
 const CONVERSATION = "dsh:main:conversation";
 const VSCODE_SIDEBAR = "vscode:view:workbench.explorer.fileView";
 /** The key `prac-client-ui-layout` persists under (see its `store.ts`). */
-const STATE_KEY = "prac-layout/v2";
+const STATE_KEY = "prac-layout/v3";
 /** The sidebar's default size; a restored 320 can only be the resize. */
 const RESIZED_LEFT = 320;
 const DEFAULT_LEFT = 280;

@@ -31,7 +31,7 @@ const CONVERSATION = "dsh:main:conversation";
 const DSH_SIDEBAR = "dsh:sidebar";
 const VSCODE_SIDEBAR = "vscode:view:workbench.explorer.fileView";
 /** The key `prac-client-ui-layout` persists under (see its `store.ts`). */
-const STATE_KEY = "prac-layout/v2";
+const STATE_KEY = "prac-layout/v3";
 /** How far the vertical sash is dragged, in px. */
 const DRAG = 100;
 
