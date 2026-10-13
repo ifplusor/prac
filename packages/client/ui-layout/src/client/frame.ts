@@ -315,6 +315,28 @@ const TAB_ACTIVE_STYLE: StyleObject = {
   boxShadow: "inset 0 -1px 0 rgba(127,127,127,0.9)",
 };
 
+/**
+ * Smallest height a stack entry may be dragged to.
+ *
+ * An entry is hidden by **folding** it, not by dragging it away, so the floor only has to keep
+ * the header and a sliver of content reachable.
+ */
+const MIN_ENTRY = 48;
+
+/**
+ * The one stack-entry drag in flight, if any.
+ *
+ * Module state on purpose: the frame is a singleton per page, an entry is rendered by a plain
+ * function (so a hook inside it would break the hook order), and only one drag can be in flight.
+ */
+let entryDrag: {
+  viewId: string;
+  pointerId: number;
+  origin: number;
+  start: number;
+  limit: number;
+} | null = null;
+
 /** One in-flight sash drag. */
 interface DragState {
   pointerId: number;
@@ -426,6 +448,8 @@ const FRAME_STYLES = `
 [data-prac-sash][data-prac-sash-dir="row"] { cursor: col-resize; }
 [data-prac-sash][data-prac-sash-dir="column"] { cursor: row-resize; }
 [data-prac-sash]:hover { background: rgba(127, 127, 127, 0.35); }
+[data-prac-stack-entry]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: ${SASH_SIZE}px; z-index: 5; cursor: row-resize; }
+[data-prac-stack-entry]:hover::after { background: rgba(127, 127, 127, 0.35); }
 `;
 
 /** Inject the frame's stylesheet once. */
@@ -561,14 +585,62 @@ export function createFrame(
      */
     const stackEntry = (viewId: string, box: Box): ReactElement => {
       const collapsed = state.views[viewId]?.collapsed === true;
+      const size = state.views[viewId]?.size;
+      const setEntrySize = (next: number): void => {
+        store.update((state) => {
+          const view = state.views[viewId];
+          if (view === undefined || view.size === next) return state;
+          return { ...state, views: { ...state.views, [viewId]: { ...view, size: next } } };
+        });
+      };
+      // The bottom `SASH_SIZE` px of the entry are its resize handle — **no extra element
+      // anywhere**, so the stack's children stay exactly its entries and the view body keeps its
+      // shape. The listener is on the **capture** phase: the press lands on the view's own DOM
+      // (the workbench's tree), which is free to `stopPropagation`, and a bubbling listener
+      // would never hear about it.
+      const onPointerDownCapture = (event: PointerDragEvent): void => {
+        if (event.button !== 0) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        if (event.clientY < rect.bottom - SASH_SIZE) return;
+        // The move/up listeners go on the **window**: a store update re-renders the frame and
+        // the entry element can be replaced mid-drag, dropping pointer capture.
+        const move = (moveEvent: PointerEvent): void => {
+          if (entryDrag === null || entryDrag.pointerId !== moveEvent.pointerId) return;
+          moveEvent.preventDefault();
+          const wanted = Math.round(entryDrag.start + (moveEvent.clientY - entryDrag.origin));
+          setEntrySize(Math.max(MIN_ENTRY, Math.min(entryDrag.limit, wanted)));
+        };
+        const finish = (upEvent: PointerEvent): void => {
+          if (entryDrag === null || entryDrag.pointerId !== upEvent.pointerId) return;
+          entryDrag = null;
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", finish);
+          window.removeEventListener("pointercancel", finish);
+        };
+        entryDrag = {
+          viewId,
+          pointerId: event.pointerId,
+          origin: event.clientY,
+          start: rect.height,
+          limit: Math.max(MIN_ENTRY, box.height - MIN_ENTRY),
+        };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", finish);
+        window.addEventListener("pointercancel", finish);
+        event.preventDefault();
+      };
       return createElement(
         "div",
         {
           key: viewId,
           "data-prac-stack-entry": viewId,
+          onPointerDownCapture,
           "data-prac-stack-collapsed": collapsed ? "true" : "false",
           style: {
-            flex: collapsed ? "0 0 auto" : "1 1 0",
+            // A person may have dragged this entry's bottom edge: then it keeps that height and
+            // its neighbours share the rest. Otherwise every entry shares equally.
+            position: "relative",
+            flex: collapsed ? "0 0 auto" : size === undefined ? "1 1 0" : `0 0 ${size}px`,
             minHeight: 0,
             display: "flex",
             flexDirection: "column",

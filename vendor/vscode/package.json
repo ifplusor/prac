@@ -20,6 +20,7 @@
     "vscode:smoke": "node scripts/smoke.mjs",
     "vscode:verify-layout": "node scripts/verify-layout.mjs",
     "vscode:verify-focus": "node scripts/verify-focus.mjs",
+    "vscode:verify-stack-size": "node scripts/verify-stack-size.mjs",
     "vscode:verify-quiet": "node scripts/verify-quiet.mjs",
     "vscode:verify-timeline": "node scripts/verify-timeline.mjs",
     "vscode:verify-group": "node scripts/verify-group.mjs",

@@ -49,6 +49,8 @@ status: in-progress
 - **未支持清单的表达**：放在启动日志、一条活体门，还是两者都要。
 - **组与区域同生共死，所以"移除一个组"要能移除一个区域**：prac 能建区域（`createRegionBeside`），现在也能删（`removeRegion`，它的逆）——frame 删节点、分裂只剩一个孩子时并回幸存者；区域子树里的 view 记录随之丢弃；通道两端（`GroupRegionChannel`、`vscode-embed` 门面）都带这个方法，`PracEditorHost.removeGroup` 调用它。**最后一个区域永不删**（总得有东西占住屏幕）。触发点是上游的 `closeEmptyGroups`（关掉一个组里最后一个编辑器就关掉该组，默认开）——`PracEditorGroup` 是自己的 `IEditorGroupView`，不继承上游那段，所以要自己接：在公开的 `closeEditor`/`closeEditors` 出口按"组空了 + 设置没关 + 还有别的组"移除自己。没有这套能力时，空组会留在屏幕上（只剩一条没有 `×` 的占位 tab）**并占住活动组**，于是 `Open to the Side` 从活动编辑器解析不到资源、静默什么都不做。
 - **右键的选中/焦点语义对齐上游**：普通右键、以及 macOS 的 `⌃+左键`，都**只移动焦点、不改选中**（上游 `listWidget` 的 `onViewPointer` 就是如此：`setFocus` 一定发生，`setSelection` 只在非右键、非修饰键时发生）。菜单握着 DOM 焦点期间，被点中的行绘制 `list.inactiveFocusOutline`（细描边）、原选中行绘制 `list.inactiveSelectionBackground`（淡填充）——所以"点的那行没高亮、旧行高亮没消失"是上游的观感，不是缺陷。**prac 不在这里加"右键即选中"的偏离**；要更强的观感由主题（`workbench.colorCustomizations` 的这两个键）决定。
+- **栈内条目的高度可按条目记住**：一个区域里堆叠的视图默认**等分**高度；每条**底边 5px** 是它的缩放手柄（拖它 ⇒ 这一条取新高度、其余分享剩下的 ✓）。手柄**不新增任何 DOM**（监听挂在条目自身、**捕获阶段**——按在视图自己的 DOM 上，工作台的树可以 `stopPropagation` ✓；提示用 `::after` 伪元素并给它 `z-index`，否则被视图的 `contain: paint` 层叠上下文盖住 ✓）。尺寸记在 **view 记录**上（`ViewRecord.size` ✓，随布局持久化 ✓），下界 48px —— 藏一个条目靠**折叠**，不是拖走 ✓。
+
 - **身份改造之后的三件事已定**（tab / 脏标记 / 关闭，"按放置"这一句裁决落在关闭上）：
   - **tab**：按放置（一个放置一个 `vscode:file:<placement>:<resource>` view，tab 由它所在的区域渲染）。
   - **脏标记**：按**模型**（资源）。VS Code 的脏是 `ITextFileEditorModel` 的属性，两个放置共享同一个模型 ⇒ 两个 tab 显示同一个脏点；按放置算会是假信息。
