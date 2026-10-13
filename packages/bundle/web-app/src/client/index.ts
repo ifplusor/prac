@@ -53,7 +53,6 @@ import {
   placeCatalogue,
   placeSurfaces,
   restoreCentre,
-  pruneEmptyRegions,
   staleFileViews,
   type PracLayout,
   type Surface,
@@ -595,8 +594,6 @@ export function apply(ctx: Context): void {
   const slots = ctx.slots;
   const focus = createFocus();
   arrange(layout);
-  // Stale empty regions first: they are the leftovers of a session whose files are gone.
-  pruneEmptyRegions(layout);
 
   /**
    * The file view attention currently rests on, every file view the app has open, and
