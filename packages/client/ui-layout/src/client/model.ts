@@ -931,3 +931,40 @@ export function splitRegionWith(
   };
   return { ...state, tree: replaceNode(state.tree, regionId, () => replacement) };
 }
+
+/**
+ * Remove a region from the tree, the inverse of {@link splitRegionWith}.
+ *
+ * The frame **owns** the tree, so the only thing that may ask for this is the embedder telling
+ * it a group is gone (a closed editor group, an emptied side). Two rules keep the result a
+ * well-formed tree: a split that still holds two children keeps them, and a split left with a
+ * single child **collapses into it** — a split of one is not a split, and the survivor has to
+ * fill the place (a survivor configured as a fixed-size child of the split would otherwise
+ * size itself to nothing as a direct child of the grandparent).
+ *
+ * Which regions **may** go is the caller's decision — the embedder keeps the last one because
+ * something has to hold the screen. Views that lived in the removed region are the caller's to
+ * drop; this function only edits the tree.
+ *
+ * @param state - the layout state.
+ * @param regionId - the region to remove.
+ * @returns the state, or the same state when there is nothing to remove.
+ */
+export function removeRegion(state: LayoutState, regionId: string): LayoutState {
+  const path = regionAncestry(state.tree, regionId);
+  // No entry means the id names no region (the tree's own root is a split, not a region).
+  if (path === undefined || path.length === 0) return state;
+  const step = path[path.length - 1];
+  if (step === undefined) return state;
+  const remaining = step.split.children.filter((_, position) => position !== step.index);
+  // Defensive: a split with no children left is not a shape this tree allows.
+  if (remaining.length === 0) return state;
+  const survivor = remaining[0];
+  const replacement: LayoutNode =
+    remaining.length === 1
+      ? survivor.type === "region"
+        ? { ...survivor, flex: true }
+        : survivor
+      : { ...step.split, children: remaining };
+  return { ...state, tree: replaceNode(state.tree, step.split.id, () => replacement) };
+}

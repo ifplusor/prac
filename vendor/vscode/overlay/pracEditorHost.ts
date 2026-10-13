@@ -114,6 +114,8 @@ export interface GroupRegionChannel {
   createRegionBeside(region: string, side: PracSide): string | undefined;
   /** The region adjacent to another one in a direction, or undefined when there is none. */
   regionInDirection(region: string, side: PracSide): string | undefined;
+  /** Remove a region: the inverse of {@link createRegionBeside}. */
+  removeRegion(region: string): void;
 }
 
 let groupRegionChannel: GroupRegionChannel | undefined;
@@ -462,6 +464,11 @@ export class PracEditorHost
     if (resolved === undefined) return;
     const index = this._groups.indexOf(resolved);
     if (index >= 0) this._groups.splice(index, 1);
+    // The **region** goes with the group: in prac a group *is* a region, and a region whose
+    // group is gone has nothing to show — leaving it behind is what made an emptied side
+    // unremovable (upstream removes the group here; the region is prac's half of that).
+    const region = this._regions.get(resolved.id);
+    if (region !== undefined) groupRegionChannel?.removeRegion(region);
     this._regions.delete(resolved.id);
     resolved.dispose();
     this._onDidRemoveGroup.fire(resolved);

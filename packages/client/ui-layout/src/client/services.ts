@@ -47,6 +47,7 @@ import {
   place,
   placeQuietly,
   regionInfos,
+  removeRegion as removeRegionFromTree,
   removeView,
   regionNode,
   setCollapsed,
@@ -56,6 +57,11 @@ import {
   splitRegionWith,
 } from "./model.js";
 import type { LayoutStore } from "./store.js";
+
+/** Whether a view's region sits inside the subtree a region id names. */
+function inRegionSubtree(region: string, target: string): boolean {
+  return region === target || region.startsWith(`${target}/`);
+}
 
 /** What {@link createServices} builds for the assembly to publish. */
 export interface LayoutServices {
@@ -311,6 +317,26 @@ export function createServices(
      */
     regionInDirection(regionId: string, side: Side): string | undefined {
       return findRegionInDirection(store.get().tree, regionId, side);
+    },
+    /**
+     * Remove a region — the inverse of {@link createRegionBeside}.
+     *
+     * The embedder asks for this when a group it created is gone (its last editor closed and
+     * the group is not the only one left). The region's **views go with it**: a record that
+     * pointed at a region which no longer exists would render nowhere and stay "known" for
+     * good.
+     *
+     * @param regionId - the region to remove.
+     */
+    removeRegion(regionId: string): void {
+      store.update((state) => {
+        const next = removeRegionFromTree(state, regionId);
+        if (next === state) return state;
+        const views = Object.fromEntries(
+          Object.entries(state.views).filter(([, view]) => !inRegionSubtree(view.region, regionId)),
+        );
+        return { ...next, views };
+      });
     },
     createRegionBeside(regionId: string, side: Side): string | undefined {
       let created: string | undefined;

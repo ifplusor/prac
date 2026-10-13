@@ -598,7 +598,9 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
       return false;
     }
     if (await this.handleCloseConfirmation([candidate])) return false; // vetoed
-    return this.doCloseEditor(candidate, options);
+    const closed = await this.doCloseEditor(candidate, options);
+    this.closeIfEmpty();
+    return closed;
   }
 
   /**
@@ -654,6 +656,25 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
   }
 
   /**
+   * Remove this group once its last editor is gone.
+   *
+   * Upstream does this inside its own `EditorGroupView` — `closeEmptyGroups`
+   * (`editorGroupView.ts:1988`, the `workbench.editor.closeEmptyGroups` setting, on by
+   * default) — but our group is its own `IEditorGroupView`, so that code never runs here.
+   * What a person sees instead: closing a side group's only file leaves the group (and its
+   * region) on screen, and because that empty group can hold the active-editor slot, the next
+   * "Open to the Side" resolves no resource from it and **silently does nothing**.
+   *
+   * The last group stays even when empty: something has to hold the centre.
+   */
+  private closeIfEmpty(): void {
+    if (this.count > 0) return;
+    if (this.groupsView.partOptions.closeEmptyGroups === false) return;
+    if (this.groupsView.groups.length <= 1) return;
+    this.groupsView.removeGroup(this);
+  }
+
+  /**
    * Close several editors.
    *
    * @param editors - the editors to close, or a filter (the filter's own semantics
@@ -685,6 +706,7 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
     for (const editor of [...inactive, ...active]) {
       closed = (await this.doCloseEditor(editor, options)) && closed;
     }
+    this.closeIfEmpty();
     return closed;
   }
 

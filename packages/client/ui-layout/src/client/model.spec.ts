@@ -32,6 +32,7 @@ import {
   setCollapsed,
   setRegionSize,
   sideGeometry,
+  removeRegion,
   splitRegionWith,
   subtreeMin,
   visibleViews,
@@ -269,6 +270,48 @@ describe("isPresent", () => {
     const current = place(state(), "dsh:sidebar", "left");
     const split = splitRegionWith(current, "left", "right", "split-1", "region-1");
     expect(isPresent(split, findSplit(split.tree, "split-1")!)).toBe(true);
+  });
+});
+
+describe("removeRegion", () => {
+  it("collapses a split into its only survivor", () => {
+    const current = splitRegionWith(state(), CENTER_REGION, "right", "split-1", "region-1");
+    const removed = removeRegion(current, "region-1");
+    // The split is gone and the region it was built around is still there.
+    expect(findSplit(removed.tree, "split-1")).toBeNull();
+    expect(isPresent(removed, findRegion(removed.tree, CENTER_REGION)!)).toBe(true);
+  });
+
+  it("collapses a chain: the survivor takes the place of the split it left", () => {
+    const once = splitRegionWith(state(), CENTER_REGION, "right", "split-1", "region-1");
+    const twice = splitRegionWith(once, "region-1", "right", "split-2", "region-2");
+    const removed = removeRegion(twice, "region-1");
+    expect(findSplit(removed.tree, "split-2")).toBeNull();
+    expect(findRegion(removed.tree, "region-2")).not.toBeNull();
+    expect(findRegion(removed.tree, CENTER_REGION)).not.toBeNull();
+  });
+
+  it("keeps the split while two children remain", () => {
+    const once = splitRegionWith(state(), CENTER_REGION, "right", "split-1", "region-1");
+    const twice = splitRegionWith(once, "region-1", "up", "split-2", "region-2");
+    const removed = removeRegion(twice, "region-1");
+    // `region-1` was one of three children of `split-1`, so the split stays.
+    expect(findSplit(removed.tree, "split-1")).not.toBeNull();
+    expect(findRegion(removed.tree, "region-2")).not.toBeNull();
+  });
+
+  it("removes a region the caller names, and ignores one that does not exist", () => {
+    const current = place(state(), "dsh:sidebar", "left");
+    // Which regions may go is the caller's decision; an unknown id edits nothing.
+    expect(findRegion(removeRegion(current, CENTER_REGION).tree, CENTER_REGION)).toBeNull();
+    expect(removeRegion(current, "no-such-region")).toBe(current);
+  });
+
+  it("leaves the survivor able to fill its new place", () => {
+    const current = splitRegionWith(state(), CENTER_REGION, "right", "split-1", "region-1");
+    const removed = removeRegion(current, CENTER_REGION);
+    const survivor = findRegion(removed.tree, "region-1");
+    expect(survivor?.flex).toBe(true);
   });
 });
 

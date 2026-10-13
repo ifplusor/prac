@@ -147,6 +147,7 @@ export function apply(ctx: Context): void {
   embed.setGroupRegionChannel({
     createRegionBeside: (region, side) => ctx.pracLayout.createRegionBeside(region, side),
     regionInDirection: (region, side) => ctx.pracLayout.regionInDirection(region, side),
+    removeRegion: (region) => ctx.pracLayout.removeRegion(region),
   });
 
   /** Boot the app for the active workspace; true once it is running. */

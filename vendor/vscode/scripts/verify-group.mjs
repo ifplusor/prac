@@ -102,6 +102,21 @@ const focusAndTyping = await page.evaluate((view) => {
     line: (globalThis.__deep.one(".view-line")?.textContent ?? "").trim(),
   };
 });
+// 2c. …and the group goes away with its last file. Upstream closes an emptied group
+// (`closeEmptyGroups`); in prac that means removing the **region**, which is what this pair of
+// assertions locks. Without it the empty group stayed on screen with no way to close it, and —
+// because it held the active-editor slot — the next split silently did nothing.
+await page.evaluate(() =>
+  globalThis.__vscodeEmbed.commands.executeCommand("workbench.action.closeActiveEditor"),
+);
+await page.waitForTimeout(3000);
+const emptied = await state();
+await page.evaluate(() =>
+  globalThis.__vscodeEmbed.commands.executeCommand("workbench.action.splitEditorToNextGroup"),
+);
+await page.waitForTimeout(3000);
+const splitAgain = await state();
+
 await browser.close();
 
 const checks = {
@@ -117,6 +132,9 @@ const checks = {
     after.regions.some((region) => region !== before.regions[0]),
   bothSurfacesShowText: after.lines.length === 2 && after.lines.every((count) => count > 0),
   theNewGroupHoldsTheFocus: focusAndTyping.focusInNewRegion === true,
+  // The emptied group takes its region with it, and the next split is not a no-op.
+  theEmptiedGroupIsRemoved: emptied.regions.length === 1 && emptied.placements.length === 1,
+  splittingAgainStillWorks: splitAgain.regions.length === 2 && splitAgain.placements.length === 2,
   // 3. Directional focus follows the tree: LEFT is the region that was already there, RIGHT the
   // one the command added. (The editors capability's `active` is per group and cannot say this.)
   focusLeftLandsInTheOldRegion: focused.left === before.regions[0],

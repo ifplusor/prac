@@ -477,6 +477,16 @@ export interface PracLayoutFace {
    */
   createRegionBeside(regionId: string, side: Side): string | undefined;
   /**
+   * Remove a region from the tree — the inverse of {@link createRegionBeside}.
+   *
+   * The embedder asks for this when an editor group it created is gone. Views that lived in
+   * the removed region are dropped with it, and the **root region is never removed**: some
+   * region has to hold the screen.
+   *
+   * @param regionId - the region to remove.
+   */
+  removeRegion(regionId: string): void;
+  /**
    * The region adjacent to another one in a direction, or undefined when there is none.
    *
    * The frame owns the region tree, so this is where a directional question ("the group to

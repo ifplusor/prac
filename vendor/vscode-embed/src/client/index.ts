@@ -75,7 +75,9 @@ export interface VscodeEmbedPage {
   /** The app's region channel, kept until the workbench publishes a face to hand it to. */
   groupRegionChannel?: {
     createRegionBeside(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+    removeRegion(region: string): void;
     regionInDirection(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+    removeRegion(region: string): void;
   };
   /** The element hosting each part, by part id, across all consumers. */
   readonly hosts: Map<string, HTMLElement>;
@@ -295,6 +297,7 @@ export interface VscodeEmbedHandle {
    */
   setGroupRegionChannel(channel: {
     createRegionBeside(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+    removeRegion(region: string): void;
     regionInDirection(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
   }): void;
   /**
@@ -827,6 +830,7 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
         side: "left" | "right" | "up" | "down",
       ): string | undefined;
       regionInDirection(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+      removeRegion(region: string): void;
     }): void => {
       record.groupRegionChannel = channel;
       record.face?.setGroupRegionChannel(channel);

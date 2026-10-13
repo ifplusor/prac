@@ -234,6 +234,7 @@ export interface PartHostFace {
   setGroupRegionChannel: (channel: {
     createRegionBeside(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
     regionInDirection(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+    removeRegion(region: string): void;
   }) => void;
   /**
    * Subscribe to changes in the placement set.

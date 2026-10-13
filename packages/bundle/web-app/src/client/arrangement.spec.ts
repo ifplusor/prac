@@ -79,6 +79,7 @@ function recordingFace(views: LayoutState["views"] = {}): {
     subscribe: () => () => {},
     listViews: () => [],
     listRegions: () => [],
+    removeRegion: () => undefined,
     place: record("place"),
     placeQuietly: record("placeQuietly"),
     removeView: record("removeView"),
