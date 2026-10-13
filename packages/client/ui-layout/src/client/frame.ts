@@ -607,7 +607,21 @@ export function createFrame(
               {
                 key: "body",
                 "data-prac-stack-body": viewId,
-                style: { flex: "1 1 auto", minHeight: 0, position: "relative", overflow: "hidden" },
+                // A **flex container**, not a block: the view host inside carries
+                // `flex: 1 1 auto`, which is inert under a block parent — the host then
+                // sizes to whatever its content reports and the pane collapses to its
+                // header. Measured on a restored layout: entry 147 → body 129 → host 22
+                // (a fresh page only looked right because the part inside reported a
+                // height first). With the body flexible, the host takes the body's box
+                // whatever the content measures.
+                style: {
+                  display: "flex",
+                  flexDirection: "column",
+                  flex: "1 1 auto",
+                  minHeight: 0,
+                  position: "relative",
+                  overflow: "hidden",
+                },
               },
               createElement(
                 IsolatedView,

@@ -90,6 +90,29 @@ async function sample() {
           collapsed: element.getAttribute("data-prac-stack-collapsed"),
         })),
         left: box(`[data-prac-region="${left}"]`),
+        // The **content**, not just the chrome: a container whose panes come back as
+        // headers only renders every stack body at zero height, and the file tree it
+        // holds has no rows — the symptom a person reports as "the file tree is gone".
+        // Measured on the bug this criterion exists for: bodies 0, rows 0 after a reload.
+        panes: {
+          bodies: [
+            ...document.querySelectorAll(`[data-prac-region="${left}"] [data-prac-stack-body]`),
+          ].map((element) => Math.round(element.getBoundingClientRect().height)),
+          // Rows live inside the view's isolation root, which `querySelectorAll` cannot
+          // cross: walk into every shadow root under the region.
+          treeRows: (() => {
+            let rows = 0;
+            const walk = (node) => {
+              rows += node.querySelectorAll?.(".monaco-list-row").length ?? 0;
+              for (const element of node.querySelectorAll?.("*") ?? []) {
+                if (element.shadowRoot) walk(element.shadowRoot);
+              }
+            };
+            const region = document.querySelector(`[data-prac-region="${left}"]`);
+            if (region) walk(region);
+            return rows;
+          })(),
+        },
         // Which container the region shows: the container layer's own state.
         activeContainer:
           document
@@ -152,6 +175,28 @@ await page.reload({ waitUntil: "load" });
 await settle();
 const reloaded = await sample();
 
+// 3b. And its **content** with it. The scenario above folds the sidebar on purpose, so the
+// folded entry has no body to measure; unfolding it has to give the pane a real body and the
+// file tree its rows. Measured on the bug this locks: after a reload the entry came back but
+// its body stayed at the header's height (0 content), and unfolding did not help — clearing
+// the persisted key was the only way out.
+const unfold = await page.evaluate((view) => {
+  const toggle = document.querySelector(
+    `[data-prac-stack-entry="${view}"] [data-prac-stack-toggle]`,
+  );
+  if (toggle === null) return null;
+  const rect = toggle.getBoundingClientRect();
+  return { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) };
+}, VSCODE_SIDEBAR);
+if (unfold !== null) {
+  await page.mouse.move(unfold.x, unfold.y);
+  await page.mouse.down();
+  await page.waitForTimeout(120);
+  await page.mouse.up();
+  await page.waitForTimeout(3000);
+}
+const unfolded = await sample();
+
 await close();
 
 const near = (a, b, tolerance) => Math.abs((a ?? 0) - (b ?? 0)) <= tolerance;
@@ -185,6 +230,12 @@ const checks = {
     reloaded.activeContainer === changed.activeContainer &&
     reloaded.stack.some((entry) => entry.view === VSCODE_SIDEBAR && entry.collapsed === "true"),
   bottomRestored: reloaded.bottom !== null && near(reloaded.bottom?.h, BAR_HEIGHT, 6),
+  // The panes' **contents** survive the reload too: every stack body in the sidebar has
+  // a real height (not the 22px header) and the file tree inside it has rows.
+  containerContentRestored:
+    unfolded.panes.bodies.length > 0 &&
+    unfolded.panes.bodies.every((height) => height > 40) &&
+    unfolded.panes.treeRows > 0,
   // No rehydration or persistence complaint from the engine.
   noErrors:
     own("__pracLayout").length === 0 &&
