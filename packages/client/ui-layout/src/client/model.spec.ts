@@ -32,6 +32,7 @@ import {
   setCollapsed,
   setRegionSize,
   sideGeometry,
+  pruneEmbedderRegions,
   removeRegion,
   splitRegionWith,
   subtreeMin,
@@ -564,5 +565,35 @@ describe("nested regions (containers)", () => {
     const next = place(state(withContainers()), "v", "left.search");
     expect(visibleViews(next, "left.search")).toEqual(["v"]);
     expect(visibleViews(next, "left")).toEqual([]);
+  });
+});
+
+describe("pruneEmbedderRegions", () => {
+  it("drops a region the embedder created and left empty", () => {
+    const current = splitRegionWith(state(), CENTER_REGION, "right", "split-1", "region-1", {
+      embedder: true,
+    });
+    const pruned = pruneEmbedderRegions(current);
+    expect(findRegion(pruned.tree, "region-1")).toBeNull();
+    expect(findSplit(pruned.tree, "split-1")).toBeNull();
+  });
+
+  it("keeps an empty region a view split made: its view may not be placed yet", () => {
+    const current = splitRegionWith(state(), CENTER_REGION, "right", "split-1", "region-1");
+    // Nothing marked, nothing placed: the boot must leave it alone.
+    expect(pruneEmbedderRegions(current)).toBe(current);
+  });
+
+  it("keeps a marked region that holds a view", () => {
+    const current = splitRegionWith(state(), CENTER_REGION, "right", "split-1", "region-1", {
+      embedder: true,
+    });
+    const withView: typeof current = {
+      ...current,
+      views: {
+        "vscode:file:p0": { region: "region-1", order: 0, hidden: false, front: true },
+      } as unknown as typeof current.views,
+    };
+    expect(pruneEmbedderRegions(withView)).toBe(withView);
   });
 });

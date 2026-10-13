@@ -47,6 +47,7 @@ import {
   place,
   placeQuietly,
   regionInfos,
+  pruneEmbedderRegions,
   removeRegion as removeRegionFromTree,
   removeView,
   regionNode,
@@ -85,6 +86,11 @@ export function createServices(
   store: LayoutStore,
   closeListeners: Set<(viewId: string) => void>,
 ): LayoutServices {
+  // The frame's own housekeeping at load: the regions the embedder created and left empty are
+  // leftovers of a session whose files are gone, and nothing on screen can close them (see
+  // `pruneEmbedderRegions`). Idempotent, and it runs before the app places anything.
+  store.update(pruneEmbedderRegions);
+
   /** The arrangement's role bindings (empty until it binds them). */
   const roles: RoleBindings = {};
 
@@ -343,7 +349,9 @@ export function createServices(
       store.update((state) => {
         const splitId = nextNodeId("split", state);
         const newRegionId = nextNodeId("region", state);
-        const next = splitRegionWith(state, regionId, side, splitId, newRegionId);
+        const next = splitRegionWith(state, regionId, side, splitId, newRegionId, {
+          embedder: true,
+        });
         if (next === state) return state;
         created = newRegionId;
         return next;

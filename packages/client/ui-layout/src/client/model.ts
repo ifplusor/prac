@@ -910,6 +910,7 @@ export function splitRegionWith(
   side: Side,
   splitId: string,
   newRegionId: string,
+  options?: { embedder?: boolean },
 ): LayoutState {
   const node = findRegion(state.tree, regionId);
   if (!node) return state;
@@ -922,6 +923,9 @@ export function splitRegionWith(
     // has a tab strip for the views it holds — which is what a person expects of an
     // editor group they just created.
     ...(node.tabs === undefined ? {} : { tabs: node.tabs }),
+    // Only the embedder's own splits carry the mark: a region the app made for a **view** is
+    // the app's shape and must survive being empty (its view may not be placed yet).
+    ...(options?.embedder === true ? { embedder: true } : {}),
   });
   const replacement: SplitNode = {
     type: "split",
@@ -967,4 +971,36 @@ export function removeRegion(state: LayoutState, regionId: string): LayoutState 
         : survivor
       : { ...step.split, children: remaining };
   return { ...state, tree: replaceNode(state.tree, step.split.id, () => replacement) };
+}
+
+/**
+ * Drop the regions the embedder left behind.
+ *
+ * A **marked** region (see {@link RegionNode.embedder}) is an editor group's home, and a group
+ * is removed when its last editor closes — so a marked region with nothing in it is the
+ * leftover of a session whose files are gone, with no group to close and no chrome on screen to
+ * close it with. Unmarked regions are the app's own shape and are never pruned, however empty
+ * they look while their views are still being placed.
+ *
+ * @param state - the layout state.
+ * @returns the state with the left-over regions removed.
+ */
+export function pruneEmbedderRegions(state: LayoutState): LayoutState {
+  const occupied = new Set(Object.values(state.views).map((view) => view.region));
+  const holdsSomething = (id: string): boolean =>
+    occupied.has(id) || [...occupied].some((region) => region.startsWith(`${id}/`));
+  const stale: string[] = [];
+  const walk = (node: LayoutNode): void => {
+    if (node.type === "region") {
+      if (node.embedder === true && !holdsSomething(node.id)) stale.push(node.id);
+      for (const child of node.children ?? []) walk(child);
+      return;
+    }
+    for (const child of node.children) walk(child);
+  };
+  walk(state.tree);
+  let next = state;
+  // Deepest first: removing a child can collapse the split its parent sat in.
+  for (const id of stale.reverse()) next = removeRegion(next, id);
+  return next;
 }

@@ -170,10 +170,51 @@ await page.evaluate(
 await page.waitForTimeout(1500);
 const changed = await sample();
 
+// 2b. Seed the two shapes the boot must tell apart: a region the **embedder** created and left
+// empty (its group's files are gone with the last page — files are not restored across a reload,
+// so no group and no chrome is left to close it), and an empty region the app's own layout made
+// (its view simply has not been placed yet — `verify:split` restores a geometry through one).
+await page.evaluate(
+  ({ key }) => {
+    const raw = JSON.parse(localStorage.getItem(key));
+    const region = (id, embedder) => ({
+      type: "region",
+      id,
+      size: 0,
+      flex: true,
+      collapsed: false,
+      cachedSize: 0,
+      min: 120,
+      ...(embedder ? { embedder: true } : {}),
+    });
+    raw.tree.children.push(region("region-stale", true), region("region-keep", false));
+    localStorage.setItem(key, JSON.stringify(raw));
+  },
+  { key: STATE_KEY },
+);
+
 // 3. Reload: everything above has to come back.
 await page.reload({ waitUntil: "load" });
 await settle();
 const reloaded = await sample();
+// Which regions the restored tree still holds — read while the page is open (the teardown closes
+// the browser).
+const restoredRegions = await page.evaluate(
+  ({ key }) => {
+    const found = [];
+    const walk = (node) => {
+      if (node.type === "region") {
+        found.push(node.id);
+        for (const child of node.children ?? []) walk(child);
+        return;
+      }
+      for (const child of node.children) walk(child);
+    };
+    walk(JSON.parse(localStorage.getItem(key)).tree);
+    return found;
+  },
+  { key: STATE_KEY },
+);
 
 // 3b. And its **content** with it. The scenario above folds the sidebar on purpose, so the
 // folded entry has no body to measure; unfolding it has to give the pane a real body and the
@@ -236,6 +277,9 @@ const checks = {
     unfolded.panes.bodies.length > 0 &&
     unfolded.panes.bodies.every((height) => height > 40) &&
     unfolded.panes.treeRows > 0,
+  // The leftover is gone, and the app's own empty region is still there.
+  staleRegionPruned:
+    !restoredRegions.includes("region-stale") && restoredRegions.includes("region-keep"),
   // No rehydration or persistence complaint from the engine.
   noErrors:
     own("__pracLayout").length === 0 &&

@@ -97,6 +97,17 @@ export interface RegionNode {
    */
   readonly tabs?: TabMode;
   /**
+   * Whether the **embedder** created this region for an editor group.
+   *
+   * A marked region is a group's home, and a group is removed when its last editor closes — so
+   * a marked region that holds nothing is the leftover of a session whose files are gone (files
+   * are not restored across a reload): it has no group to close and no chrome to close it with,
+   * and the boot drops it. Unmarked regions are never pruned — the arrangement's tracks and the
+   * regions a **view** split made are the app's own shape, and one of those being empty at load
+   * only means its view has not been placed yet.
+   */
+  readonly embedder?: boolean;
+  /**
    * Child regions, when this region **selects** among them instead of holding
    * views directly.
    *
