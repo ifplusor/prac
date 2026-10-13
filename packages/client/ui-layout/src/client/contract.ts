@@ -163,13 +163,6 @@ export type LayoutNode = RegionNode | SplitNode;
 
 /** Where one view sits, and in what order inside its region. */
 export interface ViewRecord {
-  /**
-   * The height this view's entry takes in a **stack**, once a person has dragged the boundary
-   * above it. Absent means "share the height with the other entries", which is the default and
-   * what a stack looks like before anyone touches it. The frame writes it, the store persists
-   * it with the rest of the layout.
-   */
-  size?: number;
   region: string;
   order: number;
   hidden: boolean;

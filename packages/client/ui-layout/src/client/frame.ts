@@ -315,14 +315,6 @@ const TAB_ACTIVE_STYLE: StyleObject = {
   boxShadow: "inset 0 -1px 0 rgba(127,127,127,0.9)",
 };
 
-/**
- * Smallest height a stack entry may be dragged to.
- *
- * An entry is hidden by **folding** it, not by dragging it away, so the floor only has to keep
- * the header and a sliver of content reachable.
- */
-const MIN_ENTRY = 48;
-
 /** One in-flight sash drag. */
 interface DragState {
   pointerId: number;
@@ -434,8 +426,6 @@ const FRAME_STYLES = `
 [data-prac-sash][data-prac-sash-dir="row"] { cursor: col-resize; }
 [data-prac-sash][data-prac-sash-dir="column"] { cursor: row-resize; }
 [data-prac-sash]:hover { background: rgba(127, 127, 127, 0.35); }
-[data-prac-stack-boundary] { position: relative; z-index: 5; touch-action: none; user-select: none; background: transparent; }
-[data-prac-stack-boundary]:hover { background: rgba(127, 127, 127, 0.35); }
 `;
 
 /** Inject the frame's stylesheet once. */
@@ -557,65 +547,6 @@ export function createFrame(
     const sizes = resolveSizes(state, state.viewportWidth, state.viewportHeight);
 
     /**
-     * The draggable boundary between two entries of a stack.
-     *
-     * One rule, because it is what a person means by dragging that line: the entry
-     * **above** takes the new height, the rest share what is left. The lower bound keeps an
-     * entry from being dragged away (folding is how an entry is hidden); the upper one keeps
-     * the entries below from being squeezed out.
-     *
-     * @param viewId - the entry above the boundary, the one this drag resizes.
-     * @param box - the stack's box, for the upper bound.
-     */
-    const stackBoundary = (viewId: string, box: Box): ReactElement => {
-      // A ref, not a local: every store update re-renders the frame, and a local would be
-      // re-created mid-drag — measured as "only the first few pixels of the drag stick".
-      const drag = useRef({ pointerId: -1, origin: 0, start: 0, limit: 0 });
-      const current = (): number => {
-        const element = document.querySelector<HTMLElement>(`[data-prac-stack-entry="${viewId}"]`);
-        return element?.getBoundingClientRect().height ?? box.height;
-      };
-      const onPointerDown = (event: PointerDragEvent): void => {
-        if (event.button !== 0) return;
-        const element = event.currentTarget;
-        drag.current.pointerId = event.pointerId;
-        drag.current.origin = event.clientY;
-        drag.current.start = current();
-        drag.current.limit = Math.max(MIN_ENTRY, box.height - MIN_ENTRY);
-        element.setPointerCapture(event.pointerId);
-        event.preventDefault();
-      };
-      const onPointerMove = (event: PointerDragEvent): void => {
-        if (drag.current.pointerId !== event.pointerId) return;
-        event.preventDefault();
-        const wanted = Math.round(drag.current.start + (event.clientY - drag.current.origin));
-        const size = Math.max(MIN_ENTRY, Math.min(drag.current.limit, wanted));
-        store.update((state) => {
-          const view = state.views[viewId];
-          if (view === undefined || view.size === size) return state;
-          return { ...state, views: { ...state.views, [viewId]: { ...view, size } } };
-        });
-      };
-      const onPointerUp = (event: PointerDragEvent): void => {
-        if (drag.current.pointerId !== event.pointerId) return;
-        drag.current.pointerId = -1;
-        if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-          event.currentTarget.releasePointerCapture(event.pointerId);
-        }
-      };
-      return createElement("div", {
-        key: `boundary:${viewId}`,
-        "data-prac-stack-boundary": viewId,
-        "aria-hidden": "true",
-        style: { flex: `0 0 ${SASH_SIZE}px`, cursor: "row-resize" },
-        onPointerDown,
-        onPointerMove,
-        onPointerUp,
-        onPointerCancel: onPointerUp,
-      });
-    };
-
-    /**
      * A region renders the front-most visible view from the views table.
      *
      * @param node - the region to render.
@@ -630,7 +561,6 @@ export function createFrame(
      */
     const stackEntry = (viewId: string, box: Box): ReactElement => {
       const collapsed = state.views[viewId]?.collapsed === true;
-      const size = state.views[viewId]?.size;
       return createElement(
         "div",
         {
@@ -638,14 +568,7 @@ export function createFrame(
           "data-prac-stack-entry": viewId,
           "data-prac-stack-collapsed": collapsed ? "true" : "false",
           style: {
-            // A person may have dragged this entry's boundary: then it keeps that height and
-            // its neighbours share the rest. Otherwise every entry shares equally.
-            flex:
-              collapsed || size === undefined
-                ? collapsed
-                  ? "0 0 auto"
-                  : "1 1 0"
-                : `0 0 ${size}px`,
+            flex: collapsed ? "0 0 auto" : "1 1 0",
             minHeight: 0,
             display: "flex",
             flexDirection: "column",
@@ -894,11 +817,7 @@ export function createFrame(
         showsTabStrip(state, node)
           ? [tabStrip(views, node.id), viewBody(frontView(state, node.id) ?? views[0] ?? "", box)]
           : stacked
-            ? views.flatMap((viewId, position) =>
-                position === 0
-                  ? [stackEntry(viewId, box)]
-                  : [stackBoundary(views[position - 1] ?? viewId, box), stackEntry(viewId, box)],
-              )
+            ? views.map((viewId) => stackEntry(viewId, box))
             : // No strip: the region still shows its **front** view. It used to take the
               // first by order, which is a different question — measured with a region a
               // view had just been split into: the file that was copied in was front, the
