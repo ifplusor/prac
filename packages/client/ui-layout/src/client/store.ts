@@ -29,8 +29,20 @@ import { useSyncExternalStore } from "react";
 import { type LayoutState } from "./contract.js";
 import { defaultTree } from "./model.js";
 
-/** The persisted state's key. Bump the version when the shape changes. */
-export const STATE_KEY = "prac-layout/v2";
+/**
+ * The persisted state's key: a **generation**, not a schema revision.
+ *
+ * The engine rehydrates whatever sits under it, so moving to a new generation is a deliberate
+ * reset of everybody's layout (track sizes, stack order, fold, bottom bar) under this origin.
+ *
+ * `v1` (2026-10-13, James's call): the generation that starts after the region work. The payload
+ * it replaces could not be migrated — it has no `embedder` marks, so the empty regions a person
+ * cannot close are indistinguishable from live regions whose views have not been placed yet —
+ * and a reset is acceptable, so the cleanest end state is a generation that begins empty. It is
+ * **not** the shape the earliest `v1` had; a browser still holding one of those has its state
+ * read as-if current, which is why the model reads defensively.
+ */
+export const STATE_KEY = "prac-layout/v1";
 
 // ── store ─────────────────────────────────────────────────────────────
 

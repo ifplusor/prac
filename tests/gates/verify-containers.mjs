@@ -58,7 +58,7 @@ const SURFACES = [
 /** A borrowed id's prefix: `source: "view"` entries all arrive under this. */
 const BORROWED = "vscode:view:";
 /** The key `prac-client-ui-layout` persists under (see its `store.ts`). */
-const STATE_KEY = "prac-layout/v2";
+const STATE_KEY = "prac-layout/v1";
 
 const url = requireUrl();
 const { page, own, close } = await openPrac(url);
