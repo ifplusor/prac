@@ -211,7 +211,9 @@ const fitsWidth = (pane, host) =>
 const checks = {
   // The workbench's own menu, and *only* it: the native one is suppressed on the part host.
   contextMenuIsTheAppsOwn:
-    rightClick !== null && rightClick.defaultPrevented === true && rightClick.appMenuOpened === true,
+    rightClick !== null &&
+    rightClick.defaultPrevented === true &&
+    rightClick.appMenuOpened === true,
   // The view renders, as its own pane, with the workbench's own header.
   viewHostPresent: placed.host !== null && placed.panes >= 1,
   viewHeaderRendered: placed.headerTitle !== null,
