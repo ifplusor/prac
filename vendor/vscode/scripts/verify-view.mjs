@@ -146,6 +146,42 @@ async function sample() {
   return facts;
 }
 
+// The moved-out part keeps the workbench's own context-menu suppression: VS Code prevents the
+// browser's menu on *its* root, and a part mounted in the embedder's shell is no longer under
+// it — without carrying it, a right-click shows the workbench's menu **and** the browser's.
+// Measured before this criterion existed: `defaultPrevented` was still false at the window
+// bubble stage while `.context-view` had already opened.
+const contextMenu = await page.evaluate(() => {
+  const host = globalThis.__deep.one("[data-prac-view-host]");
+  const content = host?.shadowRoot?.querySelector("[data-prac-view-content]");
+  const row = content?.querySelector(".monaco-list-row") ?? null;
+  const box = row?.getBoundingClientRect();
+  if (!box) return null;
+  return { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) };
+});
+let rightClick = null;
+if (contextMenu !== null) {
+  await page.evaluate(() => {
+    globalThis.__ctxPrevented = null;
+    window.addEventListener(
+      "contextmenu",
+      (event) => {
+        globalThis.__ctxPrevented = event.defaultPrevented;
+      },
+      false,
+    );
+  });
+  await page.mouse.move(contextMenu.x, contextMenu.y);
+  await page.mouse.down({ button: "right" });
+  await page.waitForTimeout(120);
+  await page.mouse.up({ button: "right" });
+  await page.waitForTimeout(1200);
+  rightClick = await page.evaluate(() => ({
+    defaultPrevented: globalThis.__ctxPrevented,
+    appMenuOpened: globalThis.__deep.all(".context-view").length > 0,
+  }));
+}
+
 const placed = await sample();
 // Move the seat: the old host unmounts (releasing the view) and a new one mounts
 // (creating it again) — the release/recreate judgement, exercised through the UI.
@@ -173,6 +209,9 @@ const inside = (box, outer) =>
 const fitsWidth = (pane, host) =>
   pane !== null && host !== null && pane.w > 0 && pane.w <= host.w + 1 && pane.x >= host.x - 1;
 const checks = {
+  // The workbench's own menu, and *only* it: the native one is suppressed on the part host.
+  contextMenuIsTheAppsOwn:
+    rightClick !== null && rightClick.defaultPrevented === true && rightClick.appMenuOpened === true,
   // The view renders, as its own pane, with the workbench's own header.
   viewHostPresent: placed.host !== null && placed.panes >= 1,
   viewHeaderRendered: placed.headerTitle !== null,

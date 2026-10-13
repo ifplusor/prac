@@ -133,6 +133,9 @@ function editorKey(resource: string, group: number): string {
   return `${resource}\u0000${group}`;
 }
 
+/** Hosts whose native context menu this workbench already suppresses (see `observeHost`). */
+const suppressedContextMenus = new WeakSet<HTMLElement>();
+
 export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutService {
   declare readonly _serviceBrand: undefined;
 
@@ -1811,6 +1814,15 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    * passes never see that.
    */
   private observeHost(element: HTMLElement): void {
+    // A part mounted into the embedder's shell is **no longer under the workbench's own
+    // root**, and that is where the workbench suppresses the browser's context menu. Without
+    // carrying it here, a right-click in a moved-out part (the explorer tree, an editor) opens
+    // the workbench's menu *and* the browser's. Measured before this: at the window bubble
+    // stage `defaultPrevented` was still false while `.context-view` had already opened.
+    if (!suppressedContextMenus.has(element)) {
+      suppressedContextMenus.add(element);
+      element.addEventListener("contextmenu", (event) => event.preventDefault());
+    }
     if (typeof ResizeObserver === "undefined") return;
     this.hostResizeObserver ??= this._register(new ResizeObserver(() => this.layout()));
     this.hostResizeObserver.observe(element);
