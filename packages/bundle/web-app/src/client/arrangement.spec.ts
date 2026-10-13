@@ -20,6 +20,7 @@ import {
   focusView,
   openFileInto,
   placeCatalogue,
+  pruneEmptyRegions,
   placeSurfaces,
   restoreCentre,
   staleFileViews,
@@ -62,7 +63,10 @@ const stateWith = (views: LayoutState["views"] = {}): LayoutState => ({
  *
  * @param views - the view table the policy will read.
  */
-function recordingFace(views: LayoutState["views"] = {}): {
+function recordingFace(
+  views: LayoutState["views"] = {},
+  tree?: LayoutState["tree"],
+): {
   face: PracLayoutFace;
   calls: Call[];
   children: Map<string, { id: string; label?: string }[]>;
@@ -75,11 +79,11 @@ function recordingFace(views: LayoutState["views"] = {}): {
       calls.push({ method, args });
     };
   const face = {
-    getState: () => stateWith(views),
+    getState: () => (tree === undefined ? stateWith(views) : { ...stateWith(views), tree }),
     subscribe: () => () => {},
     listViews: () => [],
     listRegions: () => [],
-    removeRegion: () => undefined,
+    removeRegion: record("removeRegion"),
     place: record("place"),
     placeQuietly: record("placeQuietly"),
     removeView: record("removeView"),
@@ -449,5 +453,44 @@ describe("placeCatalogue", () => {
         { id: "left/container:workbench.view.explorer", label: "Explorer" },
       ],
     ]);
+  });
+});
+
+/** A tree with one stale, empty editor region beside the centre. */
+const staleTree = (): LayoutState["tree"] => ({
+  type: "split",
+  id: "root",
+  dir: "row",
+  children: [
+    { type: "region", id: LEFT, size: 280, flex: false, collapsed: false, min: 120 },
+    { type: "region", id: STAGE, size: 0, flex: true, collapsed: false, min: 120 },
+    {
+      type: "split",
+      id: "row-1",
+      dir: "row",
+      children: [
+        { type: "region", id: "region-1", size: 0, flex: true, collapsed: false, min: 120 },
+        { type: "region", id: RIGHT, size: 420, flex: false, collapsed: false, min: 120 },
+      ],
+    },
+  ],
+});
+
+describe("pruneEmptyRegions", () => {
+  it("removes an empty region the person cannot close, and keeps the tracks", () => {
+    const { face, calls } = recordingFace({}, staleTree());
+    pruneEmptyRegions(face);
+    expect(
+      calls.filter((call) => call.method === "removeRegion").map((call) => call.args[0]),
+    ).toEqual(["region-1"]);
+  });
+
+  it("keeps a region that holds a view", () => {
+    const views = {
+      "vscode:file:p0": { region: "region-1", order: 0, hidden: false, front: true },
+    } as unknown as LayoutState["views"];
+    const { face, calls } = recordingFace(views, staleTree());
+    pruneEmptyRegions(face);
+    expect(calls.some((call) => call.method === "removeRegion")).toBe(false);
   });
 });

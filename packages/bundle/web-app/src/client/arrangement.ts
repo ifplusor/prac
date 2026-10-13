@@ -11,7 +11,7 @@
  * @module prac-web-app/client/arrangement
  */
 
-import type { PracLayoutFace, ViewRecord } from "prac-client-ui-layout/client";
+import type { LayoutNode, PracLayoutFace, ViewRecord } from "prac-client-ui-layout/client";
 import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 
 /** The mechanism's placement face, named once for this module's signatures. */
@@ -352,6 +352,43 @@ export function restoreCentre(layout: PracLayout): boolean {
  *
  * @param layout - the mechanism's placement face.
  */
+/** The regions that stay even when nothing is in them: the arrangement's own tracks. */
+const TRACKS: readonly string[] = [LEFT, STAGE, RIGHT, BOTTOM];
+
+/**
+ * Drop the empty editor regions nobody can close.
+ *
+ * **Files are not restored across a reload**, so a persisted side-by-side comes back as empty
+ * regions: the group that owned each one is gone with the page, and an empty region shows no
+ * chrome at all — there is nothing on screen to close. They are stale by construction, so the
+ * boot removes them. A region that holds a view, or whose subtree does, is not stale; the
+ * arrangement's own tracks stay either way, because that is where the app's views live and a
+ * track that is empty right now is about to receive one.
+ *
+ * Runs **before** the catalogue is placed, so the container children do not exist yet and the
+ * only empty regions in the tree are the stale ones.
+ *
+ * @param layout - the mechanism's placement face.
+ */
+export function pruneEmptyRegions(layout: PracLayout): void {
+  const state = layout.getState();
+  const occupied = new Set(Object.values(state.views).map((view) => view.region));
+  const holdsSomething = (id: string): boolean =>
+    occupied.has(id) || [...occupied].some((region) => region.startsWith(`${id}/`));
+  const stale: string[] = [];
+  const walk = (node: LayoutNode): void => {
+    if (node.type === "region") {
+      if (!TRACKS.includes(node.id) && !holdsSomething(node.id)) stale.push(node.id);
+      for (const child of node.children ?? []) walk(child);
+      return;
+    }
+    for (const child of node.children) walk(child);
+  };
+  walk(state.tree);
+  // Deepest first: removing a child can collapse the split its parent sat in.
+  for (const id of stale.reverse()) layout.removeRegion(id);
+}
+
 export function arrange(layout: PracLayout): void {
   layout.bindRoles(ROLES);
   // Where a view parks when it gives up the centre: the right track, which is

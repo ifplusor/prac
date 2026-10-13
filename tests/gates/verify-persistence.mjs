@@ -170,6 +170,23 @@ await page.evaluate(
 await page.waitForTimeout(1500);
 const changed = await sample();
 
+// 2b. Seed the stale shape: a region left in the persisted layout with nothing in it. Files
+// are not restored across a reload, so the group that owned such a region is gone with the
+// page — the region shows no chrome at all and there is nothing on screen to close. The boot
+// prunes it.
+await page.evaluate(({ key }) => {
+  const raw = JSON.parse(localStorage.getItem(key));
+  raw.tree.children.push({
+    type: "region",
+    id: "region-stale",
+    size: 0,
+    flex: true,
+    collapsed: false,
+    min: 120,
+  });
+  localStorage.setItem(key, JSON.stringify(raw));
+}, { key: STATE_KEY });
+
 // 3. Reload: everything above has to come back.
 await page.reload({ waitUntil: "load" });
 await settle();
@@ -236,6 +253,8 @@ const checks = {
     unfolded.panes.bodies.length > 0 &&
     unfolded.panes.bodies.every((height) => height > 40) &&
     unfolded.panes.treeRows > 0,
+  // An empty region does not survive the boot: it is a leftover, not a layout.
+  staleRegionPruned: !reloaded.regions.includes("region-stale"),
   // No rehydration or persistence complaint from the engine.
   noErrors:
     own("__pracLayout").length === 0 &&
