@@ -15,6 +15,7 @@ import {
   HEADER_HEIGHT,
   MIN_ENTRY,
   allocateStack,
+  dragChainTarget,
   dragSnapTarget,
   redistributeOnDrag,
   setViewCollapsed,
@@ -110,7 +111,7 @@ describe("allocateStack", () => {
 
 describe("redistributeOnDrag (SplitView.resize, splitview.ts:1308-1325)", () => {
   const entries = (...heights: number[]) =>
-    heights.map((height, index) => ({ viewId: `v${index}`, height }));
+    heights.map((height, index) => ({ viewId: `v${index}`, height, folded: false }));
 
   it("takes the room from the entries below, nearest first", () => {
     const drawn = redistributeOnDrag(entries(100, 200, 300), "v1", 300);
@@ -206,5 +207,40 @@ describe("dragSnapTarget (SplitView's snap at half the minimum, splitview.ts:942
 
   it("says nothing for the stack's last entry, which has no boundary", () => {
     expect(dragSnapTarget(entries([300, false]), "v0", 400)).toBeUndefined();
+  });
+});
+
+describe("dragChainTarget (the folding chain, bottom-up)", () => {
+  const entries = (...rows: [number, boolean][]) =>
+    rows.map(([height, folded], index) => ({ viewId: `v${index}`, height, folded }));
+
+  it("asks for the next entry below once the room there runs out", () => {
+    // outline / timeline / open editors / file view / probe: dragging the file view down past what
+    // the probe can give folds the probe first.
+    expect(
+      dragChainTarget(
+        entries([200, false], [200, false], [200, false], [300, false], [48, false]),
+        "v3",
+        400,
+      ),
+    ).toBe("v4");
+  });
+
+  it("walks past a folded entry to the next one below, in order", () => {
+    // outline, [open editors folded], file view: dragging outline down folds the *next open* one
+    // below, skipping the header it already folded.
+    expect(dragChainTarget(entries([300, false], [20, true], [48, false]), "v0", 400)).toBe("v2");
+    // Nothing open below: the chain has nowhere to go, and the entries above stay put.
+    expect(
+      dragChainTarget(entries([300, false], [20, true], [20, true]), "v0", 400),
+    ).toBeUndefined();
+  });
+
+  it("says nothing while the entries below still have room", () => {
+    expect(dragChainTarget(entries([300, false], [200, false]), "v0", 340)).toBeUndefined();
+  });
+
+  it("ignores a folded entry for the room, and names the first open one below", () => {
+    expect(dragChainTarget(entries([300, false], [20, true], [48, false]), "v0", 400)).toBe("v2");
   });
 });

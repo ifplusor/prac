@@ -1091,59 +1091,84 @@ export function allocateStack(
 /**
  * What every entry of a stack becomes when one entry is dragged to `target`.
  *
- * This is upstream's rule, from `SplitView.resize` (`splitview.ts:1308-1325`): the delta goes to
- * the sash's own view first, then to the views **above** it (nearest first), and the views
- * **below** give up the same delta (nearest first, each clamped at its floor). A drag therefore
- * touches several entries — that is the alignment; only the *view being dragged* is the person's
- * intent, the rest are the stack keeping its height.
+ * The delta goes to the sash's own view first, then to the views **above** it (nearest first), and
+ * the views **below** give up the same delta (nearest first, each clamped at its floor) — upstream's
+ * loops from `SplitView.resize` (`splitview.ts:1308-1325`). How far the boundary may travel is
+ * upstream's `maxDelta` (`:1281`), and it counts the room the entries **below** have: nothing above
+ * the dragged entry is ever taken from (measured: doing that made a drag eat the entries above, and
+ * the person read it as "贴底的连续折叠是不会动的"). A folded entry is a header — it owns no room
+ * and is left out of the result entirely, so a drag can never write over the size it was folded
+ * with.
  *
- * The limits are upstream's too: how far the boundary may travel is the room the views below have
- * left plus the views above (their maxima), which the frame reads off the screen before the drag
- * starts (`minDelta/maxDelta`, `splitview.ts:936-940`).
- *
- * @param entries - the stack's unfolded entries, top-down, with their current heights.
+ * @param entries - every entry of the stack, top-down, with its height and fold state.
  * @param viewId - the entry whose bottom edge is being dragged.
  * @param target - the height it is being dragged to.
- * @returns the height every entry ends up at.
+ * @returns the new height of every entry the drag touches (folded entries are absent).
  */
 export function redistributeOnDrag(
-  entries: readonly { viewId: string; height: number }[],
+  entries: readonly { viewId: string; height: number; folded: boolean }[],
   viewId: string,
   target: number,
 ): Map<string, number> {
-  const sizes = new Map(entries.map((entry) => [entry.viewId, entry.height]));
-  const at = entries.findIndex((entry) => entry.viewId === viewId);
-  if (at === -1) return sizes;
-  const sizeOf = (id: string): number => sizes.get(id) ?? MIN_ENTRY;
-  const wanted = Math.max(MIN_ENTRY, target) - (entries[at]?.height ?? MIN_ENTRY);
-  // Upstream clamps the delta before moving anything (`splitview.ts:1303`): how far the boundary
-  // may travel is what the views below can give (their room above the floor) and what the views
-  // above can give (their room above the floor too, since a shrink hands room downward). When
-  // nothing below can give, the drag simply does not move — the stack is full.
-  const up = entries.slice(0, at + 1);
-  const down = entries.slice(at + 1);
-  const maxDelta =
-    down.length === 0
-      ? Number.POSITIVE_INFINITY
-      : down.reduce((t, e) => t + Math.max(0, e.height - MIN_ENTRY), 0);
-  const minDelta = [...up, ...down].reduce((t, e) => t - Math.max(0, e.height - MIN_ENTRY), 0);
-  const delta = Math.max(minDelta, Math.min(maxDelta, wanted));
+  const open = entries.filter((entry) => !entry.folded);
+  const sizes = new Map(open.map((entry) => [entry.viewId, entry.height]));
+  const at = open.findIndex((entry) => entry.viewId === viewId);
+  const dragged = open[at];
+  if (dragged === undefined) return sizes;
+  const room = (entry: { height: number }): number => Math.max(0, entry.height - MIN_ENTRY);
+  const up = open.slice(0, at);
+  const down = open.slice(at + 1);
+  const maxDelta = down.reduce((total, entry) => total + room(entry), 0);
+  const minDelta = -[...up, ...down].reduce((total, entry) => total + room(entry), 0);
+  const delta = Math.max(
+    minDelta,
+    Math.min(maxDelta, Math.max(MIN_ENTRY, target) - dragged.height),
+  );
   if (delta === 0) return sizes;
-  // The sash's view, then the ones above it take the delta they can hold.
   let deltaUp = delta;
-  for (const peer of entries.slice(0, at + 1).reverse()) {
-    const size = Math.max(MIN_ENTRY, sizeOf(peer.viewId) + deltaUp);
-    deltaUp -= size - sizeOf(peer.viewId);
-    sizes.set(peer.viewId, size);
+  for (const entry of [dragged, ...up.slice().reverse()]) {
+    const size = Math.max(MIN_ENTRY, entry.height + deltaUp);
+    deltaUp -= size - entry.height;
+    sizes.set(entry.viewId, size);
   }
-  // The ones below give the same delta up, nearest first.
   let deltaDown = delta;
-  for (const peer of entries.slice(at + 1)) {
-    const size = Math.max(MIN_ENTRY, sizeOf(peer.viewId) - deltaDown);
-    deltaDown += size - sizeOf(peer.viewId);
-    sizes.set(peer.viewId, size);
+  for (const entry of down) {
+    const size = Math.max(MIN_ENTRY, entry.height - deltaDown);
+    deltaDown += size - entry.height;
+    sizes.set(entry.viewId, size);
   }
   return sizes;
+}
+
+/**
+ * The next entry a drag folds so that it can keep going.
+ *
+ * Growing an entry only takes room from the entries below it, and once they all sit on their floor
+ * there is none left — upstream stops the drag there (`maxDelta`, `splitview.ts:1281`). But a
+ * person dragging past that point means "get this out of the way", and what they expect is the
+ * order they described: fileView → open editors → timeline, i.e. the next entry folds and the drag
+ * continues into the room its body frees. The entries **above** the dragged one are never touched.
+ *
+ * @param entries - every entry of the stack, top-down, with its height and fold state.
+ * @param viewId - the entry whose bottom edge is being dragged.
+ * @param target - the height it is being dragged to.
+ * @returns the entry below that should fold, if the drag has run out of room.
+ */
+export function dragChainTarget(
+  entries: readonly { viewId: string; height: number; folded: boolean }[],
+  viewId: string,
+  target: number,
+): string | undefined {
+  const at = entries.findIndex((entry) => entry.viewId === viewId);
+  const dragged = entries[at];
+  if (dragged === undefined || dragged.folded) return undefined;
+  const wanted = Math.max(MIN_ENTRY, target) - dragged.height;
+  const room = entries
+    .slice(at + 1)
+    .filter((entry) => !entry.folded)
+    .reduce((total, entry) => total + Math.max(0, entry.height - MIN_ENTRY), 0);
+  if (wanted <= room) return undefined;
+  return entries.slice(at + 1).find((entry) => !entry.folded)?.viewId;
 }
 
 /**

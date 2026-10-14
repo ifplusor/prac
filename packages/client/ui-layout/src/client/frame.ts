@@ -67,6 +67,7 @@ import {
   redistributeOnDrag,
   setViewCollapsed,
   dragSnapTarget,
+  dragChainTarget,
 } from "./model.js";
 import { type LayoutStore, useLayout } from "./store.js";
 import type { LayoutState } from "./contract.js";
@@ -682,7 +683,19 @@ export function createFrame(
           moveEvent.preventDefault();
           const drag = entryDrag;
           const pointerDelta = moveEvent.clientY - drag.origin;
-          const snap = dragSnapTarget(drag.rows, drag.viewId, pointerDelta);
+          const snap =
+            dragSnapTarget(drag.rows, drag.viewId, pointerDelta) ??
+            // No threshold crossed yet: when the entries below have no room left, the drag keeps
+            // going by folding the next one down (the chain the person described: file view, open
+            // editors, timeline), while the entries above are never touched.
+            ((): { viewId: string; collapsed: boolean } | undefined => {
+              const chain = dragChainTarget(
+                drag.rows,
+                drag.viewId,
+                Math.round(drag.start + pointerDelta),
+              );
+              return chain === undefined ? undefined : { viewId: chain, collapsed: true };
+            })();
           if (snap !== undefined) {
             // Upstream snaps a view in or out and then lays the split view out again with the new
             // visibility (`splitview.ts:1298-1307`). Same here: fold it, re-read the stack and
@@ -734,7 +747,7 @@ export function createFrame(
           const target = Math.max(MIN_ENTRY, Math.min(drag.limit, wanted));
           // Upstream's rule (`SplitView.resize`): the dragged entry and the ones above it take the
           // delta, the ones below give it up — several sizes move, and the stack keeps its height.
-          const sizes = redistributeOnDrag(drag.peers, drag.viewId, target);
+          const sizes = redistributeOnDrag(drag.rows, drag.viewId, target);
           store.update((state) => {
             let views = state.views;
             let changed = false;
