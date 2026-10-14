@@ -1124,18 +1124,26 @@ export function redistributeOnDrag(
     minDelta,
     Math.min(maxDelta, Math.max(MIN_ENTRY, target) - dragged.height),
   );
-  if (delta === 0) return sizes;
-  let deltaUp = delta;
-  for (const entry of [dragged, ...up.slice().reverse()]) {
-    const size = Math.max(MIN_ENTRY, entry.height + deltaUp);
-    deltaUp -= size - entry.height;
-    sizes.set(entry.viewId, size);
+  if (delta !== 0) {
+    let deltaUp = delta;
+    for (const entry of [dragged, ...up.slice().reverse()]) {
+      const size = Math.max(MIN_ENTRY, entry.height + deltaUp);
+      deltaUp -= size - entry.height;
+      sizes.set(entry.viewId, size);
+    }
+    let deltaDown = delta;
+    for (const entry of down) {
+      const size = Math.max(MIN_ENTRY, entry.height - deltaDown);
+      deltaDown += size - entry.height;
+      sizes.set(entry.viewId, size);
+    }
   }
-  let deltaDown = delta;
-  for (const entry of down) {
-    const size = Math.max(MIN_ENTRY, entry.height - deltaDown);
-    deltaDown += size - entry.height;
-    sizes.set(entry.viewId, size);
+  // Hand back **only the entries that really move**. Everything else was in `sizes` at the height
+  // it is drawn at, which is not always the height in the layout (the allocation re-fits the stack,
+  // so a drawn 199 can sit next to a stored 200) — writing those back rewrote entries the drag
+  // never touched, and the entries above a drag drifted every time it ran (measured).
+  for (const entry of entries) {
+    if (sizes.get(entry.viewId) === entry.height) sizes.delete(entry.viewId);
   }
   return sizes;
 }

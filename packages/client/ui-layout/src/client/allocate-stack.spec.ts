@@ -110,41 +110,56 @@ describe("allocateStack", () => {
 });
 
 describe("redistributeOnDrag (SplitView.resize, splitview.ts:1308-1325)", () => {
-  const entries = (...heights: number[]) =>
-    heights.map((height, index) => ({ viewId: `v${index}`, height, folded: false }));
+  const entries = (...rows: [number, boolean][]) =>
+    rows.map(([height, folded], index) => ({ viewId: `v${index}`, height, folded }));
 
   it("takes the room from the entries below, nearest first", () => {
-    const drawn = redistributeOnDrag(entries(100, 200, 300), "v1", 300);
+    const drawn = redistributeOnDrag(entries([100, false], [200, false], [300, false]), "v1", 300);
     expect(drawn.get("v1")).toBe(300);
     expect(drawn.get("v2")).toBe(200);
-    expect(drawn.get("v0")).toBe(100);
+    // Not touched, so not handed back.
+    expect(drawn.has("v0")).toBe(false);
   });
 
-  it("does not move when the entries below have nothing to give (maxDelta = 0)", () => {
-    // The stack is full and everything below sits on its floor: upstream clamps the delta to 0,
-    // so the drag does not steal the room from the entry above.
-    const drawn = redistributeOnDrag(entries(400, 48, 48), "v1", 148);
-    expect(drawn.get("v1")).toBe(48);
-    expect(drawn.get("v2")).toBe(48);
-    expect(drawn.get("v0")).toBe(400);
+  it("hands back nothing at all when the entries below have nothing to give", () => {
+    const drawn = redistributeOnDrag(entries([400, false], [48, false], [48, false]), "v1", 148);
+    expect(drawn.size).toBe(0);
   });
 
-  it("hands a shrink to the entries below", () => {
-    const drawn = redistributeOnDrag(entries(400, 300, 200), "v1", 200);
-    expect(drawn.get("v1")).toBe(200);
-    expect(drawn.get("v2")).toBe(300);
-    expect(drawn.get("v0")).toBe(400);
+  it("treats a folded entry below as a header: it gives no room and never moves", () => {
+    const drawn = redistributeOnDrag(entries([400, false], [300, false], [20, true]), "v1", 340);
+    expect(drawn.size).toBe(0);
   });
 
-  it("leaves the room a shrink frees to the allocator when there is nothing below", () => {
-    // The last sash has no `downIndexes`, so upstream's own loops leave the leftover behind and
-    // `distributeEmptySpace` (`:1002`) places it; here that is `allocateStack`'s job.
-    const drawn = redistributeOnDrag(entries(400, 300), "v1", 200);
-    expect(drawn.get("v1")).toBe(200);
-    expect(drawn.get("v0")).toBe(400);
+  it("still takes the room an unfolded entry further down can give", () => {
+    const drawn = redistributeOnDrag(
+      entries([400, false], [200, false], [20, true], [200, false]),
+      "v1",
+      260,
+    );
+    expect(drawn.get("v1")).toBe(260);
+    expect(drawn.get("v3")).toBe(140);
+    expect(drawn.has("v0")).toBe(false);
+    expect(drawn.has("v2")).toBe(false);
+  });
+
+  it("hands a shrink to the entries below, and leaves the entries above alone", () => {
+    const withBelow = redistributeOnDrag(
+      entries([400, false], [300, false], [200, false]),
+      "v1",
+      200,
+    );
+    expect(withBelow.get("v1")).toBe(200);
+    expect(withBelow.get("v2")).toBe(300);
+    expect(withBelow.has("v0")).toBe(false);
+
+    // The last sash has no entries below, so the room it frees is the allocator's to place
+    // (upstream's `distributeEmptySpace`, `splitview.ts:1002`) — the entries above do not move.
+    const lastEntry = redistributeOnDrag(entries([400, false], [300, false]), "v1", 200);
+    expect(lastEntry.get("v1")).toBe(200);
+    expect(lastEntry.has("v0")).toBe(false);
   });
 });
-
 describe("setViewCollapsed (SplitView.setVisible's cached size, splitview.ts:228)", () => {
   it("remembers what an unsized entry was drawn at when it folds", () => {
     const state = stateOf({ a: {}, b: {} });
@@ -234,6 +249,20 @@ describe("dragChainTarget (the folding chain, bottom-up)", () => {
     expect(
       dragChainTarget(entries([300, false], [20, true], [20, true]), "v0", 400),
     ).toBeUndefined();
+  });
+
+  it("hands back only the entries that move, never the ones it left alone", () => {
+    // The entries above a drag are not taken from, and their *drawn* height can differ from the
+    // size the layout holds: writing them back is what made them drift (measured).
+    const drawn = redistributeOnDrag(
+      entries([200, false], [150, false], [100, false], [147, false]),
+      "v3",
+      200,
+    );
+    expect(drawn.has("v0")).toBe(false);
+    expect(drawn.has("v1")).toBe(false);
+    expect(drawn.has("v2")).toBe(false);
+    expect(drawn.get("v3")).toBe(200);
   });
 
   it("says nothing while the entries below still have room", () => {
