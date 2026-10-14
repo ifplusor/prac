@@ -1004,3 +1004,84 @@ export function pruneEmbedderRegions(state: LayoutState): LayoutState {
   for (const id of stale.reverse()) next = removeRegion(next, id);
   return next;
 }
+
+/**
+ * A folded entry's height: its header and nothing else.
+ *
+ * Fixed in the header's own style so the allocation subtracts it exactly instead of guessing.
+ */
+export const HEADER_HEIGHT = 20;
+
+/**
+ * Smallest height a stack entry may be dragged to.
+ *
+ * An entry is hidden by **folding** it, not by dragging it away, so the floor only has to keep
+ * the header and a sliver of content reachable.
+ */
+export const MIN_ENTRY = 48;
+
+/**
+ * The heights to draw for a stack that has folds or hand-set sizes in it.
+ *
+ * Upstream's rule, from `SplitView.distributeEmptySpace` (`splitview.ts:1329-1355`): the empty
+ * space travels **toward the bottom** — it is handed to the entries *below* the fold, and when
+ * nothing is below, to the entries *above*, which is what pushes a folded bottom entry's header
+ * down to the bottom instead of leaving a blank strip. Space going the other way (a window that
+ * shrank) shrinks everything proportionally, never below a floor.
+ *
+ * A flat stack — no folds, no sizes — is left to flex: it is the equal share it always had, and it
+ * follows a resize for free.
+ *
+ * @param views - the stack's visible views, top-down.
+ * @param state - the layout state (each view's stored size and fold).
+ * @param measured - heights from the previous frame, for entries nobody has sized.
+ * @param height - the height the stack really has (measured, not the frame's stale table).
+ * @returns the height to draw each entry at, folded ones included.
+ */
+export function allocateStack(
+  views: readonly string[],
+  state: LayoutState,
+  measured: ReadonlyMap<string, number>,
+  height: number,
+): Map<string, number> {
+  const drawn = new Map<string, number>();
+  const folded = views.filter((viewId) => state.views[viewId]?.collapsed === true);
+  const open = views.filter((viewId) => state.views[viewId]?.collapsed !== true);
+  for (const viewId of folded) drawn.set(viewId, HEADER_HEIGHT);
+  if (open.length === 0) return drawn;
+  const available = Math.max(open.length * MIN_ENTRY, height - folded.length * HEADER_HEIGHT);
+  // Entries nobody sized take what the sized ones leave: on the first frame after a load there is
+  // nothing measured yet, and an equal share of the **whole** stack would make the sizes that were
+  // written down come out smaller than they are (measured: a written 210 drawn at ~180).
+  const fixedTotal = open.reduce((total, viewId) => total + (state.views[viewId]?.size ?? 0), 0);
+  const flexible = open.filter((viewId) => state.views[viewId]?.size === undefined).length;
+  const fallback =
+    flexible > 0
+      ? Math.max(MIN_ENTRY, Math.round((available - fixedTotal) / flexible))
+      : Math.round(available / open.length);
+  for (const viewId of open) {
+    drawn.set(viewId, state.views[viewId]?.size ?? measured.get(viewId) ?? fallback);
+  }
+  const wanted = open.reduce((total, viewId) => total + (drawn.get(viewId) ?? 0), 0);
+  if (wanted > available) {
+    const scale = available / wanted;
+    for (const viewId of open) {
+      drawn.set(viewId, Math.max(MIN_ENTRY, Math.round((drawn.get(viewId) ?? 0) * scale)));
+    }
+  }
+  let leftover = available - open.reduce((total, viewId) => total + (drawn.get(viewId) ?? 0), 0);
+  const firstFold = views.findIndex((viewId) => state.views[viewId]?.collapsed === true);
+  // A drag already hands the space around as it moves, so a stack with no fold in it needs no
+  // second distribution: leaving the leftover alone is what keeps "the size in the layout is the
+  // size it is drawn at" true after a drag.
+  if (leftover <= 0 || firstFold === -1) return drawn;
+  const below = open.filter((viewId) => views.indexOf(viewId) > firstFold);
+  const above = open.filter((viewId) => views.indexOf(viewId) < firstFold);
+  const target = below.length > 0 ? below : above.length > 0 ? above : open;
+  const total = target.reduce((sum, viewId) => sum + (drawn.get(viewId) ?? 0), 0);
+  for (const viewId of target) {
+    const share = total > 0 ? Math.round((leftover * (drawn.get(viewId) ?? 0)) / total) : 0;
+    drawn.set(viewId, (drawn.get(viewId) ?? 0) + share);
+  }
+  return drawn;
+}
