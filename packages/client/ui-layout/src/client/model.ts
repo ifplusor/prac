@@ -1186,28 +1186,24 @@ export function setViewCollapsed(
 export const SNAP_DISTANCE = Math.floor(MIN_ENTRY / 2);
 
 /**
- * Whether a drag has reached the point where an entry should fold — or unfold again.
+ * Whether a drag has reached the point where an entry folds.
  *
- * Upstream's sash snaps a view in and out as the pointer passes half of its minimum size, and the
- * view comes back at the size it was hidden with (`splitview.ts:946/1301`). The two thresholds sit
- * a band apart (`limitDelta = visible ? maxDelta + halfSize : maxDelta − halfSize`, `:971`), which
- * is what stops a view from flickering in and out while the pointer stands still near the edge.
- * This is that rule for a stack, with the band as `SNAP_DISTANCE`: the neighbour folds once the
- * drag squeezes it past half its floor, and only opens again when the pointer has moved **back**
- * by more than that band.
+ * Upstream's sash snaps a view away once the drag passes half of its minimum size
+ * (`splitview.ts:942/1301`, `limitDelta = minDelta − halfSize` for the visible case). The other
+ * direction is deliberately **not** implemented: upstream has the machinery for it but nothing in
+ * the workbench opts in (`IView.snap`, `@defaultValue false`, `:78-84`), so a collapsed view stays
+ * collapsed until a person asks for it — which here is the fold toggle on its header.
  *
  * @param entries - every entry of the stack, top-down, with its current height and fold state.
  * @param viewId - the entry whose bottom edge is being dragged.
  * @param pointerDelta - how far the pointer has moved since the drag began (or since it was
  *   re-anchored, which the caller does after every snap).
- * @param previousDelta - the pointer delta of the previous move, for the backward test.
- * @returns the view to fold or unfold, if the drag has crossed a threshold.
+ * @returns the view to fold, if the drag has crossed the threshold.
  */
 export function dragSnapTarget(
   entries: readonly { viewId: string; height: number; folded: boolean }[],
   viewId: string,
   pointerDelta: number,
-  previousDelta?: number,
 ): { viewId: string; collapsed: boolean } | undefined {
   const at = entries.findIndex((entry) => entry.viewId === viewId);
   const dragged = entries[at];
@@ -1215,15 +1211,7 @@ export function dragSnapTarget(
   // The entry's own boundary cannot go under half a floor: that folds the entry being dragged.
   if (dragged.height + pointerDelta < SNAP_DISTANCE) return { viewId, collapsed: true };
   const below = entries[at + 1];
-  if (below === undefined) return undefined;
-  if (below.folded) {
-    // Opening a folded neighbour takes a real retreat, or the fold that just happened would undo
-    // itself on the very next move (measured while wiring this up: the pointer is still past the
-    // threshold at the moment the entry folds).
-    return previousDelta !== undefined && pointerDelta <= previousDelta - SNAP_DISTANCE
-      ? { viewId: below.viewId, collapsed: false }
-      : undefined;
-  }
+  if (below === undefined || below.folded) return undefined;
   return below.height - pointerDelta < SNAP_DISTANCE
     ? { viewId: below.viewId, collapsed: true }
     : undefined;

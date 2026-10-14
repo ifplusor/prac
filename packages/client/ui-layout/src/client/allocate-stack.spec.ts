@@ -189,14 +189,11 @@ describe("dragSnapTarget (SplitView's snap at half the minimum, splitview.ts:942
     expect(dragSnapTarget(entries([300, false], [48, false]), "v0", 10)).toBeUndefined();
   });
 
-  it("opens a folded neighbour only after the pointer has really come back (the band)", () => {
-    const rows = entries([300, false], [20, true]);
-    // Retreating 30px is more than the band, so it opens.
-    expect(dragSnapTarget(rows, "v0", 10, 40)).toEqual({ viewId: "v1", collapsed: false });
-    // Retreating 10px is not: without the band the fold would undo itself on the next move.
-    expect(dragSnapTarget(rows, "v0", 30, 40)).toBeUndefined();
-    // And with no previous move to compare against, nothing opens.
-    expect(dragSnapTarget(rows, "v0", 10)).toBeUndefined();
+  it("never opens a folded entry by dragging (upstream has this off by default)", () => {
+    // `IView.snap` is opt-in and nothing in the workbench opts in (splitview.ts:78-84), so a
+    // collapsed entry waits for the fold toggle on its header rather than popping open.
+    expect(dragSnapTarget(entries([300, false], [20, true]), "v0", 400)).toBeUndefined();
+    expect(dragSnapTarget(entries([300, false], [20, true]), "v0", -200)).toBeUndefined();
   });
 
   it("folds the dragged entry itself when its own boundary goes under half its floor", () => {

@@ -355,8 +355,8 @@ let entryDrag: {
   rows: { viewId: string; height: number; folded: boolean }[];
   /** The element the entries live in, so a snap can re-read the stack it just changed. */
   container: { querySelectorAll(selectors: string): readonly StackEntryNode[] } | null;
-  /** The pointer delta of the previous move: the snap band needs to see the pointer come back. */
-  lastDelta: number;
+  /** What every entry measured when the drag began: the height a folded entry comes back at. */
+  startRows: { viewId: string; height: number }[];
 } | null = null;
 
 /** What a stack entry looks like through the little of the DOM this file touches. */
@@ -682,12 +682,25 @@ export function createFrame(
           moveEvent.preventDefault();
           const drag = entryDrag;
           const pointerDelta = moveEvent.clientY - drag.origin;
-          const snap = dragSnapTarget(drag.rows, drag.viewId, pointerDelta, drag.lastDelta);
+          const snap = dragSnapTarget(drag.rows, drag.viewId, pointerDelta);
           if (snap !== undefined) {
             // Upstream snaps a view in or out and then lays the split view out again with the new
             // visibility (`splitview.ts:1298-1307`). Same here: fold it, re-read the stack and
             // re-anchor the drag, so the band is measured from where the stack now is.
-            store.update((state) => setViewCollapsed(state, snap.viewId, snap.collapsed));
+            // Folding remembers the height the entry had when the **drag began**, the way upstream
+            // hands `setVisible` the size captured at drag start (`splitview.ts:946`) — not the
+            // height it was squeezed to by the time the threshold was crossed.
+            const atStart = drag.startRows.find((row) => row.viewId === snap.viewId)?.height;
+            store.update((state) => {
+              const folded = setViewCollapsed(state, snap.viewId, snap.collapsed);
+              const view = folded.views[snap.viewId];
+              return view === undefined || atStart === undefined || view.size === atStart
+                ? folded
+                : {
+                    ...folded,
+                    views: { ...folded.views, [snap.viewId]: { ...view, size: atStart } },
+                  };
+            });
             // The fold only reaches the DOM on the next render, so the immediately re-read rows
             // still show the entry as it was: drop the one just folded by hand, or the very next
             // move would resize it as if it were an ordinary entry (measured: it wrote the folded
@@ -707,7 +720,6 @@ export function createFrame(
             });
             drag.start = rows.find((row) => row.viewId === drag.viewId)?.height ?? drag.start;
             drag.origin = moveEvent.clientY;
-            drag.lastDelta = 0;
             const below = drag.peers.slice(
               drag.peers.findIndex((peer) => peer.viewId === drag.viewId) + 1,
             );
@@ -718,7 +730,6 @@ export function createFrame(
             );
             return;
           }
-          drag.lastDelta = pointerDelta;
           const wanted = Math.round(drag.start + pointerDelta);
           const target = Math.max(MIN_ENTRY, Math.min(drag.limit, wanted));
           // Upstream's rule (`SplitView.resize`): the dragged entry and the ones above it take the
@@ -781,7 +792,7 @@ export function createFrame(
           peers,
           rows: all,
           container: container ?? null,
-          lastDelta: 0,
+          startRows: all.map((row) => ({ viewId: row.viewId, height: row.height })),
         };
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", finish);
