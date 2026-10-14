@@ -158,6 +158,11 @@ describe("setViewCollapsed (SplitView.setVisible's cached size, splitview.ts:228
     expect(folded.views.a?.size).toBe(300);
   });
 
+  it("unfolds at the height it is measured at when nothing was remembered", () => {
+    const opened = setViewCollapsed(stateOf({ a: { collapsed: true } }), "a", false, 147);
+    expect(opened.views.a?.size).toBe(147);
+  });
+
   it("drops a header-sized leftover when unfolding, and invents nothing without a measurement", () => {
     const leftover = setViewCollapsed(
       stateOf({ a: { size: 18, collapsed: true } }),

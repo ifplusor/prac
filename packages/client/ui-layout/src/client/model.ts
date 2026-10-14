@@ -1169,11 +1169,12 @@ export function setViewCollapsed(
   const view = state.views[viewId];
   if (view === undefined || view.collapsed === collapsed) return state;
   let size = view.size;
-  if (collapsed) {
-    if (size === undefined && measuredHeight !== undefined && measuredHeight >= MIN_ENTRY) {
-      size = Math.round(measuredHeight);
-    }
-  } else if (size !== undefined && size < MIN_ENTRY) {
+  if (size === undefined && measuredHeight !== undefined && measuredHeight >= MIN_ENTRY) {
+    // The height it has right now is the height it comes back at — folding and unfolding alike
+    // (upstream hands `setVisible` the size captured when the drag began, `splitview.ts:946`).
+    size = Math.round(measuredHeight);
+  }
+  if (!collapsed && size !== undefined && size < MIN_ENTRY) {
     // Unfolding has to give a body back: a header-sized leftover would leave the entry stuck.
     size = undefined;
   }
