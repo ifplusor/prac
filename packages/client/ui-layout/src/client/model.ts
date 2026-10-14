@@ -1145,3 +1145,37 @@ export function redistributeOnDrag(
   }
   return sizes;
 }
+
+/**
+ * Fold or unfold a stack entry, remembering the height it had.
+ *
+ * `SplitView` hides a view with `setVisible(false)`, which **caches the view's size**
+ * (`splitview.ts:228`) and hands it back on the way in (`:233`, `getViewCachedVisibleSize`), so a
+ * folded viewlet unfolds at the height it had. A size somebody dragged is already remembered; this
+ * covers the entry nobody has sized, whose height only exists on screen.
+ *
+ * @param state - the layout state.
+ * @param viewId - the view to fold or unfold.
+ * @param collapsed - the state to move to.
+ * @param measuredHeight - what the entry is drawn at right now, if the caller can see it.
+ * @returns the state with the view folded, and with the size it should come back at.
+ */
+export function setViewCollapsed(
+  state: LayoutState,
+  viewId: string,
+  collapsed: boolean,
+  measuredHeight?: number,
+): LayoutState {
+  const view = state.views[viewId];
+  if (view === undefined || view.collapsed === collapsed) return state;
+  let size = view.size;
+  if (collapsed) {
+    if (size === undefined && measuredHeight !== undefined && measuredHeight >= MIN_ENTRY) {
+      size = Math.round(measuredHeight);
+    }
+  } else if (size !== undefined && size < MIN_ENTRY) {
+    // Unfolding has to give a body back: a header-sized leftover would leave the entry stuck.
+    size = undefined;
+  }
+  return { ...state, views: { ...state.views, [viewId]: { ...view, collapsed, size } } };
+}

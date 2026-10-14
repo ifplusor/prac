@@ -21,7 +21,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import type { ReactElement, ReactNode } from "react";
+import type { MouseEvent as ReactMouseEvent, ReactElement, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { UsePanelInfo } from "@deepseek-ai/dsh-client-ui-layout/client";
 import type { UseSessions } from "@deepseek-ai/dsh-client-ui-session/client";
@@ -65,6 +65,7 @@ import {
   MIN_ENTRY,
   HEADER_HEIGHT,
   redistributeOnDrag,
+  setViewCollapsed,
 } from "./model.js";
 import { type LayoutStore, useLayout } from "./store.js";
 import type { LayoutState } from "./contract.js";
@@ -748,29 +749,21 @@ export function createFrame(
             type: "button",
             "data-prac-stack-toggle": viewId,
             "aria-expanded": collapsed ? "false" : "true",
-            onClick: () =>
-              store.update((current) => {
-                const view = current.views[viewId];
-                if (!view) return current;
-                const collapsed = view.collapsed !== true;
-                // Unfolding must give a body back: a size that cannot hold one (a header-sized
-                // leftover from an earlier drag) is dropped, so the entry shares the height again
-                // instead of staying stuck at that height for good.
-                const size =
-                  collapsed === false && view.size !== undefined && view.size < MIN_ENTRY
-                    ? undefined
-                    : view.size;
-                return {
-                  ...current,
-                  views: {
-                    ...current.views,
-                    [viewId]:
-                      size === undefined
-                        ? { ...view, collapsed, size: undefined }
-                        : { ...view, collapsed, size },
-                  },
-                };
-              }),
+            onClick: (event: ReactMouseEvent<HTMLElement>) => {
+              // What the entry is drawn at right now: the fold remembers it the way upstream's
+              // hidden view keeps its size, so unfolding gives the same height back.
+              const entry = (event.currentTarget as HTMLElement).closest("[data-prac-stack-entry]");
+              if (entry === null) return;
+              const height = entry.getBoundingClientRect().height;
+              store.update((current) =>
+                setViewCollapsed(
+                  current,
+                  viewId,
+                  current.views[viewId]?.collapsed !== true,
+                  height,
+                ),
+              );
+            },
             style: STACK_HEADER_STYLE,
           },
           `${state.views[viewId]?.flags?.dirty === true ? "\u25cf " : ""}${viewLabel(viewId)} ${
