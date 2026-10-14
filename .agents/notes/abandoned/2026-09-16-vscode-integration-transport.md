@@ -271,5 +271,3 @@ client 做**乐观回显**（本地先应用，等 `applied` 确认版本）；�
 - [../../../docs/architecture.md](../../../docs/architecture.md)：§3.1（一组插件切成两半）/ §3.3（通信层，本文就是它）/ §4.2（编辑器缓冲区与模型归 server）/ §4.4 原则 3（能力面五件套）/ §5.2（VS Code 提供什么）/ §7 第 1 件（本文是它的设计）。
 - [../../../docs/vscode.md](../../../docs/vscode.md)：本文背景的正文——VS Code 内部的两半、平台服务层、extHost 协议与载体。
 - [2026-09-15-vscode-capabilities-into-prac.md](2026-09-15-vscode-capabilities-into-prac.md)：能力面 `Capability<T, A>` 的形态。
-- [../in-progress/2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)：主线与需求约束、与目标架构的差距（§4）；总纲是旧编号 `决定 22`（旧编号按[工作记录](../../worklog/2026-09-09-vscode-dsh-integration.md)的决定台账解析）。
-- [../../worklog/2026-09-09-vscode-dsh-integration.md](../../worklog/2026-09-09-vscode-dsh-integration.md)：依据——「code server 的协议」（HTTP / 三型 WS / 握手 / 管理面 channel）、踩坑与决定台账。
