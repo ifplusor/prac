@@ -1091,55 +1091,57 @@ export function allocateStack(
 /**
  * What every entry of a stack becomes when one entry is dragged to `target`.
  *
- * Upstream's rule, from `SplitView.resize` (`splitview.ts:1308-1325`): the delta goes to the sash's
- * own view first, then to the views **above** it (nearest first), and the views **below** give up
- * the same delta (nearest first, each clamped at its floor). How far the boundary may travel is
- * upstream's `minDelta`/`maxDelta` (`:1279-1284`), and those sums walk **every** neighbour — a
- * folded entry included: it is a header, it owns no room and never moves, so a stack whose entries
- * below are all folded gives the drag nothing (`maxDelta = 0`), which is what stops a drag from
- * eating the entries above (measured).
+ * This is upstream's rule, from `SplitView.resize` (`splitview.ts:1308-1325`): the delta goes to
+ * the sash's own view first, then to the views **above** it (nearest first), and the views
+ * **below** give up the same delta (nearest first, each clamped at its floor). A drag therefore
+ * touches several entries — that is the alignment; only the *view being dragged* is the person's
+ * intent, the rest are the stack keeping its height.
  *
- * @param entries - every entry of the stack, top-down, with its height and fold state.
+ * The limits are upstream's too: how far the boundary may travel is the room the views below have
+ * left plus the views above (their maxima), which the frame reads off the screen before the drag
+ * starts (`minDelta/maxDelta`, `splitview.ts:936-940`).
+ *
+ * @param entries - the stack's unfolded entries, top-down, with their current heights.
  * @param viewId - the entry whose bottom edge is being dragged.
  * @param target - the height it is being dragged to.
  * @returns the height every entry ends up at.
  */
 export function redistributeOnDrag(
-  entries: readonly { viewId: string; height: number; folded: boolean }[],
+  entries: readonly { viewId: string; height: number }[],
   viewId: string,
   target: number,
 ): Map<string, number> {
   const sizes = new Map(entries.map((entry) => [entry.viewId, entry.height]));
   const at = entries.findIndex((entry) => entry.viewId === viewId);
-  const dragged = entries[at];
-  if (dragged === undefined || dragged.folded) return sizes;
-  /** What an entry can give: a folded one is a header, so nothing at all. */
-  const room = (entry: { height: number; folded: boolean }): number =>
-    entry.folded ? 0 : Math.max(0, entry.height - MIN_ENTRY);
-  const up = entries.slice(0, at);
+  if (at === -1) return sizes;
+  const sizeOf = (id: string): number => sizes.get(id) ?? MIN_ENTRY;
+  const wanted = Math.max(MIN_ENTRY, target) - (entries[at]?.height ?? MIN_ENTRY);
+  // Upstream clamps the delta before moving anything (`splitview.ts:1303`): how far the boundary
+  // may travel is what the views below can give (their room above the floor) and what the views
+  // above can give (their room above the floor too, since a shrink hands room downward). When
+  // nothing below can give, the drag simply does not move — the stack is full.
+  const up = entries.slice(0, at + 1);
   const down = entries.slice(at + 1);
-  const maxDelta = down.reduce((total, entry) => total + room(entry), 0);
-  const minDelta = -[...up, ...down].reduce((total, entry) => total + room(entry), 0);
-  const delta = Math.max(
-    minDelta,
-    Math.min(maxDelta, Math.max(MIN_ENTRY, target) - dragged.height),
-  );
+  const maxDelta =
+    down.length === 0
+      ? Number.POSITIVE_INFINITY
+      : down.reduce((t, e) => t + Math.max(0, e.height - MIN_ENTRY), 0);
+  const minDelta = [...up, ...down].reduce((t, e) => t - Math.max(0, e.height - MIN_ENTRY), 0);
+  const delta = Math.max(minDelta, Math.min(maxDelta, wanted));
   if (delta === 0) return sizes;
-  // The sash's own entry, then the ones above it, take the delta they can hold.
+  // The sash's view, then the ones above it take the delta they can hold.
   let deltaUp = delta;
-  for (const entry of [dragged, ...up.slice().reverse()]) {
-    if (entry.folded) continue;
-    const size = Math.max(MIN_ENTRY, entry.height + deltaUp);
-    deltaUp -= size - entry.height;
-    sizes.set(entry.viewId, size);
+  for (const peer of entries.slice(0, at + 1).reverse()) {
+    const size = Math.max(MIN_ENTRY, sizeOf(peer.viewId) + deltaUp);
+    deltaUp -= size - sizeOf(peer.viewId);
+    sizes.set(peer.viewId, size);
   }
-  // The ones below give the same delta up, nearest first; a folded one has nothing to give.
+  // The ones below give the same delta up, nearest first.
   let deltaDown = delta;
-  for (const entry of down) {
-    if (entry.folded) continue;
-    const size = Math.max(MIN_ENTRY, entry.height - deltaDown);
-    deltaDown += size - entry.height;
-    sizes.set(entry.viewId, size);
+  for (const peer of entries.slice(at + 1)) {
+    const size = Math.max(MIN_ENTRY, sizeOf(peer.viewId) - deltaDown);
+    deltaDown += size - sizeOf(peer.viewId);
+    sizes.set(peer.viewId, size);
   }
   return sizes;
 }

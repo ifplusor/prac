@@ -734,9 +734,7 @@ export function createFrame(
           const target = Math.max(MIN_ENTRY, Math.min(drag.limit, wanted));
           // Upstream's rule (`SplitView.resize`): the dragged entry and the ones above it take the
           // delta, the ones below give it up — several sizes move, and the stack keeps its height.
-          // Every entry, folded ones included: a folded entry is a header, so it gives the drag no
-          // room and stops a growth from eating the entries above it (see `redistributeOnDrag`).
-          const sizes = redistributeOnDrag(drag.rows, drag.viewId, target);
+          const sizes = redistributeOnDrag(drag.peers, drag.viewId, target);
           store.update((state) => {
             let views = state.views;
             let changed = false;

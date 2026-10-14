@@ -109,57 +109,41 @@ describe("allocateStack", () => {
 });
 
 describe("redistributeOnDrag (SplitView.resize, splitview.ts:1308-1325)", () => {
-  const entries = (...rows: [number, boolean][]) =>
-    rows.map(([height, folded], index) => ({ viewId: `v${index}`, height, folded }));
+  const entries = (...heights: number[]) =>
+    heights.map((height, index) => ({ viewId: `v${index}`, height }));
 
   it("takes the room from the entries below, nearest first", () => {
-    const drawn = redistributeOnDrag(entries([100, false], [200, false], [300, false]), "v1", 300);
+    const drawn = redistributeOnDrag(entries(100, 200, 300), "v1", 300);
     expect(drawn.get("v1")).toBe(300);
     expect(drawn.get("v2")).toBe(200);
     expect(drawn.get("v0")).toBe(100);
   });
 
-  it("does not move when the entries below have nothing to give", () => {
-    const drawn = redistributeOnDrag(entries([400, false], [48, false], [48, false]), "v1", 148);
+  it("does not move when the entries below have nothing to give (maxDelta = 0)", () => {
+    // The stack is full and everything below sits on its floor: upstream clamps the delta to 0,
+    // so the drag does not steal the room from the entry above.
+    const drawn = redistributeOnDrag(entries(400, 48, 48), "v1", 148);
     expect(drawn.get("v1")).toBe(48);
     expect(drawn.get("v2")).toBe(48);
     expect(drawn.get("v0")).toBe(400);
   });
 
-  it("treats a folded entry below as a header: it gives no room and never moves", () => {
-    const drawn = redistributeOnDrag(entries([400, false], [300, false], [20, true]), "v1", 340);
-    expect(drawn.get("v1")).toBe(300);
-    expect(drawn.get("v2")).toBe(20);
+  it("hands a shrink to the entries below", () => {
+    const drawn = redistributeOnDrag(entries(400, 300, 200), "v1", 200);
+    expect(drawn.get("v1")).toBe(200);
+    expect(drawn.get("v2")).toBe(300);
     expect(drawn.get("v0")).toBe(400);
   });
 
-  it("still takes the room an unfolded entry further down can give", () => {
-    const drawn = redistributeOnDrag(
-      entries([400, false], [200, false], [20, true], [200, false]),
-      "v1",
-      260,
-    );
-    expect(drawn.get("v1")).toBe(260);
-    expect(drawn.get("v2")).toBe(20);
-    expect(drawn.get("v3")).toBe(140);
+  it("leaves the room a shrink frees to the allocator when there is nothing below", () => {
+    // The last sash has no `downIndexes`, so upstream's own loops leave the leftover behind and
+    // `distributeEmptySpace` (`:1002`) places it; here that is `allocateStack`'s job.
+    const drawn = redistributeOnDrag(entries(400, 300), "v1", 200);
+    expect(drawn.get("v1")).toBe(200);
     expect(drawn.get("v0")).toBe(400);
-  });
-
-  it("hands a shrink to the entries below, and to the entries above when there are none", () => {
-    const withBelow = redistributeOnDrag(
-      entries([400, false], [300, false], [200, false]),
-      "v1",
-      200,
-    );
-    expect(withBelow.get("v1")).toBe(200);
-    expect(withBelow.get("v2")).toBe(300);
-    expect(withBelow.get("v0")).toBe(400);
-
-    const lastEntry = redistributeOnDrag(entries([400, false], [300, false]), "v1", 200);
-    expect(lastEntry.get("v1")).toBe(200);
-    expect(lastEntry.get("v0")).toBe(400);
   });
 });
+
 describe("setViewCollapsed (SplitView.setVisible's cached size, splitview.ts:228)", () => {
   it("remembers what an unsized entry was drawn at when it folds", () => {
     const state = stateOf({ a: {}, b: {} });
@@ -201,10 +185,13 @@ describe("dragSnapTarget (SplitView's snap at half the minimum, splitview.ts:942
       viewId: "v1",
       collapsed: true,
     });
+    // Still above the halfway point: nothing happens.
     expect(dragSnapTarget(entries([300, false], [48, false]), "v0", 10)).toBeUndefined();
   });
 
   it("never opens a folded entry by dragging (upstream has this off by default)", () => {
+    // `IView.snap` is opt-in and nothing in the workbench opts in (splitview.ts:78-84), so a
+    // collapsed entry waits for the fold toggle on its header rather than popping open.
     expect(dragSnapTarget(entries([300, false], [20, true]), "v0", 400)).toBeUndefined();
     expect(dragSnapTarget(entries([300, false], [20, true]), "v0", -200)).toBeUndefined();
   });
