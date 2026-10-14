@@ -262,7 +262,7 @@ const foldedBottom = await seventh.page.evaluate((view) => {
   };
 }, "vscode:view:workbench.explorer.fileView");
 await seventh.page.close();
-await browser.close();
+
 await browser.close();
 
 const checks = {
