@@ -740,19 +740,26 @@ export function createFrame(
           const at = peers.findIndex((peer) => peer.viewId === drag.viewId);
           const sizes = new Map(peers.map((peer) => [peer.viewId, peer.height]));
           if (delta > 0) {
-            // Growing: each entry below gives up what it can spare, top-down.
+            // Growing: the entries below give up what they can spare, then the entries above.
+            // Taking from below only was measured to dead-end: once everything below sits on its
+            // floor there is no room left there, and the entry could never be pulled back up
+            // (upstream looks through *every* other view — `resize` walks the whole order).
             let need = delta;
-            for (const peer of peers.slice(at + 1)) {
+            for (const peer of [...peers.slice(at + 1), ...peers.slice(0, at).reverse()]) {
               const room = Math.max(0, (sizes.get(peer.viewId) ?? MIN_ENTRY) - MIN_ENTRY);
               const take = Math.min(room, need);
               sizes.set(peer.viewId, (sizes.get(peer.viewId) ?? MIN_ENTRY) - take);
               need -= take;
+              if (need <= 0) break;
             }
             sizes.set(drag.viewId, drag.start + (delta - need));
           } else {
             // Shrinking: what this entry frees is shared by the entries below, in proportion.
             const freed = -delta;
-            const below = peers.slice(at + 1);
+            // Shrinking hands the room **toward the bottom** (upstream's rule): the entries below
+            // first, and only when there are none, the entries above.
+            const below =
+              at + 1 < peers.length ? peers.slice(at + 1) : peers.slice(0, at).reverse();
             const slack = below.reduce(
               (total, peer) =>
                 total + Math.max(0, (sizes.get(peer.viewId) ?? MIN_ENTRY) - MIN_ENTRY),
@@ -815,9 +822,9 @@ export function createFrame(
           (total, peer) => total + Math.max(0, peer.height - MIN_ENTRY),
           0,
         );
-        // Nothing below has room to give: the boundary is at its end, so the press belongs to the
-        // view under it, not to a drag that cannot move.
-        if (slack <= 0) return;
+        // A drag needs somewhere to put (or take) room: either the entries below can give, or
+        // this entry can shrink into them. With neither, the press belongs to the view under it.
+        if (slack <= 0 && rect.height <= MIN_ENTRY + 1) return;
         entryDrag = {
           viewId,
           pointerId: event.pointerId,
