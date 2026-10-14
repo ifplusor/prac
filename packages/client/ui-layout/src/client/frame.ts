@@ -64,6 +64,7 @@ import {
   allocateStack,
   MIN_ENTRY,
   HEADER_HEIGHT,
+  redistributeOnDrag,
 } from "./model.js";
 import { type LayoutStore, useLayout } from "./store.js";
 import type { LayoutState } from "./contract.js";
@@ -657,10 +658,9 @@ export function createFrame(
           const drag = entryDrag;
           const wanted = Math.round(drag.start + (moveEvent.clientY - drag.origin));
           const target = Math.max(MIN_ENTRY, Math.min(drag.limit, wanted));
-          // Only the entry being dragged gets a size: the neighbours are the allocator's business,
-          // so one drag leaves one height in the layout (measured: writing the neighbours too made
-          // every entry fixed, and the stack stopped following anything).
-          const sizes = new Map([[drag.viewId, target]]);
+          // Upstream's rule (`SplitView.resize`): the dragged entry and the ones above it take the
+          // delta, the ones below give it up — several sizes move, and the stack keeps its height.
+          const sizes = redistributeOnDrag(drag.peers, drag.viewId, target);
           store.update((state) => {
             let views = state.views;
             let changed = false;

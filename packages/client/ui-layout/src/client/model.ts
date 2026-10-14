@@ -1087,3 +1087,61 @@ export function allocateStack(
   }
   return drawn;
 }
+
+/**
+ * What every entry of a stack becomes when one entry is dragged to `target`.
+ *
+ * This is upstream's rule, from `SplitView.resize` (`splitview.ts:1308-1325`): the delta goes to
+ * the sash's own view first, then to the views **above** it (nearest first), and the views
+ * **below** give up the same delta (nearest first, each clamped at its floor). A drag therefore
+ * touches several entries — that is the alignment; only the *view being dragged* is the person's
+ * intent, the rest are the stack keeping its height.
+ *
+ * The limits are upstream's too: how far the boundary may travel is the room the views below have
+ * left plus the views above (their maxima), which the frame reads off the screen before the drag
+ * starts (`minDelta/maxDelta`, `splitview.ts:936-940`).
+ *
+ * @param entries - the stack's unfolded entries, top-down, with their current heights.
+ * @param viewId - the entry whose bottom edge is being dragged.
+ * @param target - the height it is being dragged to.
+ * @returns the height every entry ends up at.
+ */
+export function redistributeOnDrag(
+  entries: readonly { viewId: string; height: number }[],
+  viewId: string,
+  target: number,
+): Map<string, number> {
+  const sizes = new Map(entries.map((entry) => [entry.viewId, entry.height]));
+  const at = entries.findIndex((entry) => entry.viewId === viewId);
+  if (at === -1) return sizes;
+  const sizeOf = (id: string): number => sizes.get(id) ?? MIN_ENTRY;
+  const wanted = Math.max(MIN_ENTRY, target) - (entries[at]?.height ?? MIN_ENTRY);
+  // Upstream clamps the delta before moving anything (`splitview.ts:1303`): how far the boundary
+  // may travel is what the views below can give (their room above the floor) and what the views
+  // above can give (their room above the floor too, since a shrink hands room downward). When
+  // nothing below can give, the drag simply does not move — the stack is full.
+  const up = entries.slice(0, at + 1);
+  const down = entries.slice(at + 1);
+  const maxDelta =
+    down.length === 0
+      ? Number.POSITIVE_INFINITY
+      : down.reduce((t, e) => t + Math.max(0, e.height - MIN_ENTRY), 0);
+  const minDelta = [...up, ...down].reduce((t, e) => t - Math.max(0, e.height - MIN_ENTRY), 0);
+  const delta = Math.max(minDelta, Math.min(maxDelta, wanted));
+  if (delta === 0) return sizes;
+  // The sash's view, then the ones above it take the delta they can hold.
+  let deltaUp = delta;
+  for (const peer of entries.slice(0, at + 1).reverse()) {
+    const size = Math.max(MIN_ENTRY, sizeOf(peer.viewId) + deltaUp);
+    deltaUp -= size - sizeOf(peer.viewId);
+    sizes.set(peer.viewId, size);
+  }
+  // The ones below give the same delta up, nearest first.
+  let deltaDown = delta;
+  for (const peer of entries.slice(at + 1)) {
+    const size = Math.max(MIN_ENTRY, sizeOf(peer.viewId) - deltaDown);
+    deltaDown += size - sizeOf(peer.viewId);
+    sizes.set(peer.viewId, size);
+  }
+  return sizes;
+}

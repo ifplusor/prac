@@ -11,7 +11,7 @@
  */
 import { describe, expect, it } from "vite-plus/test";
 import type { LayoutState } from "./contract.js";
-import { HEADER_HEIGHT, MIN_ENTRY, allocateStack } from "./model.js";
+import { HEADER_HEIGHT, MIN_ENTRY, allocateStack, redistributeOnDrag } from "./model.js";
 
 const HEIGHT = 734;
 
@@ -101,21 +101,38 @@ describe("allocateStack", () => {
   });
 });
 
-describe("a stack that has a size but room left", () => {
-  it("gives the room to the entries nobody sized, not to the ones with a size", () => {
-    const views = ["a", "b", "c", "d"];
-    // `a` was dragged to 300; `b`..`d` were never sized. The room left goes to them, so one drag
-    // leaves exactly one height in the layout.
-    const drawn = allocateStack(
-      views,
-      stateOf({ a: { size: 300 }, b: {}, c: {}, d: {} }),
-      new Map(),
-      HEIGHT,
-    );
-    expect(drawn.get("a")).toBe(300);
-    const rest = ["b", "c", "d"].map((viewId) => drawn.get(viewId) ?? 0);
-    for (const size of rest) expect(size).toBeGreaterThan(0);
-    expect(rest[0]).toBe(rest[1]);
-    expect(rest[1]).toBe(rest[2]);
+describe("redistributeOnDrag (SplitView.resize, splitview.ts:1308-1325)", () => {
+  const entries = (...heights: number[]) =>
+    heights.map((height, index) => ({ viewId: `v${index}`, height }));
+
+  it("takes the room from the entries below, nearest first", () => {
+    const drawn = redistributeOnDrag(entries(100, 200, 300), "v1", 300);
+    expect(drawn.get("v1")).toBe(300);
+    expect(drawn.get("v2")).toBe(200);
+    expect(drawn.get("v0")).toBe(100);
+  });
+
+  it("does not move when the entries below have nothing to give (maxDelta = 0)", () => {
+    // The stack is full and everything below sits on its floor: upstream clamps the delta to 0,
+    // so the drag does not steal the room from the entry above.
+    const drawn = redistributeOnDrag(entries(400, 48, 48), "v1", 148);
+    expect(drawn.get("v1")).toBe(48);
+    expect(drawn.get("v2")).toBe(48);
+    expect(drawn.get("v0")).toBe(400);
+  });
+
+  it("hands a shrink to the entries below", () => {
+    const drawn = redistributeOnDrag(entries(400, 300, 200), "v1", 200);
+    expect(drawn.get("v1")).toBe(200);
+    expect(drawn.get("v2")).toBe(300);
+    expect(drawn.get("v0")).toBe(400);
+  });
+
+  it("leaves the room a shrink frees to the allocator when there is nothing below", () => {
+    // The last sash has no `downIndexes`, so upstream's own loops leave the leftover behind and
+    // `distributeEmptySpace` (`:1002`) places it; here that is `allocateStack`'s job.
+    const drawn = redistributeOnDrag(entries(400, 300), "v1", 200);
+    expect(drawn.get("v1")).toBe(200);
+    expect(drawn.get("v0")).toBe(400);
   });
 });
