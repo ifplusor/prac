@@ -58,7 +58,7 @@ flowchart LR
 
 ### 上游协议（设计只依赖这些）
 
-- **code server 一个 HTTP 端口 + 同一端点上按首消息分三型的 WebSocket**：Management / ExtensionHost / Tunnel，各自一条连接，靠 `?tkn=` 与握手鉴权。设计用到前两型——**Management 面**由服务端注册 channel（`remotefilesystem`、`extensions`、`telemetry`、`logger`…**没有 diagnostics channel**，marker 在渲染器的 `IMarkerService`）；**ExtensionHost 面** fork 扩展宿主，并把它与服务器之间的管道/socket 桥到这条 WS。细节见工作记录·「code server 的协议」。
+- **code server 一个 HTTP 端口 + 同一端点上按首消息分三型的 WebSocket**：Management / ExtensionHost / Tunnel，各自一条连接，靠 `?tkn=` 与握手鉴权。设计用到前两型——**Management 面**由服务端注册 channel（`remotefilesystem`、`extensions`、`telemetry`、`logger`…**没有 diagnostics channel**，marker 在渲染器的 `IMarkerService`）；**ExtensionHost 面** fork 扩展宿主，并把它与服务器之间的管道/socket 桥到这条 WS。
 - **扩展宿主协议**（`api/common/extHost.protocol.ts`）：168 个代理标识 = `MainContext` 87 + `ExtHostContext` 81；`MainThreadXxxShape` 86 个接口 / 500 个 `$` 方法；**主线程的那 87 个实现全在渲染器里**，协议之外没有任何可复用的服务端实现。
 
 ### 关键结构约束（设计就是围着它转）
