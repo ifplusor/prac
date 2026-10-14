@@ -1071,14 +1071,23 @@ export function allocateStack(
   }
   const leftover = available - open.reduce((total, viewId) => total + (drawn.get(viewId) ?? 0), 0);
   if (leftover <= 0) return drawn;
-  // Upstream hands the empty space out **from the last view backward**, each taking as much as it
-  // can hold and the remainder flowing on (`distributeEmptySpace`, `splitview.ts:1333-1355`). A
-  // hidden view has `maximumSize` 0 there and takes nothing; here a folded entry is skipped the
-  // same way. No entry in prac declares a maximum, so the first one in that order takes it all —
-  // which is what keeps the room a fold frees **below** the fold instead of somewhere above it.
-  for (const viewId of [...open].reverse()) {
-    drawn.set(viewId, (drawn.get(viewId) ?? MIN_ENTRY) + leftover);
-    break;
+  // Room left over is shared **in proportion to what each entry already has**, the way upstream's
+  // proportional layout re-lays a split view out (`saveProportions`/`proportionalLayout`,
+  // `splitview.ts:880-883`). Upstream's own `distributeEmptySpace` hands the whole remainder to the
+  // first view that will take it (`:1349-1355`), but that only behaves because every view there
+  // declares a `maximumSize`; prac's entries have no ceiling, so "first one takes all" made a
+  // stored 69 be drawn at 519 (measured in the field). A folded entry is a header and takes nothing.
+  const total = open.reduce((sum, viewId) => sum + (drawn.get(viewId) ?? 0), 0);
+  let handed = 0;
+  for (const viewId of open) {
+    const share = total > 0 ? Math.round((leftover * (drawn.get(viewId) ?? 0)) / total) : leftover;
+    handed += share;
+    drawn.set(viewId, (drawn.get(viewId) ?? 0) + share);
+  }
+  // Rounding must not lose a pixel: the last entry carries the remainder.
+  const last = open.at(-1);
+  if (last !== undefined && handed !== leftover) {
+    drawn.set(last, (drawn.get(last) ?? 0) + (leftover - handed));
   }
   return drawn;
 }

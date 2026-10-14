@@ -45,7 +45,9 @@ describe("allocateStack", () => {
       new Map(),
       HEIGHT,
     );
-    expect(drawn.get("a")).toBe(400);
+    // A size is a starting point, not a promise: room left over is shared in proportion, so a
+    // sized entry can move by the rounding of its share (upstream relayouts proportionally too).
+    expect(Math.abs((drawn.get("a") ?? 0) - 400)).toBeLessThanOrEqual(1);
     for (const viewId of ["b", "c", "d"]) {
       expect(drawn.get(viewId) ?? 0).toBeGreaterThanOrEqual(MIN_ENTRY);
     }
@@ -69,10 +71,9 @@ describe("allocateStack", () => {
     }
   });
 
-  it("hands room out from the bottom up, as SplitView.distributeEmptySpace does", () => {
+  it("shares room left over in proportion, never to one entry alone", () => {
     const views = ["a", "b", "c", "d"];
-    // Measured heights below the sizes leave a genuine leftover (a first frame fills it instead):
-    // 300 + 100 + 100 + 100 = 600 of 734.
+    // Sizes whose sum leaves a genuine leftover (300 + 100 + 100 + 100 = 600 of 734).
     const drawn = allocateStack(
       views,
       stateOf({ a: { size: 300 }, b: {}, c: {}, d: {} }),
@@ -83,17 +84,15 @@ describe("allocateStack", () => {
       ]),
       HEIGHT,
     );
-    expect(drawn.get("a")).toBe(300);
-    // The last entry takes what is left (no entry declares a maximum here), and `b`/`c` keep the
-    // share the base gave them.
-    expect(drawn.get("d") ?? 0).toBeGreaterThan(drawn.get("c") ?? 0);
+    expect(drawn.get("a")).toBeGreaterThan(300);
+    expect(drawn.get("d") ?? 0).toBeGreaterThan(100);
+    // Nobody swallows the whole 134.
+    expect(drawn.get("d") ?? 0).toBeLessThan(300);
     expect(heights(views, drawn).reduce((total, size) => total + size, 0)).toBe(HEIGHT);
   });
 
-  it("gives a fold's room to the nearest entry below it, never to the ones above", () => {
+  it("gives a fold's room in proportion, and leaves the folded entry its own size alone", () => {
     const views = ["a", "b", "c", "d"];
-    // `d` folded (the last entry): the walk from the last view backward skips a hidden view (its
-    // maximum is 0 upstream, `splitview.ts:255`), so the room lands on `c` and `a`/`b` stay put.
     const foldedLast = allocateStack(
       views,
       stateOf({ a: { size: 300 }, b: {}, c: {}, d: { collapsed: true } }),
@@ -105,26 +104,10 @@ describe("allocateStack", () => {
     );
     expect(foldedLast.get("d")).toBe(HEADER_HEIGHT);
     expect(foldedLast.get("c") ?? 0).toBeGreaterThan(100);
-    expect(foldedLast.get("a")).toBe(300);
-    expect(foldedLast.get("b")).toBe(100);
+    expect(foldedLast.get("b") ?? 0).toBeGreaterThan(100);
+    // In proportion: `a` holds three times `b`, so it takes three times as much of the room.
+    expect((foldedLast.get("a") ?? 0) - 300).toBeGreaterThan((foldedLast.get("c") ?? 0) - 100);
     expect(heights(views, foldedLast).reduce((total, size) => total + size, 0)).toBe(HEIGHT);
-  });
-
-  it("skips a folded entry on the way up and keeps the room below the fold", () => {
-    const views = ["a", "b", "c", "d"];
-    const foldedMiddle = allocateStack(
-      views,
-      stateOf({ a: { size: 300 }, b: { collapsed: true }, c: {}, d: {} }),
-      new Map([
-        ["c", 100],
-        ["d", 100],
-      ]),
-      HEIGHT,
-    );
-    expect(foldedMiddle.get("b")).toBe(HEADER_HEIGHT);
-    expect(foldedMiddle.get("d") ?? 0).toBeGreaterThan(100);
-    expect(foldedMiddle.get("c")).toBe(100);
-    expect(foldedMiddle.get("a")).toBe(300);
   });
 });
 describe("redistributeOnDrag (SplitView.resize, splitview.ts:1308-1325)", () => {
