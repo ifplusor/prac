@@ -69,46 +69,64 @@ describe("allocateStack", () => {
     }
   });
 
-  it("gives a folded bottom entry's room to the entries above it", () => {
+  it("hands room out from the bottom up, as SplitView.distributeEmptySpace does", () => {
     const views = ["a", "b", "c", "d"];
-    const measured = new Map([
-      ["b", 100],
-      ["c", 100],
-    ]);
+    // Measured heights below the sizes leave a genuine leftover (a first frame fills it instead):
+    // 300 + 100 + 100 + 100 = 600 of 734.
     const drawn = allocateStack(
       views,
-      stateOf({ a: { size: 300 }, b: {}, c: {}, d: { collapsed: true } }),
-      measured,
+      stateOf({ a: { size: 300 }, b: {}, c: {}, d: {} }),
+      new Map([
+        ["b", 100],
+        ["c", 100],
+        ["d", 100],
+      ]),
       HEIGHT,
     );
-    expect(drawn.get("d")).toBe(HEADER_HEIGHT);
-    // The size `a` carries was set by hand, so the room goes to the entries nobody sized — that is
-    // what keeps a drag to "one view's height changes".
     expect(drawn.get("a")).toBe(300);
-    expect(drawn.get("b") ?? 0).toBeGreaterThan(100);
-    expect(drawn.get("c") ?? 0).toBeGreaterThan(100);
+    // The last entry takes what is left (no entry declares a maximum here), and `b`/`c` keep the
+    // share the base gave them.
+    expect(drawn.get("d") ?? 0).toBeGreaterThan(drawn.get("c") ?? 0);
     expect(heights(views, drawn).reduce((total, size) => total + size, 0)).toBe(HEIGHT);
   });
 
-  it("gives a folded middle entry's room to the entries below it", () => {
+  it("gives a fold's room to the nearest entry below it, never to the ones above", () => {
     const views = ["a", "b", "c", "d"];
-    const measured = new Map([
-      ["c", 100],
-      ["d", 100],
-    ]);
-    const drawn = allocateStack(
+    // `d` folded (the last entry): the walk from the last view backward skips a hidden view (its
+    // maximum is 0 upstream, `splitview.ts:255`), so the room lands on `c` and `a`/`b` stay put.
+    const foldedLast = allocateStack(
       views,
-      stateOf({ a: { size: 300 }, b: { collapsed: true }, c: {}, d: {} }),
-      measured,
+      stateOf({ a: { size: 300 }, b: {}, c: {}, d: { collapsed: true } }),
+      new Map([
+        ["b", 100],
+        ["c", 100],
+      ]),
       HEIGHT,
     );
-    expect(drawn.get("b")).toBe(HEADER_HEIGHT);
-    expect(drawn.get("a")).toBe(300);
-    expect(drawn.get("c") ?? 0).toBeGreaterThan(100);
-    expect(drawn.get("d") ?? 0).toBeGreaterThan(100);
+    expect(foldedLast.get("d")).toBe(HEADER_HEIGHT);
+    expect(foldedLast.get("c") ?? 0).toBeGreaterThan(100);
+    expect(foldedLast.get("a")).toBe(300);
+    expect(foldedLast.get("b")).toBe(100);
+    expect(heights(views, foldedLast).reduce((total, size) => total + size, 0)).toBe(HEIGHT);
+  });
+
+  it("skips a folded entry on the way up and keeps the room below the fold", () => {
+    const views = ["a", "b", "c", "d"];
+    const foldedMiddle = allocateStack(
+      views,
+      stateOf({ a: { size: 300 }, b: { collapsed: true }, c: {}, d: {} }),
+      new Map([
+        ["c", 100],
+        ["d", 100],
+      ]),
+      HEIGHT,
+    );
+    expect(foldedMiddle.get("b")).toBe(HEADER_HEIGHT);
+    expect(foldedMiddle.get("d") ?? 0).toBeGreaterThan(100);
+    expect(foldedMiddle.get("c")).toBe(100);
+    expect(foldedMiddle.get("a")).toBe(300);
   });
 });
-
 describe("redistributeOnDrag (SplitView.resize, splitview.ts:1308-1325)", () => {
   const entries = (...rows: [number, boolean][]) =>
     rows.map(([height, folded], index) => ({ viewId: `v${index}`, height, folded }));
@@ -252,17 +270,12 @@ describe("dragChainTarget (the folding chain, bottom-up)", () => {
   });
 
   it("hands back only the entries that move, never the ones it left alone", () => {
-    // The entries above a drag are not taken from, and their *drawn* height can differ from the
-    // size the layout holds: writing them back is what made them drift (measured).
-    const drawn = redistributeOnDrag(
-      entries([200, false], [150, false], [100, false], [147, false]),
-      "v3",
-      200,
-    );
+    // 150 → 200 takes 50 from the 147 below it; the entry above is not touched, so it is not in
+    // the result (handing drawn heights back is what made untouched entries drift).
+    const drawn = redistributeOnDrag(entries([200, false], [150, false], [147, false]), "v1", 200);
+    expect(drawn.get("v1")).toBe(200);
+    expect(drawn.get("v2")).toBe(97);
     expect(drawn.has("v0")).toBe(false);
-    expect(drawn.has("v1")).toBe(false);
-    expect(drawn.has("v2")).toBe(false);
-    expect(drawn.get("v3")).toBe(200);
   });
 
   it("says nothing while the entries below still have room", () => {

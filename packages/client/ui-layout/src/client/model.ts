@@ -1071,19 +1071,14 @@ export function allocateStack(
   }
   const leftover = available - open.reduce((total, viewId) => total + (drawn.get(viewId) ?? 0), 0);
   if (leftover <= 0) return drawn;
-  // Who takes the room that is left: the entries **nobody has sized** (a drag sets one size and
-  // leaves the neighbours alone, so those are the ones that visibly follow), and when every entry
-  // has a size, the entries around a fold — toward the bottom first (upstream's rule).
-  const unsized = open.filter((viewId) => state.views[viewId]?.size === undefined);
-  const firstFold = views.findIndex((viewId) => state.views[viewId]?.collapsed === true);
-  const below = open.filter((viewId) => views.indexOf(viewId) > firstFold);
-  const above = open.filter((viewId) => views.indexOf(viewId) < firstFold);
-  const target =
-    unsized.length > 0 ? unsized : below.length > 0 ? below : above.length > 0 ? above : open;
-  const total = target.reduce((sum, viewId) => sum + (drawn.get(viewId) ?? 0), 0);
-  for (const viewId of target) {
-    const share = total > 0 ? Math.round((leftover * (drawn.get(viewId) ?? 0)) / total) : 0;
-    drawn.set(viewId, (drawn.get(viewId) ?? 0) + share);
+  // Upstream hands the empty space out **from the last view backward**, each taking as much as it
+  // can hold and the remainder flowing on (`distributeEmptySpace`, `splitview.ts:1333-1355`). A
+  // hidden view has `maximumSize` 0 there and takes nothing; here a folded entry is skipped the
+  // same way. No entry in prac declares a maximum, so the first one in that order takes it all —
+  // which is what keeps the room a fold frees **below** the fold instead of somewhere above it.
+  for (const viewId of [...open].reverse()) {
+    drawn.set(viewId, (drawn.get(viewId) ?? MIN_ENTRY) + leftover);
+    break;
   }
   return drawn;
 }
