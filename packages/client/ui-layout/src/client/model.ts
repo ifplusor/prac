@@ -1069,77 +1069,21 @@ export function allocateStack(
       drawn.set(viewId, Math.max(MIN_ENTRY, Math.round((drawn.get(viewId) ?? 0) * scale)));
     }
   }
-  let leftover = available - open.reduce((total, viewId) => total + (drawn.get(viewId) ?? 0), 0);
+  const leftover = available - open.reduce((total, viewId) => total + (drawn.get(viewId) ?? 0), 0);
+  if (leftover <= 0) return drawn;
+  // Who takes the room that is left: the entries **nobody has sized** (a drag sets one size and
+  // leaves the neighbours alone, so those are the ones that visibly follow), and when every entry
+  // has a size, the entries around a fold — toward the bottom first (upstream's rule).
+  const unsized = open.filter((viewId) => state.views[viewId]?.size === undefined);
   const firstFold = views.findIndex((viewId) => state.views[viewId]?.collapsed === true);
-  // A drag already hands the space around as it moves, so a stack with no fold in it needs no
-  // second distribution: leaving the leftover alone is what keeps "the size in the layout is the
-  // size it is drawn at" true after a drag.
-  if (leftover <= 0 || firstFold === -1) return drawn;
   const below = open.filter((viewId) => views.indexOf(viewId) > firstFold);
   const above = open.filter((viewId) => views.indexOf(viewId) < firstFold);
-  const target = below.length > 0 ? below : above.length > 0 ? above : open;
+  const target =
+    unsized.length > 0 ? unsized : below.length > 0 ? below : above.length > 0 ? above : open;
   const total = target.reduce((sum, viewId) => sum + (drawn.get(viewId) ?? 0), 0);
   for (const viewId of target) {
     const share = total > 0 ? Math.round((leftover * (drawn.get(viewId) ?? 0)) / total) : 0;
     drawn.set(viewId, (drawn.get(viewId) ?? 0) + share);
   }
   return drawn;
-}
-
-/**
- * What every entry of a stack becomes when one entry is dragged to `target`.
- *
- * A stack is a fixed height: growing one entry means another gives the room up. The entries
- * **below** the dragged one give first (that is what the boundary under the pointer means), and
- * when they are all on their floor the entries **above** give instead — without that second place
- * to look, an entry dragged down to its floor could never be pulled back up (measured), which is
- * upstream's behaviour too: `SplitView.resize` walks the whole order, not just one side.
- *
- * @param entries - the stack's unfolded entries, top-down, with their current heights.
- * @param viewId - the entry being dragged.
- * @param target - the height it is being dragged to.
- * @returns the height every entry ends up at.
- */
-export function redistributeOnDrag(
-  entries: readonly { viewId: string; height: number }[],
-  viewId: string,
-  target: number,
-): Map<string, number> {
-  const sizes = new Map(entries.map((entry) => [entry.viewId, entry.height]));
-  const at = entries.findIndex((entry) => entry.viewId === viewId);
-  if (at === -1) return sizes;
-  const below = entries.slice(at + 1);
-  const above = entries.slice(0, at).reverse();
-  const one = entries[at];
-  const delta = Math.max(MIN_ENTRY, target) - (one?.height ?? MIN_ENTRY);
-  if (delta > 0) {
-    let need = delta;
-    for (const peer of [...below, ...above]) {
-      const room = Math.max(0, (sizes.get(peer.viewId) ?? MIN_ENTRY) - MIN_ENTRY);
-      const take = Math.min(room, need);
-      sizes.set(peer.viewId, (sizes.get(peer.viewId) ?? MIN_ENTRY) - take);
-      need -= take;
-      if (need <= 0) break;
-    }
-    sizes.set(viewId, (one?.height ?? MIN_ENTRY) + (delta - need));
-  } else {
-    // Shrinking hands the room **toward the bottom** (upstream's rule): below first, then above.
-    const freed = -delta;
-    const takers = below.length > 0 ? below : above;
-    const slack = takers.reduce(
-      (total, peer) => total + Math.max(0, (sizes.get(peer.viewId) ?? MIN_ENTRY) - MIN_ENTRY),
-      0,
-    );
-    sizes.set(viewId, (one?.height ?? MIN_ENTRY) - freed);
-    if (slack > 0) {
-      for (const peer of takers) {
-        const room = Math.max(0, (sizes.get(peer.viewId) ?? MIN_ENTRY) - MIN_ENTRY);
-        sizes.set(
-          peer.viewId,
-          (sizes.get(peer.viewId) ?? MIN_ENTRY) + Math.round((freed * room) / slack),
-        );
-      }
-    }
-  }
-  return sizes;
 }

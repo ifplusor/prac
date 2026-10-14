@@ -64,7 +64,6 @@ import {
   allocateStack,
   MIN_ENTRY,
   HEADER_HEIGHT,
-  redistributeOnDrag,
 } from "./model.js";
 import { type LayoutStore, useLayout } from "./store.js";
 import type { LayoutState } from "./contract.js";
@@ -658,8 +657,10 @@ export function createFrame(
           const drag = entryDrag;
           const wanted = Math.round(drag.start + (moveEvent.clientY - drag.origin));
           const target = Math.max(MIN_ENTRY, Math.min(drag.limit, wanted));
-          // The rule itself is `redistributeOnDrag` — pure, and therefore tested as arithmetic.
-          const sizes = redistributeOnDrag(drag.peers, drag.viewId, target);
+          // Only the entry being dragged gets a size: the neighbours are the allocator's business,
+          // so one drag leaves one height in the layout (measured: writing the neighbours too made
+          // every entry fixed, and the stack stopped following anything).
+          const sizes = new Map([[drag.viewId, target]]);
           store.update((state) => {
             let views = state.views;
             let changed = false;
