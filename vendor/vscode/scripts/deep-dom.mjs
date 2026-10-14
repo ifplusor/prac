@@ -82,6 +82,20 @@ const WALKER = `(() => {
  */
 export async function installDeepDom(page) {
   await page.addInitScript(WALKER);
+  // Every gate starts from the frame's own defaults. This origin's storage is shared by every
+  // gate and probe, and one that inherits somebody else's layout measures a different world
+  // (measured: `layout` went red until `prac-layout/v1` was cleared by hand). Once per **page**,
+  // not per navigation: the persistence gate reloads on purpose and needs the layout to survive.
+  await page.addInitScript(() => {
+    try {
+      if (sessionStorage.getItem("prac-gate-fresh") === null) {
+        sessionStorage.setItem("prac-gate-fresh", "1");
+        localStorage.removeItem("prac-layout/v1");
+      }
+    } catch {
+      // No storage: run against whatever is there rather than fail for the wrong reason.
+    }
+  });
   await page.evaluate(WALKER);
   // The DSH shell's own full-page notice, which is not what any gate is about and which
   // makes the whole app inert while it is up (see `scripts/shell-modal.mjs`).
