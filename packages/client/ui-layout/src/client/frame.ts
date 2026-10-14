@@ -688,9 +688,23 @@ export function createFrame(
             // visibility (`splitview.ts:1298-1307`). Same here: fold it, re-read the stack and
             // re-anchor the drag, so the band is measured from where the stack now is.
             store.update((state) => setViewCollapsed(state, snap.viewId, snap.collapsed));
-            const rows = readStackRows(drag.container);
+            // The fold only reaches the DOM on the next render, so the immediately re-read rows
+            // still show the entry as it was: drop the one just folded by hand, or the very next
+            // move would resize it as if it were an ordinary entry (measured: it wrote the folded
+            // entry's floor over the height it was folded with — 107 became 48).
+            const rows = readStackRows(drag.container).filter(
+              (row) => !row.folded && !(snap.collapsed && row.viewId === snap.viewId),
+            );
             drag.rows = rows;
-            drag.peers = rows.filter((row) => !row.folded);
+            drag.peers = rows;
+            // And read the stack once more after the render, so an entry the drag just opened
+            // joins the arithmetic too.
+            requestAnimationFrame(() => {
+              if (entryDrag !== drag) return;
+              const settled = readStackRows(drag.container);
+              drag.rows = settled;
+              drag.peers = settled.filter((row) => !row.folded);
+            });
             drag.start = rows.find((row) => row.viewId === drag.viewId)?.height ?? drag.start;
             drag.origin = moveEvent.clientY;
             drag.lastDelta = 0;
