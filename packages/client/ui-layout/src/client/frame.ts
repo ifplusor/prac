@@ -64,6 +64,7 @@ import {
   allocateStack,
   MIN_ENTRY,
   HEADER_HEIGHT,
+  redistributeOnDrag,
 } from "./model.js";
 import { type LayoutStore, useLayout } from "./store.js";
 import type { LayoutState } from "./contract.js";
@@ -657,52 +658,12 @@ export function createFrame(
           const drag = entryDrag;
           const wanted = Math.round(drag.start + (moveEvent.clientY - drag.origin));
           const target = Math.max(MIN_ENTRY, Math.min(drag.limit, wanted));
-          const delta = target - drag.start;
-          const peers = drag.peers;
-          const at = peers.findIndex((peer) => peer.viewId === drag.viewId);
-          const sizes = new Map(peers.map((peer) => [peer.viewId, peer.height]));
-          if (delta > 0) {
-            // Growing: the entries below give up what they can spare, then the entries above.
-            // Taking from below only was measured to dead-end: once everything below sits on its
-            // floor there is no room left there, and the entry could never be pulled back up
-            // (upstream looks through *every* other view — `resize` walks the whole order).
-            let need = delta;
-            for (const peer of [...peers.slice(at + 1), ...peers.slice(0, at).reverse()]) {
-              const room = Math.max(0, (sizes.get(peer.viewId) ?? MIN_ENTRY) - MIN_ENTRY);
-              const take = Math.min(room, need);
-              sizes.set(peer.viewId, (sizes.get(peer.viewId) ?? MIN_ENTRY) - take);
-              need -= take;
-              if (need <= 0) break;
-            }
-            sizes.set(drag.viewId, drag.start + (delta - need));
-          } else {
-            // Shrinking: what this entry frees is shared by the entries below, in proportion.
-            const freed = -delta;
-            // Shrinking hands the room **toward the bottom** (upstream's rule): the entries below
-            // first, and only when there are none, the entries above.
-            const below =
-              at + 1 < peers.length ? peers.slice(at + 1) : peers.slice(0, at).reverse();
-            const slack = below.reduce(
-              (total, peer) =>
-                total + Math.max(0, (sizes.get(peer.viewId) ?? MIN_ENTRY) - MIN_ENTRY),
-              0,
-            );
-            sizes.set(drag.viewId, drag.start - freed);
-            if (slack > 0) {
-              for (const peer of below) {
-                const room = Math.max(0, (sizes.get(peer.viewId) ?? MIN_ENTRY) - MIN_ENTRY);
-                sizes.set(
-                  peer.viewId,
-                  (sizes.get(peer.viewId) ?? MIN_ENTRY) + Math.round((freed * room) / slack),
-                );
-              }
-            }
-          }
-          const next = Object.fromEntries(sizes);
+          // The rule itself is `redistributeOnDrag` — pure, and therefore tested as arithmetic.
+          const sizes = redistributeOnDrag(drag.peers, drag.viewId, target);
           store.update((state) => {
             let views = state.views;
             let changed = false;
-            for (const [id, size] of Object.entries(next)) {
+            for (const [id, size] of sizes) {
               const view = views[id];
               if (view === undefined || view.size === size) continue;
               if (!changed) {

@@ -11,7 +11,7 @@
  */
 import { describe, expect, it } from "vite-plus/test";
 import type { LayoutState } from "./contract.js";
-import { HEADER_HEIGHT, MIN_ENTRY, allocateStack } from "./model.js";
+import { HEADER_HEIGHT, MIN_ENTRY, allocateStack, redistributeOnDrag } from "./model.js";
 
 const HEIGHT = 734;
 
@@ -96,5 +96,37 @@ describe("allocateStack", () => {
     expect(drawn.get("a")).toBe(300);
     expect(drawn.get("c") ?? 0).toBeGreaterThan(100);
     expect(drawn.get("d") ?? 0).toBeGreaterThan(100);
+  });
+});
+
+describe("redistributeOnDrag", () => {
+  const entries = (...heights: number[]) =>
+    heights.map((height, index) => ({ viewId: `v${index}`, height }));
+
+  it("grows an entry by taking the room from the entries below it first", () => {
+    const drawn = redistributeOnDrag(entries(100, 200, 300), "v1", 300);
+    expect(drawn.get("v1")).toBe(300);
+    expect(drawn.get("v2")).toBe(200);
+    expect(drawn.get("v0")).toBe(100);
+  });
+
+  it("grows from the entries above when everything below is on its floor", () => {
+    // The reported dead end: drag an entry down to its floor, then try to pull it back up while
+    // the entry below it has nothing left to give.
+    const drawn = redistributeOnDrag(entries(400, 48, 48), "v1", 148);
+    expect(drawn.get("v1")).toBe(148);
+    expect(drawn.get("v2")).toBe(48);
+    expect(drawn.get("v0")).toBe(300);
+  });
+
+  it("hands a shrink to the entries below, and to the entries above when there are none", () => {
+    const withBelow = redistributeOnDrag(entries(400, 300, 200), "v1", 200);
+    expect(withBelow.get("v1")).toBe(200);
+    expect(withBelow.get("v2")).toBe(300);
+    expect(withBelow.get("v0")).toBe(400);
+
+    const lastEntry = redistributeOnDrag(entries(400, 300), "v1", 200);
+    expect(lastEntry.get("v1")).toBe(200);
+    expect(lastEntry.get("v0")).toBe(500);
   });
 });
