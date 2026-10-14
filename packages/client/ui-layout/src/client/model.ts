@@ -1179,3 +1179,43 @@ export function setViewCollapsed(
   }
   return { ...state, views: { ...state.views, [viewId]: { ...view, collapsed, size } } };
 }
+
+/** How close to gone an entry must be before a drag folds it: half its floor, as upstream snaps at
+ * half the view's minimum size (`splitview.ts:942/966`). */
+export const SNAP_DISTANCE = Math.floor(MIN_ENTRY / 2);
+
+/**
+ * Whether a drag has reached the point where an entry should fold — or unfold again.
+ *
+ * Upstream's sash snaps a view in and out as the pointer passes half of its minimum size, and the
+ * view comes back at the size it was hidden with (`splitview.ts:946/1301`, `setVisible(visible,
+ * size)`). This is that rule for a stack: squeezing the entry below the boundary past half of its
+ * floor folds it, dragging back onto a folded entry opens it again, and dragging the entry's own
+ * boundary under half of its floor folds that entry.
+ *
+ * @param entries - every entry of the stack, top-down, with its current height and fold state.
+ * @param viewId - the entry whose bottom edge is being dragged.
+ * @param wanted - the height it is being dragged to, before any clamping.
+ * @returns the view to fold or unfold, if the drag has crossed a threshold.
+ */
+export function dragSnapTarget(
+  entries: readonly { viewId: string; height: number; folded: boolean }[],
+  viewId: string,
+  wanted: number,
+): { viewId: string; collapsed: boolean } | undefined {
+  const at = entries.findIndex((entry) => entry.viewId === viewId);
+  const dragged = entries[at];
+  if (dragged === undefined || dragged.folded) return undefined;
+  const delta = wanted - dragged.height;
+  if (delta < 0) {
+    return wanted < SNAP_DISTANCE ? { viewId, collapsed: true } : undefined;
+  }
+  if (delta === 0) return undefined;
+  const below = entries[at + 1];
+  if (below === undefined) return undefined;
+  // Dragging onto a folded neighbour opens it, at the size it was folded with.
+  if (below.folded) return { viewId: below.viewId, collapsed: false };
+  return below.height - delta < SNAP_DISTANCE
+    ? { viewId: below.viewId, collapsed: true }
+    : undefined;
+}

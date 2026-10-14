@@ -15,6 +15,7 @@ import {
   HEADER_HEIGHT,
   MIN_ENTRY,
   allocateStack,
+  dragSnapTarget,
   redistributeOnDrag,
   setViewCollapsed,
 } from "./model.js";
@@ -167,5 +168,38 @@ describe("setViewCollapsed (SplitView.setVisible's cached size, splitview.ts:228
     expect(leftover.views.a?.size).toBeUndefined();
     const unmeasured = setViewCollapsed(stateOf({ a: {} }), "a", true);
     expect(unmeasured.views.a?.size).toBeUndefined();
+  });
+});
+
+describe("dragSnapTarget (SplitView's snap at half the minimum, splitview.ts:942/1301)", () => {
+  const entries = (...rows: [number, boolean][]) =>
+    rows.map(([height, folded], index) => ({ viewId: `v${index}`, height, folded }));
+
+  it("folds the entry below once the drag squeezes it past half its floor", () => {
+    expect(dragSnapTarget(entries([300, false], [48, false]), "v0", 330)).toEqual({
+      viewId: "v1",
+      collapsed: true,
+    });
+    // Still above the halfway point: nothing happens.
+    expect(dragSnapTarget(entries([300, false], [48, false]), "v0", 310)).toBeUndefined();
+  });
+
+  it("opens a folded neighbour again when the drag comes back onto it", () => {
+    expect(dragSnapTarget(entries([300, false], [20, true]), "v0", 340)).toEqual({
+      viewId: "v1",
+      collapsed: false,
+    });
+  });
+
+  it("folds the dragged entry itself when its own boundary goes under half its floor", () => {
+    expect(dragSnapTarget(entries([300, false], [200, false]), "v0", 20)).toEqual({
+      viewId: "v0",
+      collapsed: true,
+    });
+    expect(dragSnapTarget(entries([300, false], [200, false]), "v0", 40)).toBeUndefined();
+  });
+
+  it("says nothing for the stack's last entry, which has no boundary", () => {
+    expect(dragSnapTarget(entries([300, false]), "v0", 400)).toBeUndefined();
   });
 });
