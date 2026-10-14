@@ -75,7 +75,14 @@ interface PointerDragEvent {
     readonly parentElement: {
       readonly clientWidth: number;
       readonly clientHeight: number;
+      /** The entries of the stack this element belongs to (see `stackEntry`). */
+      querySelectorAll(selectors: string): readonly {
+        getBoundingClientRect(): { readonly bottom: number; readonly height: number };
+        getAttribute(name: string): string | null;
+      }[];
     } | null;
+    getBoundingClientRect(): { readonly bottom: number; readonly height: number };
+    getAttribute(name: string): string | null;
     setPointerCapture(pointerId: number): void;
     hasPointerCapture?(pointerId: number): boolean;
     releasePointerCapture(pointerId: number): void;
