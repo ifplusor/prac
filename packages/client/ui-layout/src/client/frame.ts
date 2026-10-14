@@ -66,6 +66,7 @@ import {
   HEADER_HEIGHT,
   redistributeOnDrag,
   setViewCollapsed,
+  dragSnapTarget,
 } from "./model.js";
 import { type LayoutStore, useLayout } from "./store.js";
 import type { LayoutState } from "./contract.js";
@@ -350,7 +351,30 @@ let entryDrag: {
   limit: number;
   /** Every entry of this stack, top-down: the ones below give up the room a drag takes. */
   peers: { viewId: string; height: number }[];
+  /** The same entries including the folded ones, which a snap has to be able to open. */
+  rows: { viewId: string; height: number; folded: boolean }[];
+  /** The element the entries live in, so a snap can re-read the stack it just changed. */
+  container: { querySelectorAll(selectors: string): readonly StackEntryNode[] } | null;
+  /** The pointer delta of the previous move: the snap band needs to see the pointer come back. */
+  lastDelta: number;
 } | null = null;
+
+/** What a stack entry looks like through the little of the DOM this file touches. */
+interface StackEntryNode {
+  getBoundingClientRect(): { readonly bottom: number; readonly height: number };
+  getAttribute(name: string): string | null;
+}
+
+/** Read a stack's entries, top-down, as they stand on screen. */
+function readStackRows(
+  container: { querySelectorAll(selectors: string): readonly StackEntryNode[] } | null,
+): { viewId: string; height: number; folded: boolean }[] {
+  return [...(container?.querySelectorAll("[data-prac-stack-entry]") ?? [])].map((node) => ({
+    viewId: node.getAttribute("data-prac-stack-entry") ?? "",
+    height: Math.round(node.getBoundingClientRect().height),
+    folded: node.getAttribute("data-prac-stack-collapsed") === "true",
+  }));
+}
 
 /** One in-flight sash drag. */
 interface DragState {
@@ -657,7 +681,31 @@ export function createFrame(
           if (entryDrag === null || entryDrag.pointerId !== moveEvent.pointerId) return;
           moveEvent.preventDefault();
           const drag = entryDrag;
-          const wanted = Math.round(drag.start + (moveEvent.clientY - drag.origin));
+          const pointerDelta = moveEvent.clientY - drag.origin;
+          const snap = dragSnapTarget(drag.rows, drag.viewId, pointerDelta, drag.lastDelta);
+          if (snap !== undefined) {
+            // Upstream snaps a view in or out and then lays the split view out again with the new
+            // visibility (`splitview.ts:1298-1307`). Same here: fold it, re-read the stack and
+            // re-anchor the drag, so the band is measured from where the stack now is.
+            store.update((state) => setViewCollapsed(state, snap.viewId, snap.collapsed));
+            const rows = readStackRows(drag.container);
+            drag.rows = rows;
+            drag.peers = rows.filter((row) => !row.folded);
+            drag.start = rows.find((row) => row.viewId === drag.viewId)?.height ?? drag.start;
+            drag.origin = moveEvent.clientY;
+            drag.lastDelta = 0;
+            const below = drag.peers.slice(
+              drag.peers.findIndex((peer) => peer.viewId === drag.viewId) + 1,
+            );
+            drag.limit = Math.max(
+              MIN_ENTRY,
+              drag.start +
+                below.reduce((total, peer) => total + Math.max(0, peer.height - MIN_ENTRY), 0),
+            );
+            return;
+          }
+          drag.lastDelta = pointerDelta;
+          const wanted = Math.round(drag.start + pointerDelta);
           const target = Math.max(MIN_ENTRY, Math.min(drag.limit, wanted));
           // Upstream's rule (`SplitView.resize`): the dragged entry and the ones above it take the
           // delta, the ones below give it up — several sizes move, and the stack keeps its height.
@@ -717,6 +765,9 @@ export function createFrame(
           start: rect.height,
           limit: Math.max(MIN_ENTRY, rect.height + slack),
           peers,
+          rows: all,
+          container: container ?? null,
+          lastDelta: 0,
         };
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", finish);

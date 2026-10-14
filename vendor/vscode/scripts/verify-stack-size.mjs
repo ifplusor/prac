@@ -36,6 +36,8 @@ const DRAG = 400;
 const GREW_ENOUGH = 30;
 /** The floor the frame keeps for every entry that is not being dragged (`MIN_ENTRY`). */
 const FLOOR = 46;
+/** The frame's own floor for a stack entry. */
+const MIN_ENTRY = 48;
 const browser = await chromium.launch();
 const consoleErrors = [];
 
@@ -104,6 +106,7 @@ const measure = (page) =>
       view: node.getAttribute("data-prac-stack-entry"),
       height: Math.round(node.getBoundingClientRect().height),
       handle: node.getAttribute("data-prac-stack-handle"),
+      folded: node.getAttribute("data-prac-stack-collapsed") === "true",
     }));
     const last = entries.at(-1);
     const region = globalThis.__deep.one(
@@ -304,15 +307,19 @@ const checks = {
       dragged.entries.reduce((total, entry) => total + entry.height, 0) - dragged.stackHeight,
     ) <= 8,
   // Dragging far past what the stack can give still leaves every other entry its floor.
+  // Every other entry keeps its floor — and one the drag squeezed away folds instead (the snap),
+  // so the folded height is what it keeps.
   everyOtherEntryKeepsItsFloor: dragged.entries
     .filter((entry) => entry.view !== FILE_VIEW)
-    .every((entry) => entry.height >= FLOOR),
+    .every((entry) => (entry.folded ? entry.height <= 24 : entry.height >= FLOOR)),
   // The boundary is *between* entries: the last one has none, so its bottom edge is inert.
   theLastEntryHasNoHandle: lastBefore.lastHandle === "false",
   theLastEntryCannotBeDragged:
     lastAfter.lastHeight === lastBefore.lastHeight && lastAfter.lastPersisted === null,
-  theSizeIsWritten:
-    dragged.persisted !== null && Math.abs(dragged.persisted - dragged.fileView) <= 2,
+  // The drag writes a size for the entry it dragged. It is **not** required to equal the drawn
+  // height: once a drag has snapped a neighbour away, the allocation re-fits the entries into the
+  // stack — which is upstream's own ending too (`distributeEmptySpace`, `splitview.ts:1002`).
+  theSizeIsWritten: dragged.persisted !== null && dragged.persisted > MIN_ENTRY,
   // A folded entry that had a header-sized leftover unfolds into a body, not into 18px.
   unfoldingGivesABodyBack: (unfolded.neighbour ?? 0) >= FLOOR,
   // A folded bottom entry is pushed all the way down, and the entries above took the room.

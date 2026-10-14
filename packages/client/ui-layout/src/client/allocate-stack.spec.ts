@@ -176,27 +176,30 @@ describe("dragSnapTarget (SplitView's snap at half the minimum, splitview.ts:942
     rows.map(([height, folded], index) => ({ viewId: `v${index}`, height, folded }));
 
   it("folds the entry below once the drag squeezes it past half its floor", () => {
-    expect(dragSnapTarget(entries([300, false], [48, false]), "v0", 330)).toEqual({
+    expect(dragSnapTarget(entries([300, false], [48, false]), "v0", 30)).toEqual({
       viewId: "v1",
       collapsed: true,
     });
     // Still above the halfway point: nothing happens.
-    expect(dragSnapTarget(entries([300, false], [48, false]), "v0", 310)).toBeUndefined();
+    expect(dragSnapTarget(entries([300, false], [48, false]), "v0", 10)).toBeUndefined();
   });
 
-  it("opens a folded neighbour again when the drag comes back onto it", () => {
-    expect(dragSnapTarget(entries([300, false], [20, true]), "v0", 340)).toEqual({
-      viewId: "v1",
-      collapsed: false,
-    });
+  it("opens a folded neighbour only after the pointer has really come back (the band)", () => {
+    const rows = entries([300, false], [20, true]);
+    // Retreating 30px is more than the band, so it opens.
+    expect(dragSnapTarget(rows, "v0", 10, 40)).toEqual({ viewId: "v1", collapsed: false });
+    // Retreating 10px is not: without the band the fold would undo itself on the next move.
+    expect(dragSnapTarget(rows, "v0", 30, 40)).toBeUndefined();
+    // And with no previous move to compare against, nothing opens.
+    expect(dragSnapTarget(rows, "v0", 10)).toBeUndefined();
   });
 
   it("folds the dragged entry itself when its own boundary goes under half its floor", () => {
-    expect(dragSnapTarget(entries([300, false], [200, false]), "v0", 20)).toEqual({
+    expect(dragSnapTarget(entries([300, false], [200, false]), "v0", -280)).toEqual({
       viewId: "v0",
       collapsed: true,
     });
-    expect(dragSnapTarget(entries([300, false], [200, false]), "v0", 40)).toBeUndefined();
+    expect(dragSnapTarget(entries([300, false], [200, false]), "v0", -260)).toBeUndefined();
   });
 
   it("says nothing for the stack's last entry, which has no boundary", () => {
