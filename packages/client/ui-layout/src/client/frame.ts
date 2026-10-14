@@ -373,7 +373,7 @@ let entryDrag: {
  * @param height - the height the stack really has (measured, not the frame's stale table).
  * @returns the height to draw each entry at, folded ones included.
  */
-function allocateStack(
+export function allocateStack(
   views: readonly string[],
   state: LayoutState,
   measured: ReadonlyMap<string, number>,
