@@ -51,20 +51,41 @@ const open = async () => {
     await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 90_000 });
     await page.waitForTimeout(8000);
   };
-  const show = async () => {
-    const spot = await page.evaluate(() => {
-      const node = globalThis.__deep.one('[data-prac-container*="workbench.view.explorer"]');
-      const box = node?.getBoundingClientRect();
-      return box
-        ? { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) }
-        : null;
+  /** How many entries the stack is showing right now (0 = the container is not on screen). */
+  const entryCount = () =>
+    page.evaluate(() => {
+      const region = globalThis.__deep.one(
+        '[data-prac-region="left/container:workbench.view.explorer"]',
+      );
+      return region?.querySelectorAll("[data-prac-stack-entry]").length ?? 0;
     });
-    if (spot === null) return;
-    await page.mouse.move(spot.x, spot.y);
-    await page.mouse.down();
-    await page.waitForTimeout(120);
-    await page.mouse.up();
-    await page.waitForTimeout(1500);
+  /**
+   * Reveal the Explorer container and **prove** the stack is there.
+   *
+   * Every reading in this gate starts with an entry table; an empty one makes a reading look
+   * plausible while saying nothing (measured: a page that asserted on `entries[1]` passed and
+   * failed on alternate runs because the container had never come up). So: click, and if no
+   * entries appeared, wait and click again — then fail loudly rather than hand back empty numbers.
+   */
+  const show = async () => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const spot = await page.evaluate(() => {
+        const node = globalThis.__deep.one('[data-prac-container*="workbench.view.explorer"]');
+        const box = node?.getBoundingClientRect();
+        return box
+          ? { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) }
+          : null;
+      });
+      if (spot !== null) {
+        await page.mouse.move(spot.x, spot.y);
+        await page.mouse.down();
+        await page.waitForTimeout(120);
+        await page.mouse.up();
+      }
+      await page.waitForTimeout(1800);
+      if ((await entryCount()) > 0) return;
+    }
+    throw new Error("the stack never appeared: the Explorer container did not come up");
   };
   await page.goto(url, { waitUntil: "load" });
   await boot();
