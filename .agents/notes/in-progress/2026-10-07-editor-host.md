@@ -45,7 +45,7 @@ status: in-progress
 
 ## Open questions
 
-- **组头**（tab 条 + 面包屑）：tab 按决定 17 归 prac（区域的 tab 条已有），**面包屑挂在组头上**——是先让 prac 的 tab 条只做 tab、把组头其余部分搬进来，还是另行处理，单独裁一次。
+- **组头**（tab 条 + 面包屑）：tab 归 prac（区域的 tab 条已有，见伞 §3.5 区域与编辑器），**面包屑挂在组头上**——是先让 prac 的 tab 条只做 tab、把组头其余部分搬进来，还是另行处理，单独裁一次。
 - **未支持清单的表达**：放在启动日志、一条活体门，还是两者都要。
 - **组与区域同生共死，所以"移除一个组"要能移除一个区域**：prac 能建区域（`createRegionBeside`），现在也能删（`removeRegion`，它的逆）——frame 删节点、分裂只剩一个孩子时并回幸存者；区域子树里的 view 记录随之丢弃；通道两端（`GroupRegionChannel`、`vscode-embed` 门面）都带这个方法，`PracEditorHost.removeGroup` 调用它。**最后一个区域永不删**（总得有东西占住屏幕）。触发点是上游的 `closeEmptyGroups`（关掉一个组里最后一个编辑器就关掉该组，默认开）——`PracEditorGroup` 是自己的 `IEditorGroupView`，不继承上游那段，所以要自己接：在公开的 `closeEditor`/`closeEditors` 出口按"组空了 + 设置没关 + 还有别的组"移除自己。没有这套能力时，空组会留在屏幕上（只剩一条没有 `×` 的占位 tab）**并占住活动组**，于是 `Open to the Side` 从活动编辑器解析不到资源、静默什么都不做。
 - **右键的选中/焦点语义对齐上游**：普通右键、以及 macOS 的 `⌃+左键`，都**只移动焦点、不改选中**（上游 `listWidget` 的 `onViewPointer` 就是如此：`setFocus` 一定发生，`setSelection` 只在非右键、非修饰键时发生）。菜单握着 DOM 焦点期间，被点中的行绘制 `list.inactiveFocusOutline`（细描边）、原选中行绘制 `list.inactiveSelectionBackground`（淡填充）——所以"点的那行没高亮、旧行高亮没消失"是上游的观感，不是缺陷。**prac 不在这里加"右键即选中"的偏离**；要更强的观感由主题（`workbench.colorCustomizations` 的这两个键）决定。
