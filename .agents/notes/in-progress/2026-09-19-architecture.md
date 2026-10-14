@@ -176,12 +176,10 @@ code server 归主干起停：空闲端口、等就绪、随 DSH 插件 dispose 
 | `in-progress/2026-09-13-vs-concept-boundary.md`        | 保留（实现边界和 lib 抽取仍是现在的分层）                                                            |
 | `in-progress/2026-09-09-vscode-dsh-integration.md`     | 保留为 umbrella；**§1 与 §4 已按这篇重写**                                                           |
 | `docs/architecture.md`                                 | **已按这篇整篇重写**（现在时的目标设计）                                                             |
-| `docs/dsh.md`、`docs/vscode.md`、worklog               | 保留（事实参考，和这篇不冲突）                                                                      |
 
 ## Related
 
 - [../in-progress/2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)：umbrella（主线、需求约束、已经定下的决定）。
-- [../../worklog/2026-09-09-vscode-dsh-integration.md](../../worklog/2026-09-09-vscode-dsh-integration.md)：依据（协议清单、核实过的事实、决定台账）。
 - [../../../docs/vscode.md](../../../docs/vscode.md) / [../../../docs/dsh.md](../../../docs/dsh.md)：两个系统的内部结构（事实参考）。
 - [../../../docs/architecture.md](../../../docs/architecture.md)：目标架构（按这篇重写后的现在时参考）。
 - [../abandoned/2026-09-16-vscode-integration-transport.md](../abandoned/2026-09-16-vscode-integration-transport.md)：broker 那份设计（现在是 P1 的备选）。

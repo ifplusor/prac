@@ -65,19 +65,15 @@ status: in-progress
 - **浮层可交互，但门的"瞬时点击"不行**（2026-10-12 量清）：应用自己的浮层（快选、菜单、通知、模态）**是能点的** —— 转到符号的行用"按下 → 停 120ms → 抬起"能选中并让编辑器滚到目标行，脏文件关不掉的确认框同理（Cancel / Don't Save 都生效）。而 Playwright 默认的**零延迟** down+up 不给按钮 `click`（实测：对话框按下即消失、抬起落在编辑器上，随后对话框被重新问一次）。⇒ 这是**门的输入**问题，不是产品缺陷：门要按人的节奏按（已写进 `verify-close` 与 `verify-editor` 的注释）。此前一轮把 `document.elementFromPoint` 的结果读成"穿透到 body"是误判——它对影子树内容返回的是**宿主**，而"点不动"的真因是 DSH 那条 Preview Notice 的全屏 mask + `#root` 的 `inert`（见下一条）。
 - ~~本仓库类型检查的 DSH 版本与运行的 DSH 不是同一个~~ **已定**：prac dev 的 DSH 锚点是一个 worktree（`../../deepseek-harness/dsh-prac-dev`），catalog 精确 pin 它的发布版本，`pnpm check` 里的逐字节比较与发布点的 `satisfies ILayout` 是两道防线 —— 见 `2026-10-12-dsh-anchor.md`。（这一条原本是「侦察结果」第 4 条那个 `panelInfo` 漂移的成因。）
 
-## 侦察结果（2026-10-07，探针跑在真 rig 上）
+## 上游契约给这个类画出的边界
 
-1. **`EditorGroupModel` 能独立构造**（`instantiationService.createInstance(EditorGroupModel, undefined)`）——不需要组视图。
-2. **`EditorPanes` 与「组的进度指示器」需要一个"组的作用域"**，跟 `EditorGroupView` 建的一样：`ProgressBar` + scoped `IContextKeyService` + **组级的 `IEditorProgressService`**（`EditorProgressIndicator(progressBar, group)`——它**不是**全局单例，第一版探针就死在 `UNKNOWN service editorProgressService`）。⇒ 嵌入式服务图里这层 scope 要我们建。
-3. **面板会反过来向组要素成员**：`EditorPanes` 源码只用到 `windowId` / `openEditor`，但真正跑起来时**面板自己**（以及进度指示器）会调 `isEmpty`、`isPinned`、`onDidModelChange`（`textDiffEditor.ts` 里 `this.group.isPinned(input)`、`progressIndicator.ts` 里 `group.onDidModelChange`）⇒ 用一个"假组"喂 `EditorPanes` 是**死路**，**必须有一个真的 `IEditorGroupView`**。这正好把"要写什么"钉死：模型能转发的都转发给 `EditorGroupModel`，其余是我们自己的行为。
+1. **`EditorGroupModel` 能独立构造**（`instantiationService.createInstance(EditorGroupModel, undefined)`）——不需要组视图，模型这块底座可以单借。
+2. **`EditorPanes` 与组的进度指示器要一个"组的作用域"**，跟 `EditorGroupView` 建的那样：`ProgressBar` + scoped `IContextKeyService` + **组级的 `IEditorProgressService`**（`EditorProgressIndicator(progressBar, group)`，**不是**全局单例）⇒ 嵌入式服务图里这层 scope 由 prac 建。
+3. **面板会反过来向组要素成员**：`EditorPanes` 的源码只用到 `windowId` / `openEditor`，但跑起来**面板自己**（以及进度指示器）会调 `isEmpty` / `isPinned` / `onDidModelChange`（`textDiffEditor.ts`、`progressIndicator.ts`）⇒ 用一个"假组"喂 `EditorPanes` 是**死路**，**必须有一个真的 `IEditorGroupView`**。分工由此定死：模型能转发的转发给 `EditorGroupModel`，其余是自己的行为；第一批成员覆盖"能开一个文件并画出来"——`windowId` / `element` / `container` / `openEditor` / `closeEditor` / `isEmpty` / `isPinned` / `contains` / `activeEditor` / `activeEditorPane` / `onDidModelChange` / `onDidActiveEditorChange` / `layout` / `setVisible` / `focus`，其余按最小实现并进"未支持"清单。
+4. **手抄的上游契约会静默漂移**：上游插件读 face 上不存在的成员时，整个外壳起不来，而唯一的报错是一句 `Cannot read properties of undefined`；本仓库的类型检查对着**已发布**的 `0.1.5-rc.1`、app 跑的是 checkout ⇒ 两个 `ILayout` 不是同一个类型，`satisfies` 也写不成 ⇒ **这类契约要自己加守卫**（见 Open questions）。
+5. **宿主 shell 的 modal 面会把整页 `inert`**：它渲染在自己的 body root 里并把 `#root` 标成 `inert` ⇒ 界面既不能点也不能聚焦。它不是任何门的题目，而"确认"是一次**持久的宿主设置**（属于人的 onboarding）⇒ 门在跑时把那层 modal root 藏掉并清掉 `inert`（两族门共用的脚本），**不代替人点确认**。
 
-⇒ 下一步就是写这个类（`PracEditorGroup`），第一批成员先覆盖"能开一个文件并画出来"：`windowId` / `element` / `container` / `openEditor` / `closeEditor` / `isEmpty` / `isPinned` / `contains` / `activeEditor` / `activeEditorPane` / `onDidModelChange` / `onDidActiveEditorChange` / `layout` / `setVisible` / `focus`，其余按最小实现并进"未支持"清单。
-
-4. **`ctx.layout` 是 prac 手抄的上游契约，上游加成员时我们静默地坏**（2026-10-12 实测）：上游的 `ui-sidebar-right` 在激活时读 `layout.panelInfo.getSnapshot().activePanelId`，而 prac 的 `LayoutFace` 没有发布 `panelInfo`（它只做了 `provideRoot({ hooks: { panelInfo } })`，没进 face）⇒ 该插件激活失败，**12 个条目不激活**（`sidebar-right` failed，其余 pending 在 `sidebarRight` / `sidebarRightTabs` 上），整个外壳起不来；唯一的报错是 `Cannot read properties of undefined (reading 'getSnapshot')`。修法：把它发布进 face。**为什么没有更早红**：本仓库的类型检查用的是已发布的 `0.1.5-rc.1`，而 app 跑的是 checkout（见 Open questions 最后一条）——两个 `ILayout` 不是同一个类型，`satisfies` 也就写不成。
-
-5. **DSH 0.2 的「Preview Notice」会把整页 `inert`**（2026-10-12 实测）：它渲染在自己的 body root 里（全屏 mask），并把 `#root` 标成 `inert`，于是 prac 的界面**既不能点也不能聚焦**（Playwright 的 actionability 检查报 `<body> intercepts pointer events`；`#root` 带 `inert="true"`）。它不是任何门的题目，而"确认"是一次**持久的宿主设置**（属于人的 onboarding），所以门在跑的时候把那层 modal root 藏掉并清掉 `inert`（`scripts/shell-modal.mjs`，两族门共用），不代替人点确认。
-
-## 判据（这一轮怎么算成立）
+## 判据（怎么算成立）
 
 1. **编辑器动作落在可见的那块面上**：转到符号 / 定义（以及任何编辑动作）动的必须是 prac 展示的那份。**已锁，两个手势**：`vendor:verify-editor` 先在**转到符号**的快选里按下符号行（可见面的渲染行从 `// top-<token>` 变成 `// filler 182…`），再用**文件内查找**把它带回文件头（渲染行变回 `// top-<token>`），两次都断言宿主元素与区域不变。
 2. **Outline / Timeline 与上游一致**（同一份模型、同一个面板）。**两条都锁了**：`vendor:verify-outline`（符号、跟随下一个文件、跟随取得焦点的区域、排在面板内）与 `vendor:verify-timeline`（面板是上游的、条目来自 `ITimelineService`、行里是当前文件的名字、换文件就换行、面板仍在自己区域内）。Timeline 的条目由一条**只给门用**的 provider 提供（这个嵌入不带 timeline 源；空面板与坏面板分不出来），经 `__vscodeEmbed.face.enableTimelineProbe()` 打开。
