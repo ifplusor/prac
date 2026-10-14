@@ -4,7 +4,7 @@ status: in-progress
 
 # Agent Note: prac 的界面形态 —— VS Code × DSH 融合
 
-> 这是这项工作的 **umbrella**：主线定义、需求约束、决定（含被否决的路线）、开放问题。
+> 这是这项工作的 **umbrella**（综合性叙述，汇总各个 step）：主线定义、需求约束、决定（含被否决的路线）、开放问题。
 > 步骤 note：[2026-09-13-vs-concept-boundary.md](2026-09-13-vs-concept-boundary.md)（概念边界与命名，实现已完成，待签字）；[../abandoned/2026-09-15-vscode-capabilities-into-prac.md](../abandoned/2026-09-15-vscode-capabilities-into-prac.md)（把能力拆散带入 prac，方案待裁）；[../abandoned/2026-09-16-vscode-integration-transport.md](../abandoned/2026-09-16-vscode-integration-transport.md)（两半之间的通信层，设计待裁——四项）；[../in-progress/2026-09-19-architecture.md](../in-progress/2026-09-19-architecture.md)（**从需求出发重做架构**：需求清单 + 推导 + 待裁，取代了旧设计）；[../in-progress/2026-09-21-p1-ext-host-chain.md](../in-progress/2026-09-21-p1-ext-host-chain.md)（**P1 第一条链的实现计划**：已核实的事实 + 三条裁决 + 步骤 + 验证）；[2026-10-05-vscode-dsh-layout-boundary.md](2026-10-05-vscode-dsh-layout-boundary.md)（**借来的组件与 prac 框架的边界**：隔离与对等、浮层归谁——**已裁，工作在进行中**）；[2026-10-06-vscode-view-catalogue.md](2026-10-06-vscode-view-catalogue.md)（**VS Code 的视图进 prac 的视图目录**）；[2026-10-07-editor-host.md](2026-10-07-editor-host.md)（**prac 自己的编辑器宿主**）。
 > 口径（**§3.8 的断言分层之后**）：**vendor 侧集成门**写作 **14/14 · 28/28 · 9/9 · 6/6 · 7/7 · 33/33**（layout · views · focus · regions · view · file）；第六门 `verify-extension` 是**条件门**（装了 VS Code 扩展才跑 5 项，没装时明确 `SKIPPED`——SKIP 不是通过）；**prac 侧活体门**写作 `verify:stack 6/6 · verify:bottom 6/6 · verify:persistence 6/6 · verify:split 11/11`；所有 part 计数一律 **8/8**；**单测**写作 `pnpm test`。
 
