@@ -207,6 +207,62 @@ if (toggle !== null) {
 const unfolded = await measure(sixth.page);
 await sixth.page.close();
 
+// 7. Folding the **bottom** entry pushes its header down to the bottom: the room it gives back
+// goes to the entries above it (upstream's `distributeEmptySpace` hands space around "toward the
+// bottom", so with nothing below the fold the entries above take it). Left unmanaged, the strip
+// under the folded header is simply blank — and the entry cannot be moved out of the way itself.
+const seventh = await open();
+await seventh.page.evaluate(() => {
+  const raw = JSON.parse(localStorage.getItem("prac-layout/v1"));
+  raw.views["vscode:view:workbench.explorer.fileView"] = {
+    ...raw.views["vscode:view:workbench.explorer.fileView"],
+    size: 300,
+  };
+  localStorage.setItem("prac-layout/v1", JSON.stringify(raw));
+});
+await seventh.page.reload({ waitUntil: "load" });
+await seventh.boot();
+await seventh.show();
+const sized = await measure(seventh.page);
+// The full id: the measured list truncates names for readability.
+const bottomView = await seventh.page.evaluate(() => {
+  const region = globalThis.__deep.one(
+    '[data-prac-region="left/container:workbench.view.explorer"]',
+  );
+  return (
+    [...(region?.querySelectorAll("[data-prac-stack-entry]") ?? [])]
+      .at(-1)
+      ?.getAttribute("data-prac-stack-entry") ?? null
+  );
+});
+await seventh.page.evaluate((last) => {
+  const raw = JSON.parse(localStorage.getItem("prac-layout/v1"));
+  const key = Object.keys(raw.views).find((id) => id === last);
+  if (key !== undefined) raw.views[key] = { ...raw.views[key], collapsed: true };
+  localStorage.setItem("prac-layout/v1", JSON.stringify(raw));
+}, bottomView);
+await seventh.page.reload({ waitUntil: "load" });
+await seventh.boot();
+await seventh.show();
+const foldedBottom = await seventh.page.evaluate((view) => {
+  const region = globalThis.__deep.one(
+    '[data-prac-region="left/container:workbench.view.explorer"]',
+  );
+  const nodes = [...(region?.querySelectorAll("[data-prac-stack-entry]") ?? [])];
+  const last = nodes.at(-1)?.getBoundingClientRect();
+  const box = region?.getBoundingClientRect();
+  const file = globalThis.__deep.one(`[data-prac-stack-entry="${view}"]`)?.getBoundingClientRect();
+  return {
+    regionBottom: box ? Math.round(box.bottom) : null,
+    lastBottom: last ? Math.round(last.bottom) : null,
+    lastTop: last ? Math.round(last.top) : null,
+    lastHeight: last ? Math.round(last.height) : null,
+    fileView: file ? Math.round(file.height) : null,
+    entries: nodes.map((node) => Math.round(node.getBoundingClientRect().height)),
+  };
+}, "vscode:view:workbench.explorer.fileView");
+await seventh.page.close();
+await browser.close();
 await browser.close();
 
 const checks = {
@@ -238,6 +294,15 @@ const checks = {
     dragged.persisted !== null && Math.abs(dragged.persisted - dragged.fileView) <= 2,
   // A folded entry that had a header-sized leftover unfolds into a body, not into 18px.
   unfoldingGivesABodyBack: (unfolded.neighbour ?? 0) >= FLOOR,
+  // A folded bottom entry is pushed all the way down, and the entries above took the room.
+  foldingTheBottomEntryPushesItDown:
+    foldedBottom.regionBottom !== null &&
+    foldedBottom.lastBottom !== null &&
+    Math.abs(foldedBottom.regionBottom - foldedBottom.lastBottom) <= 6,
+  theEntriesAboveAbsorbTheRoom:
+    foldedBottom.lastHeight !== null &&
+    foldedBottom.lastHeight <= 24 &&
+    (foldedBottom.fileView ?? 0) >= 300,
   theMiddleIsNotAHandle: Math.abs((plainAfter.fileView ?? 0) - (plainBefore.fileView ?? 0)) <= 2,
   // The layout is the memory: the size it holds is the size the entry is drawn at.
   aWrittenSizeIsRestored:

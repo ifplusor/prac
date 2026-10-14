@@ -216,8 +216,17 @@ function viewLabel(viewId: string): string {
 }
 
 /** The header a stacked view carries: its label plus a fold toggle. */
+/**
+ * A folded entry's height: its header and nothing else.
+ *
+ * Fixed in the header's own style so the allocation subtracts it exactly instead of guessing.
+ */
+const HEADER_HEIGHT = 20;
+
 const STACK_HEADER_STYLE: StyleObject = {
   display: "block",
+  height: HEADER_HEIGHT,
+  boxSizing: "border-box",
   width: "100%",
   textAlign: "left",
   padding: "2px 6px",
@@ -345,6 +354,79 @@ let entryDrag: {
   /** Every entry of this stack, top-down: the ones below give up the room a drag takes. */
   peers: { viewId: string; height: number }[];
 } | null = null;
+
+/**
+ * The heights to draw for a stack that has folds or hand-set sizes in it.
+ *
+ * Upstream's rule, from `SplitView.distributeEmptySpace` (`splitview.ts:1329-1355`): the empty
+ * space travels **toward the bottom** — it is handed to the entries *below* the fold, and when
+ * nothing is below, to the entries *above*, which is what pushes a folded bottom entry's header
+ * down to the bottom instead of leaving a blank strip. Space going the other way (a window that
+ * shrank) shrinks everything proportionally, never below a floor.
+ *
+ * A flat stack — no folds, no sizes — is left to flex: it is the equal share it always had, and it
+ * follows a resize for free.
+ *
+ * @param views - the stack's visible views, top-down.
+ * @param state - the layout state (each view's stored size and fold).
+ * @param measured - heights from the previous frame, for entries nobody has sized.
+ * @param height - the height the stack really has (measured, not the frame's stale table).
+ * @returns the height to draw each entry at, folded ones included.
+ */
+function allocateStack(
+  views: readonly string[],
+  state: LayoutState,
+  measured: ReadonlyMap<string, number>,
+  height: number,
+): Map<string, number> {
+  const drawn = new Map<string, number>();
+  const folded = views.filter((viewId) => state.views[viewId]?.collapsed === true);
+  const open = views.filter((viewId) => state.views[viewId]?.collapsed !== true);
+  for (const viewId of folded) drawn.set(viewId, HEADER_HEIGHT);
+  if (open.length === 0) return drawn;
+  const available = Math.max(open.length * MIN_ENTRY, height - folded.length * HEADER_HEIGHT);
+  // Entries nobody sized take what the sized ones leave: on the first frame after a load there is
+  // nothing measured yet, and an equal share of the **whole** stack would make the sizes that were
+  // written down come out smaller than they are (measured: a written 210 drawn at ~180).
+  const fixedTotal = open.reduce((total, viewId) => total + (state.views[viewId]?.size ?? 0), 0);
+  const flexible = open.filter((viewId) => state.views[viewId]?.size === undefined).length;
+  const fallback =
+    flexible > 0
+      ? Math.max(MIN_ENTRY, Math.round((available - fixedTotal) / flexible))
+      : Math.round(available / open.length);
+  for (const viewId of open) {
+    drawn.set(viewId, state.views[viewId]?.size ?? measured.get(viewId) ?? fallback);
+  }
+  const wanted = open.reduce((total, viewId) => total + (drawn.get(viewId) ?? 0), 0);
+  if (wanted > available) {
+    const scale = available / wanted;
+    for (const viewId of open) {
+      drawn.set(viewId, Math.max(MIN_ENTRY, Math.round((drawn.get(viewId) ?? 0) * scale)));
+    }
+  }
+  let leftover = available - open.reduce((total, viewId) => total + (drawn.get(viewId) ?? 0), 0);
+  const firstFold = views.findIndex((viewId) => state.views[viewId]?.collapsed === true);
+  // A drag already hands the space around as it moves, so a stack with no fold in it needs no
+  // second distribution: leaving the leftover alone is what keeps "the size in the layout is the
+  // size it is drawn at" true after a drag.
+  if (leftover <= 0 || firstFold === -1) return drawn;
+  const below = open.filter((viewId) => views.indexOf(viewId) > firstFold);
+  const above = open.filter((viewId) => views.indexOf(viewId) < firstFold);
+  const target = below.length > 0 ? below : above.length > 0 ? above : open;
+  const total = target.reduce((sum, viewId) => sum + (drawn.get(viewId) ?? 0), 0);
+  for (const viewId of target) {
+    const share = total > 0 ? Math.round((leftover * (drawn.get(viewId) ?? 0)) / total) : 0;
+    drawn.set(viewId, (drawn.get(viewId) ?? 0) + share);
+  }
+  return drawn;
+}
+
+/** Whether two measurement maps say the same thing. */
+function sameSizes(a: ReadonlyMap<string, number>, b: ReadonlyMap<string, number>): boolean {
+  if (a.size !== b.size) return false;
+  for (const [key, value] of a) if (b.get(key) !== value) return false;
+  return true;
+}
 
 /** One in-flight sash drag. */
 interface DragState {
@@ -550,6 +632,38 @@ export function createFrame(
     const frameRef = useRef<HTMLDivElement | null>(null);
 
     // Track the frame's own box (not the window).
+    /** What each stack entry measured on the previous frame (see `allocateStack`). */
+    const measuredEntries = useRef<Map<string, number>>(new Map());
+    /**
+     * What each region measured.
+     *
+     * `allocateStack` needs the height the stack **really** has: the frame's own size table comes
+     * from the previous frame and a stack that overflowed once keeps reporting the too-large
+     * number (measured: 756 against a region that is 734 tall).
+     */
+    const measuredRegions = useRef<Map<string, number>>(new Map());
+    /** Bumped when the measurements changed, so the allocation runs again with the real numbers. */
+    const [measureVersion, setMeasureVersion] = useState(0);
+    void measureVersion;
+    useLayoutEffect(() => {
+      const entries = new Map<string, number>();
+      for (const node of document.querySelectorAll<HTMLElement>("[data-prac-stack-entry]")) {
+        const viewId = node.getAttribute("data-prac-stack-entry");
+        if (viewId !== null) entries.set(viewId, Math.round(node.getBoundingClientRect().height));
+      }
+      const regions = new Map<string, number>();
+      for (const node of document.querySelectorAll<HTMLElement>("[data-prac-region]")) {
+        const regionId = node.getAttribute("data-prac-region");
+        if (regionId !== null)
+          regions.set(regionId, Math.round(node.getBoundingClientRect().height));
+      }
+      const changed =
+        !sameSizes(entries, measuredEntries.current) ||
+        !sameSizes(regions, measuredRegions.current);
+      measuredEntries.current = entries;
+      measuredRegions.current = regions;
+      if (changed) setMeasureVersion((version) => version + 1);
+    });
     useLayoutEffect(() => {
       const element = frameRef.current;
       if (!element) return undefined;
@@ -592,9 +706,14 @@ export function createFrame(
      * @param viewId - the view this entry shows.
      * @param box - the box of the region holding the stack.
      */
-    const stackEntry = (viewId: string, box: Box, handle: boolean): ReactElement => {
+    const stackEntry = (
+      viewId: string,
+      box: Box,
+      handle: boolean,
+      allocated: number | undefined = undefined,
+    ): ReactElement => {
       const collapsed = state.views[viewId]?.collapsed === true;
-      const size = state.views[viewId]?.size;
+      const size = allocated ?? state.views[viewId]?.size;
       // The bottom `SASH_SIZE` px of the entry are its resize handle — **no extra element
       // anywhere**, so the stack's children stay exactly its entries and the view body keeps its
       // shape. The listener is on the **capture** phase: the press lands on the view's own DOM
@@ -984,7 +1103,25 @@ export function createFrame(
         showsTabStrip(state, node)
           ? [tabStrip(views, node.id), viewBody(frontView(state, node.id) ?? views[0] ?? "", box)]
           : stacked
-            ? views.map((viewId, position) => stackEntry(viewId, box, position < views.length - 1))
+            ? (() => {
+                // A plain stack shares the height through flex; once something is folded or sized
+                // the distribution has to be explicit (`allocateStack`).
+                const allocated = views.some(
+                  (viewId) =>
+                    state.views[viewId]?.size !== undefined ||
+                    state.views[viewId]?.collapsed === true,
+                )
+                  ? allocateStack(
+                      views,
+                      state,
+                      measuredEntries.current,
+                      measuredRegions.current.get(node.id) ?? box.height,
+                    )
+                  : undefined;
+                return views.map((viewId, position) =>
+                  stackEntry(viewId, box, position < views.length - 1, allocated?.get(viewId)),
+                );
+              })()
             : // No strip: the region still shows its **front** view. It used to take the
               // first by order, which is a different question — measured with a region a
               // view had just been split into: the file that was copied in was front, the
