@@ -70,6 +70,7 @@ import {
   dragChainTarget,
   moveViewInRegion,
   resetStackBoundary,
+  setEntryFolded,
 } from "./model.js";
 import { type LayoutStore, useLayout } from "./store.js";
 import type { LayoutState } from "./contract.js";
@@ -1262,6 +1263,61 @@ export function createFrame(
      * @param node - the region to render.
      * @param dir - the parent split's axis.
      */
+    /**
+     * A stack row's header: the fold switch and the title.
+     *
+     * A row is a leaf region that holds exactly one view (`node.entry`), so its header belongs to
+     * the region and the fold is the region's `collapsed` — the height it remembers rides along in
+     * `cachedSize`, the same two-field rule a folded row has everywhere else.
+     */
+    const entryHeader = (node: RegionNode, viewId: string): ReactElement =>
+      createElement(
+        "div",
+        {
+          "data-prac-stack-header": node.id,
+          style: { ...STACK_HEADER_STYLE, display: "flex", alignItems: "center", gap: "2px" },
+        },
+        createElement(
+          "button",
+          {
+            type: "button",
+            "data-prac-stack-toggle": node.id,
+            "aria-expanded": node.collapsed === true ? "false" : "true",
+            title: node.collapsed === true ? "Expand" : "Collapse",
+            onClick: (event: ReactMouseEvent<HTMLElement>) => {
+              const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
+              const height = row?.getBoundingClientRect().height;
+              store.update((current) =>
+                setEntryFolded(current, node.id, node.collapsed !== true, height),
+              );
+            },
+            style: {
+              background: "none",
+              border: "none",
+              color: "inherit",
+              cursor: "pointer",
+              padding: "0 2px",
+              font: "inherit",
+            },
+          },
+          node.collapsed === true ? "\u25b8" : "\u25be",
+        ),
+        createElement(
+          "span",
+          {
+            "data-prac-stack-title": node.id,
+            style: {
+              flex: "1 1 auto",
+              cursor: "pointer",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            },
+          },
+          viewLabel(viewId),
+        ),
+      );
+
     const renderRegion = (node: RegionNode, dir: Dir, fill = false): ReactElement => {
       const box = sizes.get(node.id) ?? ZERO_BOX;
       const child = activeChild(state, node);
@@ -1290,31 +1346,33 @@ export function createFrame(
         },
         showsTabStrip(state, node)
           ? [tabStrip(views, node.id), viewBody(frontView(state, node.id) ?? views[0] ?? "", box)]
-          : stacked
-            ? (() => {
-                // A plain stack shares the height through flex; once something is folded or sized
-                // the distribution has to be explicit (`allocateStack`).
-                const allocated = views.some(
-                  (viewId) =>
-                    state.views[viewId]?.size !== undefined ||
-                    state.views[viewId]?.collapsed === true,
-                )
-                  ? allocateStack(
-                      views,
-                      state,
-                      measuredEntries.current,
-                      measuredRegions.current.get(node.id) ?? box.height,
-                    )
-                  : undefined;
-                return views.map((viewId, position) =>
-                  stackEntry(viewId, box, position < views.length - 1, allocated?.get(viewId)),
-                );
-              })()
-            : // No strip: the region still shows its **front** view. It used to take the
-              // first by order, which is a different question — measured with a region a
-              // view had just been split into: the file that was copied in was front, the
-              // region rendered its neighbour, and the new file's view got no surface.
-              [viewBody(frontView(state, node.id) ?? views[0] ?? "", box)],
+          : node.entry === true && views.length === 1
+            ? [entryHeader(node, views[0] ?? ""), viewBody(views[0] ?? "", box)]
+            : stacked
+              ? (() => {
+                  // A plain stack shares the height through flex; once something is folded or sized
+                  // the distribution has to be explicit (`allocateStack`).
+                  const allocated = views.some(
+                    (viewId) =>
+                      state.views[viewId]?.size !== undefined ||
+                      state.views[viewId]?.collapsed === true,
+                  )
+                    ? allocateStack(
+                        views,
+                        state,
+                        measuredEntries.current,
+                        measuredRegions.current.get(node.id) ?? box.height,
+                      )
+                    : undefined;
+                  return views.map((viewId, position) =>
+                    stackEntry(viewId, box, position < views.length - 1, allocated?.get(viewId)),
+                  );
+                })()
+              : // No strip: the region still shows its **front** view. It used to take the
+                // first by order, which is a different question — measured with a region a
+                // view had just been split into: the file that was copied in was front, the
+                // region rendered its neighbour, and the new file's view got no surface.
+                [viewBody(frontView(state, node.id) ?? views[0] ?? "", box)],
       );
     };
 
