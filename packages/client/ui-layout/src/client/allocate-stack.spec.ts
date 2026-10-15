@@ -22,7 +22,13 @@ import {
   moveViewInRegion,
   resetStackBoundary,
   ensureStackShape,
+  stackEntries,
+  setEntryHeight,
+  setEntryFolded,
+  moveEntry,
   visibleViews,
+  findRegion,
+  HEADER_HEIGHT,
 } from "./model.js";
 
 const HEIGHT = 734;
@@ -461,5 +467,59 @@ describe("ensureStackShape (S2 step 1: a stack becomes a column split of one-vie
       b: view("left", 1, { hidden: true }),
     });
     expect(ensureStackShape(hidden)).toBe(hidden);
+  });
+});
+
+describe("stack entries (S2: the rows are leaf regions)", () => {
+  const shaped = () =>
+    ensureStackShape({
+      tree: {
+        type: "region",
+        id: "left",
+        size: 300,
+        flex: false,
+        collapsed: false,
+        cachedSize: 300,
+        min: 40,
+        stack: true,
+      },
+      views: {
+        a: { region: "left", order: 0, hidden: false, size: 120 },
+        b: { region: "left", order: 1, hidden: false, size: 80 },
+      },
+    } as unknown as LayoutState);
+
+  it("lists the rows and numbers them by the tree, not the records", () => {
+    const entries = stackEntries(shaped().tree);
+    expect(entries.map((entry) => [entry.id, entry.size])).toEqual([
+      ["left/stack/a", 120],
+      ["left/stack/b", 80],
+    ]);
+  });
+
+  it("writes a row's height and fold onto its leaf", () => {
+    const state = shaped();
+    const taller = setEntryHeight(state, "left/stack/a", 200);
+    expect(findRegion(taller.tree, "left/stack/a")?.size).toBe(200);
+    expect(setEntryHeight(taller, "left/stack/a", 200)).toBe(taller);
+    const folded = setEntryFolded(state, "left/stack/a", true, 120);
+    const leaf = findRegion(folded.tree, "left/stack/a");
+    expect(leaf?.collapsed).toBe(true);
+    // folded, the row is a header line — that is its `size`; the height it remembers is separate
+    expect(leaf?.size).toBe(HEADER_HEIGHT);
+    expect(leaf?.cachedSize).toBe(120);
+    expect(
+      findRegion(setEntryFolded(folded, "left/stack/a", false).tree, "left/stack/a")?.size,
+    ).toBe(120);
+  });
+
+  it("reorders the split's children by reference and direction", () => {
+    const state = shaped();
+    const swapped = moveEntry(state, "left/stack/b", "left/stack/a", "up");
+    expect(stackEntries(swapped.tree).map((entry) => entry.id)).toEqual([
+      "left/stack/b",
+      "left/stack/a",
+    ]);
+    expect(moveEntry(state, "left/stack/a", "left/stack/b", "up")).toBe(state);
   });
 });

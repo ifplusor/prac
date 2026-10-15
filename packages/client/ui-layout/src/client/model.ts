@@ -618,6 +618,7 @@ export function ensureStackShape(state: LayoutState): LayoutState {
     const view = state.views[viewId];
     const leaf = regionNode(`${regionId}/stack/${viewId}`, view?.size ?? MIN_ENTRY, {
       min: MIN_ENTRY,
+      entry: true,
       ...(view?.collapsed === true ? { collapsed: true } : {}),
       ...(view?.cachedSize !== undefined ? { cachedSize: view.cachedSize } : {}),
     });
@@ -1338,6 +1339,129 @@ export function resetStackBoundary(
     { viewId: above.viewId, height: even },
     { viewId: below.viewId, height: even },
   ];
+}
+
+/**
+ * The entry regions of a stack split, in order.
+ *
+ * @param node - the subtree to look in.
+ * @returns the leaves the normalizer made (empty for anything that is not a stack split).
+ */
+export function stackEntries(node: LayoutNode): RegionNode[] {
+  if (node.type !== "split" || node.dir !== "column") return [];
+  const entries = node.children.filter(
+    (child): child is RegionNode => child.type === "region" && child.entry === true,
+  );
+  return entries.length === node.children.length ? entries : [];
+}
+
+/**
+ * Set a stack row's height — the leaf region's own `size`, which is what the layout draws.
+ *
+ * @param state - current state.
+ * @param entryId - the entry region's id.
+ * @param height - the height to hold.
+ * @returns the new state, or the same one when nothing changes.
+ */
+export function setEntryHeight(state: LayoutState, entryId: string, height: number): LayoutState {
+  const size = Math.max(MIN_ENTRY, Math.round(height));
+  const node = findRegion(state.tree, entryId);
+  if (node === null || node.size === size) return state;
+  return { ...state, tree: setRegionSize(state.tree, entryId, size) };
+}
+
+/**
+ * Fold or unfold a stack row, with the same two-field rule a folded row has in the design: the
+ * height it remembers goes in `cachedSize`, and `size` stops being a height (E1/E2).
+ *
+ * @param state - current state.
+ * @param entryId - the entry region's id.
+ * @param collapsed - whether the row should be folded.
+ * @param measuredHeight - the height it is drawn at right now, if the caller knows it.
+ * @returns the new state, or the same one when nothing changes.
+ */
+export function setEntryFolded(
+  state: LayoutState,
+  entryId: string,
+  collapsed: boolean,
+  measuredHeight?: number,
+): LayoutState {
+  const node = findRegion(state.tree, entryId);
+  if (node === null || (node.collapsed === true) === collapsed) return state;
+  if (collapsed) {
+    const remembered = measuredHeight ?? node.size ?? node.cachedSize;
+    const cachedSize = remembered === undefined ? undefined : Math.round(remembered);
+    return {
+      ...state,
+      tree: updateRegion(state.tree, entryId, (node) => ({
+        ...node,
+        collapsed: true,
+        size: HEADER_HEIGHT,
+        // `cachedSize` is optional: omit it rather than write an undefined into a required field.
+        ...(cachedSize === undefined ? {} : { cachedSize }),
+      })),
+    };
+  }
+  const size =
+    node.cachedSize === undefined ? MIN_ENTRY : Math.max(MIN_ENTRY, Math.round(node.cachedSize));
+  return {
+    ...state,
+    // Unfolded, `cachedSize` follows the same convention `regionNode` uses: it mirrors `size`.
+    tree: updateRegion(state.tree, entryId, (node) => ({
+      ...node,
+      collapsed: false,
+      size,
+      cachedSize: size,
+    })),
+  };
+}
+
+/**
+ * Move one stack row next to another — the same reference-and-direction move as `moveViewInRegion`,
+ * but the order lives in the split's children now.
+ *
+ * @param state - current state.
+ * @param entryId - the row being moved.
+ * @param referenceId - the row it is dropped against.
+ * @param direction - `"up"` lands it before the reference, `"down"` after it.
+ * @returns the new state, or the same one when the move changes nothing.
+ */
+export function moveEntry(
+  state: LayoutState,
+  entryId: string,
+  referenceId: string,
+  direction: "up" | "down",
+): LayoutState {
+  if (entryId === referenceId) return state;
+  const walk = (node: LayoutNode): { node: LayoutNode; moved: boolean } => {
+    if (node.type !== "split") return { node, moved: false };
+    const index = node.children.findIndex((child) => child.id === entryId);
+    const at = node.children.findIndex((child) => child.id === referenceId);
+    if (index >= 0 && at >= 0) {
+      const others = node.children.filter((child) => child.id !== entryId);
+      const to = others.findIndex((child) => child.id === referenceId);
+      const target = direction === "up" ? to : to + 1;
+      const moving = node.children[index] as LayoutNode;
+      const next = [...others.slice(0, target), moving, ...others.slice(target)];
+      return {
+        node: { ...node, children: next },
+        moved: next.some((child, position) => child !== node.children[position]),
+      };
+    }
+    for (let position = 0; position < node.children.length; position += 1) {
+      const child = node.children[position];
+      if (child === undefined || child.type === "region") continue;
+      const inner = walk(child);
+      if (inner.moved) {
+        const children = [...node.children];
+        children[position] = inner.node;
+        return { node: { ...node, children }, moved: true };
+      }
+    }
+    return { node, moved: false };
+  };
+  const result = walk(state.tree);
+  return result.moved ? { ...state, tree: result.node } : state;
 }
 
 export function dragChainTarget(

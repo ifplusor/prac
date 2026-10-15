@@ -108,6 +108,13 @@ export interface RegionNode {
    */
   readonly embedder?: boolean;
   /**
+   * This region is one row of a stack — a leaf the normalizer made, holding exactly one view.
+   *
+   * It lets the frame tell a stack row (which draws a header and can be folded) from an ordinary
+   * region (which does not), without sniffing at the id.
+   */
+  entry?: boolean;
+  /**
    * Child regions, when this region **selects** among them instead of holding
    * views directly.
    *
