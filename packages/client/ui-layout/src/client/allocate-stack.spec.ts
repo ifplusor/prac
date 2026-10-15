@@ -19,6 +19,8 @@ import {
   dragSnapTarget,
   redistributeOnDrag,
   setViewCollapsed,
+  moveViewInRegion,
+  visibleViews,
 } from "./model.js";
 
 const HEIGHT = 734;
@@ -304,5 +306,58 @@ describe("dragChainTarget (the folding chain, bottom-up)", () => {
 
   it("ignores a folded entry for the room, and names the first open one below", () => {
     expect(dragChainTarget(entries([300, false], [20, true], [48, false]), "v0", 400)).toBe("v2");
+  });
+});
+
+describe("moveViewInRegion (Grid.moveView within one parent, grid.ts:480-495)", () => {
+  const strip = (state: LayoutState) => visibleViews(state, "r");
+  const regionOf = (
+    orders: Record<string, number>,
+    extra: Record<string, { region?: string; hidden?: boolean }> = {},
+  ): LayoutState =>
+    ({
+      views: Object.fromEntries(
+        Object.entries(orders).map(([id, order]) => [
+          id,
+          { region: "r", order, hidden: false, ...extra[id] },
+        ]),
+      ),
+    }) as unknown as LayoutState;
+
+  it("lands a view before or after its reference", () => {
+    const state = regionOf({ a: 0, b: 1, c: 2 });
+    expect(strip(moveViewInRegion(state, "c", "a", "up"))).toEqual(["c", "a", "b"]);
+    expect(strip(moveViewInRegion(state, "a", "c", "down"))).toEqual(["b", "c", "a"]);
+    expect(strip(moveViewInRegion(state, "a", "b", "down"))).toEqual(["b", "a", "c"]);
+  });
+
+  it("changes nothing when the view is already where it is dropped", () => {
+    const state = regionOf({ a: 0, b: 1, c: 2 });
+    expect(moveViewInRegion(state, "b", "a", "down")).toBe(state);
+    expect(moveViewInRegion(state, "b", "b", "up")).toBe(state);
+  });
+
+  it("keeps hidden views of the region in their relative places", () => {
+    const state = regionOf({ a: 0, b: 1, c: 2 }, { b: { hidden: true } });
+    const moved = moveViewInRegion(state, "c", "a", "up");
+    expect(strip(moved)).toEqual(["c", "a"]);
+    expect(moved.views.b?.order).toBe(2);
+  });
+
+  it("refuses to move across regions, or with an unknown view", () => {
+    const state = regionOf({ a: 0, b: 1 }, { b: { region: "other" } });
+    expect(moveViewInRegion(state, "a", "b", "down")).toBe(state);
+    expect(moveViewInRegion(state, "nope", "a", "down")).toBe(state);
+  });
+
+  it("leaves the moved view's own size and fold state alone", () => {
+    const state = regionOf({ a: 0, b: 1 });
+    const sized = {
+      ...state,
+      views: { ...state.views, b: { ...state.views.b!, size: 300, collapsed: true } },
+    };
+    const moved = moveViewInRegion(sized, "b", "a", "up");
+    expect(moved.views.b?.size).toBe(300);
+    expect(moved.views.b?.collapsed).toBe(true);
   });
 });

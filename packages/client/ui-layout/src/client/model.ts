@@ -537,6 +537,53 @@ function landingRegion(
  * @param regionId - the region to inspect.
  * @returns the front view id, or undefined when the region shows nothing.
  */
+/**
+ * Move a view next to another one **inside the same region** — the stack's drag-to-reorder.
+ *
+ * Upstream states a move as **reference + direction** (`Grid.moveView(view, sizing, referenceView,
+ * direction)`, `grid.ts:480-495`; `Direction.Up` / `Direction.Down`, `editorPart.ts:807-810`), and
+ * within one parent that is a pure reorder. A region's order is its views' `order` field
+ * (`visibleViews` sorts by it), so the move renumbers that field: the dragged view lands immediately
+ * before or after the reference, and everything else keeps its relative position — including views
+ * that are currently hidden. The view keeps its own height and fold state; only `order` changes
+ * (`moveView` passes no `Sizing`, `grid.ts:480-495`).
+ *
+ * @param state - current state.
+ * @param viewId - the view being moved.
+ * @param referenceViewId - the view it is dropped against.
+ * @param direction - `"up"` lands it before the reference, `"down"` after it.
+ * @returns the new state, or the same state when the move changes nothing.
+ */
+export function moveViewInRegion(
+  state: LayoutState,
+  viewId: string,
+  referenceViewId: string,
+  direction: "up" | "down",
+): LayoutState {
+  const view = state.views[viewId];
+  const reference = state.views[referenceViewId];
+  if (view === undefined || reference === undefined) return state;
+  // Moving across regions is `place`, a different mechanism; this one only reorders.
+  if (view.region !== reference.region) return state;
+  if (viewId === referenceViewId) return state;
+  const strip = Object.entries(state.views)
+    .filter(([, entry]) => entry.region === view.region)
+    .sort((a, b) => a[1].order - b[1].order)
+    .map(([id]) => id);
+  const others = strip.filter((id) => id !== viewId);
+  const at = others.indexOf(referenceViewId);
+  if (at < 0) return state;
+  const target = direction === "up" ? at : at + 1;
+  const next = [...others.slice(0, target), viewId, ...others.slice(target)];
+  if (next.every((id, index) => id === strip[index])) return state;
+  const views = { ...state.views };
+  next.forEach((id, index) => {
+    const entry = views[id];
+    if (entry !== undefined && entry.order !== index) views[id] = { ...entry, order: index };
+  });
+  return { ...state, views };
+}
+
 export function frontView(state: LayoutState, regionId: string): string | undefined {
   const views = visibleViews(state, regionId);
   return views.find((id) => state.views[id]?.front === true) ?? views[0];
