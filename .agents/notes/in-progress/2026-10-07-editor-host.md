@@ -23,7 +23,7 @@ status: in-progress
    - `EditorPanes` —— 面板的创建 / 生命周期 / DOM 搬运（实测它只向组要 `windowId` 与 `openEditor`，所以能装在**我们自己的**组对象上）；
    - 面板类 —— `TextFileEditor` / `AbstractTextCodeEditor` 那套编辑体验（注册成 prac 自己的 editor id，由 `IEditorResolverService` 按工作区文件 glob 解析到它）。
 3. **我们要写的**：`IEditorGroupView`（= `IEditorGroup`，51 个成员，其中绝大多数是对 `EditorGroupModel` 的转发）+ 宿主三接口的最小集（`IEditorGroupsService` 15 / `IEditorPart` 8 + `IEditorGroupsView` 18 / `IEditorPartsView` 10）。需要真行为的十余个：组注册与查表、活动组与激活事件、加/删组、`partOptions`、可见性、layout 事件、上下文键的 `bind`。
-4. **多组 + 分栏 = prac 的区域树**：一个载文件的区域 = 一个组（`stage` 是默认那个），拆区域 = 新组（与"分栏是区域的性质"一致）；只放侧栏 / 面板的区域没有组。
+4. **多组 + 分栏 = prac 的区域树**：一个载文件的区域 = 一个组（`center` 是默认那个），拆区域 = 新组（与"分栏是区域的性质"一致）；只放侧栏 / 面板的区域没有组。
 5. **目录与落位**：`listOpenFiles()` 照旧读编辑器服务的打开集合；文件在哪个区域 = 它在哪个组，"把文件搬去另一个区域" = 编辑器在组之间搬（`moveEditors`）。**文件不再由 frame 给每个文件一个宿主**——那是组的活；prac 的 tab 条仍然描述这个区域里的视图顺序。
 6. **一个文件可以同时住在多个区域**（VS Code 的 Split Editor 语义）：所以**身份是"放置"，不是文件**。能力按 `(文件, 组)` 报条目（`placement / resource / group / region / active / dirty / preview`），同一个文件在两处就是两条；prac 侧为每条建自己的视图，落位由条目给的 `region` 决定。三条由此确立的边界：
    - **视图 id 的键是"放置令牌"**（`vscode:file:<placement>:<resource>`）。令牌由宿主在文件第一次出现在某个组时发放，**组随视图搬家时令牌不变**（下面第 ② 条），所以"移动"不会让消费者的名字变成陈旧的。用组做键会在每次移动时改名（实测：`splitView` 之后视图 id 从 `p0` 变成 `p2`，浮层与门都握着已经不存在的名字）；用区域做键则给不出 id——区域是挂载时才知道的，而 id 必须在挂载之前就有。令牌只在一种情况下重发：**编辑器被搬进一个已经有组的区域**（第 ③ 条）——上游的 `moveEditor` 先在目标组打开、再在源组关闭，而那前一半与"Split Editor 的复制"**是同一个事件**，宿主无从分辨，于是按新放置发放。代价是被移动的视图在新区域里是一个新 tab（追加在末尾，与 VS Code 移动编辑器一致），所以**消费者必须每次从目录重新读 id，不能缓存**。
@@ -38,7 +38,7 @@ status: in-progress
 ## Alternatives（放弃了什么）
 
 - **保留离屏部件**（今日形态）：James 否决——它是第二个世界，且会一直是债。
-- **把上游 `EditorPart` 挂进 `stage`**：否决——**部件无法与 DSH 的视图结合**（当初把文件做成视图、把部件挪去离屏，正是为了绕开它）。
+- **把上游 `EditorPart` 挂进 `center`**：否决——**部件无法与 DSH 的视图结合**（当初把文件做成视图、把部件挪去离屏，正是为了绕开它）。
 - **复用上游 `EditorGroupView`（一个区域一个组）**：否决——**组是只装编辑器的封闭世界，装不下 prac 视图**；区域的容器必须是 prac 的。
 - **给离屏部件真实布局，再把组/面板的 DOM 搬进 prac 视图**：实测四种做法全失败（单组搬 control 被隐藏；每文件一组 + `openEditor(描述符, group)` 只有第一次成功且开成两份；`addGroup` + `moveEditors` 搬移返回 false；`SIDE_GROUP` 让 `openEditor` 返回 undefined）——根因是离屏部件是"单格网格"。即便修好，它仍是第二个世界。
 - **prac 从零实现面板与模型**：不必——`EditorGroupModel` 与 `EditorPanes` 都以组对象为界，可以照借。
@@ -62,7 +62,7 @@ status: in-progress
   - **脏标记**：按**模型**（资源）。VS Code 的脏是 `ITextFileEditorModel` 的属性，两个放置共享同一个模型 ⇒ 两个 tab 显示同一个脏点；按放置算会是假信息。
   - **关闭**：按**放置**。`close(placement, resource)` 一直接到 capability 上（`embeddedWorkbench` 在 `findEditors(uri)` 的结果里只取 `groupId === placement` 的那一个实例），tab 的 × 用 `host.filePlacement(view)` 报名。在飞行中的护栏也改成按放置（`closingFiles` 用 `placementKey`），只有"这个资源的每个放置都在关闭"才拦住 `activate`（`isClosingEverywhere`）——文件还在另一个区域里开着时，激活它是正当的。上游语义一致：关一个组不动另一个组。
   - **"当前文件"**：是"最前区域里处于 `activeEditor` 的那个**放置**"（区域最前由 prac 的 front 决定，组内 active 由 `EditorGroupModel` 决定）；`web-app` 现有的 `currentFile` 重挑就是它在用。
-- **零延迟的 down+up 会让工作台的确认框重问一次 —— 已定性为合成输入的产物，不是产品缺陷**（`exp144`–`exp148` 量清）：按住 30ms 再抬起就正常（`mouseup` 目标就是 Cancel 按钮、对话框关闭并保持关闭）；而**零延迟**那一次的 `mouseup` 目标落在编辑器上。期间没有任何东西移动或改序 —— 对话框与按钮的盒不变（`exp144` `moved:false`）、覆盖层与 stage 的 DOM 顺序与 z-index 不变（`exp148`：`stageFirst`、层 `z-index:20`）、prac 的 layout 无变化、也没有 `focusin`（`exp146`）—— 所以既不是重排/重定位，也不是 attention 被浮层焦点驱动。`elementFromPoint` 在所有时刻都返回影子树**宿主**（无 class 的 DIV），用它判断"点在谁身上"本身就是错的。⇒ 门继续按人的节奏按（120ms），这条不再追。
+- **零延迟的 down+up 会让工作台的确认框重问一次 —— 已定性为合成输入的产物，不是产品缺陷**（`exp144`–`exp148` 量清）：按住 30ms 再抬起就正常（`mouseup` 目标就是 Cancel 按钮、对话框关闭并保持关闭）；而**零延迟**那一次的 `mouseup` 目标落在编辑器上。期间没有任何东西移动或改序 —— 对话框与按钮的盒不变（`exp144` `moved:false`）、覆盖层与 center 的 DOM 顺序与 z-index 不变（`exp148`：`stageFirst`、层 `z-index:20`）、prac 的 layout 无变化、也没有 `focusin`（`exp146`）—— 所以既不是重排/重定位，也不是 attention 被浮层焦点驱动。`elementFromPoint` 在所有时刻都返回影子树**宿主**（无 class 的 DIV），用它判断"点在谁身上"本身就是错的。⇒ 门继续按人的节奏按（120ms），这条不再追。
 - **`addGroup` 的通道（已通）**：在 prac，组就是区域，所以"加一个组"是**问 frame 要一个新区域**。face 的 `createRegionBeside(regionId, side)` 用 `splitRegionWith` 做纯树编辑（**不移动任何 view**），同步返回新区域 id；`PracEditorHost.addGroup` 拿它 + `ensureGroup(newRegion, newRegion)` 把新组绑到那个区域上。通道两端：workbench 面 `setGroupRegionFactory(factory)`（模块级持有 —— host 走 DI，没有应用回调的缝），应用侧在 `vscode-host` 安装 `(region, side) => ctx.pracLayout.createRegionBeside(region, side)`；`vscode-embed` 的门面会先把 factory 存下、等工作台面 publish 时补交（应用先于工作台面启动）。**实测**：单个组时 `workbench.action.splitEditorToNextGroup` 从"什么都不做"变成开出 `p1@region-2`。**仍未做**：方向型 `findGroup`（LEFT/RIGHT/UP/DOWN）需要一个区域树几何查找（`regionInDirection`），同样经这条通道回答。
 - **浮层可交互，但门的"瞬时点击"不行**（2026-10-12 量清）：应用自己的浮层（快选、菜单、通知、模态）**是能点的** —— 转到符号的行用"按下 → 停 120ms → 抬起"能选中并让编辑器滚到目标行，脏文件关不掉的确认框同理（Cancel / Don't Save 都生效）。而 Playwright 默认的**零延迟** down+up 不给按钮 `click`（实测：对话框按下即消失、抬起落在编辑器上，随后对话框被重新问一次）。⇒ 这是**门的输入**问题，不是产品缺陷：门要按人的节奏按（已写进 `verify-close` 与 `verify-editor` 的注释）。此前一轮把 `document.elementFromPoint` 的结果读成"穿透到 body"是误判——它对影子树内容返回的是**宿主**，而"点不动"的真因是 DSH 那条 Preview Notice 的全屏 mask + `#root` 的 `inert`（见下一条）。
 - ~~本仓库类型检查的 DSH 版本与运行的 DSH 不是同一个~~ **已定**：prac dev 的 DSH 锚点是一个 worktree（`../../deepseek-harness/dsh-prac-dev`），catalog 精确 pin 它的发布版本，`pnpm check` 里的逐字节比较与发布点的 `satisfies ILayout` 是两道防线 —— 见 `2026-10-12-dsh-anchor.md`。（这一条原本是「侦察结果」第 4 条那个 `panelInfo` 漂移的成因。）

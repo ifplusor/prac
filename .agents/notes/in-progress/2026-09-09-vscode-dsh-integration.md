@@ -53,7 +53,7 @@ status: in-progress
 - **部件永远是被容纳的一方**：经 host 挂进来，**不是搬过来**。
 - **容纳单位 = `view`**：`prac.view` 目录里同时住着 `dsh:*` 与 `vscode:*` 两方 view，它们已经是同一种东西；**container 是可选分组**、**part 是可选的高级形态**（整块标准 IDE 区域），都不是 prac 组合的单位。
   - 为什么：用 part 当单位等于让 prac 说 workbench 的编排词汇，并继承它"单实例 / 只能搬"的约束。
-  - **（2026-09-19 James 再确认）编排单位就是一个视图**，不是整块区域；编辑器那一侧的视图 = 一个文件一个视图（§3.5），**tab 是区域级的**（`stage` 默认 `tab`、不支持 `stack`）。
+  - **（2026-09-19 James 再确认）编排单位就是一个视图**，不是整块区域；编辑器那一侧的视图 = 一个文件一个视图（§3.5），**tab 是区域级的**（`center` 默认 `tab`、不支持 `stack`）。
 
 ### 3.3 框架归属与分层
 
@@ -72,10 +72,10 @@ status: in-progress
 
 ### 3.5 区域与编辑器
 
-- **区域的形态**：常驻区（区域 id `left` / `right`；**角色**用平台名 `primarySidebar` / `secondarySidebar`，绑到 DSH 的 `dsh:sidebar` / `dsh:rightbar`——位置中立，区域 id 不动、改名要升持久化 key）不分栏、但**都可堆叠**（可折叠 header、排序、尺寸记忆）；**布局模式（分区 / `tab` / `stack`）由机制提供、由「区域名」绑定**，每个子区域跟随它所在区域名的绑定；**`stage` 的分栏必须带视图**（对齐 VS Code 的 editor group）；新增**常驻底栏**（`bottom`，默认收起，放 terminal / 输出 / 问题）；`stage` 支持**任意方向**分栏（上下左右、可嵌套）——**任何方向都造不出空 region**。
+- **区域的形态**：常驻区（区域 id `left` / `right`；**角色**用平台名 `primarySidebar` / `secondarySidebar`，绑到 DSH 的 `dsh:sidebar` / `dsh:rightbar`——位置中立，区域 id 不动、改名要升持久化 key）不分栏、但**都可堆叠**（可折叠 header、排序、尺寸记忆）；**布局模式（分区 / `tab` / `stack`）由机制提供、由「区域名」绑定**，每个子区域跟随它所在区域名的绑定；**`center` 的分栏必须带视图**（对齐 VS Code 的 editor group）；新增**常驻底栏**（`bottom`，默认收起，放 terminal / 输出 / 问题）；`center` 支持**任意方向**分栏（上下左右、可嵌套）——**任何方向都造不出空 region**。
 - **对话是普通 view**：`dsh:main:conversation` 可被编排放到任意 region（默认侧边），注意力可把它提升到中间；`selectPanel` 只把**新选中的**视图放进编排给它的 region，不再"替换当前 main 视图所在的那个 region"。
-- **VS Code 侧提供"单个 file view"**：prac 的"编辑器" = **一个文件一个视图**，**不是 editor part / editor group**；**tab 是区域级的**（不是 `stage` 专有，**frame 级标签页**）、**分栏是区域的性质**——`stage` 默认 `tab`、不支持 `stack`；frame 本身仍不认识"编辑器组"。
-  - 为什么：用 VS Code 的 editor part（自带 tab 条与 group 模型），chat 与 editor 就无法在 stage 里自由并排。
+- **VS Code 侧提供"单个 file view"**：prac 的"编辑器" = **一个文件一个视图**，**不是 editor part / editor group**；**tab 是区域级的**（不是 `center` 专有，**frame 级标签页**）、**分栏是区域的性质**——`center` 默认 `tab`、不支持 `stack`；frame 本身仍不认识"编辑器组"。
+  - 为什么：用 VS Code 的 editor part（自带 tab 条与 group 模型），chat 与 editor 就无法在 center 里自由并排。
   - 代价：`workbench.parts.editor` 现在是**过渡形态**；lib 的 editor 句柄应定义成 `editor(file) → view`。
 
 ### 3.6 工作区与状态
@@ -169,7 +169,7 @@ status: in-progress
 ### 已定方向、尚未做
 
 4. **扩展贡献的 view**（**前提已改**：原来记的"tree view 没数据"是过时的，2026-09-21 核实**树视图本来就通**——挂 cSpell 的 `cSpellIssuesViewByFile` 得到的是扩展自己给的 `No issues found.`）。剩下的真缺口是：① **webview 视图**（`type=webview`，body 完全空，我们没接这条路）；② **没编译出来的内建扩展**（`references-view` / `npm` / `emmet`… 激活失败 ⇒ 视图无数据）。**"哪几个视图要进 prac 的界面"也还没定**——第一优先的排序要不要按新事实调整，待 James。
-5. **frame 批次**：还差 `stage` 的 tab（需要 VS Code 侧的 `editor(file)`）；持久化的 **per-workspace 那半**未做。堆叠与底栏还缺：拖拽排序、view 间 sash 调尺寸、底栏开合入口。
+5. **frame 批次**：还差 `center` 的 tab（需要 VS Code 侧的 `editor(file)`）；持久化的 **per-workspace 那半**未做。堆叠与底栏还缺：拖拽排序、view 间 sash 调尺寸、底栏开合入口。
 6. **自动保存打开之后，验证门怎么调**：那几条"文件保持不动"的断言是靠故意关掉 autoSave 才稳的（`verify-file` 最近一次 33/33 直接绿、与旧注意不一致，待查）。
 7. **扩展安装的正当路径**：等 terminal 落地（它提供 `VSCODE_IPC_HOOK_CLI`）后用 `server-cli --install-extension` 正规安装；在那之前不装用户 VS Code 扩展（扩展目录现在由 `fs.watch` 接住，装了就能用）。
 8. **sidebar / panel / statusbar 的映射**：还欠被 stub 掉的 layout 语义（显隐 / zen / centered / floating / 多窗口）。
