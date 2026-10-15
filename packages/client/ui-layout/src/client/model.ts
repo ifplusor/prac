@@ -297,7 +297,9 @@ export function revealRegion(tree: LayoutNode, id: string): LayoutNode {
  * @param node - the child node.
  */
 export function nodeBasis(node: LayoutNode): { flex: boolean; size: number } {
-  if (node.type === "split") return { flex: true, size: 0 };
+  // A split without them shares the leftover, exactly as before they existed; a split standing in
+  // for a fixed-size region carries that region's basis instead.
+  if (node.type === "split") return { flex: node.flex ?? true, size: node.size ?? 0 };
   if (node.collapsed) return { flex: false, size: 0 };
   return { flex: node.flex, size: node.size };
 }
@@ -582,6 +584,98 @@ export function moveViewInRegion(
     if (entry !== undefined && entry.order !== index) views[id] = { ...entry, order: index };
   });
   return { ...state, views };
+}
+
+/**
+ * Shape every stack in the tree the way the design states it: **a `column` split whose children are
+ * one-view regions**.
+ *
+ * A region in `stack` mode that holds two or more visible views stops being a region that holds
+ * views: it becomes a split of leaves, one per view, and the views' `region` moves to their leaf.
+ * Heights and folds move with them — a leaf's `size` **is** the row's height (`splitview.ts:60-84`
+ * is upstream's version of the same idea) — so the drawn height and the stored height are the same
+ * number by construction, which is what `ViewRecord.size` used to break.
+ *
+ * Two things keep a second pass cheap and safe:
+ *
+ * - the split takes the **region's own id**, so a named region (`left`, `center`, …) keeps the name
+ *   its role binding is looked up by;
+ * - a leaf's id is derived from the region and the view (`<region>/stack/<viewId>`), so reordering
+ *   does not rename anything and a normalised state normalises to itself.
+ *
+ * Regions that hold one visible view, and regions in `tabs` mode (which has no height semantics),
+ * are left exactly as they are.
+ *
+ * @param state - current state.
+ * @returns the shaped state, or the same state when every stack already has that shape.
+ */
+export function ensureStackShape(state: LayoutState): LayoutState {
+  let changed = false;
+  const views = { ...state.views };
+
+  /** One view's leaf: the id is derived, the height is the view's own, the fold moves over. */
+  const leafFor = (regionId: string, viewId: string): RegionNode => {
+    const view = state.views[viewId];
+    const leaf = regionNode(`${regionId}/stack/${viewId}`, view?.size ?? MIN_ENTRY, {
+      min: MIN_ENTRY,
+      ...(view?.collapsed === true ? { collapsed: true } : {}),
+      ...(view?.cachedSize !== undefined ? { cachedSize: view.cachedSize } : {}),
+    });
+    const record = views[viewId];
+    if (record !== undefined && record.region !== leaf.id) {
+      // The height lives in the tree now; the record no longer carries one (G1: `tabs` has none).
+      const { size: _size, cachedSize: _cached, ...rest } = record;
+      views[viewId] = { ...rest, region: leaf.id, collapsed: undefined };
+      changed = true;
+    }
+    return leaf;
+  };
+
+  const visibleIn = (regionId: string): string[] =>
+    Object.entries(state.views)
+      .filter(([, view]) => view.region === regionId && !view.hidden)
+      .sort((a, b) => a[1].order - b[1].order)
+      .map(([id]) => id);
+
+  const walk = (node: LayoutNode): LayoutNode => {
+    if (node.type === "split") {
+      const children = node.children.map(walk);
+      if (children.every((child, index) => child === node.children[index])) return node;
+      changed = true;
+      return { ...node, children };
+    }
+    // A region can hold child regions (the container layer); shape those first.
+    let region = node;
+    if (region.children !== undefined && region.children.length > 0) {
+      const children = region.children.map(walk) as RegionNode[];
+      if (!children.every((child, index) => child === region.children?.[index])) {
+        region = { ...region, children };
+        changed = true;
+      }
+    }
+    if (region.stack !== true) return region;
+    const visible = visibleIn(region.id);
+    if (visible.length < 2) return region;
+    // Already the shape: a column split of one-view leaves, none of them holding a view's own height.
+    const shaped =
+      region.children !== undefined &&
+      region.children.length === visible.length &&
+      region.children.every((child, index) => child.id === `${region.id}/stack/${visible[index]}`);
+    if (shaped) return region;
+    changed = true;
+    return {
+      type: "split",
+      id: region.id,
+      dir: "column",
+      size: region.size,
+      flex: region.flex === true,
+      children: visible.map((viewId) => leafFor(region.id, viewId)),
+    };
+  };
+
+  const tree = walk(state.tree);
+  if (!changed) return state;
+  return { ...state, tree, views };
 }
 
 export function frontView(state: LayoutState, regionId: string): string | undefined {

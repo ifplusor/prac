@@ -155,6 +155,16 @@ export interface SplitNode {
   readonly type: "split";
   readonly id: string;
   readonly dir: Dir;
+  /**
+   * What the split takes along its parent's axis.
+   *
+   * Optional, and **absent means "share the leftover"** — which is what every split in the frame's
+   * default tree wants. A split that has to stand in for a fixed-size region (a stack replacing a
+   * named region, say) carries that region's `size` and `flex: false` instead. Upstream's own
+   * serialized branch has a `size` for the same reason (`grid.ts:764-769`).
+   */
+  readonly size?: number;
+  readonly flex?: boolean;
   readonly children: LayoutNode[];
 }
 

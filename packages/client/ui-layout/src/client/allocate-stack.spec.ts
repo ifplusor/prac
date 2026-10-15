@@ -21,6 +21,7 @@ import {
   setViewCollapsed,
   moveViewInRegion,
   resetStackBoundary,
+  ensureStackShape,
   visibleViews,
 } from "./model.js";
 
@@ -397,5 +398,68 @@ describe("resetStackBoundary (SplitView's sash reset, splitview.ts:1186)", () =>
 
   it("does nothing for a row that is not in the stack", () => {
     expect(resetStackBoundary(rows([100, false], [100, false]), "nope")).toEqual([]);
+  });
+});
+
+describe("ensureStackShape (S2 step 1: a stack becomes a column split of one-view leaves)", () => {
+  const stateWith = (tree: unknown, views: Record<string, unknown>): LayoutState =>
+    ({ tree, views }) as unknown as LayoutState;
+  const region = (id: string, size: number, extra: Record<string, unknown> = {}) => ({
+    type: "region",
+    id,
+    size,
+    flex: false,
+    collapsed: false,
+    cachedSize: size,
+    min: 40,
+    ...extra,
+  });
+  const view = (regionId: string, order: number, extra: Record<string, unknown> = {}) => ({
+    region: regionId,
+    order,
+    hidden: false,
+    ...extra,
+  });
+
+  it("turns a stack of two visible views into a column split of leaves, keeping the region's id", () => {
+    const state = stateWith(region("left", 300, { stack: true }), {
+      a: view("left", 0, { size: 120 }),
+      b: view("left", 1, { size: 80, collapsed: true, cachedSize: 80 }),
+    });
+    const shaped = ensureStackShape(state);
+    expect(shaped.tree).toMatchObject({ type: "split", id: "left", dir: "column", size: 300 });
+    const children = (
+      shaped.tree as { children: { id: string; size: number; collapsed: boolean }[] }
+    ).children;
+    expect(children.map((child) => [child.id, child.size, child.collapsed])).toEqual([
+      ["left/stack/a", 120, false],
+      ["left/stack/b", 80, true],
+    ]);
+    // the height and the fold live in the tree now; the records do not carry them
+    expect(shaped.views.a?.region).toBe("left/stack/a");
+    expect(shaped.views.a?.size).toBeUndefined();
+    expect(shaped.views.b?.cachedSize).toBeUndefined();
+  });
+
+  it("normalises to itself, and leaves one-view stacks and tabs regions alone", () => {
+    const state = stateWith(region("left", 300, { stack: true }), {
+      a: view("left", 0),
+      b: view("left", 1),
+    });
+    const once = ensureStackShape(state);
+    expect(ensureStackShape(once)).toBe(once);
+    const single = stateWith(region("left", 300, { stack: true }), { a: view("left", 0) });
+    expect(ensureStackShape(single)).toBe(single);
+    const tabs = stateWith(region("left", 300, { tabs: "multiple" }), {
+      a: view("left", 0),
+      b: view("left", 1),
+    });
+    expect(ensureStackShape(tabs)).toBe(tabs);
+    // hidden views are not rows, so they do not become leaves
+    const hidden = stateWith(region("left", 300, { stack: true }), {
+      a: view("left", 0),
+      b: view("left", 1, { hidden: true }),
+    });
+    expect(ensureStackShape(hidden)).toBe(hidden);
   });
 });
