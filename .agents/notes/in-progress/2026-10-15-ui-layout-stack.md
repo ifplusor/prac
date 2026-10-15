@@ -124,6 +124,31 @@ status: in-progress
    验收：拖到边缘 ⇒ 该块 `visible = false`、空间按 `Distribute` 分出去；拖回恢复原尺寸；别的块不乱动。
 4. **（可选，另裁）** 借上游 `Grid` 作引擎：那时模型已同形，成本小得多。
 
+### 第 1 步的状态形状（栈 → 叶子）
+
+**不变量**：一个 `stack` 模式的区域里有 **≥2 条可见视图**时，树里就是**一个 `column` 分栏**，孩子是**一视图一个 region**（leaf），每条 `ViewRecord.region` 指向各自的 leaf。
+
+| 事实 | 之前 | 之后 |
+| --- | --- | --- |
+| 条目的高度 | `ViewRecord.size`（+ `cachedSize`）| **leaf 的 `size`**（树节点）|
+| 折叠 | `ViewRecord.collapsed` + `size` | **leaf 的 `collapsed` / `cachedSize`**（region 本来就有这两个字段）|
+| 顺序 | `ViewRecord.order` | **分栏孩子的顺序**（leaf 的顺序）|
+| 谁算高度 | 渲染期 `allocateStack` | 布局期 `resolveSizes`（一次算完）|
+| `ViewRecord.size` | 存高度 | **退场**（`tabs` 模式本就没有高度语义，见 G1）|
+
+**成形与迁移是同一个函数**：每次状态变化后，把"住着 ≥2 条可见视图的 `stack` 区域"整理成上面的形状（`ensureStackShape`）——按顺序把每条视图各放进一个 leaf、把视图记录里的高度与折叠搬进 leaf、把这些 leaf 挂进一个 `column` 分栏。旧数据（`prac-layout/v1`，数据由人清）加载后跑同一个函数即完成迁移，所以**不需要单独的迁移代码**。
+
+**只有栈改形状**：只住一条视图的区域、以及 `tabs` 模式（一个区域住多条视图、只显示一条）都不变 ⇒ 迁移是局部的。
+
+**这一条的手势**：不重写，仍然是现有的拖边界 / 折叠链 / snap / 双击复位，只是它们写的是 **leaf 的尺寸**而不是视图记录 —— 行为因此不变；把它们推广到"区域的 sash"（含 `Distribute` 语义）留给第 2、3 步。
+
+**验收（行为不变）**：
+
+- `verify:stack` 的三件事照旧（一条裸渲染 / 两条成栈并折叠 / 折叠后展开回原高）；
+- **`rows == sizes` 由构造成立**：画面来自 `resolveSizes`，拖动写的就是同一批数；
+- 刷新后一致；
+- 单测：`allocateStack` 的用例改为对**树的尺寸分配**断言；栈的手势用例（拖边界 / 折叠链 / snap / 双击复位）改为对 **leaf** 断言。
+
 ## Open questions
 
 - 标题条上"可拖区域"的视觉提示（光标 `grab`/`move`？悬停高亮？）与插入线的样式/阈值。
