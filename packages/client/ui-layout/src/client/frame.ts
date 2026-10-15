@@ -68,6 +68,7 @@ import {
   setViewCollapsed,
   dragSnapTarget,
   dragChainTarget,
+  moveViewInRegion,
 } from "./model.js";
 import { type LayoutStore, useLayout } from "./store.js";
 import type { LayoutState } from "./contract.js";
@@ -344,6 +345,15 @@ function sameSizes(a: ReadonlyMap<string, number>, b: ReadonlyMap<string, number
  * Module state on purpose: the frame is a singleton per page, an entry is rendered by a plain
  * function (so a hook inside it would break the hook order), and only one drag can be in flight.
  */
+/** One in-flight drag of an entry by its title: reordering, not resizing. */
+let reorderDrag: {
+  viewId: string;
+  pointerId: number;
+  container: HTMLElement;
+  line: HTMLElement;
+  target: { reference: string; direction: "up" | "down" } | null;
+} | null = null;
+
 let entryDrag: {
   viewId: string;
   pointerId: number;
@@ -655,6 +665,89 @@ export function createFrame(
      * @param viewId - the view this entry shows.
      * @param box - the box of the region holding the stack.
      */
+    /**
+     * Start a reorder: the pointer went down on an entry's **title** (not its bottom `SASH_SIZE`
+     * px, which is the resizing sash, and not the fold switch). Upstream states a move as reference
+     * + direction (`Grid.moveView`, `grid.ts:480-495`), so the drop target is "the row under the
+     * pointer, above or below its midline"; a pointer that leaves the rows drops nothing and the
+     * entry stays where it was. The dragged entry keeps its height and fold state — only `order`
+     * changes — and this path never folds anything (`setViewCollapsed` is not involved).
+     */
+    const beginReorder = (down: PointerDragEvent, viewId: string): void => {
+      const container = (down.currentTarget as HTMLElement).parentElement;
+      if (container === null) return;
+      const line = document.createElement("div");
+      line.setAttribute("data-prac-stack-drop", viewId);
+      Object.assign(line.style, {
+        position: "absolute",
+        left: "0",
+        right: "0",
+        height: "2px",
+        background: "var(--vscode-focusBorder, #007fd4)",
+        pointerEvents: "none",
+        zIndex: "6",
+      });
+      const drag = {
+        viewId,
+        pointerId: down.pointerId,
+        container,
+        line,
+        target: null as { reference: string; direction: "up" | "down" } | null,
+      };
+      reorderDrag = drag;
+      const rows = (): { id: string; element: HTMLElement; top: number; bottom: number }[] =>
+        [...container.querySelectorAll<HTMLElement>("[data-prac-stack-entry]")].map((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            id: element.getAttribute("data-prac-stack-entry") ?? "",
+            element,
+            top: rect.top,
+            bottom: rect.bottom,
+          };
+        });
+      const stop = (): void => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", finish);
+        window.removeEventListener("pointercancel", drop);
+        drag.line.remove();
+        if (reorderDrag === drag) reorderDrag = null;
+      };
+      const drop = (): void => {
+        if (reorderDrag !== drag) return;
+        stop();
+      };
+      const move = (moveEvent: PointerEvent): void => {
+        if (reorderDrag !== drag || moveEvent.pointerId !== drag.pointerId) return;
+        const hit = rows().find(
+          (row) => moveEvent.clientY >= row.top && moveEvent.clientY < row.bottom,
+        );
+        if (hit === undefined || hit.id === "") {
+          // Off the rows: nothing will be dropped, so show nothing.
+          drag.target = null;
+          drag.line.remove();
+          return;
+        }
+        const direction = moveEvent.clientY < hit.top + (hit.bottom - hit.top) / 2 ? "up" : "down";
+        drag.target = { reference: hit.id, direction };
+        hit.element.appendChild(drag.line);
+        drag.line.style.top = direction === "up" ? "0" : "";
+        drag.line.style.bottom = direction === "down" ? "0" : "";
+      };
+      const finish = (upEvent: PointerEvent): void => {
+        if (reorderDrag !== drag || upEvent.pointerId !== drag.pointerId) return;
+        const target = drag.target;
+        stop();
+        if (target === null || target.reference === viewId) return;
+        store.update((state) =>
+          moveViewInRegion(state, viewId, target.reference, target.direction),
+        );
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", finish);
+      window.addEventListener("pointercancel", drop);
+      down.preventDefault();
+    };
+
     const stackEntry = (
       viewId: string,
       box: Box,
@@ -672,10 +765,23 @@ export function createFrame(
         // Only an entry with an entry **below** it has a boundary to drag: the stack's last
         // entry ends at the stack's own edge, where a drag has nothing to give (and would eat
         // the bottom 5px of the view's content).
-        if (!handle) return;
         if (event.button !== 0) return;
         const rect = event.currentTarget.getBoundingClientRect();
-        if (event.clientY < rect.bottom - SASH_SIZE) return;
+        // The bottom `SASH_SIZE` px is the resizing sash; the fold switch is the button. Everywhere
+        // else on the header row is the reorder handle (upstream's sash is its own element and takes
+        // precedence where it overlaps, `splitview.ts:1168-1173`).
+        if (event.clientY >= rect.bottom - SASH_SIZE) {
+          if (!handle) return;
+        } else {
+          const onToggle = (
+            (event as unknown as { target: EventTarget | null }).target as HTMLElement | null
+          )?.closest?.("[data-prac-stack-toggle]");
+          if (onToggle === null || onToggle === undefined) {
+            beginReorder(event, viewId);
+            return;
+          }
+          return;
+        }
         // The move/up listeners go on the **window**: a store update re-renders the frame and
         // the entry element can be replaced mid-drag, dropping pointer capture.
         const move = (moveEvent: PointerEvent): void => {
@@ -832,32 +938,63 @@ export function createFrame(
           },
         },
         createElement(
-          "button",
+          "div",
           {
             key: "header",
-            type: "button",
-            "data-prac-stack-toggle": viewId,
-            "aria-expanded": collapsed ? "false" : "true",
-            onClick: (event: ReactMouseEvent<HTMLElement>) => {
-              // What the entry is drawn at right now: the fold remembers it the way upstream's
-              // hidden view keeps its size, so unfolding gives the same height back.
-              const entry = (event.currentTarget as HTMLElement).closest("[data-prac-stack-entry]");
-              if (entry === null) return;
-              const height = entry.getBoundingClientRect().height;
-              store.update((current) =>
-                setViewCollapsed(
-                  current,
-                  viewId,
-                  current.views[viewId]?.collapsed !== true,
-                  height,
-                ),
-              );
-            },
-            style: STACK_HEADER_STYLE,
+            "data-prac-stack-header": viewId,
+            style: { ...STACK_HEADER_STYLE, display: "flex", alignItems: "center", gap: "2px" },
           },
-          `${state.views[viewId]?.flags?.dirty === true ? "\u25cf " : ""}${viewLabel(viewId)} ${
-            collapsed ? "\u25b8" : "\u25be"
-          }`,
+          createElement(
+            "button",
+            {
+              key: "toggle",
+              type: "button",
+              "data-prac-stack-toggle": viewId,
+              "aria-expanded": collapsed ? "false" : "true",
+              title: collapsed ? "Expand" : "Collapse",
+              onClick: (event: ReactMouseEvent<HTMLElement>) => {
+                // What the entry is drawn at right now: the fold remembers it the way upstream's
+                // hidden view keeps its size, so unfolding gives the same height back.
+                const entry = (event.currentTarget as HTMLElement).closest(
+                  "[data-prac-stack-entry]",
+                );
+                if (entry === null) return;
+                const height = entry.getBoundingClientRect().height;
+                store.update((current) =>
+                  setViewCollapsed(
+                    current,
+                    viewId,
+                    current.views[viewId]?.collapsed !== true,
+                    height,
+                  ),
+                );
+              },
+              style: {
+                background: "none",
+                border: "none",
+                color: "inherit",
+                cursor: "pointer",
+                padding: "0 2px",
+                font: "inherit",
+              },
+            },
+            collapsed ? "\u25b8" : "\u25be",
+          ),
+          createElement(
+            "span",
+            {
+              key: "title",
+              "data-prac-stack-title": viewId,
+              style: {
+                flex: "1 1 auto",
+                cursor: "grab",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              },
+            },
+            `${state.views[viewId]?.flags?.dirty === true ? "\u25cf " : ""}${viewLabel(viewId)}`,
+          ),
         ),
         collapsed
           ? null
