@@ -99,7 +99,11 @@ status: in-progress
 
 ## 必须先裁的
 
-1. **行的上界给多少**：C5/C6 与"不按比例"都以"行有 `maximumSize`"为前提，而 prac 现在没有 `max`。没有它就只能回到"按比例"（我们试过 A″）或者"一条吞掉全部"（现场见过 519）。⇒ 需要裁：`max` 从哪来（缺省值 / 逐视图声明 / 由区域高度与其它行的下界推出）。
+1. **行的上界给多少**：**上游的答案已经明确——`max` 由每个视图自己声明，框架只读不发明**（`IView.maximumWidth/maximumHeight`，`splitview.ts:60`；`SplitView` 只读 `view.maximumSize`，`grid`/`splitview` 里的 `distributeEmptySpace` 用它封顶）。三条配套事实：
+   - **隐藏的视图，`maximumSize` 记作 0**（`get maximumSize() { return this.visible ? this.view.maximumSize : 0; }`，`splitview.ts:254-255`）⇒ 折叠的行**不可能再长大**，这正是"邻着折叠行就继续找展开的行"的基础；
+   - **多数视图不设上限**（`Number.POSITIVE_INFINITY`）⇒ 空闲空间会**整块给第一个还有余量的行**（"一条吃掉"是上游行为，不是异常）；
+   - **固定尺寸的部件**把 `max` 设成等于 `min`：标题栏（`titlebarPart.ts:66`）、状态栏（`statusbarPart.ts:144`）、活动栏（`activitybarPart.ts:100`）；**内容自带上限**的另有声明（编辑器面板 `editorPane.ts:63-65`、设置编辑器 `:447`、notebook `:143`）。
+   ⇒ 所以对 prac 只剩一个决定：**栈里的行要不要自己声明 `max`**。对齐上游（侧栏 viewlet 的形态）就是**不设上限**；若要有上限，也应由**视图自己声明**，而不是框架按比例拍一个。
 2. **顺序怎么表示**：行为上已定（F1–F10：顺序是区域里的**数据**、可被拖拽改写、跟着视图走）。剩下的是表示形式——留在视图记录里，还是变成树的结构（F1 的顺序 = branch 的孩子顺序）——这仍属于实现选型。
 3. **E1 记的是哪一刻的高度**：折叠那一刻的实测值，还是**拖动开始时**的值（上游 `snapAfter.size` 取的是后者）。
 
