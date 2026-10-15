@@ -24,8 +24,9 @@ import {
 const HEIGHT = 734;
 
 /** A state with just the view records `allocateStack` reads. */
-const stateOf = (views: Record<string, { size?: number; collapsed?: boolean }>): LayoutState =>
-  ({ views }) as unknown as LayoutState;
+const stateOf = (
+  views: Record<string, { size?: number; collapsed?: boolean; max?: number }>,
+): LayoutState => ({ views }) as unknown as LayoutState;
 
 const heights = (views: readonly string[], drawn: ReadonlyMap<string, number>): number[] =>
   views.map((viewId) => drawn.get(viewId) ?? 0);
@@ -71,9 +72,9 @@ describe("allocateStack", () => {
     }
   });
 
-  it("shares room left over in proportion, never to one entry alone", () => {
+  it("hands room left over to the rows that can take it, from the last one back", () => {
     const views = ["a", "b", "c", "d"];
-    // Sizes whose sum leaves a genuine leftover (300 + 100 + 100 + 100 = 600 of 734).
+    // 300 + 100 + 100 + 100 = 600 of the stack, so 134 is genuinely left over.
     const drawn = allocateStack(
       views,
       stateOf({ a: { size: 300 }, b: {}, c: {}, d: {} }),
@@ -84,30 +85,54 @@ describe("allocateStack", () => {
       ]),
       HEIGHT,
     );
-    expect(drawn.get("a")).toBeGreaterThan(300);
-    expect(drawn.get("d") ?? 0).toBeGreaterThan(100);
-    // Nobody swallows the whole 134.
-    expect(drawn.get("d") ?? 0).toBeLessThan(300);
+    // Nobody declares a ceiling here, so the **last** capable row takes the whole remainder — the
+    // order `distributeEmptySpace` walks in. It is not a proportional re-share.
+    expect(drawn.get("a")).toBe(300);
+    expect(drawn.get("b")).toBe(100);
+    expect(drawn.get("c")).toBe(100);
+    expect(drawn.get("d")).toBe(100 + (HEIGHT - 600));
     expect(heights(views, drawn).reduce((total, size) => total + size, 0)).toBe(HEIGHT);
   });
 
-  it("gives a fold's room in proportion, and leaves the folded entry its own size alone", () => {
-    const views = ["a", "b", "c", "d"];
-    const foldedLast = allocateStack(
+  it("stops at a declared ceiling and moves on to the next capable row", () => {
+    const views = ["a", "b", "c"];
+    const drawn = allocateStack(
       views,
-      stateOf({ a: { size: 300 }, b: {}, c: {}, d: { collapsed: true } }),
+      stateOf({ a: {}, b: {}, c: { max: 300 } }),
       new Map([
+        ["a", 100],
         ["b", 100],
         ["c", 100],
       ]),
       HEIGHT,
     );
-    expect(foldedLast.get("d")).toBe(HEADER_HEIGHT);
-    expect(foldedLast.get("c") ?? 0).toBeGreaterThan(100);
-    expect(foldedLast.get("b") ?? 0).toBeGreaterThan(100);
-    // In proportion: `a` holds three times `b`, so it takes three times as much of the room.
-    expect((foldedLast.get("a") ?? 0) - 300).toBeGreaterThan((foldedLast.get("c") ?? 0) - 100);
-    expect(heights(views, foldedLast).reduce((total, size) => total + size, 0)).toBe(HEIGHT);
+    // `c` walks up to its own ceiling; what is left goes to `b`, the next row back.
+    expect(drawn.get("c")).toBe(300);
+    expect(drawn.get("b")).toBe(HEIGHT - 400);
+    expect(drawn.get("a")).toBe(100);
+  });
+
+  it("gives a fold's room to the rows that can take it, from the last one back", () => {
+    const views = ["a", "b", "c"];
+    const foldedLast = allocateStack(
+      views,
+      stateOf({ a: {}, b: {}, c: { collapsed: true } }),
+      new Map([
+        ["a", 40],
+        ["b", 40],
+      ]),
+      HEIGHT,
+    );
+    const available = Math.max(2 * MIN_ENTRY, HEIGHT - HEADER_HEIGHT);
+    // The folded row is a header and takes nothing; the room goes to `b` (the last row that can
+    // still grow) — not in proportion to what the rows already hold.
+    expect(foldedLast.get("c")).toBe(HEADER_HEIGHT);
+    expect(foldedLast.get("b")).toBe(40 + (available - 80));
+    expect(foldedLast.get("a")).toBe(40);
+    // The folded row still holds its header line, so the stack's own height is `available` + it.
+    expect(heights(views, foldedLast).reduce((total, size) => total + size, 0)).toBe(
+      available + HEADER_HEIGHT,
+    );
   });
 });
 describe("redistributeOnDrag (SplitView.resize, splitview.ts:1308-1325)", () => {

@@ -1071,23 +1071,24 @@ export function allocateStack(
   }
   const leftover = available - open.reduce((total, viewId) => total + (drawn.get(viewId) ?? 0), 0);
   if (leftover <= 0) return drawn;
-  // Room left over is shared **in proportion to what each entry already has**, the way upstream's
-  // proportional layout re-lays a split view out (`saveProportions`/`proportionalLayout`,
-  // `splitview.ts:880-883`). Upstream's own `distributeEmptySpace` hands the whole remainder to the
-  // first view that will take it (`:1349-1355`), but that only behaves because every view there
-  // declares a `maximumSize`; prac's entries have no ceiling, so "first one takes all" made a
-  // stored 69 be drawn at 519 (measured in the field). A folded entry is a header and takes nothing.
-  const total = open.reduce((sum, viewId) => sum + (drawn.get(viewId) ?? 0), 0);
-  let handed = 0;
-  for (const viewId of open) {
-    const share = total > 0 ? Math.round((leftover * (drawn.get(viewId) ?? 0)) / total) : leftover;
-    handed += share;
-    drawn.set(viewId, (drawn.get(viewId) ?? 0) + share);
-  }
-  // Rounding must not lose a pixel: the last entry carries the remainder.
-  const last = open.at(-1);
-  if (last !== undefined && handed !== leftover) {
-    drawn.set(last, (drawn.get(last) ?? 0) + (leftover - handed));
+  // Room left over goes to the rows that can still take it, **from the last one back**, each up to
+  // its own ceiling — `distributeEmptySpace`'s order (`splitview.ts:1349-1355`). It is deliberately
+  // **not** a proportional re-share: `saveProportions`/`proportionalLayout` (`:880-883`) is a
+  // different mechanism (how a split view re-lays itself out), and folding a row is not a resize of
+  // the container. A row only stops taking room when it declares a ceiling; none does today, so the
+  // last capable row takes what is left (that is what VS Code's uncapped viewlets do — collapsing
+  // one lets its neighbour grow). A folded row can take nothing: it is a header.
+  let remaining = leftover;
+  for (let index = open.length - 1; index >= 0 && remaining > 0; index -= 1) {
+    const viewId = open[index];
+    if (viewId === undefined) continue;
+    const size = drawn.get(viewId) ?? 0;
+    const ceiling = state.views[viewId]?.max ?? Number.POSITIVE_INFINITY;
+    const room = Math.max(0, Math.round(ceiling) - size);
+    if (room <= 0) continue;
+    const give = Math.min(remaining, room);
+    drawn.set(viewId, size + give);
+    remaining -= give;
   }
   return drawn;
 }

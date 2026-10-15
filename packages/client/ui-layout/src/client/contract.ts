@@ -169,7 +169,17 @@ export interface ViewRecord {
    * a stack looks like before anyone touches it. The frame writes it, the store persists it with
    * the rest of the layout.
    */
+  /** The height this view was left at (its own, unless it is folded). */
   size?: number;
+  /**
+   * This view's ceiling in a stack, if it declares one.
+   *
+   * The interface is the design (`IView.maximumWidth/maximumHeight`, `splitview.ts:60`); a hidden
+   * view counts as 0 (`:254-255`). Nothing declares one yet: VS Code's own viewlets do not, so a
+   * row that can grow takes the free room. Without a ceiling the room goes to the last capable row
+   * first — the order `distributeEmptySpace` uses (`splitview.ts:1349-1355`).
+   */
+  max?: number;
   region: string;
   order: number;
   hidden: boolean;
