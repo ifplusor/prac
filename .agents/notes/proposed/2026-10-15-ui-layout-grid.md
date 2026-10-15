@@ -2,42 +2,34 @@
 status: proposed
 ---
 
-# Agent Note: ui-layout 升级到 grid（栈 → 叶子）
+# Agent Note: stage 的分栏与调整尺寸对齐上游 Grid
 
 ## Problem
 
-**栈内高度有两个权威**：视图记录里的 `ViewRecord.size`（人拖出来的、以及折叠时记下的）与渲染期分配器**画出来**的值（`allocateStack`）。两者可以不一致，现场见过"布局里存 69、屏幕上画 519"。用户报的"上面的 item 会变"、折叠高度丢失、一条吞掉整块剩余，都是它的下游。
+**stage 的分栏在"调整尺寸"这件事上能力不足**，没有上游 editor part 那种灵活性。上游把这一切长在 `Grid` 的叶子上，prac 的区域只有 `size` / `flex` / `min`：
 
-根因不是分配器写得不好，而是**栈里的条目不是布局的叶子**：
+| 上游 editor part / Grid 有 | prac 的区域现在 |
+| --- | --- |
+| 每块 `minimumWidth/Height` **与 `maximumWidth/Height`**（`editorPart.ts:64-67`）| 只有 `min`，**没有 `max`** |
+| `priority`（中心那一格是 `LayoutPriority.High`，`editorPart.ts:1046`）⇒ 空间紧张时**中心最后让位** | 没有优先级概念 |
+| `Sizing`：`resizeView(...)`，以及 `setViewVisible(view, visible, DistributeSizing)`（`grid.ts:543/654`）⇒ "**同轴重新分配**"而不是只推邻居 | 拖 sash **只推动紧邻那一块** |
+| grid 的 **edge snapping**（`grid.ts:283`）⇒ 拖到边缘吸附 / 收起 | sash 没有 snap |
+| `leaf.maximized`（`ISerializedLeafNode`，`grid.ts:756-761`）⇒ 一块最大化 | 没有 |
+| 它会知道"某块正卡在最小值上"（`editorPart.ts:783`）⇒ 才有收起 / 恢复的反馈 | 没有 |
 
-- `split` 的尺寸住在**树**里（一个权威，`resolveSizes` 一次算完）；
-- `stack` 的尺寸住在**视图记录**里，再由渲染期一个分配器算成画面高度（第二个权威）。
-
-另一条独立的诉求指向同一个方向：**stage 要有上游 editor part 那种调整尺寸的灵活性**（同轴重新分配、中心最后让位、拖到边缘收起）——那些能力上游都长在 `Grid` 的叶子上（`minimum/maximumWidth/Height`、`priority`、`Sizing`、edge snapping）。
+**这条与"栈内高度的两个权威"无关**：那是布局模型的一致性问题（另见 [../in-progress/2026-10-05-vscode-dsh-layout-boundary.md](../in-progress/2026-10-05-vscode-dsh-layout-boundary.md) 的开放问题），两者只在"借用上游形状"这一点上偶然同向，不是彼此的解法。
 
 ## Proposal
 
-把状态对齐上游 `Grid` 的序列化形状（`ISerializedGrid = { root, orientation, width, height }`；节点是 `branch` / `leaf`），让**栈变成树的结构**：
+给区域补上上游 Grid 的那几件能力，分层做：
 
-| prac 现在 | 目标 | 说明 |
-| --- | --- | --- |
-| `SplitNode{dir, children[], size, flex?}` | `branch{orientation, data[], size}` | 同构：改的是名与字段，不是结构 |
-| `RegionNode{id, size, flex?, min, collapsed?, children?}` | `leaf{data: regionId, size, visible?, maximized?}` + 该视图的 `min` / `max` / `priority` | 区域仍是叶子；`min` 有、**`max` 缺** |
-| 区域 `stack: true` + n 条视图 | 一个 `column` branch + n 个 leaf（每条一个只住一个视图的 region） | **这次改动的核心** |
-| `ViewRecord.size`（栈内高度） | **删除**；高度只在 leaf 上 | 两个权威合一 |
-| `ViewRecord.collapsed` | `leaf.visible = false`，且该 leaf 的 `size` / `min` = 标题高 | 折叠仍是"只剩标题"，但由树表达 |
-| `flex?: boolean` | `size` + `min` / `max` + `Sizing` | `flex` 是 prac 自造的概念，改用上游的"分配 / 扩展" |
+1. **`max`**：区域除 `min` 之外声明 `max`；分配、拖 sash、窗口变化都按 `min ≤ size ≤ max` 收敛。
+2. **`priority`**：区域可以声明优先级；中心默认 `High` ⇒ 空间紧张时**中心最后让位**（谁先让位、谁最后让位，成为设计的一部分，而不是实现里的偶然）。
+3. **`Sizing`**：sash 拖动支持两种语义——`Distribute`（**同轴重新分配**：同轴所有块按比例吸收）与 `Expand`（只推邻居）。默认取 `Distribute`（对齐 `editorPart.ts:672`）。
+4. **sash 的 edge snap**：拖到边缘吸附并收起该块（`visible = false`），空间按 `Distribute` 分出去；拖回恢复原尺寸。
+5. **`maximized`**（可选）：一块临时最大化，不写进持久化。
 
-**要补的语义**：每叶 `min` + `max`；`priority`（中心 `LayoutPriority.High`，空间紧张时最后让位）；`Sizing`（`Distribute` 同轴重新分配 / `Expand` 只推邻居）；sash 的 **edge snap**；可选 `maximized`。
-
-**删除清单**：`allocateStack`、`redistributeOnDrag`、`dragChainTarget` 的**实现**随栈消失而删除；它们的**语义**搬到边界上——sash 拖动 = `resizeView`；折叠 = `setViewVisible(leaf, false, DistributeSizing)`；"链式折叠" = 同一手势里连续 `setViewVisible`。
-
-### 分步
-
-1. **栈 → 叶子**：`stack` 模式改为 `column` branch；删三个函数；门与单测改读数（"条目"→"叶子"）。
-2. **补语义**：`max`、`priority`、`Sizing`（先 `Distribute`）、中心 priority。
-3. **手势对齐**：sash 的 snap / edge collapse（复用现有 snap 的阈值与滞回）、`setViewVisible` 的分配语义。
-4. **（可选，另裁）借用上游 `Grid` 作引擎**：那时模型已同形，替换成本小；代价是把 DOM 与几何交给上游 widget，isolation / frame / 门要重挂。
+**不动的东西**：栈（`stack` 模式与栈内高度）这次不改——它是布局模型自己的问题，见上面的"无关"说明；`flex` 先保留，等第 1–2 步落地后再评估是否退场。
 
 ## 验收
 
