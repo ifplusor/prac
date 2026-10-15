@@ -347,11 +347,21 @@ function sameSizes(a: ReadonlyMap<string, number>, b: ReadonlyMap<string, number
  * function (so a hook inside it would break the hook order), and only one drag can be in flight.
  */
 /** One in-flight drag of an entry by its title: reordering, not resizing. */
+/**
+ * How far a press may drift before it counts as a drag instead of a click.
+ *
+ * A title bar answers to both: a click folds the entry (`setViewCollapsed`), a drag reorders it
+ * (`moveViewInRegion`). This slop is what drag-and-drop layers use to tell the two apart.
+ */
+const REORDER_SLOP = 4;
+
 let reorderDrag: {
   viewId: string;
   pointerId: number;
   container: HTMLElement;
   line: HTMLElement;
+  origin: { x: number; y: number };
+  moved: boolean;
   target: { reference: string; direction: "up" | "down" } | null;
 } | null = null;
 
@@ -696,6 +706,8 @@ export function createFrame(
         pointerId: down.pointerId,
         container,
         line,
+        origin: { x: down.clientX, y: down.clientY },
+        moved: false,
         target: null as { reference: string; direction: "up" | "down" } | null,
       };
       reorderDrag = drag;
@@ -722,6 +734,14 @@ export function createFrame(
       };
       const move = (moveEvent: PointerEvent): void => {
         if (reorderDrag !== drag || moveEvent.pointerId !== drag.pointerId) return;
+        // A press that stays put is a **click** (fold/unfold); only real movement reorders.
+        if (
+          Math.abs(moveEvent.clientX - drag.origin.x) > REORDER_SLOP ||
+          Math.abs(moveEvent.clientY - drag.origin.y) > REORDER_SLOP
+        ) {
+          drag.moved = true;
+        }
+        if (!drag.moved) return;
         const hit = rows().find(
           (row) => moveEvent.clientY >= row.top && moveEvent.clientY < row.bottom,
         );
@@ -740,7 +760,18 @@ export function createFrame(
       const finish = (upEvent: PointerEvent): void => {
         if (reorderDrag !== drag || upEvent.pointerId !== drag.pointerId) return;
         const target = drag.target;
+        const moved = drag.moved;
         stop();
+        if (!moved) {
+          // They clicked the title rather than dragging it: that is the fold switch.
+          const height = readStackRows(container as unknown as StackContainer).find(
+            (row) => row.viewId === viewId,
+          )?.height;
+          store.update((state) =>
+            setViewCollapsed(state, viewId, state.views[viewId]?.collapsed !== true, height),
+          );
+          return;
+        }
         if (target === null || target.reference === viewId) return;
         store.update((state) =>
           moveViewInRegion(state, viewId, target.reference, target.direction),
@@ -814,13 +845,17 @@ export function createFrame(
             return;
           }
         } else {
-          const onToggle = (
-            (event as unknown as { target: EventTarget | null }).target as HTMLElement | null
-          )?.closest?.("[data-prac-stack-toggle]");
-          if (onToggle === null || onToggle === undefined) {
-            beginReorder(event, viewId);
-            return;
-          }
+          // Only the header row is a handle. A press in the entry's **body** belongs to the view
+          // (the file tree, the editor) and must not be swallowed: doing that made a click in the
+          // content fold the entry (caught by verify:timeline).
+          const target = (event as unknown as { target: EventTarget | null }).target;
+          const header =
+            target instanceof HTMLElement ? target.closest("[data-prac-stack-header]") : null;
+          if (header === null) return;
+          const onToggle =
+            target instanceof HTMLElement ? target.closest("[data-prac-stack-toggle]") : null;
+          if (onToggle !== null) return;
+          beginReorder(event, viewId);
           return;
         }
         // The move/up listeners go on the **window**: a store update re-renders the frame and
