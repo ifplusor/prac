@@ -18,17 +18,17 @@ prac 自己的界面框架：它取代 `dsh-client-ui-layout` 那套固定的三
 
 树里只有两种节点：
 
-| 节点 | 是什么 |
-| --- | --- |
-| **`split`** | 分栏分列（`row` / `column`），孩子各占一块，可拖 sash 改比例 |
-| **`region`** | 一个**位置**，住视图或子区域 |
+| 节点         | 是什么                                                       |
+| ------------ | ------------------------------------------------------------ |
+| **`split`**  | 分栏分列（`row` / `column`），孩子各占一块，可拖 sash 改比例 |
+| **`region`** | 一个**位置**，住视图或子区域                                 |
 
 区域的孩子有两种，模式随孩子而定：
 
-| 孩子是 | **顺序**（`stack`） | **选择**（`tab`） |
-| --- | --- | --- |
-| **视图** | 依次排开，每条可折叠 | 同时只显示一个 |
-| **区域** | —— | 同时只显示一个 |
+| 孩子是   | **顺序**（`stack`）  | **选择**（`tab`） |
+| -------- | -------------------- | ----------------- |
+| **视图** | 依次排开，每条可折叠 | 同时只显示一个    |
+| **区域** | ——                   | 同时只显示一个    |
 
 - **`stack`（顺序）**：一个区域里同时显示多个视图，各自有标题与折叠开关；高度在它们之间分配（§4.2）。这是 VS Code 侧栏那种"视图条"的形态。
 - **`tab`（选择）**：同一时刻只显示一个孩子，切换的是**选中**（布局状态），不是叠放。`stage`（中心区）与 `bottom` 用它。
@@ -51,7 +51,7 @@ prac 自己的界面框架：它取代 `dsh-client-ui-layout` 那套固定的三
 
 ```ts
 interface LayoutState {
-  tree: LayoutNode;                 // 区域树
+  tree: LayoutNode; // 区域树
   views: Record<string, ViewRecord>; // 视图记录
   // …（与目录、几何相关的字段见 contract.ts）
 }
@@ -72,18 +72,18 @@ interface RegionNode {
   id: string;
   size: number;
   flex?: boolean;
-  min: number;              // DEFAULT_MIN = 120 / CENTER_MIN = 240
+  min: number; // DEFAULT_MIN = 120 / CENTER_MIN = 240
   collapsed?: boolean;
   cachedSize?: number;
-  embedder?: boolean;       // 由嵌入方创建（编辑器组）——空且无内容时在启动期剪除
+  embedder?: boolean; // 由嵌入方创建（编辑器组）——空且无内容时在启动期剪除
   children?: RegionChild[]; // 孩子：视图 id 或子区域；住子区域 ⇒ 该区域是"选择"模式
 }
 
 interface ViewRecord {
-  region: string;           // 住在哪个区域
-  size?: number;            // 顺序（stack）里的高度；缺省 = 与他人分享
-  collapsed?: boolean;      // 折叠：只剩标题
-  front?: boolean;          // 选择（tab）里显示哪一个
+  region: string; // 住在哪个区域
+  size?: number; // 顺序（stack）里的高度；缺省 = 与他人分享
+  collapsed?: boolean; // 折叠：只剩标题
+  front?: boolean; // 选择（tab）里显示哪一个
   // …
 }
 ```
@@ -118,13 +118,13 @@ allocateStack(views, state, measured, height) → Map<viewId, height>
 
 交互时谁写尺寸：
 
-| 动作 | 函数 | 语义 |
-| --- | --- | --- |
-| 拖条目底边 | `redistributeOnDrag(entries, viewId, target)` | 对齐 `SplitView.resize`：增量先给被拖那条与**上方**（最近优先），**下方**按 −增量让出；边界能走多远由**下方未折叠**的余量决定（不吃上面的）；折叠条目是标题，不给余量、也不被写 |
-| 拖到极限 | `dragSnapTarget(entries, viewId, pointerDelta)` | 邻条被挤过"下界一半" ⇒ 折叠它；被拖那条自己过一半 ⇒ 折叠自己；**不自动展开**（上游 `IView.snap` 默认 false） |
-| 继续拖 | `dragChainTarget(entries, viewId, target)` | 下方余量耗尽 ⇒ 折下一条（链式），空间朝栈底走 |
-| 折叠/展开 | `setViewCollapsed(state, viewId, collapsed, measuredHeight?)` | 折叠时记下当时高度（展开回到它）；展开时丢掉小于下界的残留 |
-| 让出的空间归谁 | `allocateStack` 的余量分配 | **从上往下逐条发**（`distributeEmptySpace` 的顺序）：先给折叠位置**下方**的条目，下方没有才往上 |
+| 动作           | 函数                                                          | 语义                                                                                                                                                                            |
+| -------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 拖条目底边     | `redistributeOnDrag(entries, viewId, target)`                 | 对齐 `SplitView.resize`：增量先给被拖那条与**上方**（最近优先），**下方**按 −增量让出；边界能走多远由**下方未折叠**的余量决定（不吃上面的）；折叠条目是标题，不给余量、也不被写 |
+| 拖到极限       | `dragSnapTarget(entries, viewId, pointerDelta)`               | 邻条被挤过"下界一半" ⇒ 折叠它；被拖那条自己过一半 ⇒ 折叠自己；**不自动展开**（上游 `IView.snap` 默认 false）                                                                    |
+| 继续拖         | `dragChainTarget(entries, viewId, target)`                    | 下方余量耗尽 ⇒ 折下一条（链式），空间朝栈底走                                                                                                                                   |
+| 折叠/展开      | `setViewCollapsed(state, viewId, collapsed, measuredHeight?)` | 折叠时记下当时高度（展开回到它）；展开时丢掉小于下界的残留                                                                                                                      |
+| 让出的空间归谁 | `allocateStack` 的余量分配                                    | **从上往下逐条发**（`distributeEmptySpace` 的顺序）：先给折叠位置**下方**的条目，下方没有才往上                                                                                 |
 
 **张力**：高度因此有**两个权威**——视图记录里的 `size` 与分配器**画出来**的值。两者可以不一致，`verify-persistence` 见过的现场是"存 69 / 画 519"。上游没有这个分叉：`SplitView` 的 `item.size` **就是**画面高度，布局过程会赋值它。收敛这两者的两条路（待裁）：
 
@@ -181,11 +181,11 @@ allocateStack(views, state, measured, height) → Map<viewId, height>
 
 ## 8. 与上游的分工
 
-| | 谁拥有 |
-| --- | --- |
-| 区域树、分栏、选择、顺序、几何、浮层、隔离边界 | **prac**（这个包） |
+|                                                         | 谁拥有                                                |
+| ------------------------------------------------------- | ----------------------------------------------------- |
+| 区域树、分栏、选择、顺序、几何、浮层、隔离边界          | **prac**（这个包）                                    |
 | 视图的**内容**（编辑器、终端、语言服务、扩展贡献的 UI） | 上游 VS Code（引入源码树 + patch + overlay，不 fork） |
-| 视图的**来源**（谁声明的） | 目录（`catalogue.ts`），机制只按注册表成员认识它 |
+| 视图的**来源**（谁声明的）                              | 目录（`catalogue.ts`），机制只按注册表成员认识它      |
 
 **对齐优先**：凡是上游有明确机制的地方（`SplitView` 的重分配与 snap、`distributeEmptySpace` 的顺序、`setVisible` 的缓存尺寸），prac 照做而不是发明；确有取舍时写成显式决定，不留在代码里当暗规则。
 
@@ -209,19 +209,19 @@ allocateStack(views, state, measured, height) → Map<viewId, height>
 
 ## 11. 文件索引
 
-| 文件 | 职责 |
-| --- | --- |
-| `contract.ts`（572） | 契约与类型：`LayoutState` / `LayoutNode` / `ViewRecord` / `Box` / 常量 / `LayoutFace` / `PracLayoutFace` / 角色绑定 |
-| `model.ts`（1255） | 纯函数：树与尺寸（`resolveSizes` / `sashSizes` / `subtreeMin` / `setRegionSize` / `splitRegionWith` / `removeRegion` / `pruneEmbedderRegions`）、放置（`place` / `placeQuietly` / `removeView` / `selectChild` / `setFront`）、栈内（`allocateStack` / `redistributeOnDrag` / `dragSnapTarget` / `dragChainTarget` / `setViewCollapsed`） |
-| `frame.ts`（1228） | 渲染与交互：区域、选择、顺序、sash、条头与手柄、拖拽（捕获阶段 + 窗口级 move/up） |
-| `isolation.ts`（279） | 每视图一个影子根；框架 UI 镜像与原地重写；硬边界 |
-| `services.ts`（401） | `createServices`：在 store 与槽位之上发布面 |
-| `store.ts`（143） | 状态单元 + 订阅；`STATE_KEY`；DSH 快照引擎 |
-| `catalogue.ts`（150） | 视图目录与 id 形状 |
-| `theme.ts`（65） | `ThemePresenter` |
-| `index.ts`（179） | 插件本体：声明槽位、发布面、跟随目录 |
-| `public.ts`（43） | 类型再导出（dts 面） |
-| `model.spec.ts`（599）/ `catalogue.spec.ts`（101）/ `allocate-stack.spec.ts` | 单测：几何与放置、目录、栈内分配与拖拽算术 |
+| 文件                                                                         | 职责                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contract.ts`（572）                                                         | 契约与类型：`LayoutState` / `LayoutNode` / `ViewRecord` / `Box` / 常量 / `LayoutFace` / `PracLayoutFace` / 角色绑定                                                                                                                                                                                                                       |
+| `model.ts`（1255）                                                           | 纯函数：树与尺寸（`resolveSizes` / `sashSizes` / `subtreeMin` / `setRegionSize` / `splitRegionWith` / `removeRegion` / `pruneEmbedderRegions`）、放置（`place` / `placeQuietly` / `removeView` / `selectChild` / `setFront`）、栈内（`allocateStack` / `redistributeOnDrag` / `dragSnapTarget` / `dragChainTarget` / `setViewCollapsed`） |
+| `frame.ts`（1228）                                                           | 渲染与交互：区域、选择、顺序、sash、条头与手柄、拖拽（捕获阶段 + 窗口级 move/up）                                                                                                                                                                                                                                                         |
+| `isolation.ts`（279）                                                        | 每视图一个影子根；框架 UI 镜像与原地重写；硬边界                                                                                                                                                                                                                                                                                          |
+| `services.ts`（401）                                                         | `createServices`：在 store 与槽位之上发布面                                                                                                                                                                                                                                                                                               |
+| `store.ts`（143）                                                            | 状态单元 + 订阅；`STATE_KEY`；DSH 快照引擎                                                                                                                                                                                                                                                                                                |
+| `catalogue.ts`（150）                                                        | 视图目录与 id 形状                                                                                                                                                                                                                                                                                                                        |
+| `theme.ts`（65）                                                             | `ThemePresenter`                                                                                                                                                                                                                                                                                                                          |
+| `index.ts`（179）                                                            | 插件本体：声明槽位、发布面、跟随目录                                                                                                                                                                                                                                                                                                      |
+| `public.ts`（43）                                                            | 类型再导出（dts 面）                                                                                                                                                                                                                                                                                                                      |
+| `model.spec.ts`（599）/ `catalogue.spec.ts`（101）/ `allocate-stack.spec.ts` | 单测：几何与放置、目录、栈内分配与拖拽算术                                                                                                                                                                                                                                                                                                |
 
 ## 12. 验证
 
