@@ -6,13 +6,13 @@ status: in-progress
 
 ## Problem
 
-一个区域可以**同时显示多条视图**（`stack` 模式），纵向排列，每条一行。这个"栈"是 prac 自己加的（VS Code把"多条视图上下排"实现为一个纵向的 `SplitView`，没有"栈"这个概念）。它的行为一直被分散地定：有些写在 layout note 的设计里，有些只存在于实现里，还有几处**互相冲突**——于是同一个动作在不同路径上给出不同结果（现场见过"布局里存 69、屏幕上画 519"）。
+一个区域可以**同时显示多条视图**（`stack` 模式），纵向排列，每条一行。这个"栈"是 prac 自己加的（VS Code 把"多条视图上下排"实现为一个纵向的 `SplitView`，没有"栈"这个概念）。它的行为一直被分散地定：有些写在 layout note 的设计里，有些只存在于实现里，还有几处**互相冲突**——于是同一个动作在不同路径上给出不同结果（现场见过"布局里存 69、屏幕上画 519"）。
 
 这份 note 只做一件事：**把栈的行为完整、可验证地定义下来**。先定行为，再选实现。
 
 ## 行为定义
 
-按"人能观察到什么"写；每条都应当能被判据钉住。**总则：凡未写明处，一律对齐VS Code**（`SplitView` / `Grid`）；VS Code怎么做，这里就怎么写。
+按"人能观察到什么"写；每条都应当能被判据钉住。**总则：凡未写明处，一律对齐 VS Code**（`SplitView` / `Grid`）；VS Code 怎么做，这里就怎么写。
 
 ### A. 构成
 
@@ -26,8 +26,8 @@ status: in-progress
 - **B2** **一条边界可拖 ⟺ 它某一侧还有行能"缩"（`size − min > 0`）、另一侧还有行能"长"（`max − size > 0`）**。缩/长的判断是**累计**的：从边界往一侧看，只要**某一处**还能动，那一侧就算能动。
 - **B3** **折叠的行不能缩也不能长**（它的 `size == min`、没有余量）⇒ 求高度时**跳过它**，继续向该侧找**展开的**行——"sash 邻着折叠的行，会继续向上下的展开的行求高度"。
 - **B4** 两侧都找不到能动的行 ⇒ **边界禁用**（不可拖）。**上下两端连续折叠的行**因此不参与拖拽：有效的边界只出现在"还能动"的行之间。
-- **B5** **双击一条可拖的边界 = reset**（VS Code `onDidReset`，`splitview.ts:1186`）。VS Code对折叠有明确例外：若该边界**上方/下方最近的 snap 行是折叠的**，直接返回——**双击无效**（`:1193-1199`）。reset 到什么由消费者决定（workbench 那一层不在这棵源码树里）。
-- **B6** 拖动期间有 body 级的 `keydown` / `keyup` 监听（Alt 参与判定，`:895-966`）——即"拖动中可以按键改变行为"是VS Code形态。
+- **B5** **双击一条可拖的边界 = reset**（VS Code `onDidReset`，`splitview.ts:1186`）。VS Code 对折叠有明确例外：若该边界**上方/下方最近的 snap 行是折叠的**，直接返回——**双击无效**（`:1193-1199`）。reset 到什么由消费者决定（workbench 那一层不在这棵源码树里）。
+- **B6** 拖动期间有 body 级的 `keydown` / `keyup` 监听（Alt 参与判定，`:895-966`）——即"拖动中可以按键改变行为"是 VS Code 形态。
 - **B7** 手柄的可点区域 = 边界的 ±`SASH_SIZE`；**最后一条没有边界**（它的底边就是区域的边）。
 
 ### C. 高度
@@ -36,7 +36,7 @@ status: in-progress
 - **C2** 人拖过之后，那一条的高度**就是它自己的**：屏幕上是它，刷新后仍是它。
 - **C3** 每条有**下界**（`MIN_ENTRY = 48`：标题 + 一点内容）与**上界**（见 C6）。
 - **C4** 折叠的条目占**标题高**（`HEADER_HEIGHT = 20`）。
-- **C5** 拖动按 B2/B3 的方向取高度：**先给离边界最近的、还能动的那条**（下方优先，照VS Code `resize` 的顺序），到它的上界为止，再给下一条。
+- **C5** 拖动按 B2/B3 的方向取高度：**先给离边界最近的、还能动的那条**（下方优先，照 VS Code `resize` 的顺序），到它的上界为止，再给下一条。
 - **C6** **不按比例**：余量**整块给一个行**，到它的 `maximumSize` 为止（对齐 `distributeEmptySpace`）。**上界由行自己声明**（`IView.maximumWidth/maximumHeight`，`splitview.ts:60`；隐藏时记作 0，`:254-255`；不声明就无上限）——没有上界就会一条吞掉全部（现场见过 `openEditors` 从 69 被画成 519）。grid 那条 note 里的 per-region `max` 与本条一致。
 - **C7** 人设的高度加起来**超过**区域高度时：按 C6 的顺序收敛，且**任何一条不破下界**。
 - **C8** **区域自身变高/变矮时**（窗口变化、邻居让位）：走 C5/C6 的同一条规则（按顺序、到上界为止），**不按比例**。
@@ -51,7 +51,7 @@ status: in-progress
 
 ### E. 折叠与展开
 
-- **E1** 折叠 = 只剩标题；它的高度**被记住**（对齐VS Code：`size` 与 `_cachedVisibleSize` 是**两个字段**——隐藏时 `size = 0`、记忆写进 `_cachedVisibleSize`，`splitview.ts:228-246`）。记忆的值**由调用者决定**：可以显式传入，缺省取当时的高度（`:237`）；拖动路径上传的是**拖动开始时的快照值**（`resize` 的 `sizes` 参数，`:1015`）。
+- **E1** 折叠 = 只剩标题；它的高度**被记住**（对齐 VS Code ：`size` 与 `_cachedVisibleSize` 是**两个字段**——隐藏时 `size = 0`、记忆写进 `_cachedVisibleSize`，`splitview.ts:228-246`）。记忆的值**由调用者决定**：可以显式传入，缺省取当时的高度（`:237`）；拖动路径上传的是**拖动开始时的快照值**（`resize` 的 `sizes` 参数，`:1015`）。
 - **E2** 展开 ⇒ 回到**记住的高度**，并按 `clamp(cached, view.min, view.max)` 收敛（`:234`）——即**不足下界会被抬到下界**，不是丢弃。
 - **E3** 记忆**参与持久化**：序列化状态里带 `cachedVisibleSize`（`:273` / `:277`），grid 的 leaf 也带 `size` 与 `visible`（`grid.ts:756-761`）⇒ 折叠的行**刷新后仍记得它原来多高**。
 - **E4** 折叠/展开腾出或需要的空间，走 C5/C6 的规则（给还能长的行、到上界为止、**不按比例**）。
@@ -60,7 +60,7 @@ status: in-progress
 
 **两种手势按"地点"分开**（已定）：**拖 sash（= 行的底边 5px）= 只改高度**；**拖标题条 = 重排顺序**。它们互不触发：改高度走 B/C/D 那套 snap，重排**不折叠、不展开**任何行。
 
-**移动的模型**对齐VS Code `Grid`：给定**参照行 + 方向**（上/下）即可确定落点（`moveView(view, sizing, referenceView, direction)`，`grid.ts:480-495`；方向 `Direction.Up/Down`，`editorPart.ts:807-810`）。拖动标题时，落点提示落在某条边界上（= 参照行 + 方向）。同一父节点内是**纯换序**；被移动的视图**保持自己的尺寸**（不传 `Sizing` 时不做重新分配）。
+**移动的模型**对齐 VS Code `Grid`：给定**参照行 + 方向**（上/下）即可确定落点（`moveView(view, sizing, referenceView, direction)`，`grid.ts:480-495`；方向 `Direction.Up/Down`，`editorPart.ts:807-810`）。拖动标题时，落点提示落在某条边界上（= 参照行 + 方向）。同一父节点内是**纯换序**；被移动的视图**保持自己的尺寸**（不传 `Sizing` 时不做重新分配）。
 
 - **F1** 顺序 = 该区域的视图顺序。
 - **F2** **抓手 = 标题条**（标题文字与折叠开关之外的可拖区域）；**行底边的 `SASH_SIZE` 属于 sash**，在那里按下是改高度，不是重排。
@@ -72,7 +72,7 @@ status: in-progress
 - **F8** 取消（丢到区域外、或 Esc）⇒ **回到原位**，不留改动。
 - **F9** 重排后的顺序随布局持久化。
 
-**VS Code对照**：`Grid` **没有内置拖拽**（`gridview.ts` 里没有 `dragAndDrop` / `dropTarget`），移动是程序化的；拖拽手势在更高层（编辑器的 tab DnD、侧栏的 viewlet DnD），那两处不在这棵裁剪过的源码树里 ⇒ 抓手与落点的具体形态是**prac 自己的决定**。
+**VS Code 对照**：`Grid` **没有内置拖拽**（`gridview.ts` 里没有 `dragAndDrop` / `dropTarget`），移动是程序化的；拖拽手势在更高层（编辑器的 tab DnD、侧栏的 viewlet DnD），那两处不在这棵裁剪过的源码树里 ⇒ 抓手与落点的具体形态是**prac 自己的决定**。
 
 ### G. 与「选择（tab）」的关系
 
@@ -82,7 +82,7 @@ status: in-progress
 
 - **H1** 0 条：区域不渲染（空区域不渲染）。
 - **H2** 1 条：裸渲染。
-- **H3** **全部折叠**：没有人能长 ⇒ 腾出的空间**留白**（推导自 B2/B4：此时所有边界都禁用）。这条是**从VS Code规则推导**的，不是直接观察。
+- **H3** **全部折叠**：没有人能长 ⇒ 腾出的空间**留白**（推导自 B2/B4：此时所有边界都禁用）。这条是**从 VS Code 规则推导**的，不是直接观察。
 
 ### I. 持久化
 
@@ -100,18 +100,18 @@ status: in-progress
 
 ## 必须先裁的
 
-1. ~~行的上界给多少~~ —— **已定（对齐 VS Code）**：**VS Code的答案已经明确——`max` 由每个视图自己声明，框架只读不发明**（`IView.maximumWidth/maximumHeight`，`splitview.ts:60`；`SplitView` 只读 `view.maximumSize`，`grid`/`splitview` 里的 `distributeEmptySpace` 用它封顶）。三条配套事实：
+1. ~~行的上界给多少~~ —— **已定（对齐 VS Code ）**：**VS Code 的答案已经明确——`max` 由每个视图自己声明，框架只读不发明**（`IView.maximumWidth/maximumHeight`，`splitview.ts:60`；`SplitView` 只读 `view.maximumSize`，`grid`/`splitview` 里的 `distributeEmptySpace` 用它封顶）。三条配套事实：
    - **隐藏的视图，`maximumSize` 记作 0**（`get maximumSize() { return this.visible ? this.view.maximumSize : 0; }`，`splitview.ts:254-255`）⇒ 折叠的行**不可能再长大**，这正是"邻着折叠行就继续找展开的行"的基础；
-   - **多数视图不设上限**（`Number.POSITIVE_INFINITY`）⇒ 空闲空间会**整块给第一个还有余量的行**（"一条吃掉"是VS Code行为，不是异常）；
+   - **多数视图不设上限**（`Number.POSITIVE_INFINITY`）⇒ 空闲空间会**整块给第一个还有余量的行**（"一条吃掉"是 VS Code 行为，不是异常）；
    - **固定尺寸的部件**把 `max` 设成等于 `min`：标题栏（`titlebarPart.ts:66`）、状态栏（`statusbarPart.ts:144`）、活动栏（`activitybarPart.ts:100`）；**内容自带上限**的另有声明（编辑器面板 `editorPane.ts:63-65`、设置编辑器 `:447`、notebook `:143`）。
-   ⇒ 所以对 prac 决定已下：**prac 的行先都不声明 `max`**。对齐VS Code（侧栏 viewlet 的形态）就是**不设上限**；若要有上限，也应由**视图自己声明**，而不是框架按比例拍一个。
+   ⇒ 所以对 prac 决定已下：**prac 的行先都不声明 `max`**。对齐 VS Code （侧栏 viewlet 的形态）就是**不设上限**；若要有上限，也应由**视图自己声明**，而不是框架按比例拍一个。
 2. **顺序怎么表示**：行为上已定（F1–F10：顺序是区域里的**数据**、可被拖拽改写、跟着视图走）。剩下的是表示形式——留在视图记录里，还是变成树的结构（F1 的顺序 = branch 的孩子顺序）——这仍属于实现选型。
-3. ~~折录取哪一刻的高度~~ —— **已定**：对齐VS Code（调用者可显式传入、缺省取当时高度；拖动路径传拖动开始时的快照），见 E1–E3。
+3. ~~折录取哪一刻的高度~~ —— **已定**：对齐 VS Code （调用者可显式传入、缺省取当时高度；拖动路径传拖动开始时的快照），见 E1–E3。
 
 ## Alternatives（实现选型，待行为定案后再谈）
 
 - **S1** 保留"视图记录存高度 + 渲染期分配"两个空间，把分配结果**写回**（试过，未收敛）。
-- **S2** **栈 = 一个 `column` 分栏**：每条 = 一个只住一个视图的 region ⇒ 高度只剩树一个权威（与VS Code把 viewlet 做成 `SplitView` item 同形）。
+- **S2** **栈 = 一个 `column` 分栏**：每条 = 一个只住一个视图的 region ⇒ 高度只剩树一个权威（与 VS Code 把 viewlet 做成 `SplitView` item 同形）。
 - **S3** 高度**不持久化**，每次由策略算出；人拖出来的只存"偏好"（行为上 B2 会变成"建议"）。
 
 ## Open questions
@@ -125,5 +125,5 @@ status: in-progress
 ## Related
 
 - [2026-10-05-vscode-dsh-layout-boundary.md](2026-10-05-vscode-dsh-layout-boundary.md)：区域骨架、隔离与对等；它保留"区域可以按 `stack` 模式同时显示多条视图"这条设计。
-- [../proposed/2026-10-15-ui-layout-grid.md](../proposed/2026-10-15-ui-layout-grid.md)：区域的分栏与调整尺寸对齐VS Code Grid（`max` / `priority` / `Sizing` / snap）——与本 note 是**两件事**，只在"借用VS Code形状"上偶然同向。
+- [../proposed/2026-10-15-ui-layout-grid.md](../proposed/2026-10-15-ui-layout-grid.md)：区域的分栏与调整尺寸对齐 VS Code Grid（`max` / `priority` / `Sizing` / snap）——与本 note 是**两件事**，只在"借用 VS Code 形状"上偶然同向。
 - `packages/client/ui-layout/DESIGN.md`：这个包的当前设计。

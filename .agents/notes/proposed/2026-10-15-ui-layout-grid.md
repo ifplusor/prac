@@ -2,11 +2,11 @@
 status: proposed
 ---
 
-# Agent Note: stage 的分栏与调整尺寸对齐VS Code Grid
+# Agent Note: stage 的分栏与调整尺寸对齐 VS Code Grid
 
 ## Problem
 
-**stage 的分栏在"调整尺寸"这件事上能力不足**，没有VS Code editor part 那种灵活性。VS Code把这一切长在 `Grid` 的叶子上，prac 的区域只有 `size` / `flex` / `min`：
+**stage 的分栏在"调整尺寸"这件事上能力不足**，没有 VS Code editor part 那种灵活性。VS Code 把这一切长在 `Grid` 的叶子上，prac 的区域只有 `size` / `flex` / `min`：
 
 | VS Code editor part / Grid 有 | prac 的区域现在 |
 | --- | --- |
@@ -17,11 +17,11 @@ status: proposed
 | `leaf.maximized`（`ISerializedLeafNode`，`grid.ts:756-761`）⇒ 一块最大化 | 没有 |
 | 它会知道"某块正卡在最小值上"（`editorPart.ts:783`）⇒ 才有收起 / 恢复的反馈 | 没有 |
 
-**这条与"栈内高度的两个权威"无关**：那是布局模型的一致性问题（另见 [../in-progress/2026-10-05-vscode-dsh-layout-boundary.md](../in-progress/2026-10-05-vscode-dsh-layout-boundary.md) 的开放问题），两者只在"借用VS Code形状"这一点上偶然同向，不是彼此的解法。
+**这条与"栈内高度的两个权威"无关**：那是布局模型的一致性问题（另见 [../in-progress/2026-10-05-vscode-dsh-layout-boundary.md](../in-progress/2026-10-05-vscode-dsh-layout-boundary.md) 的开放问题），两者只在"借用 VS Code 形状"这一点上偶然同向，不是彼此的解法。
 
 ## Proposal
 
-给区域补上VS Code Grid 的那几件能力，分层做：
+给区域补上 VS Code Grid 的那几件能力，分层做：
 
 1. **`max`**：区域除 `min` 之外声明 `max`；分配、拖 sash、窗口变化都按 `min ≤ size ≤ max` 收敛。
 2. **`priority`**：区域可以声明优先级；中心默认 `High` ⇒ 空间紧张时**中心最后让位**（谁先让位、谁最后让位，成为设计的一部分，而不是实现里的偶然）。
@@ -42,7 +42,7 @@ status: proposed
 
 - **只补语义（G1）**：保持 prac 的树与两个空间，移植 `max` / `priority` / `Sizing` / snap。改动小，但"两个权威"这条张力留着，屏幕与状态仍可能分家。
 - **保留栈、只把分配器做得更保守**（"只在交互结束时写回"）：治不了根，且每次新增写入者都要记得维持一致。
-- **直接借用 `Grid` 作引擎（G3）**：保真度最高，但把 DOM 与几何交给VS Code widget；等本提议落地、模型同形后代价小得多，故列为第 4 步。
+- **直接借用 `Grid` 作引擎（G3）**：保真度最高，但把 DOM 与几何交给 VS Code widget；等本提议落地、模型同形后代价小得多，故列为第 4 步。
 
 ## Open questions
 

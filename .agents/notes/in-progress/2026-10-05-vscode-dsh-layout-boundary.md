@@ -60,7 +60,7 @@ prac 的框架声称「区域树、编排、层级、浮层」都归自己（`do
 - **基础层不需要 z 序**："现在显示哪一个"是**选中**的问题——它是布局的**状态**（持久化），走注意力只是**改变它的交互过程**。
 - **框架的装饰单列**：sash、拖拽落点提示、焦点环这类画在内容之上的东西，是**框架自己的装饰**，与内容不同类、不参与内容层序（防止"反正有东西画在上面"被拿来当理由，把内容叠放引回基础层）。
 
-**容器 = 一个具名子区域，与兄弟之间"选一"**（James 2026-10-06）：VS Code的容器（Explorer / Search / SCM / Run）**不是一个新对象**——它是"选择"区域下的一个孩子区域，名字来自来源目录。**activity bar 的图标条不继承**，切换的载体是**区域头部的容器条**。没有真容器的视图 = "选择"区域下只装它自己的子区域（与VS Code"给它生成一个容器"同构）。
+**容器 = 一个具名子区域，与兄弟之间"选一"**（James 2026-10-06）：VS Code 的容器（Explorer / Search / SCM / Run）**不是一个新对象**——它是"选择"区域下的一个孩子区域，名字来自来源目录。**activity bar 的图标条不继承**，切换的载体是**区域头部的容器条**。没有真容器的视图 = "选择"区域下只装它自己的子区域（与 VS Code"给它生成一个容器"同构）。
 
 **区域 = 一组视图或一组子区域，模式由"命名区域"绑定：**
 
@@ -74,11 +74,11 @@ prac 的框架声称「区域树、编排、层级、浮层」都归自己（`do
 
 | 角色 | 绑到谁 | 借的是谁的名 |
 | --- | --- | --- |
-| `primarySidebar` | DSH 的 `dsh:sidebar` | VS Code：Primary Side Bar |
-| `secondarySidebar` | DSH 的 `dsh:rightbar` | VS Code：Secondary Side Bar（`ViewContainerLocation.AuxiliaryBar`） |
+| `primarySidebar` | DSH 的 `dsh:sidebar` | VS Code ：Primary Side Bar |
+| `secondarySidebar` | DSH 的 `dsh:rightbar` | VS Code ：Secondary Side Bar（`ViewContainerLocation.AuxiliaryBar`） |
 
 - **机制提供模式集合**（它认识 `stack` / `tab` / 分区）；**区域名绑定"可用哪些 + 默认哪个"**。两者分开，所以"区域对等"与"各区域不一样"不再打架；**这张表是数据，不是特权**。
-- **两个层次要分清（落地时容易混）**：**角色**是 prac 的词，用**平台的角色名** `primarySidebar` / `secondarySidebar`（`RoleBindings`，代码里已改）——位置中立，因为VS Code允许 primary 侧栏换边；**区域 id** 是**位置**词 `left` / `right`（不改，改它要升持久化 key）；**借来的名字不动**（`dsh:sidebar` 是 DSH 那个叫 `sidebar` 的槽、`vscode:sidebar` 指 VS Code 的 sidebar、`workbench.parts.sidebar` / `workbench.parts.auxiliarybar` 是VS Code部件 id）。
+- **两个层次要分清（落地时容易混）**：**角色**是 prac 的词，用**平台的角色名** `primarySidebar` / `secondarySidebar`（`RoleBindings`，代码里已改）——位置中立，因为 VS Code 允许 primary 侧栏换边；**区域 id** 是**位置**词 `left` / `right`（不改，改它要升持久化 key）；**借来的名字不动**（`dsh:sidebar` 是 DSH 那个叫 `sidebar` 的槽、`vscode:sidebar` 指 VS Code 的 sidebar、`workbench.parts.sidebar` / `workbench.parts.auxiliarybar` 是 VS Code 部件 id）。
 - **区域名是设计层的名字，与来源无关**：`left` / `right` / `center` / `bottom` 是**位置**；DSH 那边的槽名（`sidebar`）与 VS Code 那边的部件 id（`workbench.parts.sidebar`）是**借来的名字**，不在这一层出现。
 - **每个子区域跟随它所在区域名的绑定**（`center` 拆出来的每块都有 `tab`、都不能 `stack`）。
 - **tab 是区域级的**，不是 center 专有。
@@ -86,16 +86,16 @@ prac 的框架声称「区域树、编排、层级、浮层」都归自己（`do
 
 ### 不继承 VS Code 的布局复杂度
 
-VS Code的布局树比我们的大（primary sidebar 里还有 activity bar、它的 position 有 top/bottom/hidden；一个 sidebar 有**多个 tab、tab 里再是 stack**；bottom 是 **Panel**，位置能绕 editor 的 top/left/right/bottom）。**分类之后大半不必继承**：
+VS Code 的布局树比我们的大（primary sidebar 里还有 activity bar、它的 position 有 top/bottom/hidden；一个 sidebar 有**多个 tab、tab 里再是 stack**；bottom 是 **Panel**，位置能绕 editor 的 top/left/right/bottom）。**分类之后大半不必继承**：
 
-| VS Code的东西 | 它其实属于 | 我们的处理 |
+| VS Code 的东西 | 它其实属于 | 我们的处理 |
 | --- | --- | --- |
 | activity bar 及其 position、sidebar 的 tab 套 stack | **借用件的内容**（容器树） | 不继承——它在那个视图**盒子里**（隔离之后更是如此） |
 | primary / secondary sidebar | **角色** | 借它的**名**（`primarySidebar` / `secondarySidebar`） |
 | 两个侧栏一左一右 | **位置** | 已有：区域 `left` / `right` |
 | Panel 的 top/left/right/bottom | **摆放** | 不需要 `panel.position` 这个概念——**把那个视图搬到别的区域**就行（任意方向分栏已支持） |
 
-⇒ VS Code的复杂仍然是复杂，但它**留在盒子里**，不是我们布局模型的复杂度。**唯一需要时再加的是"一级还是两级"**：我们机制现在只有一级（区域内 `tab` **或** `stack`），而借用件自带的那层（tab 套 stack）在盒内；我们自己的视图又少又平，**没有真实需求就不加第二级**。
+⇒ VS Code 的复杂仍然是复杂，但它**留在盒子里**，不是我们布局模型的复杂度。**唯一需要时再加的是"一级还是两级"**：我们机制现在只有一级（区域内 `tab` **或** `stack`），而借用件自带的那层（tab 套 stack）在盒内；我们自己的视图又少又平，**没有真实需求就不加第二级**。
 
 ### 视图的状态
 
@@ -105,11 +105,11 @@ VS Code的布局树比我们的大（primary sidebar 里还有 activity bar、�
 
 ### 借用件的 adaptor
 
-**框架只提供隔离本身，不认识任何来源词**。VS Code 那一侧的专有知识——`monaco-workbench` 类、`--vscode-*` 变量、VS Code样式表、它自己的浮层模型——**全部收在 `vscode-host` 这一层**（机制侧落在 `vendor/vscode-embed`，政策在插件行）：
+**框架只提供隔离本身，不认识任何来源词**。VS Code 那一侧的专有知识——`monaco-workbench` 类、`--vscode-*` 变量、VS Code 样式表、它自己的浮层模型——**全部收在 `vscode-host` 这一层**（机制侧落在 `vendor/vscode-embed`，政策在插件行）：
 
 - **框架侧**：给每个视图一个盒子、一个隔离边界（影子根），到此为止。**它不知道里面是 VS Code**，也不需要"沙箱槽"这类特殊槽——**就是普通槽 + 宿主元素**。
-- **adaptor 侧**：把VS Code那几样东西投进边界内——**规则表照原样投**、**主题变量以 `:host` 作用域投**、**借用件的宿主元素带 `monaco-workbench` 类**（三者缺一不可，见下）。**浮层按谁创建分**：由**应用自己的服务**创建的面（上下文视图即菜单、命令面板、通知、悬停、模态）**进框架的悬浮层**；由**视图部件自己在自己 DOM 里**画的面（补全列表、webview 的 overlay）**是视图的内部**——同树、自闭环，也正是 CSS 锚点能用的前提（实验 7：锚点在影根里、浮层在文档里 → 不解析）。桥的三条路要分清：整部件走 `partHost`（宿主带 `[data-vscode-embed-part-host]`），VS Code 的**视图**（explorer 等）走 `mountViewInto`（宿主是 `[data-vscode-embed-view]`），**应用自己的根**走 `floatHost`（宿主带 `[data-vscode-embed-float-host]`，机制包把它注册进框架的 `shell.overlay`）。
-- **只投规则表还不够：VS Code的视图 CSS 大多挂在 `.monaco-workbench` 下**。框架**故意不把**这个类放在隔离宿主上（那是另一回事：放在**文档里的宿主**上会让规则作用到宿主本身与其祖先，整屏变样——实测过），于是被镜像进影根的规则**一条也匹配不上**：Outline 的 `display:flex`、`.outline-message{display:none}`、`.outline-tree{height:100%}` 全部落空，表现是**消息常驻 + 树按内容撑高**（实测 734px 的区域里树高 7612px）。修法是**在隔离根内部**给借用件自己的宿主元素带上这个类：作用域仍被影根挡住（实测影根外盒子一个没变），而VS Code规则恢复了它们的上下文。⇒ 规则表是**条件**，宿主上的语境类也是。
+- **adaptor 侧**：把 VS Code 那几样东西投进边界内——**规则表照原样投**、**主题变量以 `:host` 作用域投**、**借用件的宿主元素带 `monaco-workbench` 类**（三者缺一不可，见下）。**浮层按谁创建分**：由**应用自己的服务**创建的面（上下文视图即菜单、命令面板、通知、悬停、模态）**进框架的悬浮层**；由**视图部件自己在自己 DOM 里**画的面（补全列表、webview 的 overlay）**是视图的内部**——同树、自闭环，也正是 CSS 锚点能用的前提（实验 7：锚点在影根里、浮层在文档里 → 不解析）。桥的三条路要分清：整部件走 `partHost`（宿主带 `[data-vscode-embed-part-host]`），VS Code 的**视图**（explorer 等）走 `mountViewInto`（宿主是 `[data-vscode-embed-view]`），**应用自己的根**走 `floatHost`（宿主带 `[data-vscode-embed-float-host]`，机制包把它注册进框架的 `shell.overlay`）。
+- **只投规则表还不够：VS Code 的视图 CSS 大多挂在 `.monaco-workbench` 下**。框架**故意不把**这个类放在隔离宿主上（那是另一回事：放在**文档里的宿主**上会让规则作用到宿主本身与其祖先，整屏变样——实测过），于是被镜像进影根的规则**一条也匹配不上**：Outline 的 `display:flex`、`.outline-message{display:none}`、`.outline-tree{height:100%}` 全部落空，表现是**消息常驻 + 树按内容撑高**（实测 734px 的区域里树高 7612px）。修法是**在隔离根内部**给借用件自己的宿主元素带上这个类：作用域仍被影根挡住（实测影根外盒子一个没变），而 VS Code 规则恢复了它们的上下文。⇒ 规则表是**条件**，宿主上的语境类也是。
 - **adaptor 与框架之间没有显式接口**：框架给盒子与边界，adaptor 从元素自己认它的根（`getRootNode()`）——根就长在元素上，再加一条"谁告诉谁"的边只是多一层；等出现第二个 adaptor 再抽。
 - **借用件的浮层就在框架的悬浮层里**：工作台自己的根**住在**框架的 `shell.overlay`（不是与框架并排的第二个层）——部件早被搬进各视图，跟着根走的只有"应用自己创建的面"。根因此拿到**框架的盒子**（浮层几何全部由它算出：命令面板是 `0.62 × 容器宽`），根与它没放行的东西**点击穿透**，浮层容器逐类放行。「局部浮层进视图自己的根、全局交给框架」这半已落地；**菜单与悬停也在这层里**（实测：那是应用的 `contextViewService` / hover 服务创建的，不是视图部件）。
 - ⇒ **机制不做特例，来源词也不外溢**：`monaco-workbench` 从"宿主侧要镜像的类"变成**adaptor 内部的事**。
@@ -150,7 +150,7 @@ VS Code的布局树比我们的大（primary sidebar 里还有 activity bar、�
 
 ## 这一轮定下的
 
-- **隔离形态的对应规则**：契约只承诺**"框架保证隔离，且接口对所有形态一致"**（见"隔离的保证与形态"）；形态规则表**等第二种形态真出现再写**。现在落地的只有影子根，webview 本来就是独立浏览上下文、框架不用动作。逐根投放的配方是四件事：① **规则表照原样投**（document 的规则不作用于影子树）；② **主题变量以 `:host` 作用域投**（**不要**把 `monaco-workbench` 放在**宿主本身**上：那会让规则作用到宿主，实测画面整体变样）；③ **借用件的宿主元素在根内带 `monaco-workbench`**（缺它则所有挂在该类下的视图规则失效——2026-10-07 实测：Outline 消息常驻、树撑到 7612px）；④ **活的订阅**，不是死拷贝（主题那张表被原地改写）。都便宜，且不需要VS Code补丁。
+- **隔离形态的对应规则**：契约只承诺**"框架保证隔离，且接口对所有形态一致"**（见"隔离的保证与形态"）；形态规则表**等第二种形态真出现再写**。现在落地的只有影子根，webview 本来就是独立浏览上下文、框架不用动作。逐根投放的配方是四件事：① **规则表照原样投**（document 的规则不作用于影子树）；② **主题变量以 `:host` 作用域投**（**不要**把 `monaco-workbench` 放在**宿主本身**上：那会让规则作用到宿主，实测画面整体变样）；③ **借用件的宿主元素在根内带 `monaco-workbench`**（缺它则所有挂在该类下的视图规则失效——2026-10-07 实测：Outline 消息常驻、树撑到 7612px）；④ **活的订阅**，不是死拷贝（主题那张表被原地改写）。都便宜，且不需要 VS Code 补丁。
 - **哪些界面由框架创建**：判据是**谁创建**——由**应用自己的服务**创建的（上下文视图即菜单、命令面板、通知、悬停、模态）归框架的悬浮层；由**视图部件在自己的 DOM 里**画的（补全列表、webview 的 overlay）归**视图自己**（自闭环）。
 - **坐标空间：借用件的浮层共用框架悬浮层的坐标**。判据不是"有没有锚点"：应用的菜单与悬停**有锚点但也在那一层里**（它们由应用的 `contextViewService` / hover 服务创建，与命令面板同源）；它们按**视口坐标**定位，而该层就是框架的盒子，所以落位正确。**框架自己创建锚点类浮层**（跨视图锚定）仍**先不做**——锚点矩形 + 失效/跟随规则等真出现"必须跨视图锚定"的面再引入。
 - **盒子是硬边界**：视图内部的面**不能越出盒子**（框架裁）。所以"越出盒子"不是视图的选项，而是一个**需求**——真需要时它必须走框架的悬浮层，那时才跟坐标空间打交道。
@@ -205,11 +205,11 @@ VS Code的布局树比我们的大（primary sidebar 里还有 activity bar、�
 
 组件级隔离一律用**隔离**（影子根 / 独立浏览上下文），不用"沙箱"——本仓"沙箱"只指 **agent 运行时的执行沙箱**。`docs/architecture.md` §3.1 已同步。
 
-> **下一步（另立一条 note）**：把布局的状态升级到VS Code `Grid` 的形状（栈 → 叶子、补 `min`/`max`/`priority`/`Sizing`）——是**另一个工作**，见 [2026-10-15-ui-layout-grid.md](../proposed/2026-10-15-ui-layout-grid.md)。
+> **下一步（另立一条 note）**：把布局的状态升级到 VS Code `Grid` 的形状（栈 → 叶子、补 `min`/`max`/`priority`/`Sizing`）——是**另一个工作**，见 [2026-10-15-ui-layout-grid.md](../proposed/2026-10-15-ui-layout-grid.md)。
 
 ## Related
 
 - [../../in-progress/2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)：umbrella（主线、需求约束、已定的决定）。
 - [../../in-progress/2026-09-19-architecture.md](../in-progress/2026-09-19-architecture.md)：从需求重做的架构（需求清单与方向）。
 - [../../in-progress/2026-09-13-vs-concept-boundary.md](../in-progress/2026-09-13-vs-concept-boundary.md)：概念边界与命名（"机制不认识来源词"、"容纳单位 = 视图"的出处）。
-- [../../../docs/architecture.md](../../../docs/architecture.md)：面向目标的设计（§3.1 是这里口径的VS Code；这套设计落进去时 §3.1 要同步）。
+- [../../../docs/architecture.md](../../../docs/architecture.md)：面向目标的设计（§3.1 是这里口径的 VS Code ；这套设计落进去时 §3.1 要同步）。

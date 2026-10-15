@@ -12,7 +12,7 @@ prac 自己的界面框架：它取代 `dsh-client-ui-layout` 那套固定的三
 
 三句话：
 
-1. **布局归 prac**。区域树、编排、层级、浮层都是框架自己的，不是借用VS Code再补接缝。
+1. **布局归 prac**。区域树、编排、层级、浮层都是框架自己的，不是借用 VS Code 再补接缝。
 2. **区域是骨架，视图是单位**。区域划分空间、给视图盒子；视图被摆放、被拖动、被隔离。分栏、拖放、迁移都发生在**区域**这一级。
 3. **机制不认识视图的来源**。`vscode:` / `dsh:` / prac 自己的视图，走同一种对象、同一套契约、同一套保证。
 
@@ -34,12 +34,12 @@ prac 自己的界面框架：它取代 `dsh-client-ui-layout` 那套固定的三
 
 - **`stack`（顺序）**：一个区域里同时显示多个视图，各自有标题与折叠开关；高度在它们之间分配（§4.2）。这是 VS Code 侧栏那种"视图条"的形态。
 - **`tab`（选择）**：同一时刻只显示一个孩子，切换的是**选中**（布局状态），不是叠放。`center`（中心区）与 `bottom` 用它。
-- **容器 = 具名子区域**：VS Code的 Explorer / Search / SCM / Run **不是一个新对象**，而是"选择"区域下的一个孩子区域（例如 `left/container:workbench.view.explorer`）。所以容器之间是"选择"，容器内部是"顺序"。
+- **容器 = 具名子区域**：VS Code 的 Explorer / Search / SCM / Run **不是一个新对象**，而是"选择"区域下的一个孩子区域（例如 `left/container:workbench.view.explorer`）。所以容器之间是"选择"，容器内部是"顺序"。
 - **悬浮层**是顶层的一个区域：住命令、通知，以及任何被临时放到那里的视图。它的内容按"这一次的呈现"渲染，**不进持久化**。
 
 ### 1.2 位置与角色分开
 
-区域 id 是**位置**（`left` / `right` / `center` / `bottom`）；平台名（`primarySidebar` / `secondarySidebar` / `panel`）是**角色**，通过 DSH 的槽位绑定到位置上。VS Code自己也是这么分的（`workbench.sideBar.location` 让 primary 侧栏能放左或放右），所以 prac 不把两者焊死。
+区域 id 是**位置**（`left` / `right` / `center` / `bottom`）；平台名（`primarySidebar` / `secondarySidebar` / `panel`）是**角色**，通过 DSH 的槽位绑定到位置上。VS Code 自己也是这么分的（`workbench.sideBar.location` 让 primary 侧栏能放左或放右），所以 prac 不把两者焊死。
 
 ### 1.3 视图的三种摆放
 
@@ -116,7 +116,7 @@ interface ViewRecord {
 allocateStack(views, state, measured, height) → Map<viewId, height>
 ```
 
-规则（对齐 `SplitView`）：每人先拿下界 `MIN_ENTRY`；把"人设的 `ViewRecord.size`"按序兑现；总量放不下就按比例缩；剩下的空间**按各条当前高度的比例分**（等价于VS Code `saveProportions` / `proportionalLayout` 的观感）。折叠的条目按 `HEADER_HEIGHT` 占位、不参与分配。
+规则（对齐 `SplitView`）：每人先拿下界 `MIN_ENTRY`；把"人设的 `ViewRecord.size`"按序兑现；总量放不下就按比例缩；剩下的空间**按各条当前高度的比例分**（等价于 VS Code `saveProportions` / `proportionalLayout` 的观感）。折叠的条目按 `HEADER_HEIGHT` 占位、不参与分配。
 
 交互时谁写尺寸：
 
@@ -128,14 +128,14 @@ allocateStack(views, state, measured, height) → Map<viewId, height>
 | 折叠/展开      | `setViewCollapsed(state, viewId, collapsed, measuredHeight?)` | 折叠时记下当时高度（展开回到它）；展开时丢掉小于下界的残留                                                                                                                      |
 | 让出的空间归谁 | `allocateStack` 的余量分配                                    | **从上往下逐条发**（`distributeEmptySpace` 的顺序）：先给折叠位置**下方**的条目，下方没有才往上                                                                                 |
 
-**张力**：高度因此有**两个权威**——视图记录里的 `size` 与分配器**画出来**的值。两者可以不一致，`verify-persistence` 见过的现场是"存 69 / 画 519"。VS Code没有这个分叉：`SplitView` 的 `item.size` **就是**画面高度，布局过程会赋值它。收敛这两者的两条路（待裁）：
+**张力**：高度因此有**两个权威**——视图记录里的 `size` 与分配器**画出来**的值。两者可以不一致，`verify-persistence` 见过的现场是"存 69 / 画 519"。VS Code 没有这个分叉：`SplitView` 的 `item.size` **就是**画面高度，布局过程会赋值它。收敛这两者的两条路（待裁）：
 
 - **A**：保留两个空间，把分配结果**写回**视图记录（只在交互结束时写，避免启动/恢复期扰动）。
 - **B**：把"栈"提升为**树里的结构**（栈 = 一个 split，每条 = 一个 region）⇒ 高度只剩树这一个空间，`allocateStack` 与 `redistributeOnDrag` 都可删。
 
 ### 3.3 交互的基准
 
-拖动期间的算术以**拖动开始时冻结的快照**为基准（`pointerDelta` 与条目当时的尺寸），每帧从快照重算，不跨帧累积——这是VS Code `resize(index, delta, sizes, …)` 的形状，也是避免"自我放大"的关键。
+拖动期间的算术以**拖动开始时冻结的快照**为基准（`pointerDelta` 与条目当时的尺寸），每帧从快照重算，不跨帧累积——这是 VS Code `resize(index, delta, sizes, …)` 的形状，也是避免"自我放大"的关键。
 
 ---
 
@@ -184,15 +184,15 @@ allocateStack(views, state, measured, height) → Map<viewId, height>
 
 ---
 
-## 8. 与VS Code的分工
+## 8. 与 VS Code 的分工
 
 |                                                         | 谁拥有                                           |
 | ------------------------------------------------------- | ------------------------------------------------ |
 | 区域树、分栏、选择、顺序、几何、浮层、隔离边界          | **prac**（这个包）                               |
-| 视图的**内容**（编辑器、终端、语言服务、扩展贡献的 UI） | VS Code（引入源码树 + patch + overlay，不 fork） |
+| 视图的**内容**（编辑器、终端、语言服务、扩展贡献的 UI） | VS Code （引入源码树 + patch + overlay，不 fork） |
 | 视图的**来源**（谁声明的）                              | 目录（`catalogue.ts`），机制只按注册表成员认识它 |
 
-**对齐优先**：凡是VS Code有明确机制的地方（`SplitView` 的重分配与 snap、`distributeEmptySpace` 的顺序、`setVisible` 的缓存尺寸），prac 照做而不是发明；确有取舍时写成显式决定，不留在代码里当暗规则。
+**对齐优先**：凡是 VS Code 有明确机制的地方（`SplitView` 的重分配与 snap、`distributeEmptySpace` 的顺序、`setVisible` 的缓存尺寸），prac 照做而不是发明；确有取舍时写成显式决定，不留在代码里当暗规则。
 
 ---
 
@@ -207,7 +207,7 @@ allocateStack(views, state, measured, height) → Map<viewId, height>
 ## 10. 已知张力与待裁
 
 1. **栈内高度的两个空间**（§3.2）：写回（A）还是把栈提升为树结构（B）。B 从设计上消掉分叉，代价是一次结构性重构。
-2. **`ctx.layout` 手抄的 **DSH** 契约会静默漂移**：VS Code加成员、prac 没跟上时，外壳会整块起不来，而唯一的报错是一句 `Cannot read properties of undefined`；本仓库的类型检查对着**已发布**的版本、app 跑 checkout，两个 `ILayout` 不是同一类型，`satisfies` 也写不成 ⇒ 这类契约要自己加守卫。
+2. **`ctx.layout` 手抄的 **DSH** 契约会静默漂移**：VS Code 加成员、prac 没跟上时，外壳会整块起不来，而唯一的报错是一句 `Cannot read properties of undefined`；本仓库的类型检查对着**已发布**的版本、app 跑 checkout，两个 `ILayout` 不是同一类型，`satisfies` 也写不成 ⇒ 这类契约要自己加守卫。
 3. **组头**（tab 条 + 面包屑）：tab 归 prac（区域的 tab 条已有）；**面包屑挂在组头上**——是先让 prac 的 tab 条只做 tab、把组头其余部分搬进来，还是另行处理，单独裁一次。
 
 ---
@@ -232,5 +232,5 @@ allocateStack(views, state, measured, height) → Map<viewId, height>
 
 - **单测**：`vp run --filter prac-client-ui-layout test`（模型、目录、栈内算术）。
 - **活体门**（prac 侧）：`tests/gates/verify-{stack,split,containers,bottom,persistence}.mjs`——依次覆盖：一个视图裸渲染 / 两个视图成栈并折叠 / 借来的容器是具名子区域 / 底栏 / 状态随刷新回来。
-- **与VS Code交界**（vendor 侧）：`vendor/vscode/scripts/verify-{layout,view,editor,file,views,outline,timeline,focus,tabs,close,quiet,group,stack-size}.mjs`。
+- **与 VS Code 交界**（vendor 侧）：`vendor/vscode/scripts/verify-{layout,view,editor,file,views,outline,timeline,focus,tabs,close,quiet,group,stack-size}.mjs`。
 - 探针（一次性测量）写在 `.build/scratch/exp*.mjs`，不入库。
