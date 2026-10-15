@@ -37,7 +37,7 @@ status: in-progress
 - **C3** 每条有**下界**（`MIN_ENTRY = 48`：标题 + 一点内容）与**上界**（见 C6）。
 - **C4** 折叠的条目占**标题高**（`HEADER_HEIGHT = 20`）。
 - **C5** 拖动按 B2/B3 的方向取高度：**先给离边界最近的、还能动的那条**（下方优先，照VS Code `resize` 的顺序），到它的上界为止，再给下一条。
-- **C6** **不按比例**：余量**整块给一个行**，到它的 `maximumSize` 为止（对齐 `distributeEmptySpace`）。**这条依赖"行有声明的上界"**——没有上界就会一条吞掉全部（现场见过 `openEditors` 从 69 被画成 519）。上界属于另一条 note：[../proposed/2026-10-15-ui-layout-grid.md](../proposed/2026-10-15-ui-layout-grid.md)。
+- **C6** **不按比例**：余量**整块给一个行**，到它的 `maximumSize` 为止（对齐 `distributeEmptySpace`）。**上界由行自己声明**（`IView.maximumWidth/maximumHeight`，`splitview.ts:60`；隐藏时记作 0，`:254-255`；不声明就无上限）——没有上界就会一条吞掉全部（现场见过 `openEditors` 从 69 被画成 519）。grid 那条 note 里的 per-region `max` 与本条一致。
 - **C7** 人设的高度加起来**超过**区域高度时：按 C6 的顺序收敛，且**任何一条不破下界**。
 - **C8** **区域自身变高/变矮时**（窗口变化、邻居让位）：走 C5/C6 的同一条规则（按顺序、到上界为止），**不按比例**。
 
@@ -100,11 +100,11 @@ status: in-progress
 
 ## 必须先裁的
 
-1. **行的上界给多少**：**VS Code的答案已经明确——`max` 由每个视图自己声明，框架只读不发明**（`IView.maximumWidth/maximumHeight`，`splitview.ts:60`；`SplitView` 只读 `view.maximumSize`，`grid`/`splitview` 里的 `distributeEmptySpace` 用它封顶）。三条配套事实：
+1. ~~行的上界给多少~~ —— **已定（对齐 VS Code）**：**VS Code的答案已经明确——`max` 由每个视图自己声明，框架只读不发明**（`IView.maximumWidth/maximumHeight`，`splitview.ts:60`；`SplitView` 只读 `view.maximumSize`，`grid`/`splitview` 里的 `distributeEmptySpace` 用它封顶）。三条配套事实：
    - **隐藏的视图，`maximumSize` 记作 0**（`get maximumSize() { return this.visible ? this.view.maximumSize : 0; }`，`splitview.ts:254-255`）⇒ 折叠的行**不可能再长大**，这正是"邻着折叠行就继续找展开的行"的基础；
    - **多数视图不设上限**（`Number.POSITIVE_INFINITY`）⇒ 空闲空间会**整块给第一个还有余量的行**（"一条吃掉"是VS Code行为，不是异常）；
    - **固定尺寸的部件**把 `max` 设成等于 `min`：标题栏（`titlebarPart.ts:66`）、状态栏（`statusbarPart.ts:144`）、活动栏（`activitybarPart.ts:100`）；**内容自带上限**的另有声明（编辑器面板 `editorPane.ts:63-65`、设置编辑器 `:447`、notebook `:143`）。
-   ⇒ 所以对 prac 只剩一个决定：**栈里的行要不要自己声明 `max`**。对齐VS Code（侧栏 viewlet 的形态）就是**不设上限**；若要有上限，也应由**视图自己声明**，而不是框架按比例拍一个。
+   ⇒ 所以对 prac 决定已下：**prac 的行先都不声明 `max`**。对齐VS Code（侧栏 viewlet 的形态）就是**不设上限**；若要有上限，也应由**视图自己声明**，而不是框架按比例拍一个。
 2. **顺序怎么表示**：行为上已定（F1–F10：顺序是区域里的**数据**、可被拖拽改写、跟着视图走）。剩下的是表示形式——留在视图记录里，还是变成树的结构（F1 的顺序 = branch 的孩子顺序）——这仍属于实现选型。
 3. ~~折录取哪一刻的高度~~ —— **已定**：对齐VS Code（调用者可显式传入、缺省取当时高度；拖动路径传拖动开始时的快照），见 E1–E3。
 
