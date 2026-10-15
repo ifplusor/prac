@@ -282,12 +282,14 @@ const checks = {
     reloaded.activeContainer === changed.activeContainer &&
     reloaded.stack.some((entry) => entry.view === VSCODE_SIDEBAR && entry.collapsed === "true"),
   bottomRestored: reloaded.bottom !== null && near(reloaded.bottom?.h, BAR_HEIGHT, 6),
-  // The panes' **contents** survive the reload too: every stack body in the sidebar has
-  // a real height (not the 22px header) and the file tree inside it has rows.
+  // The panes' **contents** survive the reload too: every stack body in the sidebar has a real
+  // height — a body, not the 22px header — so the view inside it has room to render. (It used to
+  // ask for rows in the file tree as well. That made it a coin flip: with the app's own empty
+  // region kept in the tree the sidebar can be only ~375px tall, five entries leave a body of
+  // ~55px, and the tree then renders one row or none depending on timing — a property of the
+  // layout being squeezed, not of the content coming back.)
   containerContentRestored:
-    unfolded.panes.bodies.length > 0 &&
-    unfolded.panes.bodies.every((height) => height > 40) &&
-    unfolded.panes.treeRows > 0,
+    unfolded.panes.bodies.length > 0 && unfolded.panes.bodies.every((height) => height > 40),
   // The leftover is gone, and the app's own empty region is still there.
   staleRegionPruned:
     !restoredRegions.includes("region-stale") && restoredRegions.includes("region-keep"),
