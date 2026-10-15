@@ -31,13 +31,13 @@ prac 自己的界面框架：它取代 `dsh-client-ui-layout` 那套固定的三
 | **区域** | ——                   | 同时只显示一个    |
 
 - **`stack`（顺序）**：一个区域里同时显示多个视图，各自有标题与折叠开关；高度在它们之间分配（§4.2）。这是 VS Code 侧栏那种"视图条"的形态。
-- **`tab`（选择）**：同一时刻只显示一个孩子，切换的是**选中**（布局状态），不是叠放。`stage`（中心区）与 `bottom` 用它。
+- **`tab`（选择）**：同一时刻只显示一个孩子，切换的是**选中**（布局状态），不是叠放。`center`（中心区）与 `bottom` 用它。
 - **容器 = 具名子区域**：上游的 Explorer / Search / SCM / Run **不是一个新对象**，而是"选择"区域下的一个孩子区域（例如 `left/container:workbench.view.explorer`）。所以容器之间是"选择"，容器内部是"顺序"。
 - **悬浮层**是顶层的一个区域：住命令、通知，以及任何被临时放到那里的视图。它的内容按"这一次的呈现"渲染，**不进持久化**。
 
 ### 1.2 位置与角色分开
 
-区域 id 是**位置**（`left` / `right` / `stage` / `bottom`）；平台名（`primarySidebar` / `secondarySidebar` / `panel`）是**角色**，通过 DSH 的槽位绑定到位置上。上游自己也是这么分的（`workbench.sideBar.location` 让 primary 侧栏能放左或放右），所以 prac 不把两者焊死。
+区域 id 是**位置**（`left` / `right` / `center` / `bottom`）；平台名（`primarySidebar` / `secondarySidebar` / `panel`）是**角色**，通过 DSH 的槽位绑定到位置上。上游自己也是这么分的（`workbench.sideBar.location` 让 primary 侧栏能放左或放右），所以 prac 不把两者焊死。
 
 ### 1.3 视图的三种摆放
 
@@ -88,7 +88,7 @@ interface ViewRecord {
 }
 ```
 
-常量（`contract.ts`）：`SASH_SIZE = 5`、`DEFAULT_MIN = 120`、`CENTER_MIN = 240`、`CENTER_REGION = "stage"`、`BOTTOM_REGION = "bottom"`；栈内下界与标题高在 `model.ts`：`MIN_ENTRY = 48`、`HEADER_HEIGHT = 20`。
+常量（`contract.ts`）：`SASH_SIZE = 5`、`DEFAULT_MIN = 120`、`CENTER_MIN = 240`、`CENTER_REGION = "center"`、`BOTTOM_REGION = "bottom"`；栈内下界与标题高在 `model.ts`：`MIN_ENTRY = 48`、`HEADER_HEIGHT = 20`。
 
 **视图 id 形如 `<source>:<name>`**（`catalogue.ts`：`viewSource` / `DSH_VIEW_SOURCE = "dsh:"` / `DSH_SIDEBAR_VIEW` / `DSH_MAIN_PREFIX`）。prac 自己的视图注册进槽位 `prac.view`（`VIEW_SLOT`）。
 

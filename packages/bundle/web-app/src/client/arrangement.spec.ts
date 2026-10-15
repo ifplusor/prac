@@ -14,7 +14,7 @@ import {
   DSH_SIDEBAR_VIEW,
   LEFT,
   RIGHT,
-  STAGE,
+  CENTER,
   VSCODE_SURFACE,
   arrange,
   focusView,
@@ -119,7 +119,7 @@ describe("placeSurfaces", () => {
     const { face, calls } = recordingFace();
     placeSurfaces(face, CONVERSATION, FILE_VIEW);
     expect(shapes(calls)).toEqual([
-      ["place", DSH_CONVERSATION_VIEW, STAGE],
+      ["place", DSH_CONVERSATION_VIEW, CENTER],
       ["place", FILE_VIEW, RIGHT],
     ]);
   });
@@ -129,7 +129,7 @@ describe("placeSurfaces", () => {
     placeSurfaces(face, VSCODE_SURFACE, FILE_VIEW);
     expect(shapes(calls)).toEqual([
       ["place", DSH_CONVERSATION_VIEW, RIGHT],
-      ["place", FILE_VIEW, STAGE],
+      ["place", FILE_VIEW, CENTER],
     ]);
   });
 
@@ -146,26 +146,26 @@ describe("focusView", () => {
     focusView(face, FILE_VIEW);
     expect(shapes(calls)).toEqual([
       ["place", DSH_CONVERSATION_VIEW, RIGHT],
-      ["place", FILE_VIEW, STAGE],
+      ["place", FILE_VIEW, CENTER],
     ]);
   });
 
   it("does not park the conversation when the conversation *is* what comes forward", () => {
     const { face, calls } = recordingFace();
     focusView(face, DSH_CONVERSATION_VIEW);
-    expect(shapes(calls)).toEqual([["place", DSH_CONVERSATION_VIEW, STAGE]]);
+    expect(shapes(calls)).toEqual([["place", DSH_CONVERSATION_VIEW, CENTER]]);
   });
 });
 
 describe("staleFileViews", () => {
   const records = {
-    [FILE_VIEW]: { region: STAGE, order: 0, hidden: false },
+    [FILE_VIEW]: { region: CENTER, order: 0, hidden: false },
     "vscode:file:vscode-remote://127.0.0.1:3084/workspace/closed.ts": {
-      region: STAGE,
+      region: CENTER,
       order: 1,
       hidden: false,
     },
-    [DSH_CONVERSATION_VIEW]: { region: STAGE, order: 2, hidden: false },
+    [DSH_CONVERSATION_VIEW]: { region: CENTER, order: 2, hidden: false },
     "vscode:view:workbench.view.search": { region: LEFT, order: 3, hidden: false },
   } satisfies Record<string, ViewRecord>;
   const resourceOf = (view: string): string | undefined =>
@@ -197,12 +197,12 @@ describe("restoreCentre", () => {
       [DSH_CONVERSATION_VIEW]: { region: RIGHT, order: 0, hidden: false },
     });
     expect(restoreCentre(face)).toBe(true);
-    expect(shapes(calls)).toEqual([["place", DSH_CONVERSATION_VIEW, STAGE]]);
+    expect(shapes(calls)).toEqual([["place", DSH_CONVERSATION_VIEW, CENTER]]);
   });
 
   it("leaves it where it is when the centre is already its", () => {
     const { face, calls } = recordingFace({
-      [DSH_CONVERSATION_VIEW]: { region: STAGE, order: 0, hidden: false },
+      [DSH_CONVERSATION_VIEW]: { region: CENTER, order: 0, hidden: false },
     });
     expect(restoreCentre(face)).toBe(false);
     expect(shapes(calls)).toEqual([]);
@@ -215,7 +215,7 @@ describe("openFileInto", () => {
     openFileInto(face, FILE_VIEW);
     expect(shapes(calls)).toEqual([
       ["place", DSH_CONVERSATION_VIEW, RIGHT],
-      ["place", FILE_VIEW, STAGE],
+      ["place", FILE_VIEW, CENTER],
     ]);
   });
 });
@@ -241,7 +241,7 @@ describe("arrange", () => {
     arrange(face);
     expect(shapes(calls.slice(2))).toEqual([
       ["place", DSH_SIDEBAR_VIEW, LEFT],
-      ["place", DSH_CONVERSATION_VIEW, STAGE],
+      ["place", DSH_CONVERSATION_VIEW, CENTER],
       ["place", "dsh:rightbar", RIGHT],
       ["hide", "dsh:rightbar"],
     ]);
@@ -374,14 +374,14 @@ describe("placeCatalogue", () => {
         region: null,
       }),
     ]);
-    expect(shapes(calls)).toEqual([["placeQuietly", "vscode:file:p1:x", STAGE]]);
+    expect(shapes(calls)).toEqual([["placeQuietly", "vscode:file:p1:x", CENTER]]);
   });
 
   it("splits a file's second placement out beside the one already on screen", () => {
     // The app copied the editor into another group (Split Editor): the file already has
     // a view, and the new placement goes **beside** it rather than on top of it.
     const { face, calls } = recordingFace({
-      "vscode:file:p1:x": { region: STAGE, order: 0, hidden: false },
+      "vscode:file:p1:x": { region: CENTER, order: 0, hidden: false },
     });
     placeCatalogue(face, [
       entry({
@@ -389,7 +389,7 @@ describe("placeCatalogue", () => {
         appId: "x",
         source: "file",
         location: "stage",
-        region: STAGE,
+        region: CENTER,
       }),
       entry({
         view: "vscode:file:p2:x",
@@ -400,7 +400,7 @@ describe("placeCatalogue", () => {
       }),
     ]);
     expect(shapes(calls)).toEqual([
-      ["placeQuietly", "vscode:file:p2:x", STAGE],
+      ["placeQuietly", "vscode:file:p2:x", CENTER],
       ["splitView", "vscode:file:p2:x", "right"],
     ]);
   });
@@ -417,7 +417,7 @@ describe("placeCatalogue", () => {
         appId: "x",
         source: "file",
         location: "stage",
-        region: STAGE,
+        region: CENTER,
       }),
     ]);
     expect(shapes(calls)).toEqual([]);

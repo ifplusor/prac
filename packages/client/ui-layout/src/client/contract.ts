@@ -258,7 +258,7 @@ export const CENTER_MIN = 240;
  * the frame's own default, and the arrangement is free to place the same view
  * somewhere else (see {@link PracLayoutFace.selectPanel}).
  */
-export const CENTER_REGION = "stage";
+export const CENTER_REGION = "center";
 /**
  * The frame's bottom bar.
  *

@@ -18,7 +18,7 @@
 import { distinctColours, openPrac, report, requireUrl } from "./harness.mjs";
 
 const BOTTOM = "bottom";
-const STAGE = "stage";
+const CENTER = "center";
 /** A prac view with content, used to fill the bar. */
 const VIEW = "dsh:main:conversation";
 
@@ -97,7 +97,7 @@ async function sample() {
         viewHosts: [...document.querySelectorAll(`[data-prac-region="${bottom}"] *`)].length,
       };
     },
-    { bottom: BOTTOM, stage: STAGE },
+    { bottom: BOTTOM, stage: CENTER },
   );
   facts.distinctColours = await distinctColours(page, facts.bottom);
   return facts;
@@ -142,7 +142,7 @@ const checks = {
   barEmptied: emptied,
   absentWhileEmpty:
     initial.bottom === null &&
-    initial.regions.filter((region) => !region.includes("/")).join(",") === "left,stage",
+    initial.regions.filter((region) => !region.includes("/")).join(",") === "left,center",
   // 2. Filled: at the bottom, full width, at the bar's size, with pixels.
   appearsAtTheBottom:
     opened.bottom !== null &&

@@ -187,7 +187,7 @@ const placed = await sample();
 // (creating it again) — the release/recreate judgement, exercised through the UI.
 await page.evaluate(
   ({ seat }) => {
-    globalThis.__pracLayout.place(seat, "stage");
+    globalThis.__pracLayout.place(seat, "center");
   },
   { seat: SEAT },
 );
@@ -225,7 +225,7 @@ const checks = {
   // Structurally present is not enough — it has to have pixels.
   viewPainted: painted(placed),
   // Release + recreate: the seat moved regions, so the view was created twice.
-  remountLandedInStage: moved.region === "stage" && moved.panes >= 1,
+  remountLandedInStage: moved.region === "center" && moved.panes >= 1,
   remountPainted: painted(moved),
   // A failed mount would be logged by the composition, not thrown at the embedder.
   noMountErrors: placed.mountErrors === 0 && moved.mountErrors === 0,

@@ -26,7 +26,7 @@ export const DSH_CONVERSATION_VIEW = "dsh:main:conversation";
 
 /** The mechanism's default regions (`prac-client-ui-layout`'s default region tree). */
 export const LEFT = "left";
-export const STAGE = "stage";
+export const CENTER = "center";
 export const RIGHT = "right";
 export const BOTTOM = "bottom";
 
@@ -41,7 +41,7 @@ export type Surface = typeof CONVERSATION | typeof VSCODE_SURFACE;
  * The region a view is brought forward into. The centre is the work area; the
  * mechanism's `stage` region stays a valid target even after it has been split.
  */
-export const FOCUS_VIEW_REGION = STAGE;
+export const FOCUS_VIEW_REGION = CENTER;
 
 /**
  * The arrangement's default placement table — the single place that says what
@@ -57,7 +57,7 @@ export const DEFAULT_PLACEMENTS: readonly {
   readonly hidden?: boolean;
 }[] = [
   { view: DSH_SIDEBAR_VIEW, region: LEFT },
-  { view: DSH_CONVERSATION_VIEW, region: STAGE },
+  { view: DSH_CONVERSATION_VIEW, region: CENTER },
   { view: DSH_RIGHTBAR_VIEW, region: RIGHT, hidden: true },
 ];
 // No default for the centre's editor: since decision 17 a file is a view that
@@ -75,7 +75,7 @@ export const DEFAULT_PLACEMENTS: readonly {
  * frame knows only region ids.
  */
 const LOCATION_REGION: Readonly<Record<VscodeCatalogueEntry["location"], string>> = {
-  stage: STAGE,
+  stage: CENTER,
   sidebar: LEFT,
   panel: BOTTOM,
   auxiliarybar: RIGHT,
@@ -235,7 +235,7 @@ function placeFileEntries(layout: PracLayout, entries: readonly VscodeCatalogueE
       layout.placeQuietly(entry.view, shown.region);
       layout.splitView(entry.view, "right");
     } else {
-      layout.placeQuietly(entry.view, STAGE);
+      layout.placeQuietly(entry.view, CENTER);
     }
   }
 }
@@ -261,8 +261,8 @@ export const ROLES = {
  * @param surface - the surface attention is on.
  */
 export function placeSurfaces(layout: PracLayout, surface: Surface, fileView: string | null): void {
-  layout.place(DSH_CONVERSATION_VIEW, surface === CONVERSATION ? STAGE : RIGHT);
-  if (fileView !== null) layout.place(fileView, surface === VSCODE_SURFACE ? STAGE : RIGHT);
+  layout.place(DSH_CONVERSATION_VIEW, surface === CONVERSATION ? CENTER : RIGHT);
+  if (fileView !== null) layout.place(fileView, surface === VSCODE_SURFACE ? CENTER : RIGHT);
 }
 
 /**

@@ -210,7 +210,7 @@ const checks = {
   // test — `web-app`'s `arrangement.spec.ts`; what is live here is the file view
   // actually moving between regions and painting in each.)
   promotedFileCentred:
-    states.promoted.host?.region === "stage" && Math.abs(offset(states.promoted)) < 200,
+    states.promoted.host?.region === "center" && Math.abs(offset(states.promoted)) < 200,
   promotedWiderThanBeside: states.promoted.host.box.w > states.parked.host.box.w * 1.3,
   paintedThroughThePromotion:
     painted(states.opened) && painted(states.promoted) && painted(states.parked),
@@ -224,14 +224,14 @@ const checks = {
   // Parking the conversation in the centre sends the file back to the track.
   parkedParksTheFileInTheTrack:
     states.parked.host?.region === "right" &&
-    states.parked.conversationRegion === "stage" &&
+    states.parked.conversationRegion === "center" &&
     offset(states.parked) > 200,
   // Back returns attention to where it was: the conversation is centred again and
   // the file is back in the track, still painting.
   backReturns:
     states.back.focus === "conversation" &&
     states.back.host?.region === "right" &&
-    states.back.conversationRegion === "stage" &&
+    states.back.conversationRegion === "center" &&
     offset(states.back) > 200 &&
     painted(states.back),
 };

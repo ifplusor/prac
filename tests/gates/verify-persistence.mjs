@@ -269,7 +269,7 @@ const checks = {
   // put the panel containers there.
   startedDefault:
     near(initial.left?.w, DEFAULT_LEFT, 6) &&
-    initial.regions.filter((region) => !region.includes("/")).join(",") === "left,stage,bottom",
+    initial.regions.filter((region) => !region.includes("/")).join(",") === "left,center,bottom",
   // The engine integration: the state is under the versioned key, and it is the
   // state the moves produced (not just a key that exists).
   written: changed.persisted !== null && changed.persisted.leftSize === RESIZED_LEFT,

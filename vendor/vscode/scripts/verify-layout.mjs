@@ -48,7 +48,7 @@ const sha = (buffer) => createHash("sha256").update(buffer).digest("hex");
  * The region the arrangement (`prac-web-app`'s client half, `openFileInto`) asks
  * for a newly opened file. The DOM must agree with the placement policy.
  */
-const ARRANGED_FILE_REGION = "stage";
+const ARRANGED_FILE_REGION = "center";
 
 /**
  * The view id a file view carries by convention (`prac-client-vscode-host`); the
@@ -379,7 +379,7 @@ const checks = {
     states.default.regions
       .map((region) => region.id)
       .filter((id) => !id.includes("/"))
-      .join(",") === "left,stage,right,bottom",
+      .join(",") === "left,center,right,bottom",
   defaultConversationInTheTrack:
     states.default.modelConversationRegion === TRACK_REGION &&
     states.default.conversationInTrack === true,

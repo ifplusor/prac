@@ -25,7 +25,7 @@
 import { distinctColours, openPrac, report, requireUrl } from "./harness.mjs";
 
 const LEFT = "left";
-const STAGE = "stage";
+const CENTER = "center";
 const BOTTOM = "bottom";
 const CONVERSATION = "dsh:main:conversation";
 const DSH_SIDEBAR = "dsh:sidebar";
@@ -208,12 +208,12 @@ const checks = {
     initial.regions
       .map((region) => region.id)
       .filter((id) => !id.includes("/"))
-      .join(",") === "left,stage,bottom",
+      .join(",") === "left,center,bottom",
   // Each side's pane renders where the side says, and holds the view.
   paneOnTheRight:
-    (regionBox(splitRight, rightPane)?.x ?? 0) > (regionBox(splitRight, STAGE)?.x ?? 0) &&
-    near(regionBox(splitRight, rightPane)?.y, regionBox(splitRight, STAGE)?.y, 2) &&
-    near(regionBox(splitRight, rightPane)?.h, regionBox(splitRight, STAGE)?.h, 2),
+    (regionBox(splitRight, rightPane)?.x ?? 0) > (regionBox(splitRight, CENTER)?.x ?? 0) &&
+    near(regionBox(splitRight, rightPane)?.y, regionBox(splitRight, CENTER)?.y, 2) &&
+    near(regionBox(splitRight, rightPane)?.h, regionBox(splitRight, CENTER)?.h, 2),
   paneOnTheLeft:
     (regionBox(splitLeft, leftPane)?.x ?? 0) < (regionBox(splitLeft, rightPane)?.x ?? 0) &&
     near(regionBox(splitLeft, leftPane)?.y, regionBox(splitLeft, rightPane)?.y, 2),

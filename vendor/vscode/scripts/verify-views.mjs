@@ -238,7 +238,7 @@ async function sample(page) {
   const regionOf = (id) => facts.regions.find((region) => region.id === id) ?? null;
   facts.left = regionOf("left");
   facts.right = regionOf("right");
-  facts.stage = regionOf("stage");
+  facts.stage = regionOf("center");
   facts.editorPaint = await paintAt(page, facts.host?.box, EDITOR_HOST);
   facts.overlayPaint = facts.overlay ? await paintAt(page, facts.overlay, RECALL) : null;
   return facts;
@@ -488,7 +488,7 @@ const checks = {
   // 6. arrow keys move the cursor; Enter runs the selected row's 聚焦.
   arrowsMoveCursor: states.cursorMoved === FILE_VIEW,
   enterFocusedIntoTheCentre:
-    states.focusedByKey.host?.region === "stage" &&
+    states.focusedByKey.host?.region === "center" &&
     // The conversation parks in the track instead of the track emptying out:
     // one view holds a region, and the one that yields stays on screen.
     states.focusedByKey.conversationRegion === "right",

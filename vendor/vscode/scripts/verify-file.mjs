@@ -291,7 +291,7 @@ const split = await liveSurfaces();
 // …and moving it back leaves one region, so one group shows it again.
 step("merge region");
 await page.evaluate(
-  (resource) => globalThis.__pracLayout.place(globalThis.__pracFileView(resource), "stage"),
+  (resource) => globalThis.__pracLayout.place(globalThis.__pracFileView(resource), "center"),
   uriOf(FILE_A),
 );
 await waitForSurface(uriOf(FILE_A));
@@ -381,7 +381,7 @@ if (activeResource === null) throw new Error("no active editor to exercise the c
 // `activate`. Both halves matter: prac's front view and the app's active editor are
 // two states, and the UI keeps them in step through this action.
 await page.evaluate(
-  (resource) => globalThis.__pracLayout.place(globalThis.__pracFileView(resource), "stage"),
+  (resource) => globalThis.__pracLayout.place(globalThis.__pracFileView(resource), "center"),
   activeResource,
 );
 await page.waitForTimeout(1500);
@@ -536,7 +536,7 @@ await page.waitForTimeout(3000);
 // group the app's **active** one — which is what decides whose editor the command copies
 // (a split copies the active editor, and the split just made the other group active).
 await page.evaluate(
-  (resource) => globalThis.__pracLayout.place(globalThis.__pracFileView(resource), "stage"),
+  (resource) => globalThis.__pracLayout.place(globalThis.__pracFileView(resource), "center"),
   uriOf(FILE_A),
 );
 await waitForSurface(uriOf(FILE_A));
@@ -640,7 +640,7 @@ const checks = {
     mounted.editors === 1 &&
     oneSurface.length === 1 &&
     oneSurface[0].resource === uriOf(FILE_A) &&
-    mounted.region === "stage",
+    mounted.region === "center",
   firstShowsItsOwnText: mounted.lines > 3 && mounted.text.includes(FILE_A.marker),
   secondShowsItsOwnText: second.lines > 3 && second.text.includes(FILE_B.marker),
   // 2. Paint, because present-but-blank is the failure mode.
@@ -716,7 +716,7 @@ const checks = {
   // 10. A reload takes the files with it — and takes their views with them.
   reloadForgetsTheFiles: reloaded.open.length === 0 && reloaded.fileHosts === 0,
   noTabForAClosedFile: reloaded.fileTabs.length === 0,
-  conversationTakesTheCentreBack: reloaded.conversationRegion === "stage",
+  conversationTakesTheCentreBack: reloaded.conversationRegion === "center",
   // 11. The diagnostics capability's contract.
   diagnosticsSummaryIsTheSameSet: (() => {
     const { summary } = diagnosticsProbe.snapshot;

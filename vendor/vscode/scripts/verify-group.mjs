@@ -135,7 +135,7 @@ const readPreviewTabs = () =>
         const id = region?.getAttribute("data-prac-region") ?? "";
         return { id, preview: tab.getAttribute("data-prac-tab-preview") };
       })
-      .filter((tab) => /^(stage|region)/.test(tab.id)),
+      .filter((tab) => /^(center|region)/.test(tab.id)),
   );
 const beforeSide = await readPreviewTabs();
 await page.evaluate(
