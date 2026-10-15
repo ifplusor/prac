@@ -512,7 +512,7 @@ const FRAME_STYLES = `
 [data-prac-sash][data-prac-sash-dir="row"] { cursor: col-resize; }
 [data-prac-sash][data-prac-sash-dir="column"] { cursor: row-resize; }
 [data-prac-sash]:hover { background: rgba(127, 127, 127, 0.35); }
-[data-prac-stack-entry]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: ${SASH_SIZE}px; z-index: 5; cursor: row-resize; }
+[data-prac-stack-entry]::after { content: ""; cursor: row-resize; position: absolute; left: 0; right: 0; bottom: 0; height: ${SASH_SIZE}px; z-index: 5; cursor: row-resize; }
 [data-prac-stack-entry]:hover::after { background: rgba(127, 127, 127, 0.35); }
 `;
 
@@ -1065,7 +1065,7 @@ export function createFrame(
               "data-prac-stack-title": viewId,
               style: {
                 flex: "1 1 auto",
-                cursor: "grab",
+                cursor: "pointer",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
