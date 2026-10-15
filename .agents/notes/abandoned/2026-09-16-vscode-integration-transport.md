@@ -52,7 +52,7 @@ flowchart LR
 
 **渲染器**跑 workbench（UI）；**扩展宿主**跑扩展代码（只有 `vscode.*` API，没有 DOM），在另一个进程；**主线程**不是线程，是扩展宿主协议的另一端——在 workbench 里替扩展宿主做 UI / 编辑器 / 存储 / 诊断的那套实现（`api/browser/**` 的 `@extHostNamedCustomer`）。**两种形态下主线程都在渲染器里**，远程形态搬走的只有扩展宿主。
 
-**对 prac 的意义**：扩展宿主能拿到的（文档、诊断、语言特性、搜索、终端、任务）是 **tier S**；只有主线程能答的（可见编辑器与选择、对话框、quick pick、进度）是 **tier C**——而主线程住在页面，所以今天"页面不在 ⇒ 没有能力"。broker 要做的，就是把主线程这一角色从渲染器搬到 server 侧（形状见「设计」，最小面见「证据」）。
+**对 prac 的意义**：扩展宿主能拿到的（文档、诊断、语言特性、搜索、终端、任务）是 **tier S**；只有主线程能答的（可见编辑器与选择、对话框、quick pick、进度）是 **tier C**——而主线程住在页面，所以今天"页面不在 ⇒ 没有能力"。broker 要做的，就是把主线程这一角色从渲染器搬到 server 侧（形状见「设计」，最小接口见「证据」）。
 
 > 角色表与图、`MainThread*` 的实现清单与计数、平台服务层（`src/vs/platform/**` 是什么、DI 怎么来、主线程用到 42 个 / 166 处）、协议与载体（帧格式与 12 种消息、桌面 utility 进程 + MessagePort、远程 WS + fork 桥）都在 [`docs/vscode.md`](../../../docs/vscode.md)。
 
@@ -124,7 +124,7 @@ flowchart LR
 | **本地 Extension Host（UI 扩展）** | **没有对应物**：只有一个远程扩展宿主 | tier C 里"只有页面能答"的那些（可见编辑器与选择、对话框、quick pick、进度）由 client 半边答；要不要真的起一个 UI 扩展宿主，本文没定 |
 | **VS Code Server** | `out-vscode-reh` 进程（已由主干起停） | 不变；broker 作为**客户端**连它的 Management 面 |
 | **Remote Extension Host（工作区扩展）** | 由**页面**发起连接才 fork | 由 **broker** 发起 ⇒ 页面刷新不再重启扩展宿主 |
-| **（官方图没有这一块）** | 渲染器**就是**主线程 | **broker 扮演主线程**（最小面见「证据」） |
+| **（官方图没有这一块）** | 渲染器**就是**主线程 | **broker 扮演主线程**（最小接口见「证据」） |
 | **（官方图没有这一块）** | agent 够不着任何 IDE 能力 | broker 的能力**直接注册成 agent 工具**（进程内，无协议） |
 
 ### 两条连接（①②）与三层回答（tier S / C / X）
@@ -183,7 +183,7 @@ client 做**乐观回显**（本地先应用，等 `applied` 确认版本）；�
 
 ## 证据
 
-### 1. "broker 扮演主线程"的最小面：**18 个代理 / 82 个方法**起步
+### 1. "broker 扮演主线程"的最小接口：**18 个代理 / 82 个方法**起步
 
 **启动到"可激活"不需要主线程实现任何东西。** init 是**主线程推给扩展宿主**的：`ExtHostConfiguration.$initializeConfiguration`（`extHostConfiguration.ts:126`）、`ExtHostWorkspace.$initializeWorkspace`（`extHostWorkspace.ts:268`）、`ExtHostTelemetry.$initializeTelemetryLevel`（`extHostTelemetry.ts:86`）；扩展宿主的 `initialize()` 卡在 `waitForInitializeCall()`（`extHostExtensionService.ts:242` → `extHostWorkspace.ts:274`）。⇒ broker 先要会**发**这三条，而不是实现什么。
 

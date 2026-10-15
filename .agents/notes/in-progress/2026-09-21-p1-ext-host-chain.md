@@ -46,7 +46,7 @@ status: in-progress
 - **主线程那面没有现成东西可复用**：reh / web 产物里都没有 `vs/workbench/api/common`；主线程实现只存在于 renderer bundle 里。
 - **但 `out-build/` 可 import**（实测）：它是**我们自己的构建产物**（`vendor/vscode/scripts/build.mjs:275` 第 4 步 transpile `src/` → `out-build`）。`rpcProtocol.js`、`extHost.protocol.js` 都能直接 import（需要 3 个全局 `_VSCODE_PRODUCT_JSON` / `_VSCODE_PACKAGE_JSON` / `_VSCODE_FILE_ROOT`），`mainThreadLanguageFeatures.js` / `mainThreadDocuments.js` / `mainThreadConfiguration.js` 也能 import；`mainThreadExtensionService.js` 要 `window`（得 shim），聚合入口要 CSS loader（不能用）。`out-build` **没有 `.d.ts`**。
 
-### 2.3 主线程那一端的最小面（侦察 ad6674db 定稿）
+### 2.3 主线程那一端的最小接口（侦察 ad6674db 定稿）
 
 - **不做就"挂起"（不是报错）**：`$initializeWorkspace`（barrier 不开）、`$initializeConfiguration`（barrier 不开）、`MainThreadExtensionService.$onWillActivateExtension`（ext host await 它）、`MainThreadStorage.$initializeExtensionStorage`（缺它 memento 的 `whenReady` reject ⇒ 激活失败；**返回 `undefined` 即可**）。
 - **"喂文档"就是两条推送**：`$acceptDocumentsAndEditorsDelta`——`IModelAddedData.lines` **是全文**，ext host 拿它建本地镜像，**没有"回主线程读文本"的 RPC**；之后每次编辑推 `$acceptModelChanged`（增量 + `versionId` + `eol`）。查询那一刻文档不在镜像里 ⇒ hover 直接 reject。
@@ -121,7 +121,7 @@ status: in-progress
 
 1. **让VS Code 内建扩展变成可加载的**（独立可验，不碰协议）：给 `extensions/css-language-features` 与它的 `server/` 各装依赖，再编译 client 与 server 两半。**验收**：`client/out/node/cssClientMain.js` 与 `server/out/node/cssServerMain.js` 存在，且 `vscode-languageclient` 从扩展目录能解析。
 2. **连接与协议写进 `vendor/vscode-embed`**（机制，不带政策）：建载体（`VSCODE_EXTHOST_IPC_HOOK` 管道）→ `cp.fork(bootstrap-fork.js, …)` → 固定顺序握手（`Ready` → initData → `Initialized`）→ import `out-build` 的 `RPCProtocol` 与 id 表，落成一个可复用的入口；host 插件只决定"何时起、给谁用"。
-3. **主线程最小面**（同在 lib 里）：§2.3 那批必需顾客（含 `MainThreadStorage`、`MainThreadOutputService`，以及 §2.4 那 12 个 `$registerXxx`）＋ 初始化推送 ＋ 文档推送。**验收**：css 扩展真的激活、`$registerHoverProvider` 到达主线程。
+3. **主线程最小接口**（同在 lib 里）：§2.3 那批必需顾客（含 `MainThreadStorage`、`MainThreadOutputService`，以及 §2.4 那 12 个 `$registerXxx`）＋ 初始化推送 ＋ 文档推送。**验收**：css 扩展真的激活、`$registerHoverProvider` 到达主线程。
 4. **扩展清单来自真实扫描**：扫VS Code 内建扩展目录与用户扩展目录，构造 initData 的 `extensions` 快照（第一条链可以让只有 css 进 `myExtensions`，但清单本身必须是扫出来的）。
 5. **问一次查询**：主线程调 `$provideHover`（VS Code 侧 1-based → seam 的 0-based），翻成 `{kind:'hover'}`。**验收**：拿到 CSS 属性的真实文档。
 6. **接进 agent 侧**：写 provider、在 prac 的 bundle patch 里插 `@deepseek-ai/dsh-lsp` 与插件行，用 `lsp` 工具问一次。
