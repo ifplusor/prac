@@ -69,6 +69,7 @@ import {
   dragSnapTarget,
   dragChainTarget,
   moveViewInRegion,
+  resetStackBoundary,
 } from "./model.js";
 import { type LayoutStore, useLayout } from "./store.js";
 import type { LayoutState } from "./contract.js";
@@ -377,6 +378,9 @@ interface StackEntryNode {
 }
 
 /** Read a stack's entries, top-down, as they stand on screen. */
+/** What {@link readStackRows} needs of a container — a plain element qualifies structurally. */
+type StackContainer = Parameters<typeof readStackRows>[0];
+
 function readStackRows(
   container: { querySelectorAll(selectors: string): readonly StackEntryNode[] } | null,
 ): { viewId: string; height: number; folded: boolean }[] {
@@ -761,6 +765,32 @@ export function createFrame(
       // shape. The listener is on the **capture** phase: the press lands on the view's own DOM
       // (the workbench's tree), which is free to `stopPropagation`, and a bubbling listener
       // would never hear about it.
+      /**
+       * A double-click on the boundary (its bottom `SASH_SIZE` px) evens out the two rows it
+       * separates — upstream's sash reset (`onDidReset`, `splitview.ts:1186`), which also refuses
+       * when a whole side is folded. A double-click anywhere else on the entry does nothing.
+       */
+      const onDoubleClickCapture = (event: PointerDragEvent): void => {
+        if (event.button !== 0) return;
+        const element = event.currentTarget as HTMLElement;
+        const rect = element.getBoundingClientRect();
+        if (event.clientY < rect.bottom - SASH_SIZE) return;
+        const reset = resetStackBoundary(
+          readStackRows(element.parentElement as unknown as StackContainer),
+          viewId,
+        );
+        if (reset.length === 0) return;
+        store.update((state) => {
+          const views = { ...state.views };
+          for (const { viewId: id, height } of reset) {
+            const view = views[id];
+            if (view !== undefined && view.collapsed !== true)
+              views[id] = { ...view, size: height };
+          }
+          return { ...state, views };
+        });
+      };
+
       const onPointerDownCapture = (event: PointerDragEvent): void => {
         // Only an entry with an entry **below** it has a boundary to drag: the stack's last
         // entry ends at the stack's own edge, where a drag has nothing to give (and would eat
@@ -772,6 +802,17 @@ export function createFrame(
         // precedence where it overlaps, `splitview.ts:1168-1173`).
         if (event.clientY >= rect.bottom - SASH_SIZE) {
           if (!handle) return;
+          // A boundary that can move nothing is not draggable (B4): both sides are folded or already
+          // at their floor. `redistributeOnDrag` reports only the rows that would actually move.
+          const here = readStackRows(
+            (event.currentTarget as HTMLElement).parentElement as unknown as StackContainer,
+          );
+          if (
+            [...redistributeOnDrag(here, viewId, 1)].length === 0 &&
+            [...redistributeOnDrag(here, viewId, -1)].length === 0
+          ) {
+            return;
+          }
         } else {
           const onToggle = (
             (event as unknown as { target: EventTarget | null }).target as HTMLElement | null
@@ -926,6 +967,8 @@ export function createFrame(
           "data-prac-stack-handle": handle ? "true" : "false",
           onPointerDownCapture,
           "data-prac-stack-collapsed": collapsed ? "true" : "false",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onDoubleClick: onDoubleClickCapture as any,
           style: {
             // A person may have dragged this entry's bottom edge: then it keeps that height and
             // its neighbours share the rest. Otherwise every entry shares equally.

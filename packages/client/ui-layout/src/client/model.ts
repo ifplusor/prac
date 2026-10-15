@@ -1214,6 +1214,38 @@ export function redistributeOnDrag(
  * @param target - the height it is being dragged to.
  * @returns the entry below that should fold, if the drag has run out of room.
  */
+/**
+ * What a **double-click on a boundary** does: even out the two rows it separates.
+ *
+ * Upstream's `SplitView` fires `onDidReset` for the sash (`splitview.ts:1186`) and names the row it
+ * would work with by looking outward for the first **snap** view, skipping folded ones
+ * (`findFirstSnapIndex`, `:1454-1461`). It then refuses outright when that row is hidden
+ * (`:1193-1199`) — a folded row is a header and has no height to even out. This keeps the same
+ * shape: find the nearest row above and the nearest row below that are **both unfolded**, and give
+ * the pair the same height (their average, never under the floor). Anything else resets nothing.
+ *
+ * @param entries - the stack's rows, in visual order, with the heights they are drawn at.
+ * @param viewId - the row whose bottom edge was double-clicked.
+ * @returns the new heights for the pair, or an empty list when there is nothing to even out.
+ */
+export function resetStackBoundary(
+  entries: readonly { viewId: string; height: number; folded: boolean }[],
+  viewId: string,
+): { viewId: string; height: number }[] {
+  const at = entries.findIndex((entry) => entry.viewId === viewId);
+  if (at < 0) return [];
+  // Upstream searches outward **from the boundary's own row** (`range(index, -1)` / `range(index+1,…)`,
+  // `:1187-1188`) and only refuses when a whole side is folded (`:1193-1199`).
+  const above = entries.slice(0, at + 1).findLast((entry) => !entry.folded);
+  const below = entries.slice(at + 1).find((entry) => !entry.folded);
+  if (above === undefined || below === undefined) return [];
+  const even = Math.max(MIN_ENTRY, Math.round((above.height + below.height) / 2));
+  return [
+    { viewId: above.viewId, height: even },
+    { viewId: below.viewId, height: even },
+  ];
+}
+
 export function dragChainTarget(
   entries: readonly { viewId: string; height: number; folded: boolean }[],
   viewId: string,

@@ -20,6 +20,7 @@ import {
   redistributeOnDrag,
   setViewCollapsed,
   moveViewInRegion,
+  resetStackBoundary,
   visibleViews,
 } from "./model.js";
 
@@ -359,5 +360,42 @@ describe("moveViewInRegion (Grid.moveView within one parent, grid.ts:480-495)", 
     const moved = moveViewInRegion(sized, "b", "a", "up");
     expect(moved.views.b?.size).toBe(300);
     expect(moved.views.b?.collapsed).toBe(true);
+  });
+});
+
+describe("resetStackBoundary (SplitView's sash reset, splitview.ts:1186)", () => {
+  const rows = (...spec: [number, boolean][]) =>
+    spec.map(([height, folded], index) => ({ viewId: `v${index}`, height, folded }));
+
+  it("evens out the nearest rows above and below", () => {
+    const reset = resetStackBoundary(rows([300, false], [100, false], [200, false]), "v0");
+    expect(reset).toEqual([
+      { viewId: "v0", height: 200 },
+      { viewId: "v1", height: 200 },
+    ]);
+  });
+
+  it("looks past folded rows for the pair, and refuses when a whole side is folded", () => {
+    // The boundary at v1's bottom edge: v1 itself is folded, so the pair is v0 with v2.
+    expect(resetStackBoundary(rows([100, false], [50, true], [300, false]), "v1")).toEqual([
+      { viewId: "v0", height: 200 },
+      { viewId: "v2", height: 200 },
+    ]);
+    // Every row above the boundary is folded: nothing to even out with (upstream returns early).
+    expect(resetStackBoundary(rows([50, true], [50, true], [300, false]), "v1")).toEqual([]);
+    // Every row below it is folded.
+    expect(resetStackBoundary(rows([300, false], [50, true], [50, true]), "v0")).toEqual([]);
+  });
+
+  it("never evens a pair below the floor", () => {
+    const reset = resetStackBoundary(rows([10, false], [10, false]), "v0");
+    expect(reset).toEqual([
+      { viewId: "v0", height: 48 },
+      { viewId: "v1", height: 48 },
+    ]);
+  });
+
+  it("does nothing for a row that is not in the stack", () => {
+    expect(resetStackBoundary(rows([100, false], [100, false]), "nope")).toEqual([]);
   });
 });
