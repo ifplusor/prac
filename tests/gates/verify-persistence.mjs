@@ -88,7 +88,18 @@ async function sample() {
         ].map((element) => ({
           view: element.getAttribute("data-prac-stack-entry"),
           collapsed: element.getAttribute("data-prac-stack-collapsed"),
+          // What it is drawn at, next to what the layout holds (below): the two disagreeing is
+          // what the write-back experiment has to be judged on.
+          height: Math.round(element.getBoundingClientRect().height),
         })),
+        sizes: Object.fromEntries(
+          Object.entries(state?.views ?? {})
+            .filter(([, view]) => view?.size !== undefined || view?.collapsed === true)
+            .map(([id, view]) => [
+              id.split(":").pop(),
+              `${view.size ?? "-"}${view.collapsed === true ? ",F" : ""}`,
+            ]),
+        ),
         left: box(`[data-prac-region="${left}"]`),
         // The **content**, not just the chrome: a container whose panes come back as
         // headers only renders every stack body at zero height, and the file tree it
