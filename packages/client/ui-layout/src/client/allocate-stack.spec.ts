@@ -12,7 +12,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { LayoutState } from "./contract.js";
 import {
-  HEADER_HEIGHT,
   MIN_ENTRY,
   allocateStack,
   dragChainTarget,
