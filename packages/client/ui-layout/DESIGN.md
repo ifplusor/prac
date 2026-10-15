@@ -160,11 +160,13 @@ allocateStack(views, state, measured, height) → Map<viewId, height>
 
 ---
 
-## 6. 服务、门面与插件
+## 6. 服务、接口与插件
 
 - **`store.ts`**：一个不可变状态单元 + 订阅集，引擎是 DSH 的 `client-store` 快照 store；键是**版次**（`STATE_KEY = "prac-layout/v1"`），引擎只按原位水合，所以换版次是一次**有意的全量重置**。store 不知道放置规则——那些是 `model.ts` 的纯函数。
-- **`services.ts`**：`createServices(store, …)` 在 store 与槽位注册表之上发布**三类消费者、三种形状**的面（见文件的模块注释）。它不注册别的插件，只发布面并返回清理函数。
-- **`index.ts`**：插件本体（`name = "prac-client-ui-layout"`，`inject = ["slots", "theme", "uiSession"]`）。它声明 frame 的槽位、发布面、跟随目录变化，并保持 DSH 那四个区域槽位的契约。**它发布的一切都是一个 `ctx.effect` 的清理函数**，卸载即回滚。
+> 中文说**接口**，代码里的标识符是 `Face`（`LayoutFace` / `PracLayoutFace`）——它是**给消费者的契约**，不是遮住内部的 facade。
+
+- **`services.ts`**：`createServices(store, …)` 在 store 与槽位注册表之上发布**三类消费者、三种形状**的接口（见文件的模块注释）。它不注册别的插件，只发布接口并返回清理函数。
+- **`index.ts`**：插件本体（`name = "prac-client-ui-layout"`，`inject = ["slots", "theme", "uiSession"]`）。它声明 frame 的槽位、发布接口、跟随目录变化，并保持 DSH 那四个区域槽位的契约。**它发布的一切都是一个 `ctx.effect` 的清理函数**，卸载即回滚。
 - **`catalogue.ts`**：视图目录——哪些 view id 存在、在哪里被声明。视图 id 是 `<source>:<name>`，"渲染在哪"来自目录，不来自 id 本身。
 
 ---
@@ -215,11 +217,11 @@ allocateStack(views, state, measured, height) → Map<viewId, height>
 | `model.ts`（1255）                                                           | 纯函数：树与尺寸（`resolveSizes` / `sashSizes` / `subtreeMin` / `setRegionSize` / `splitRegionWith` / `removeRegion` / `pruneEmbedderRegions`）、放置（`place` / `placeQuietly` / `removeView` / `selectChild` / `setFront`）、栈内（`allocateStack` / `redistributeOnDrag` / `dragSnapTarget` / `dragChainTarget` / `setViewCollapsed`） |
 | `frame.ts`（1228）                                                           | 渲染与交互：区域、选择、顺序、sash、条头与手柄、拖拽（捕获阶段 + 窗口级 move/up）                                                                                                                                                                                                                                                         |
 | `isolation.ts`（279）                                                        | 每视图一个影子根；框架 UI 镜像与原地重写；硬边界                                                                                                                                                                                                                                                                                          |
-| `services.ts`（401）                                                         | `createServices`：在 store 与槽位之上发布面                                                                                                                                                                                                                                                                                               |
+| `services.ts`（401）                                                         | `createServices`：在 store 与槽位之上发布接口                                                                                                                                                                                                                                                                                               |
 | `store.ts`（143）                                                            | 状态单元 + 订阅；`STATE_KEY`；DSH 快照引擎                                                                                                                                                                                                                                                                                                |
 | `catalogue.ts`（150）                                                        | 视图目录与 id 形状                                                                                                                                                                                                                                                                                                                        |
 | `theme.ts`（65）                                                             | `ThemePresenter`                                                                                                                                                                                                                                                                                                                          |
-| `index.ts`（179）                                                            | 插件本体：声明槽位、发布面、跟随目录                                                                                                                                                                                                                                                                                                      |
+| `index.ts`（179）                                                            | 插件本体：声明槽位、发布接口、跟随目录                                                                                                                                                                                                                                                                                                      |
 | `public.ts`（43）                                                            | 类型再导出（dts 面）                                                                                                                                                                                                                                                                                                                      |
 | `model.spec.ts`（599）/ `catalogue.spec.ts`（101）/ `allocate-stack.spec.ts` | 单测：几何与放置、目录、栈内分配与拖拽算术                                                                                                                                                                                                                                                                                                |
 
