@@ -200,40 +200,7 @@ prac 的框架声称「区域树、编排、层级、浮层」都归自己（`do
 
 组件级隔离一律用**隔离**（影子根 / 独立浏览上下文），不用"沙箱"——本仓"沙箱"只指 **agent 运行时的执行沙箱**。`docs/architecture.md` §3.1 已同步。
 
-## 提议：升级到 grid（G2，待裁）
-
-**要解决什么**：栈内高度有**两个权威**——视图记录里的 `size` 与渲染期分配器**画出来**的值——于是"屏幕 ≠ 状态"可以发生（现场见过"存 69 / 画 519"）。根因不是分配器写得不好，而是**栈里的条目不是布局的叶子**：`split` 的尺寸住在树里（一个权威），`stack` 的尺寸住在视图记录里（另一个权威）。
-
-**目标形状**：把状态对齐上游 `Grid` 的序列化形状（`ISerializedGrid = { root, orientation, width, height }`，节点是 `branch` / `leaf`）：
-
-| prac 现在 | 目标 | 说明 |
-| --- | --- | --- |
-| `SplitNode{dir, children[], size, flex?}` | `branch{orientation, data[], size}` | 同构，改的是**名与字段**而不是结构 |
-| `RegionNode{id, size, flex?, min, collapsed?, children?}` | `leaf{data: regionId, size, visible?, maximized?}` + 该视图的 `min`/`max`/`priority` | 区域仍是叶子；**min 有、max 缺**要补 |
-| 区域 `stack: true` + n 条视图 | 一个 `column` branch + n 个 leaf（**每条一个只住一个视图的 region**）| **这是这次改动的核心**：栈从"视图记录的关系"变成"树的结构" |
-| `ViewRecord.size`（栈内高度） | **删除**；高度只在 leaf 上 | 两个权威合一 |
-| `ViewRecord.collapsed` | `leaf.visible = false` + 该 leaf 的 `size/min = 标题高` | 折叠仍是"只剩标题"，但由树表达 |
-| `flex?: boolean` | `size` + `min`/`max` 与 `Sizing` 语义 | `flex` 现在是 prac 自造的概念，改用上游的"分配/扩展"两种 sizing |
-
-**语义要补（第二步）**：每个叶子 `min` + **`max`**（现在只有 min）；`priority`（中心 `LayoutPriority.High`：空间紧张时中心最后让位）；`Sizing`（`Distribute` 同轴重新分配 / `Expand` 只推邻居）；sash 的 **edge snap**（拖到边缘吸附/收起）；可选 `maximized`（一个 leaf 最大化）。
-
-**删除清单**：`allocateStack`（分配器）、`redistributeOnDrag`（拖动重分配）、`dragChainTarget`（折叠链）三者的**实现**随栈消失而删除；它们的**语义**保留，搬到边界上：sash 拖动 = `resizeView`；折叠 = `setViewVisible(leaf, false, DistributeSizing)`；"链式折叠"= 同一手势里连续 `setViewVisible`。
-
-**分步**：
-
-1. **栈 → 叶子**：`stack` 模式改为 `column` branch；状态迁移无需代码（`prac-layout/v1` 不换版次，旧数据由人清）；删三个函数；门与单测跟着改读数（"条目"变成"叶子"）。
-2. **补语义**：`max`、`priority`、`Sizing`（先做 `Distribute`）、中心 priority。
-3. **手势对齐**：sash 的 snap/edge collapse（复用现有 snap 的阈值与滞回），`setViewVisible` 的分配语义。
-4. **（可选，后续另裁）** 直接借用上游 `Grid` 作为引擎：那时模型已同形，替换成本小；代价是把 DOM 与几何交给上游 widget，isolation / frame / 门要重挂。
-
-**验收（每步都要能测）**：
-
-- 第 1 步：`verify:stack` 的三件事不变（一条裸渲染、两条成栈并折叠、折叠后展开回到原高）；`verify:persistence` 的"屏幕 = 状态"成立（`rows == sizes`，且刷新后一致）；单测里"栈内分配"的用例改为"树的尺寸分配"。
-- 第 2 步：新判据——同轴三块：拖一条边 ⇒ **三块按比例变**、任一块 **≥ min 且 ≤ max**、另一轴纹丝不动；中心 priority：窗口变小时**中心最后让位**。
-- 第 3 步：sash 拖到边缘 ⇒ 该块 `visible = false` 且空间按 `DistributeSizing` 分出去；拖回 ⇒ 恢复原尺寸；全程"别的块不乱动"。
-- 第 4 步：同第 1–3 步，但门要验证"隔离宿主挂在 grid 的 leaf 元素上"。
-
-**风险与代价**：一次模型重构（树、持久化、门、单测同时动）；`flex` 退场后要确认现有默认树（常驻区的比例、底栏固定高）都能用 `size/min/max` 表达；`visible` 与"空区域不渲染"的既有行为要对齐。
+> **下一步（另立一条 note）**：把布局的状态升级到上游 `Grid` 的形状（栈 → 叶子、补 `min`/`max`/`priority`/`Sizing`）——是**另一个工作**，见 [2026-10-15-ui-layout-grid.md](../proposed/2026-10-15-ui-layout-grid.md)。
 
 ## Related
 
