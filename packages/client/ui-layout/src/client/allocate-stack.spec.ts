@@ -429,21 +429,22 @@ describe("ensureStackShape (S2 step 1: a stack becomes a column split of one-vie
   it("turns a stack of two visible views into a column split of leaves, keeping the region's id", () => {
     const state = stateWith(region("left", 300, { stack: true }), {
       a: view("left", 0, { size: 120 }),
-      b: view("left", 1, { size: 80, collapsed: true, cachedSize: 80 }),
+      b: view("left", 1, { collapsed: true, cachedSize: 80 }),
+      c: view("left", 2),
     });
     const shaped = ensureStackShape(state);
     expect(shaped.tree).toMatchObject({ type: "split", id: "left", dir: "column", size: 300 });
-    const children = (
-      shaped.tree as { children: { id: string; size: number; collapsed: boolean }[] }
-    ).children;
-    expect(children.map((child) => [child.id, child.size, child.collapsed])).toEqual([
-      ["left/stack/a", 120, false],
-      ["left/stack/b", 80, true],
+    const children = (shaped.tree as unknown as { children: Record<string, unknown>[] }).children;
+    // a sized row keeps its height; a folded row is its header; a row nobody sized stays flexible
+    expect(children.map((child) => [child.id, child.size, child.collapsed, child.flex])).toEqual([
+      ["left/stack/a", 120, false, false],
+      ["left/stack/b", 20, true, false],
+      ["left/stack/c", 48, false, true],
     ]);
     // the height and the fold live in the tree now; the records do not carry them
     expect(shaped.views.a?.region).toBe("left/stack/a");
     expect(shaped.views.a?.size).toBeUndefined();
-    expect(shaped.views.b?.cachedSize).toBeUndefined();
+    expect(shaped.views.c?.size).toBeUndefined();
   });
 
   it("normalises to itself, and leaves one-view stacks and tabs regions alone", () => {

@@ -86,7 +86,9 @@ async function sample() {
         stack: [
           ...document.querySelectorAll(`[data-prac-region="${left}"] [data-prac-stack-entry]`),
         ].map((element) => ({
-          view: element.getAttribute("data-prac-stack-entry"),
+          view:
+            element.getAttribute("data-prac-stack-view") ??
+            element.getAttribute("data-prac-stack-entry"),
           collapsed: element.getAttribute("data-prac-stack-collapsed"),
           // What it is drawn at, next to what the layout holds (below): the two disagreeing is
           // what the write-back experiment has to be judged on.

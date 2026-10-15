@@ -250,7 +250,10 @@ export function createServices(
         // A container's children **stack** their views: that is what a container
         // is for — grouping views that share one strip of screen.
         const nodes = children.map((child) =>
-          regionNode(child.id, 0, { label: child.label, stack: true }),
+          regionNode(child.id, 0, {
+            label: child.label,
+            stack: true,
+          }),
         );
         const tree = setRegionChildren(state.tree, regionId, nodes, label);
         return tree === state.tree ? state : { ...state, tree };
@@ -259,7 +262,10 @@ export function createServices(
     /** The child regions a region selects among. */
     regionChildren(regionId: string): RegionChild[] {
       const node = findRegion(store.get().tree, regionId);
-      return (node?.children ?? []).map((child) => ({ id: child.id, label: child.label }));
+      return (node?.children ?? []).map((child) => ({
+        id: child.id,
+        label: child.type === "region" ? child.label : undefined,
+      }));
     },
     setFront(viewId: string): void {
       store.update((state) => setFront(state, viewId));

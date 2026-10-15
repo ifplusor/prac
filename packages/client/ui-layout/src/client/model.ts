@@ -66,7 +66,7 @@ function childNodes(node: LayoutNode): readonly LayoutNode[] {
  * @param state - current state.
  * @param node - the region to look into.
  */
-export function activeChild(state: LayoutState, node: RegionNode): RegionNode | null {
+export function activeChild(state: LayoutState, node: RegionNode): LayoutNode | null {
   const children = node.children;
   if (children === undefined || children.length === 0) return null;
   const chosen = children.find((child) => child.id === node.active);
@@ -237,7 +237,7 @@ export function setRegionSize(tree: LayoutNode, id: string, size: number): Layou
 export function setRegionChildren(
   tree: LayoutNode,
   id: string,
-  children: readonly RegionNode[],
+  children: readonly LayoutNode[],
   label?: string,
 ): LayoutNode {
   return updateRegion(tree, id, (node) => ({
@@ -616,12 +616,22 @@ export function ensureStackShape(state: LayoutState): LayoutState {
   /** One view's leaf: the id is derived, the height is the view's own, the fold moves over. */
   const leafFor = (regionId: string, viewId: string): RegionNode => {
     const view = state.views[viewId];
-    const leaf = regionNode(`${regionId}/stack/${viewId}`, view?.size ?? MIN_ENTRY, {
-      min: MIN_ENTRY,
-      entry: true,
-      ...(view?.collapsed === true ? { collapsed: true } : {}),
-      ...(view?.cachedSize !== undefined ? { cachedSize: view.cachedSize } : {}),
-    });
+    // A row nobody sized stays **flexible** so the rows keep sharing the height equally, the way a
+    // stack does before anyone touches it; a row that was sized keeps that height, and a folded one
+    // is its header.
+    const sized = view?.size;
+    const leaf = regionNode(
+      `${regionId}/stack/${viewId}`,
+      view?.collapsed === true ? HEADER_HEIGHT : (sized ?? MIN_ENTRY),
+      {
+        min: MIN_ENTRY,
+        entry: true,
+        flex: view?.collapsed === true ? false : sized === undefined,
+        ...(sized !== undefined && view?.collapsed !== true ? { size: sized } : {}),
+        ...(view?.collapsed === true ? { collapsed: true } : {}),
+        ...(view?.cachedSize !== undefined ? { cachedSize: view.cachedSize } : {}),
+      },
+    );
     const record = views[viewId];
     if (record !== undefined && record.region !== leaf.id) {
       // The height lives in the tree now; the record no longer carries one (G1: `tabs` has none).
@@ -711,8 +721,13 @@ export function setFront(state: LayoutState, viewId: string): LayoutState {
  * @param regionId - the region to inspect.
  */
 export function visibleViews(state: LayoutState, regionId: string): string[] {
+  // A stack's views live in its **rows** (the entry leaves a `column` split holds), so listing a
+  // region's views has to look through the split: the rest of the system still asks "which views
+  // are in this region" and must keep getting the same answer it always did.
+  const split = state.tree === undefined ? null : findSplit(state.tree, regionId);
+  const inRows = new Set(split === null ? [] : stackEntries(split).map((entry) => entry.id));
   return Object.entries(state.views)
-    .filter(([, view]) => view.region === regionId && !view.hidden)
+    .filter(([, view]) => !view.hidden && (view.region === regionId || inRows.has(view.region)))
     .sort((a, b) => a[1].order - b[1].order)
     .map(([id]) => id);
 }

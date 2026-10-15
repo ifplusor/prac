@@ -71,6 +71,8 @@ import {
   moveViewInRegion,
   resetStackBoundary,
   setEntryFolded,
+  moveEntry,
+  setEntryHeight,
 } from "./model.js";
 import { type LayoutStore, useLayout } from "./store.js";
 import type { LayoutState } from "./contract.js";
@@ -402,6 +404,25 @@ function readStackRows(
   }));
 }
 
+/**
+ * One in-flight drag of a boundary between two **stack rows** (entry leaves).
+ *
+ * The rows come from the DOM (`readStackRows`), the arithmetic is the stack's own
+ * (`dragSnapTarget` / `dragChainTarget` / `redistributeOnDrag`), and the writes go into the tree —
+ * a row's height is its region's `size`, so the drawn height and the stored height are one number.
+ */
+interface EntryDragState {
+  pointerId: number;
+  draggedId: string;
+  container: NonNullable<StackContainer>;
+  rows: { viewId: string; height: number; folded: boolean }[];
+  peers: { viewId: string; height: number; folded: boolean }[];
+  startRows: { viewId: string; height: number }[];
+  start: number;
+  origin: number;
+  limit: number;
+}
+
 /** One in-flight sash drag. */
 interface DragState {
   pointerId: number;
@@ -437,6 +458,7 @@ interface SashProps {
  */
 function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): ReactElement {
   const drag = useRef<DragState | null>(null);
+  const entry = useRef<EntryDragState | null>(null);
 
   const onPointerDown = (event: PointerDragEvent): void => {
     if (event.button !== 0) return;
@@ -447,6 +469,31 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
     if (!split || !a || !b || a.collapsed || b.collapsed) return;
     const element = event.currentTarget;
     const container = element.parentElement;
+    if (a.entry === true && b.entry === true && container !== null) {
+      // Between two stack rows the boundary is the stack's own: floors, snap and the folding chain
+      // are the stack's semantics (B/C/D), not the generic two-region resize.
+      const rows = readStackRows(container as unknown as StackContainer);
+      const index = rows.findIndex((row) => row.viewId === a.id);
+      if (index < 0) return;
+      const below = rows.slice(index + 1);
+      const origin = event.clientY;
+      entry.current = {
+        pointerId: event.pointerId,
+        draggedId: a.id,
+        container,
+        rows,
+        peers: rows.filter((row) => !row.folded),
+        startRows: rows.map((row) => ({ viewId: row.viewId, height: row.height })),
+        start: rows[index]?.height ?? MIN_ENTRY,
+        origin,
+        limit:
+          (rows[index]?.height ?? MIN_ENTRY) +
+          below.reduce((total, row) => total + Math.max(0, row.height - MIN_ENTRY), 0),
+      };
+      element.setPointerCapture(event.pointerId);
+      event.preventDefault();
+      return;
+    }
     const extent = dir === "row" ? container!.clientWidth : container!.clientHeight;
     const present = split.children.filter((child) => isPresent(state, child));
     const sashes = Math.max(0, present.length - 1) * SASH_SIZE;
@@ -467,6 +514,61 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
   };
 
   const onPointerMove = (event: PointerDragEvent): void => {
+    const stackDrag = entry.current;
+    if (stackDrag !== null && stackDrag.pointerId === event.pointerId) {
+      event.preventDefault();
+      const pointerDelta = event.clientY - stackDrag.origin;
+      const snap =
+        dragSnapTarget(stackDrag.rows, stackDrag.draggedId, pointerDelta) ??
+        ((): { viewId: string; collapsed: boolean } | undefined => {
+          const chain = dragChainTarget(
+            stackDrag.rows,
+            stackDrag.draggedId,
+            Math.round(stackDrag.start + pointerDelta),
+          );
+          return chain === undefined ? undefined : { viewId: chain, collapsed: true };
+        })();
+      if (snap !== undefined) {
+        // Fold it, remembering the height the row had when the **drag began** (upstream hands
+        // `setVisible` the size captured at drag start), then re-read and re-anchor the band.
+        const atStart = stackDrag.startRows.find((row) => row.viewId === snap.viewId)?.height;
+        store.update((state) =>
+          setEntryFolded(state, snap.viewId, snap.collapsed, atStart ?? MIN_ENTRY),
+        );
+        const rows = readStackRows(stackDrag.container as unknown as StackContainer).filter(
+          (row) => !row.folded && !(snap.collapsed && row.viewId === snap.viewId),
+        );
+        stackDrag.rows = rows;
+        stackDrag.peers = rows;
+        requestAnimationFrame(() => {
+          if (entry.current !== stackDrag) return;
+          const settled = readStackRows(stackDrag.container as unknown as StackContainer);
+          stackDrag.rows = settled;
+          stackDrag.peers = settled.filter((row) => !row.folded);
+        });
+        stackDrag.start =
+          rows.find((row) => row.viewId === stackDrag.draggedId)?.height ?? stackDrag.start;
+        stackDrag.origin = event.clientY;
+        const below = stackDrag.peers.slice(
+          stackDrag.peers.findIndex((peer) => peer.viewId === stackDrag.draggedId) + 1,
+        );
+        stackDrag.limit = Math.max(
+          MIN_ENTRY,
+          stackDrag.start +
+            below.reduce((total, peer) => total + Math.max(0, peer.height - MIN_ENTRY), 0),
+        );
+        return;
+      }
+      const wanted = Math.round(stackDrag.start + pointerDelta);
+      const target = Math.max(MIN_ENTRY, Math.min(stackDrag.limit, wanted));
+      const sizes = redistributeOnDrag(stackDrag.rows, stackDrag.draggedId, target);
+      store.update((state) => {
+        let next = state;
+        for (const [id, height] of sizes) next = setEntryHeight(next, id, height);
+        return next;
+      });
+      return;
+    }
     const current = drag.current;
     if (!current || current.pointerId !== event.pointerId) return;
     event.preventDefault();
@@ -482,6 +584,13 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
   };
 
   const onPointerUp = (event: PointerDragEvent): void => {
+    if (entry.current !== null && entry.current.pointerId === event.pointerId) {
+      entry.current = null;
+      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      return;
+    }
     const current = drag.current;
     if (!current) return;
     drag.current = null;
@@ -490,8 +599,27 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
     }
   };
 
+  const onDoubleClick = (): void => {
+    const state = store.get();
+    const a = findRegion(state.tree, leftId);
+    const b = findRegion(state.tree, rightId);
+    if (a?.entry !== true || b?.entry !== true) return;
+    // A row's parent element is the split's container, which is what `readStackRows` walks.
+    const container = document.querySelector(
+      `[data-prac-region="${CSS.escape(leftId)}"]`,
+    )?.parentElement;
+    if (container === null || container === undefined) return;
+    const reset = resetStackBoundary(readStackRows(container as unknown as StackContainer), leftId);
+    store.update((next) => {
+      let out = next;
+      for (const { viewId, height } of reset) out = setEntryHeight(out, viewId, height);
+      return out;
+    });
+  };
+
   return createElement("div", {
     "data-prac-sash": `${splitId}:${index}`,
+    onDoubleClick,
     "data-prac-sash-dir": dir,
     "data-prac-sash-left": leftId,
     "data-prac-sash-right": rightId,
@@ -533,7 +661,13 @@ export function ensureStyles(): void {
  * @param dir - the parent split's axis (the axis the minimum belongs on).
  */
 function regionStyle(node: RegionNode, dir: Dir, fill = false): StyleObject {
-  if (node.collapsed) return { flex: "0 0 0px", minWidth: 0, minHeight: 0, overflow: "hidden" };
+  if (node.collapsed) {
+    // A folded stack row is **only its header** — a row that vanished entirely would lose the fold
+    // switch that opens it again (design B4/D1).
+    if (node.entry === true)
+      return { flex: `0 0 ${HEADER_HEIGHT}px`, minWidth: 0, minHeight: 0, overflow: "hidden" };
+    return { flex: "0 0 0px", minWidth: 0, minHeight: 0, overflow: "hidden" };
+  }
   // The minimum is expressed on the split's own axis: a flex region with
   // `min-width: 0` can be squeezed to nothing by its siblings.
   const minimum = {
@@ -688,9 +822,13 @@ export function createFrame(
      * entry stays where it was. The dragged entry keeps its height and fold state — only `order`
      * changes — and this path never folds anything (`setViewCollapsed` is not involved).
      */
-    const beginReorder = (down: PointerDragEvent, viewId: string): void => {
-      const container = (down.currentTarget as HTMLElement).parentElement;
-      if (container === null) return;
+    const beginReorder = (
+      down: PointerDragEvent,
+      viewId: string,
+      containerIn?: HTMLElement | null,
+    ): void => {
+      const container = containerIn ?? (down.currentTarget as HTMLElement).parentElement;
+      if (container === null || container === undefined) return;
       const line = document.createElement("div");
       line.setAttribute("data-prac-stack-drop", viewId);
       Object.assign(line.style, {
@@ -769,13 +907,22 @@ export function createFrame(
             (row) => row.viewId === viewId,
           )?.height;
           store.update((state) =>
-            setViewCollapsed(state, viewId, state.views[viewId]?.collapsed !== true, height),
+            findRegion(state.tree, viewId)?.entry === true
+              ? setEntryFolded(
+                  state,
+                  viewId,
+                  findRegion(state.tree, viewId)?.collapsed !== true,
+                  height,
+                )
+              : setViewCollapsed(state, viewId, state.views[viewId]?.collapsed !== true, height),
           );
           return;
         }
         if (target === null || target.reference === viewId) return;
         store.update((state) =>
-          moveViewInRegion(state, viewId, target.reference, target.direction),
+          findRegion(state.tree, viewId)?.entry === true
+            ? moveEntry(state, viewId, target.reference, target.direction)
+            : moveViewInRegion(state, viewId, target.reference, target.direction),
         );
       };
       window.addEventListener("pointermove", move);
@@ -1249,7 +1396,7 @@ export function createFrame(
                 }),
               style: { ...TAB_STYLE, ...(child.id === activeId ? TAB_ACTIVE_STYLE : {}) },
             },
-            child.label ?? viewLabel(child.id),
+            (child.type === "region" ? child.label : undefined) ?? viewLabel(child.id),
           ),
         ),
       );
@@ -1306,6 +1453,11 @@ export function createFrame(
           "span",
           {
             "data-prac-stack-title": node.id,
+            onPointerDownCapture: (event: PointerDragEvent) => {
+              if (event.button !== 0) return;
+              const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
+              beginReorder(event, node.id, row?.parentElement ?? null);
+            },
             style: {
               flex: "1 1 auto",
               cursor: "pointer",
@@ -1331,7 +1483,8 @@ export function createFrame(
           },
           [
             (node.children?.length ?? 0) > 1 ? containerBar(node, child.id) : null,
-            renderRegion(child, dir, true),
+            // The chosen child may be a split (a stack took a region's place in this list).
+            child.type === "split" ? renderNode(child, dir) : renderRegion(child, dir, true),
           ],
         );
       }
@@ -1342,12 +1495,40 @@ export function createFrame(
         {
           key: node.id,
           "data-prac-region": node.id,
+          // A stack row is a region too: carry the entry markers so the frame's DOM-based helpers
+          // (`readStackRows`, the reorder gesture, the gates) see a row where they expect one.
+          ...(node.entry === true
+            ? {
+                // The frame's own helpers key on the **region**; readers that need to know which
+                // view a row shows read `data-prac-stack-view`.
+                "data-prac-stack-entry": node.id,
+                "data-prac-stack-view": views[0] ?? "",
+                "data-prac-stack-collapsed": node.collapsed === true ? "true" : "false",
+              }
+            : {}),
           style: regionStyle(node, dir, fill),
         },
         showsTabStrip(state, node)
           ? [tabStrip(views, node.id), viewBody(frontView(state, node.id) ?? views[0] ?? "", box)]
           : node.entry === true && views.length === 1
-            ? [entryHeader(node, views[0] ?? ""), viewBody(views[0] ?? "", box)]
+            ? [
+                entryHeader(node, views[0] ?? ""),
+                createElement(
+                  "div",
+                  {
+                    "data-prac-stack-body": node.id,
+                    style: {
+                      display: "flex",
+                      flexDirection: "column",
+                      flex: "1 1 auto",
+                      minHeight: 0,
+                      position: "relative",
+                      overflow: "hidden",
+                    },
+                  },
+                  viewBody(views[0] ?? "", box),
+                ),
+              ]
             : stacked
               ? (() => {
                   // A plain stack shares the height through flex; once something is folded or sized

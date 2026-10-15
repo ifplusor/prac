@@ -123,7 +123,14 @@ export interface RegionNode {
    * borrowed **container** is: a named child region, selected among its sibling
    * containers. A region with no children holds views, as before.
    */
-  readonly children?: readonly RegionNode[];
+  /**
+   * The regions this one chooses between (one at a time, `active` names the chosen one).
+   *
+   * A child may also be a **split**: a stack turns the region that held its views into a `column`
+   * split (`ensureStackShape`), and that split takes the region's place in its parent's list. The
+   * parent still chooses by id (`active`), so it does not care what kind of subtree it chose.
+   */
+  readonly children?: readonly LayoutNode[];
   /**
    * Which child is shown, by id.
    *
