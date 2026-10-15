@@ -1206,17 +1206,29 @@ export function setViewCollapsed(
 ): LayoutState {
   const view = state.views[viewId];
   if (view === undefined || view.collapsed === collapsed) return state;
-  let size = view.size;
-  if (size === undefined && measuredHeight !== undefined && measuredHeight >= MIN_ENTRY) {
-    // The height it has right now is the height it comes back at — folding and unfolding alike
-    // (upstream hands `setVisible` the size captured when the drag began, `splitview.ts:946`).
-    size = Math.round(measuredHeight);
+  if (collapsed) {
+    // Folding writes the height into its **own** field; the entry's `size` stops being a height
+    // (VS Code: `_cachedVisibleSize = size; size = 0`, `splitview.ts:237-238`). The frame's toggle
+    // hands over the measured height; a drag hands over the size captured when the drag began.
+    const remembered = measuredHeight ?? view.size ?? view.cachedSize;
+    const cachedSize = remembered === undefined ? undefined : Math.round(remembered);
+    return {
+      ...state,
+      views: { ...state.views, [viewId]: { ...view, collapsed, size: undefined, cachedSize } },
+    };
   }
-  if (!collapsed && size !== undefined && size < MIN_ENTRY) {
-    // Unfolding has to give a body back: a header-sized leftover would leave the entry stuck.
-    size = undefined;
-  }
-  return { ...state, views: { ...state.views, [viewId]: { ...view, collapsed, size } } };
+  // Unfolding goes back to the remembered height, **lifted to the floor** rather than dropped
+  // (`clamp(cached, view.min, view.max)`, `splitview.ts:234`): a header-sized leftover would leave
+  // the row stuck. Upstream reads **only** the memory here — the `size` argument of `setVisible` is
+  // for the hide branch (`:237`), never for showing (`:234` reads `_cachedVisibleSize` alone). So a
+  // row with no memory shares the height again instead of opening at whatever it currently measures,
+  // which while folded is the header.
+  const size =
+    view.cachedSize === undefined ? undefined : Math.max(MIN_ENTRY, Math.round(view.cachedSize));
+  return {
+    ...state,
+    views: { ...state.views, [viewId]: { ...view, collapsed, size, cachedSize: undefined } },
+  };
 }
 
 /** How close to gone an entry must be before a drag folds it: half its floor, as upstream snaps at

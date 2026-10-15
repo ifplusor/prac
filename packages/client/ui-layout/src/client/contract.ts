@@ -164,13 +164,20 @@ export type LayoutNode = RegionNode | SplitNode;
 /** Where one view sits, and in what order inside its region. */
 export interface ViewRecord {
   /**
-   * The height this view's entry takes in a **stack**, once a person has dragged its bottom
-   * edge. Absent means "share the height with the other entries", which is the default and what
-   * a stack looks like before anyone touches it. The frame writes it, the store persists it with
-   * the rest of the layout.
+   * The height this view's entry takes in a **stack**, once a person has dragged its bottom edge.
+   * Absent means "share the height with the other entries". While the entry is **folded** this is
+   * not a height at all: a folded row is a header, and what it remembers lives in `cachedSize`
+   * (VS Code keeps `size` and `_cachedVisibleSize` apart, `splitview.ts:221-246`).
    */
-  /** The height this view was left at (its own, unless it is folded). */
   size?: number;
+  /**
+   * The height a **folded** row remembers, so unfolding puts it back where it was.
+   *
+   * Upstream's `_cachedVisibleSize`: written when the row hides (`splitview.ts:237`), read back
+   * through `clamp(cached, view.min, view.max)` when it shows again (`:234`), and carried in the
+   * serialized state (`:273-277`).
+   */
+  cachedSize?: number;
   /**
    * This view's ceiling in a stack, if it declares one.
    *

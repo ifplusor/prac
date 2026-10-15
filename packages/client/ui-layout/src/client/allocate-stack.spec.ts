@@ -25,7 +25,7 @@ const HEIGHT = 734;
 
 /** A state with just the view records `allocateStack` reads. */
 const stateOf = (
-  views: Record<string, { size?: number; collapsed?: boolean; max?: number }>,
+  views: Record<string, { size?: number; collapsed?: boolean; max?: number; cachedSize?: number }>,
 ): LayoutState => ({ views }) as unknown as LayoutState;
 
 const heights = (views: readonly string[], drawn: ReadonlyMap<string, number>): number[] =>
@@ -187,34 +187,46 @@ describe("redistributeOnDrag (SplitView.resize, splitview.ts:1308-1325)", () => 
   });
 });
 describe("setViewCollapsed (SplitView.setVisible's cached size, splitview.ts:228)", () => {
-  it("remembers what an unsized entry was drawn at when it folds", () => {
+  it("remembers what an unsized entry was drawn at, in its own field", () => {
     const state = stateOf({ a: {}, b: {} });
     const folded = setViewCollapsed(state, "a", true, 173);
     expect(folded.views.a?.collapsed).toBe(true);
-    expect(folded.views.a?.size).toBe(173);
-    expect(setViewCollapsed(folded, "a", false, 20).views.a?.size).toBe(173);
+    // A folded row is a header: `size` is not its height any more, the memory is separate.
+    expect(folded.views.a?.size).toBeUndefined();
+    expect(folded.views.a?.cachedSize).toBe(173);
+    const opened = setViewCollapsed(folded, "a", false, 20);
+    expect(opened.views.a?.size).toBe(173);
+    expect(opened.views.a?.cachedSize).toBeUndefined();
   });
 
-  it("keeps a size somebody dragged, whatever the measurement says", () => {
-    const folded = setViewCollapsed(stateOf({ a: { size: 300 } }), "a", true, 173);
-    expect(folded.views.a?.size).toBe(300);
+  it("remembers what the caller hands over, and falls back to the size it already had", () => {
+    // The caller's value wins (SplitView: `_cachedVisibleSize = typeof size === 'number' ? size : this.size`).
+    const told = setViewCollapsed(stateOf({ a: { size: 300 } }), "a", true, 173);
+    expect(told.views.a?.cachedSize).toBe(173);
+    expect(told.views.a?.size).toBeUndefined();
+    // With nothing handed over, the height it already held is what it remembers.
+    const fellBack = setViewCollapsed(stateOf({ a: { size: 300 } }), "a", true);
+    expect(fellBack.views.a?.cachedSize).toBe(300);
+    expect(fellBack.views.a?.size).toBeUndefined();
   });
 
-  it("unfolds at the height it is measured at when nothing was remembered", () => {
+  it("shares the height again when nothing was remembered", () => {
+    // Showing reads the memory alone (splitview.ts:234); the measurement a folded row reports is its
+    // header, so opening at that would leave a body of a few pixels.
     const opened = setViewCollapsed(stateOf({ a: { collapsed: true } }), "a", false, 147);
-    expect(opened.views.a?.size).toBe(147);
+    expect(opened.views.a?.size).toBeUndefined();
   });
 
-  it("drops a header-sized leftover when unfolding, and invents nothing without a measurement", () => {
-    const leftover = setViewCollapsed(
-      stateOf({ a: { size: 18, collapsed: true } }),
+  it("lifts a header-sized memory to the floor when unfolding, and invents nothing without one", () => {
+    const lifted = setViewCollapsed(
+      stateOf({ a: { cachedSize: 18, collapsed: true } }),
       "a",
       false,
-      18,
     );
-    expect(leftover.views.a?.size).toBeUndefined();
+    expect(lifted.views.a?.size).toBe(48);
     const unmeasured = setViewCollapsed(stateOf({ a: {} }), "a", true);
     expect(unmeasured.views.a?.size).toBeUndefined();
+    expect(unmeasured.views.a?.cachedSize).toBeUndefined();
   });
 });
 
