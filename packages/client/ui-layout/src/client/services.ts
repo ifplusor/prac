@@ -40,6 +40,7 @@ import type { RegionInfo, ViewInfo } from "./catalogue.js";
 import {
   ensureView,
   findRegion,
+  findNode,
   freshNodeId,
   regionInDirection as findRegionInDirection,
   firstRegionId,
@@ -48,14 +49,17 @@ import {
   placeQuietly,
   regionInfos,
   pruneEmbedderRegions,
+  ensureStackShape,
   removeRegion as removeRegionFromTree,
   removeView,
   regionNode,
   setCollapsed,
+  setViewCollapsed,
   setFront,
   setRegionChildren,
   setRegionSize,
   splitRegionWith,
+  structuralRegion,
 } from "./model.js";
 import type { LayoutStore } from "./store.js";
 
@@ -89,6 +93,13 @@ export function createServices(
   // The frame's own housekeeping at load: the regions the embedder created and left empty are
   // leftovers of a session whose files are gone, and nothing on screen can close them (see
   // `pruneEmbedderRegions`). Idempotent, and it runs before the app places anything.
+  // Every write keeps the stack invariant: a region with two visible views **is** a column split of
+  // one-view rows. Hiding the last visible view, placing one, folding one — they all change the shape
+  // (a stack that falls back to one row melts, an empty leftover holds no space), so the normaliser
+  // runs on the way out of each change rather than only on placements.
+  const write = store.update.bind(store);
+  store.update = (change: Parameters<typeof store.update>[0]) =>
+    write((state: LayoutState) => ensureStackShape(change(state)));
   store.update(pruneEmbedderRegions);
 
   /** The arrangement's role bindings (empty until it binds them). */
@@ -249,12 +260,17 @@ export function createServices(
       store.update((state) => {
         // A container's children **stack** their views: that is what a container
         // is for — grouping views that share one strip of screen.
-        const nodes = children.map((child) =>
-          regionNode(child.id, 0, {
+        const nodes = children.map((child) => {
+          // **Keep** a subtree that already exists under this id: it may be a `column` split (a stack
+          // that took the region's place), and rebuilding it as a fresh region would throw its rows
+          // away. The caller read the children, other placements happened, then it wrote.
+          const existing = findNode(state.tree, child.id);
+          if (existing !== null) return existing;
+          return regionNode(child.id, 0, {
             label: child.label,
             stack: true,
-          }),
-        );
+          });
+        });
         const tree = setRegionChildren(state.tree, regionId, nodes, label);
         return tree === state.tree ? state : { ...state, tree };
       });
@@ -284,10 +300,9 @@ export function createServices(
       });
     },
     setViewCollapsed(viewId: string, collapsed: boolean): void {
-      store.update((state) => {
-        const view = ensureView(state, viewId);
-        return { ...state, views: { ...state.views, [viewId]: { ...view, collapsed } } };
-      });
+      // Through the model: a view that lives in a stack **row** folds through its region, so writing
+      // the record here would leave the picture unchanged.
+      store.update((state) => setViewCollapsed(state, viewId, collapsed));
     },
     /** Collapse a region to nothing (remembering its size) or restore it. */
     setCollapsed(regionId: string, collapsed: boolean): void {
@@ -315,7 +330,15 @@ export function createServices(
         if (record === undefined) return state;
         const splitId = nextNodeId("split", state);
         const newRegionId = nextNodeId("region", state);
-        const next = splitRegionWith(state, record.region, side, splitId, newRegionId);
+        // Address the region the view's home **stands for**: if it lives in a stack row, splitting
+        // the row would put the new pane inside the stack.
+        const next = splitRegionWith(
+          state,
+          structuralRegion(state.tree, record.region),
+          side,
+          splitId,
+          newRegionId,
+        );
         if (next === state) return state;
         return place(next, viewId, newRegionId);
       });

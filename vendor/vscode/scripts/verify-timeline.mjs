@@ -102,7 +102,10 @@ const checks = {
   thePaneIsUpstreams: withAlpha.mounted && withAlpha.paneHeight > 20,
   theProviderAnswered: withAlpha.rows.length > 0,
   theRowNamesTheActiveFile: withAlpha.rows.some((row) => row.includes("prac-timeline-alpha.txt")),
-  itStaysInItsRegion: withAlpha.region === "left/container:workbench.view.explorer",
+  // The view may live in the region itself or in a **row** of the stack that took its place.
+  itStaysInItsRegion:
+    withAlpha.region === "left/container:workbench.view.explorer" ||
+    (withAlpha.region ?? "").startsWith("left/container:workbench.view.explorer/stack/"),
   itFollowsTheActiveFile:
     withDelta.rows.length > 0 &&
     withDelta.rows.some((row) => row.includes("prac-timeline-delta.txt")) &&

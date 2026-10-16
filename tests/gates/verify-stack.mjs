@@ -37,8 +37,12 @@ await page.waitForTimeout(1500);
 
 /** The region the default arrangement actually shows views in. */
 const REGION = await page.evaluate((outer) => {
-  const child = document.querySelector(`[data-prac-region="${outer}"] [data-prac-region]`);
-  return child?.getAttribute("data-prac-region") ?? outer;
+  // The child that shows views may be a plain region **or** a `column` split (a stack takes the
+  // region's place and keeps its id), so both kinds count.
+  const child = document.querySelector(
+    `[data-prac-region="${outer}"] > [data-prac-region], [data-prac-region="${outer}"] > [data-prac-split]`,
+  );
+  return child?.getAttribute("data-prac-region") ?? child?.getAttribute("data-prac-split") ?? outer;
 }, OUTER_REGION);
 
 /** The stack entries of the region, with their boxes and fold state. */
@@ -54,7 +58,11 @@ async function sample() {
         h: Math.round(rect.height),
       };
     };
-    const host = document.querySelector(`[data-prac-region="${region}"]`);
+    // The region that holds the rows may be a plain region or the `column` split that took its
+    // place (a stack), so both elements answer to the id.
+    const host =
+      document.querySelector(`[data-prac-region="${region}"]`) ??
+      document.querySelector(`[data-prac-split="${region}"]`);
     const bar = document.querySelector('[data-prac-container-bar="left"]');
     return {
       region: box(host),
@@ -86,7 +94,7 @@ await page.evaluate(({ region, view }) => globalThis.__pracLayout.place(view, re
   view: ADDED_VIEW,
 });
 await page.waitForSelector(
-  `[data-prac-region="${REGION}"] [data-prac-stack-entry="${ADDED_VIEW}"]`,
+  `[data-prac-region="${REGION}"] [data-prac-stack-entry="${ADDED_VIEW}"], [data-prac-split="${REGION}"] [data-prac-stack-entry="${ADDED_VIEW}"]`,
   { timeout: 60_000 },
 );
 await page.waitForTimeout(2000);

@@ -180,16 +180,27 @@ async function sample(page) {
       walk(state.tree);
       return {
         frame: box(globalThis.__deep.one("[data-prac-frame]")),
-        regions: [...globalThis.__deep.all("[data-prac-region]")].map((element) => ({
-          id: element.getAttribute("data-prac-region"),
-          ...box(element),
-        })),
+        // A region that holds two visible views is a `column` split carrying the same id, so the
+        // list of "regions on screen" has to count both kinds — otherwise a track that became a
+        // stack looks like it vanished and the pane a split just added cannot be told apart.
+        regions: [...globalThis.__deep.all("[data-prac-region], [data-prac-split]")].map(
+          (element) => ({
+            id: element.getAttribute("data-prac-region") ?? element.getAttribute("data-prac-split"),
+            split: element.hasAttribute("data-prac-split"),
+            ...box(element),
+          }),
+        ),
         host: host
           ? {
-              region:
-                globalThis.__deep
-                  .closest(host, "[data-prac-region]")
-                  ?.getAttribute("data-prac-region") ?? null,
+              // A view may sit in a stack **row**: the row's id is the region's id plus the view, so
+              // the region a person means is the part before `/stack/`.
+              region: (() => {
+                const id =
+                  globalThis.__deep
+                    .closest(host, "[data-prac-region]")
+                    ?.getAttribute("data-prac-region") ?? null;
+                return id === null ? null : id.split("/stack/")[0];
+              })(),
               box: box(host),
             }
           : null,
@@ -383,9 +394,13 @@ states.splitWhileOpen = await sample(page);
 // whole story (the container layer gives each track named children), so diff
 // against the sample taken just before the split.
 const knownBefore = new Set(states.movedBySelect.regions.map((region) => region.id));
+// The pane a split adds is a **region**: a split element may also be new here (the old region
+// becomes a `column` split that carries its id), and picking that one would name the source.
 const newRegion =
-  states.splitWhileOpen.regions.map((region) => region.id).find((id) => !knownBefore.has(id)) ??
-  null;
+  states.splitWhileOpen.regions
+    .filter((region) => region.split !== true)
+    .map((region) => region.id)
+    .find((id) => !knownBefore.has(id)) ?? null;
 if (!newRegion) throw new Error("分栏 did not create a new region");
 await toggleRecall(page);
 states.split = await sample(page);
@@ -507,7 +522,8 @@ const checks = {
   splitCreatedPane: !!newPane,
   splitPaneBesideSource: sideBySide(states.split.right, newPane),
   splitSourceKeptItsView:
-    states.split.modelViews[CONVERSATION_VIEW]?.region === "right" && states.split.hostCount === 1,
+    (states.split.modelViews[CONVERSATION_VIEW]?.region ?? "").split("/stack/")[0] === "right" &&
+    states.split.hostCount === 1,
   splitEditorPaintedInNewPane:
     painted(states.split.editorPaint) && states.split.host?.region === newRegion,
   splitSourcePanePainted: painted(states.sourcePanePaint),

@@ -271,6 +271,22 @@ export function selectChild(tree: LayoutNode, regionId: string, childId: string)
  * @param tree - the tree to update.
  * @param id - the region to reveal.
  */
+/**
+ * The node with this id, wherever it is — a region **or** a split.
+ *
+ * @param node - the subtree to search.
+ * @param id - the id to look for.
+ * @returns the node, or null when it is not in the tree.
+ */
+export function findNode(node: LayoutNode, id: string): LayoutNode | null {
+  if (node.id === id) return node;
+  for (const child of node.children ?? []) {
+    const hit = findNode(child, id);
+    if (hit !== null) return hit;
+  }
+  return null;
+}
+
 export function revealRegion(tree: LayoutNode, id: string): LayoutNode {
   const walk = (node: LayoutNode): LayoutNode => {
     if (node.type === "split") {
@@ -282,8 +298,10 @@ export function revealRegion(tree: LayoutNode, id: string): LayoutNode {
     const children = node.children;
     if (children === undefined || children.length === 0) return node;
     // A region's children are regions, so the walk stays in the region type.
-    const next = children.map((child) => walk(child) as RegionNode);
-    const target = next.find((child) => findRegion(child, id) !== null);
+    const next = children.map((child) => walk(child));
+    // A child may be a split (a stack took the region's place in this list), so ask "does this
+    // subtree hold the id" with `findNode` — `findRegion` answers a different question.
+    const target = next.find((child) => findNode(child, id) !== null);
     const changed = next.some((child, index) => child !== children[index]);
     if (target === undefined) return changed ? { ...node, children: next } : node;
     return { ...node, children: next, active: target.id };
@@ -361,7 +379,7 @@ export function place(state: LayoutState, viewId: string, regionId: string): Lay
   // reveal — routing may have put the view in a child of the region named.
   const landing = next.views[viewId]?.region ?? regionId;
   const tree = revealRegion(next.tree, landing);
-  return tree === next.tree ? next : { ...next, tree };
+  return ensureStackShape(tree === next.tree ? next : { ...next, tree });
 }
 
 /**
@@ -475,7 +493,8 @@ export function placeQuietly(state: LayoutState, viewId: string, regionId: strin
     }
   }
   views[viewId] = { ...view, region: landing.region, hidden: false, order, front: true };
-  return { ...state, tree: landing.tree, views };
+  // A placement is where a stack appears or changes shape: normalise on the way out.
+  return ensureStackShape({ ...state, tree: landing.tree, views });
 }
 
 /**
@@ -516,6 +535,14 @@ function landingRegion(
 ): { tree: LayoutNode; region: string } {
   const region = findRegion(tree, regionId);
   if (region?.children === undefined || region.children.length === 0) {
+    // The target may be a **stack**: a view already one of its rows belongs to that row. Without
+    // this a placement reads it as "not there yet" and re-rows it on every pass.
+    const stack = findSplit(tree, regionId);
+    const rows = stack === null ? [] : stackEntries(stack);
+    if (rows.length > 0) {
+      const home = rows.find((row) => row.id.endsWith(`/stack/${viewId}`));
+      return { tree, region: home?.id ?? regionId };
+    }
     return { tree, region: regionId };
   }
   const id = `${regionId}/${viewId}`;
@@ -622,7 +649,7 @@ export function ensureStackShape(state: LayoutState): LayoutState {
     const sized = view?.size;
     const leaf = regionNode(
       `${regionId}/stack/${viewId}`,
-      view?.collapsed === true ? HEADER_HEIGHT : (sized ?? MIN_ENTRY),
+      view?.collapsed === true ? HEADER_HEIGHT : (sized ?? 0),
       {
         min: MIN_ENTRY,
         entry: true,
@@ -642,18 +669,68 @@ export function ensureStackShape(state: LayoutState): LayoutState {
     return leaf;
   };
 
+  // Read the **working** map, not `state.views`: `leafFor` re-points a view at the leaf it just
+  // made, and a reader on the old map would see every fresh row as empty and melt it away.
   const visibleIn = (regionId: string): string[] =>
-    Object.entries(state.views)
+    Object.entries(views)
       .filter(([, view]) => view.region === regionId && !view.hidden)
       .sort((a, b) => a[1].order - b[1].order)
       .map(([id]) => id);
 
+  /** A one-row stack is a bare region again: the design shows a lone view without a header. */
+  const melt = (node: SplitNode, rows: RegionNode[], size: number, flex: boolean): LayoutNode => {
+    const kept = rows.find((row) => visibleIn(row.id).length > 0);
+    // Nothing left to show: the leftover must not hold space. A **flexible** region counts as present
+    // while empty (`isPresent`), which would leave an empty bottom bar on screen.
+    if (kept === undefined) {
+      return regionNode(node.id, size, { flex: false, min: MIN_ENTRY, stack: true });
+    }
+    const view = visibleIn(kept.id)[0];
+    if (view !== undefined) {
+      const record = views[view];
+      if (record !== undefined) {
+        views[view] = { ...record, region: node.id, collapsed: undefined, size: undefined };
+        changed = true;
+      }
+    }
+    return regionNode(node.id, size, {
+      flex,
+      min: MIN_ENTRY,
+      stack: true,
+      ...(kept.collapsed === true ? { collapsed: true } : {}),
+      ...(kept.cachedSize !== undefined ? { cachedSize: kept.cachedSize } : {}),
+    });
+  };
+
   const walk = (node: LayoutNode): LayoutNode => {
     if (node.type === "split") {
       const children = node.children.map(walk);
-      if (children.every((child, index) => child === node.children[index])) return node;
+      let shaped = children;
+      let dirty = !children.every((child, index) => child === node.children[index]);
+      // A stack split may have picked up a view directly (a container that had already become one is
+      // still addressed by its own id): such a view gets a row of its own. And a stack that falls
+      // back to fewer than two visible rows melts into a plain region.
+      if (stackEntries({ ...node, children: shaped }).length === shaped.length) {
+        const strays = visibleIn(node.id);
+        if (strays.length > 0) {
+          shaped = [
+            ...shaped,
+            ...strays.map((viewId) => leafFor(node.id, viewId) as unknown as LayoutNode),
+          ];
+          dirty = true;
+        }
+        const rows = shaped.filter(
+          (child): child is RegionNode => child.type === "region" && child.entry === true,
+        );
+        const shown = rows.filter((row) => visibleIn(row.id).length > 0);
+        if (shown.length < 2) {
+          changed = true;
+          return melt(node, shown.length > 0 ? shown : rows, node.size ?? 0, node.flex ?? true);
+        }
+      }
+      if (!dirty) return node;
       changed = true;
-      return { ...node, children };
+      return { ...node, children: shaped };
     }
     // A region can hold child regions (the container layer); shape those first.
     let region = node;
@@ -684,7 +761,40 @@ export function ensureStackShape(state: LayoutState): LayoutState {
     };
   };
 
-  const tree = walk(state.tree);
+  let tree = walk(state.tree);
+
+  // A record may still carry the height the layout used to keep there (the same persisted key was in
+  // use before rows held it): move it into the row, so an old state keeps the size and the fold it
+  // was saved with instead of quietly forgetting them.
+  for (const [viewId, record] of Object.entries(views)) {
+    if (
+      record.size === undefined &&
+      record.cachedSize === undefined &&
+      record.collapsed === undefined
+    ) {
+      continue;
+    }
+    const home = record.region === undefined ? null : findNode(tree, record.region);
+    if (home === null || home.type !== "region" || home.entry !== true) continue;
+    const folded = record.collapsed === true;
+    const from = record.size ?? record.cachedSize;
+    tree = updateRegion(tree, home.id, (entry) =>
+      folded
+        ? {
+            ...entry,
+            collapsed: true,
+            flex: false,
+            size: HEADER_HEIGHT,
+            cachedSize: from ?? entry.cachedSize ?? entry.size,
+          }
+        : from === undefined
+          ? entry
+          : { ...entry, collapsed: false, flex: false, size: from, cachedSize: from },
+    );
+    const { size: _size, cachedSize: _cached, ...rest } = record;
+    views[viewId] = { ...rest, collapsed: undefined };
+    changed = true;
+  }
   if (!changed) return state;
   return { ...state, tree, views };
 }
@@ -1069,8 +1179,11 @@ export function splitRegionWith(
   newRegionId: string,
   options?: { embedder?: boolean },
 ): LayoutState {
-  const node = findRegion(state.tree, regionId);
-  if (!node) return state;
+  // The id may name a **split** now (a stack takes the region's place), and splitting *it* is what a
+  // caller means: the new pane lands beside the whole stack, not between two of its rows.
+  const node = findNode(state.tree, regionId);
+  if (node === null) return state;
+  const tabs = node.type === "region" ? node.tabs : undefined;
   const { dir, before } = sideGeometry(side);
   const fresh = regionNode(newRegionId, 0, {
     flex: true,
@@ -1079,7 +1192,7 @@ export function splitRegionWith(
     // came from shows. The centre carries `tabs: "multiple"`, so a region split off it
     // has a tab strip for the views it holds — which is what a person expects of an
     // editor group they just created.
-    ...(node.tabs === undefined ? {} : { tabs: node.tabs }),
+    ...(tabs === undefined ? {} : { tabs }),
     // Only the embedder's own splits carry the mark: a region the app made for a **view** is
     // the app's shape and must survive being empty (its view may not be placed yet).
     ...(options?.embedder === true ? { embedder: true } : {}),
@@ -1369,6 +1482,23 @@ export function resetStackBoundary(
  * @param id - the child to find.
  * @returns the parent split, or null.
  */
+/**
+ * The region a view's home belongs to for **structure**.
+ *
+ * A stack row is a leaf that exists to hold one view; an operation that splits or moves a region
+ * addresses the region the row stands for — the split that took the region's id. Without this a
+ * "split beside me" lands *inside* the stack, between two rows.
+ *
+ * @param tree - the tree to look in.
+ * @param regionId - the view's region, possibly a row.
+ * @returns the region to address.
+ */
+export function structuralRegion(tree: LayoutNode, regionId: string): string {
+  const parent = findParentSplit(tree, regionId);
+  if (parent !== null && regionId.startsWith(`${parent.id}/stack/`)) return parent.id;
+  return regionId;
+}
+
 export function findParentSplit(node: LayoutNode, id: string): SplitNode | null {
   if (node.type !== "split") return null;
   if (node.children.some((child) => child.id === id)) return node;
@@ -1398,8 +1528,13 @@ export function stackEntries(node: LayoutNode): RegionNode[] {
 export function setEntryHeight(state: LayoutState, entryId: string, height: number): LayoutState {
   const size = Math.max(MIN_ENTRY, Math.round(height));
   const node = findRegion(state.tree, entryId);
-  if (node === null || node.size === size) return state;
-  return { ...state, tree: setRegionSize(state.tree, entryId, size) };
+  if (node === null || (node.size === size && node.flex !== true)) return state;
+  // A height a person dragged is a **fixed** height: a flexible row's element is `flex: 1 1 0` and
+  // ignores `size`, so writing the number alone would leave the picture unchanged.
+  return {
+    ...state,
+    tree: updateRegion(state.tree, entryId, (entry) => ({ ...entry, size, flex: false })),
+  };
 }
 
 /**
@@ -1568,6 +1703,10 @@ export function setViewCollapsed(
 ): LayoutState {
   const view = state.views[viewId];
   if (view === undefined || view.collapsed === collapsed) return state;
+  // A view that lives in a stack **row** folds through its region: that is where a row's height and
+  // fold live, so writing the record flag would draw nothing.
+  const home = view.region === undefined ? null : findRegion(state.tree, view.region);
+  if (home?.entry === true) return setEntryFolded(state, home.id, collapsed, measuredHeight);
   if (collapsed) {
     // Folding writes the height into its **own** field; the entry's `size` stops being a height
     // (VS Code: `_cachedVisibleSize = size; size = 0`, `splitview.ts:237-238`). The frame's toggle

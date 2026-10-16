@@ -436,11 +436,12 @@ describe("ensureStackShape (S2 step 1: a stack becomes a column split of one-vie
     const shaped = ensureStackShape(state);
     expect(shaped.tree).toMatchObject({ type: "split", id: "left", dir: "column", size: 300 });
     const children = (shaped.tree as unknown as { children: Record<string, unknown>[] }).children;
-    // a sized row keeps its height; a folded row is its header; a row nobody sized stays flexible
+    // A sized row keeps its height, a folded row is its header, and a row nobody sized carries **no
+    // height of its own** (0 + flexible): it shares whatever the others leave.
     expect(children.map((child) => [child.id, child.size, child.collapsed, child.flex])).toEqual([
       ["left/stack/a", 120, false, false],
       ["left/stack/b", 20, true, false],
-      ["left/stack/c", 48, false, true],
+      ["left/stack/c", 0, false, true],
     ]);
     // the height and the fold live in the tree now; the records do not carry them
     expect(shaped.views.a?.region).toBe("left/stack/a");

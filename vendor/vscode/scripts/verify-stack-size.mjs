@@ -37,6 +37,7 @@ const GREW_ENOUGH = 30;
 /** The floor the frame keeps for every entry that is not being dragged (`MIN_ENTRY`). */
 const FLOOR = 46;
 /** The frame's own floor for a stack entry. */
+const SASH_SIZE = 5;
 const MIN_ENTRY = 48;
 const browser = await chromium.launch();
 const consoleErrors = [];
@@ -56,8 +57,10 @@ const open = async () => {
   /** How many entries the stack is showing right now (0 = the container is not on screen). */
   const entryCount = () =>
     page.evaluate(() => {
+      // The explorer container may be a plain region or a `column` split: a stack takes the
+      // region's place in the tree, so the id can name either kind of element.
       const region = globalThis.__deep.one(
-        '[data-prac-region="left/container:workbench.view.explorer"]',
+        '[data-prac-region="left/container:workbench.view.explorer"], [data-prac-split="left/container:workbench.view.explorer"]',
       );
       return region?.querySelectorAll("[data-prac-stack-entry]").length ?? 0;
     });
@@ -110,17 +113,41 @@ const measure = (page) =>
     }));
     const last = entries.at(-1);
     const region = globalThis.__deep.one(
-      '[data-prac-region="left/container:workbench.view.explorer"]',
+      '[data-prac-region="left/container:workbench.view.explorer"], [data-prac-split="left/container:workbench.view.explorer"]',
     );
     return {
       stackHeight: region ? Math.round(region.getBoundingClientRect().height) : null,
       fileView: height(view),
       neighbour: height("vscode:view:outline"),
-      persisted: raw?.views?.[view]?.size ?? null,
+      persisted: (() => {
+        const walk = (n) => {
+          if (n.type === "region" && n.id.endsWith(`/stack/${view}`))
+            return n.flex === true ? null : (n.size ?? null);
+          for (const c of n.children ?? []) {
+            const hit = walk(c);
+            if (hit !== null && hit !== undefined) return hit;
+          }
+          return null;
+        };
+        return raw?.tree ? walk(raw.tree) : null;
+      })(),
       lastView: last?.view ?? null,
       lastHeight: last?.height ?? null,
       lastHandle: last?.handle ?? null,
-      lastPersisted: last?.view ? (raw?.views?.[last.view]?.size ?? null) : null,
+      lastPersisted: last?.view
+        ? (() => {
+            const walk = (n) => {
+              if (n.type === "region" && n.id.endsWith(`/stack/${last.view}`))
+                return n.flex === true ? null : (n.size ?? null);
+              for (const c of n.children ?? []) {
+                const hit = walk(c);
+                if (hit !== null && hit !== undefined) return hit;
+              }
+              return null;
+            };
+            return raw?.tree ? walk(raw.tree) : null;
+          })()
+        : null,
       entries,
     };
   }, FILE_VIEW);
@@ -251,7 +278,7 @@ const sized = await measure(seventh.page);
 // The full id: the measured list truncates names for readability.
 const bottomView = await seventh.page.evaluate(() => {
   const region = globalThis.__deep.one(
-    '[data-prac-region="left/container:workbench.view.explorer"]',
+    '[data-prac-region="left/container:workbench.view.explorer"], [data-prac-split="left/container:workbench.view.explorer"]',
   );
   return (
     [...(region?.querySelectorAll("[data-prac-stack-entry]") ?? [])]
@@ -270,7 +297,7 @@ await seventh.boot();
 await seventh.show();
 const foldedBottom = await seventh.page.evaluate((view) => {
   const region = globalThis.__deep.one(
-    '[data-prac-region="left/container:workbench.view.explorer"]',
+    '[data-prac-region="left/container:workbench.view.explorer"], [data-prac-split="left/container:workbench.view.explorer"]',
   );
   const nodes = [...(region?.querySelectorAll("[data-prac-stack-entry]") ?? [])];
   const last = nodes.at(-1)?.getBoundingClientRect();
@@ -303,8 +330,12 @@ const checks = {
   // had to be clamped and nothing is left over.
   theEntriesStillAddUpToTheStack:
     dragged.entries.length > 0 &&
+    // The rows plus the sashes between them fill the stack (the sashes are real elements now, the
+    // way upstream's split view counts them).
     Math.abs(
-      dragged.entries.reduce((total, entry) => total + entry.height, 0) - dragged.stackHeight,
+      dragged.entries.reduce((total, entry) => total + entry.height, 0) +
+        Math.max(0, dragged.entries.length - 1) * SASH_SIZE -
+        dragged.stackHeight,
     ) <= 8,
   // Dragging far past what the stack can give still leaves every other entry its floor.
   // Every other entry keeps its floor — and one the drag squeezed away folds instead (the snap),

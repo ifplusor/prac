@@ -46,6 +46,8 @@ import {
 } from "./contract.js";
 import { mountIsolated, releaseIsolated } from "./isolation.js";
 import {
+  stackEntries,
+  findParentSplit,
   activeChild,
   edgeRegion,
   findRegion,
@@ -398,7 +400,8 @@ function readStackRows(
   container: { querySelectorAll(selectors: string): readonly StackEntryNode[] } | null,
 ): { viewId: string; height: number; folded: boolean }[] {
   return [...(container?.querySelectorAll("[data-prac-stack-entry]") ?? [])].map((node) => ({
-    viewId: node.getAttribute("data-prac-stack-entry") ?? "",
+    viewId:
+      node.getAttribute("data-prac-stack-row") ?? node.getAttribute("data-prac-stack-entry") ?? "",
     height: Math.round(node.getBoundingClientRect().height),
     folded: node.getAttribute("data-prac-stack-collapsed") === "true",
   }));
@@ -414,13 +417,104 @@ function readStackRows(
 interface EntryDragState {
   pointerId: number;
   draggedId: string;
-  container: NonNullable<StackContainer>;
+  container: StackContainer;
   rows: { viewId: string; height: number; folded: boolean }[];
   peers: { viewId: string; height: number; folded: boolean }[];
   startRows: { viewId: string; height: number }[];
   start: number;
   origin: number;
   limit: number;
+}
+
+let rowDrag: EntryDragState | null = null;
+
+function startEntryDrag(
+  store: LayoutStore,
+  container: StackContainer,
+  rowId: string,
+  pointerId: number,
+  origin: number,
+  element: { setPointerCapture?(pointerId: number): void } | null,
+): void {
+  const rows = readStackRows(container);
+  const index = rows.findIndex((row) => row.viewId === rowId);
+  if (index < 0) return;
+  const below = rows.slice(index + 1);
+  const drag: EntryDragState = {
+    pointerId,
+    draggedId: rowId,
+    container,
+    rows,
+    peers: rows.filter((row) => !row.folded),
+    startRows: rows.map((row) => ({ viewId: row.viewId, height: row.height })),
+    start: rows[index]?.height ?? MIN_ENTRY,
+    origin,
+    limit:
+      (rows[index]?.height ?? MIN_ENTRY) +
+      below.reduce((total, row) => total + Math.max(0, row.height - MIN_ENTRY), 0),
+  };
+  rowDrag = drag;
+  const move = (moveEvent: PointerEvent): void => {
+    if (rowDrag !== drag || moveEvent.pointerId !== drag.pointerId) return;
+    moveEvent.preventDefault();
+    const pointerDelta = moveEvent.clientY - drag.origin;
+    const snap =
+      dragSnapTarget(drag.rows, drag.draggedId, pointerDelta) ??
+      ((): { viewId: string; collapsed: boolean } | undefined => {
+        const chain = dragChainTarget(
+          drag.rows,
+          drag.draggedId,
+          Math.round(drag.start + pointerDelta),
+        );
+        return chain === undefined ? undefined : { viewId: chain, collapsed: true };
+      })();
+    if (snap !== undefined) {
+      const atStart = drag.startRows.find((row) => row.viewId === snap.viewId)?.height;
+      store.update((state) =>
+        setEntryFolded(state, snap.viewId, snap.collapsed, atStart ?? MIN_ENTRY),
+      );
+      const rows = readStackRows(drag.container).filter(
+        (row) => !row.folded && !(snap.collapsed && row.viewId === snap.viewId),
+      );
+      drag.rows = rows;
+      drag.peers = rows;
+      requestAnimationFrame(() => {
+        if (rowDrag !== drag) return;
+        const settled = readStackRows(drag.container);
+        drag.rows = settled;
+        drag.peers = settled.filter((row) => !row.folded);
+      });
+      drag.start = rows.find((row) => row.viewId === drag.draggedId)?.height ?? drag.start;
+      drag.origin = moveEvent.clientY;
+      const below = drag.peers.slice(
+        drag.peers.findIndex((peer) => peer.viewId === drag.draggedId) + 1,
+      );
+      drag.limit = Math.max(
+        MIN_ENTRY,
+        drag.start + below.reduce((total, peer) => total + Math.max(0, peer.height - MIN_ENTRY), 0),
+      );
+      return;
+    }
+    const wanted = Math.round(drag.start + pointerDelta);
+    const target = Math.max(MIN_ENTRY, Math.min(drag.limit, wanted));
+    const sizes = redistributeOnDrag(drag.rows, drag.draggedId, target);
+    store.update((state) => {
+      let next = state;
+      for (const [id, height] of sizes) next = setEntryHeight(next, id, height);
+      return next;
+    });
+  };
+  const stop = (upEvent: PointerEvent): void => {
+    if (rowDrag !== drag || upEvent.pointerId !== drag.pointerId) return;
+    rowDrag = null;
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", stop);
+    window.removeEventListener("pointercancel", stop);
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", stop);
+  window.addEventListener("pointercancel", stop);
+  element?.setPointerCapture?.(pointerId);
 }
 
 /** One in-flight sash drag. */
@@ -458,7 +552,6 @@ interface SashProps {
  */
 function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): ReactElement {
   const drag = useRef<DragState | null>(null);
-  const entry = useRef<EntryDragState | null>(null);
 
   const onPointerDown = (event: PointerDragEvent): void => {
     if (event.button !== 0) return;
@@ -475,21 +568,14 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
       const rows = readStackRows(container as unknown as StackContainer);
       const index = rows.findIndex((row) => row.viewId === a.id);
       if (index < 0) return;
-      const below = rows.slice(index + 1);
-      const origin = event.clientY;
-      entry.current = {
-        pointerId: event.pointerId,
-        draggedId: a.id,
-        container,
-        rows,
-        peers: rows.filter((row) => !row.folded),
-        startRows: rows.map((row) => ({ viewId: row.viewId, height: row.height })),
-        start: rows[index]?.height ?? MIN_ENTRY,
-        origin,
-        limit:
-          (rows[index]?.height ?? MIN_ENTRY) +
-          below.reduce((total, row) => total + Math.max(0, row.height - MIN_ENTRY), 0),
-      };
+      startEntryDrag(
+        store,
+        container as unknown as StackContainer,
+        a.id,
+        event.pointerId,
+        event.clientY,
+        element,
+      );
       element.setPointerCapture(event.pointerId);
       event.preventDefault();
       return;
@@ -514,61 +600,6 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
   };
 
   const onPointerMove = (event: PointerDragEvent): void => {
-    const stackDrag = entry.current;
-    if (stackDrag !== null && stackDrag.pointerId === event.pointerId) {
-      event.preventDefault();
-      const pointerDelta = event.clientY - stackDrag.origin;
-      const snap =
-        dragSnapTarget(stackDrag.rows, stackDrag.draggedId, pointerDelta) ??
-        ((): { viewId: string; collapsed: boolean } | undefined => {
-          const chain = dragChainTarget(
-            stackDrag.rows,
-            stackDrag.draggedId,
-            Math.round(stackDrag.start + pointerDelta),
-          );
-          return chain === undefined ? undefined : { viewId: chain, collapsed: true };
-        })();
-      if (snap !== undefined) {
-        // Fold it, remembering the height the row had when the **drag began** (upstream hands
-        // `setVisible` the size captured at drag start), then re-read and re-anchor the band.
-        const atStart = stackDrag.startRows.find((row) => row.viewId === snap.viewId)?.height;
-        store.update((state) =>
-          setEntryFolded(state, snap.viewId, snap.collapsed, atStart ?? MIN_ENTRY),
-        );
-        const rows = readStackRows(stackDrag.container as unknown as StackContainer).filter(
-          (row) => !row.folded && !(snap.collapsed && row.viewId === snap.viewId),
-        );
-        stackDrag.rows = rows;
-        stackDrag.peers = rows;
-        requestAnimationFrame(() => {
-          if (entry.current !== stackDrag) return;
-          const settled = readStackRows(stackDrag.container as unknown as StackContainer);
-          stackDrag.rows = settled;
-          stackDrag.peers = settled.filter((row) => !row.folded);
-        });
-        stackDrag.start =
-          rows.find((row) => row.viewId === stackDrag.draggedId)?.height ?? stackDrag.start;
-        stackDrag.origin = event.clientY;
-        const below = stackDrag.peers.slice(
-          stackDrag.peers.findIndex((peer) => peer.viewId === stackDrag.draggedId) + 1,
-        );
-        stackDrag.limit = Math.max(
-          MIN_ENTRY,
-          stackDrag.start +
-            below.reduce((total, peer) => total + Math.max(0, peer.height - MIN_ENTRY), 0),
-        );
-        return;
-      }
-      const wanted = Math.round(stackDrag.start + pointerDelta);
-      const target = Math.max(MIN_ENTRY, Math.min(stackDrag.limit, wanted));
-      const sizes = redistributeOnDrag(stackDrag.rows, stackDrag.draggedId, target);
-      store.update((state) => {
-        let next = state;
-        for (const [id, height] of sizes) next = setEntryHeight(next, id, height);
-        return next;
-      });
-      return;
-    }
     const current = drag.current;
     if (!current || current.pointerId !== event.pointerId) return;
     event.preventDefault();
@@ -584,13 +615,6 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
   };
 
   const onPointerUp = (event: PointerDragEvent): void => {
-    if (entry.current !== null && entry.current.pointerId === event.pointerId) {
-      entry.current = null;
-      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
-      return;
-    }
     const current = drag.current;
     if (!current) return;
     drag.current = null;
@@ -691,10 +715,17 @@ function regionStyle(node: RegionNode, dir: Dir, fill = false): StyleObject {
  * @param node - the split to style.
  */
 function splitStyle(node: SplitNode): StyleObject {
+  // The basis is the region's, the way `regionStyle` computes it: a split that took a **fixed**
+  // region's place (a stack standing where the track was) has to keep that size, not take a share.
+  // A size of 0 means "no opinion" — the container layer builds its children that way — while a
+  // positive size with `flex: false` is a fixed extent the region carried over (the track a stack
+  // now stands in). Either way the split must not shrink a sized neighbour.
+  const basis =
+    node.flex === false && (node.size ?? 0) > 0 ? `0 0 ${node.size}px` : ("1 1 0" as const);
   return {
     display: "flex",
     flexDirection: node.dir === "row" ? "row" : "column",
-    flex: "1 1 0",
+    flex: basis,
     minWidth: 0,
     minHeight: 0,
     overflow: "hidden",
@@ -854,7 +885,10 @@ export function createFrame(
         [...container.querySelectorAll<HTMLElement>("[data-prac-stack-entry]")].map((element) => {
           const rect = element.getBoundingClientRect();
           return {
-            id: element.getAttribute("data-prac-stack-entry") ?? "",
+            id:
+              element.getAttribute("data-prac-stack-row") ??
+              element.getAttribute("data-prac-stack-entry") ??
+              "",
             element,
             top: rect.top,
             bottom: rect.bottom,
@@ -1107,7 +1141,10 @@ export function createFrame(
         const container = event.currentTarget.parentElement;
         const all = [...(container?.querySelectorAll("[data-prac-stack-entry]") ?? [])].map(
           (node) => ({
-            viewId: node.getAttribute("data-prac-stack-entry") ?? "",
+            viewId:
+              node.getAttribute("data-prac-stack-row") ??
+              node.getAttribute("data-prac-stack-entry") ??
+              "",
             height: Math.round(node.getBoundingClientRect().height),
             /** A folded entry is a header: it owns no height to give and must not be written to. */
             folded: node.getAttribute("data-prac-stack-collapsed") === "true",
@@ -1428,7 +1465,8 @@ export function createFrame(
           "button",
           {
             type: "button",
-            "data-prac-stack-toggle": node.id,
+            // Readers find a row's switch by the **view** it shows (the handler uses the region).
+            "data-prac-stack-toggle": viewId,
             "aria-expanded": node.collapsed === true ? "false" : "true",
             title: node.collapsed === true ? "Expand" : "Collapse",
             onClick: (event: ReactMouseEvent<HTMLElement>) => {
@@ -1499,10 +1537,58 @@ export function createFrame(
           // (`readStackRows`, the reorder gesture, the gates) see a row where they expect one.
           ...(node.entry === true
             ? {
-                // The frame's own helpers key on the **region**; readers that need to know which
-                // view a row shows read `data-prac-stack-view`.
-                "data-prac-stack-entry": node.id,
-                "data-prac-stack-view": views[0] ?? "",
+                // A row's bottom `SASH_SIZE` px is the boundary — the design says a row's bottom
+                // edge **is** it, and the frame draws a sash there as well. Both call one starter.
+                onPointerDownCapture: (event: PointerDragEvent) => {
+                  if (event.button !== 0) return;
+                  const element = event.currentTarget as unknown as HTMLElement;
+                  const rect = element.getBoundingClientRect();
+                  if (event.clientY < rect.bottom - SASH_SIZE) return;
+                  const container = element.parentElement;
+                  if (container === null) return;
+                  // The **last** row has no boundary (design B7): its bottom edge is the stack's.
+                  const rows = readStackRows(container as unknown as StackContainer);
+                  if (rows.findIndex((row) => row.viewId === node.id) >= rows.length - 1) return;
+                  startEntryDrag(
+                    store,
+                    container as unknown as StackContainer,
+                    node.id,
+                    event.pointerId,
+                    event.clientY,
+                    element,
+                  );
+                  event.preventDefault();
+                },
+                onDoubleClick: (event: ReactMouseEvent<HTMLElement>) => {
+                  // The boundary is this row's bottom edge, so a double-click here resets the pair the
+                  // way a double-click on the sash does (design B5).
+                  const element = event.currentTarget as HTMLElement;
+                  const rect = element.getBoundingClientRect();
+                  if (event.clientY < rect.bottom - SASH_SIZE) return;
+                  const container = element.parentElement;
+                  if (container === null) return;
+                  const reset = resetStackBoundary(
+                    readStackRows(container as unknown as StackContainer),
+                    node.id,
+                  );
+                  store.update((next) => {
+                    let out = next;
+                    for (const { viewId, height } of reset)
+                      out = setEntryHeight(out, viewId, height);
+                    return out;
+                  });
+                },
+                // `data-prac-stack-entry` carries the **view** id (every gate and probe reads it that
+                // way); the frame's own helpers key on the region, in `data-prac-stack-row`.
+                "data-prac-stack-entry": views[0] ?? "",
+                "data-prac-stack-row": node.id,
+                // The **last** row has no boundary (design B7); readers ask with this marker.
+                "data-prac-stack-handle": (() => {
+                  const parent = findParentSplit(state.tree, node.id);
+                  const siblings = parent === null ? [] : stackEntries(parent);
+                  const at = siblings.findIndex((row) => row.id === node.id);
+                  return at >= 0 && at < siblings.length - 1 ? "true" : "false";
+                })(),
                 "data-prac-stack-collapsed": node.collapsed === true ? "true" : "false",
               }
             : {}),
@@ -1513,21 +1599,24 @@ export function createFrame(
           : node.entry === true && views.length === 1
             ? [
                 entryHeader(node, views[0] ?? ""),
-                createElement(
-                  "div",
-                  {
-                    "data-prac-stack-body": node.id,
-                    style: {
-                      display: "flex",
-                      flexDirection: "column",
-                      flex: "1 1 auto",
-                      minHeight: 0,
-                      position: "relative",
-                      overflow: "hidden",
-                    },
-                  },
-                  viewBody(views[0] ?? "", box),
-                ),
+                // A folded row is **only its header** (design B4/D1): no body at all.
+                node.collapsed === true
+                  ? null
+                  : createElement(
+                      "div",
+                      {
+                        "data-prac-stack-body": node.id,
+                        style: {
+                          display: "flex",
+                          flexDirection: "column",
+                          flex: "1 1 auto",
+                          minHeight: 0,
+                          position: "relative",
+                          overflow: "hidden",
+                        },
+                      },
+                      viewBody(views[0] ?? "", box),
+                    ),
               ]
             : stacked
               ? (() => {

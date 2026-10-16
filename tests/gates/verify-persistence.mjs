@@ -84,7 +84,9 @@ async function sample() {
         ),
         bottom: box(`[data-prac-region="${bottom}"]`),
         stack: [
-          ...document.querySelectorAll(`[data-prac-region="${left}"] [data-prac-stack-entry]`),
+          ...document.querySelectorAll(
+            `[data-prac-region="${left}"] [data-prac-stack-entry], [data-prac-split="${left}"] [data-prac-stack-entry]`,
+          ),
         ].map((element) => ({
           view:
             element.getAttribute("data-prac-stack-view") ??

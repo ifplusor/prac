@@ -113,7 +113,11 @@ const bars = await page.evaluate(() =>
  */
 async function sample(region) {
   return page.evaluate((id) => {
-    const element = document.querySelector(`[data-prac-region="${id}"]`);
+    // A container that holds two visible views is a `column` split of rows, and the split carries
+    // the region's id, so both kinds of element answer for it.
+    const element =
+      document.querySelector(`[data-prac-region="${id}"]`) ??
+      document.querySelector(`[data-prac-split="${id}"]`);
     if (!element) return null;
     const rect = element.getBoundingClientRect();
     return {
@@ -126,11 +130,15 @@ async function sample(region) {
       hosts: [...element.querySelectorAll("[data-prac-view-host]")].map((host) =>
         Math.round(host.getBoundingClientRect().height),
       ),
-      children: [...element.querySelectorAll(":scope > [data-prac-region]")].map((child) =>
-        child.getAttribute("data-prac-region"),
+      // The container the track selects may itself be a `column` split (a stack took the region's
+      // id), so the elements that answer for a region are both kinds.
+      children: [
+        ...element.querySelectorAll(":scope > [data-prac-region], :scope > [data-prac-split]"),
+      ].map(
+        (child) => child.getAttribute("data-prac-region") ?? child.getAttribute("data-prac-split"),
       ),
-      shown: [...element.querySelectorAll("[data-prac-region]")].map((child) =>
-        child.getAttribute("data-prac-region"),
+      shown: [...element.querySelectorAll("[data-prac-region], [data-prac-split]")].map(
+        (child) => child.getAttribute("data-prac-region") ?? child.getAttribute("data-prac-split"),
       ),
       bar:
         element
@@ -150,9 +158,11 @@ async function select(container) {
   const bar = container.slice(0, container.indexOf("/"));
   await page.click(`[data-prac-container-bar="${bar}"] [data-prac-container="${container}"]`);
   await page.waitForFunction(
-    (id) => document.querySelector(`[data-prac-region="${id}"]`) !== null,
+    (id) =>
+      document.querySelector(`[data-prac-region="${id}"]`) !== null ||
+      document.querySelector(`[data-prac-split="${id}"]`) !== null,
     container,
-    { timeout: 30_000 },
+    { timeout: 60_000 },
   );
   await page.waitForTimeout(500);
   return sample(container);
