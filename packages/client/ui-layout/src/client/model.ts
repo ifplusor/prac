@@ -492,6 +492,77 @@ const priorityRank = (priority: LayoutPriority | undefined): number =>
 const clampClaim = (basis: Basis, size: number): number =>
   Math.min(basis.max, Math.max(basis.min, Math.round(size)));
 
+/** Whether every child of this split is a stack row — i.e. the split **is** a stack. */
+export function isStackSplit(node: SplitNode, children: readonly LayoutNode[]): boolean {
+  return (
+    children.length > 0 &&
+    children.every((child) => child.type === "region" && child.entry === true)
+  );
+}
+
+/**
+ * Share a **stack's** extent out the way VS Code's `SplitView` does (design C6/C8).
+ *
+ * A row that nobody has sized takes an even share to begin with; after that, room that appears goes
+ * to **one** row — the first that can still grow, looking from the last one back — up to what it
+ * declares, and room that is taken comes back the same way, never under a floor. A folded row (one
+ * whose claim is pinned to its header) neither gives nor takes: it is skipped, and the search
+ * continues past it (B3). When no row can move, the leftover simply stays unassigned, which is the
+ * blank space the rules call for (H3).
+ *
+ * @param basis - one claim per row, in the split's order.
+ * @param content - the extent to share out, sashes already taken off.
+ * @param folded - which rows are folded (they hold a header and nothing else).
+ * @returns one size per row.
+ */
+export function allocateStack(
+  basis: readonly Basis[],
+  content: number,
+  folded: readonly boolean[] = [],
+): number[] {
+  // A folded row holds its **header**, and that height is part of the stack's extent like any other
+  // (its claim reads 0 because a folded row is drawn from its header, not from a `size` of its own).
+  const sized = basis.map((entry, index) => (folded[index] === true ? HEADER_HEIGHT : entry.size));
+  const settled = sized.reduce((total, size) => total + size, 0);
+  // A row nobody has sized takes an equal share of what the sized ones leave (C1) — the fold's own
+  // header is not part of what is shared out (C4).
+  const unsized = basis
+    .map((_, index) => index)
+    .filter((index) => folded[index] !== true && basis[index]!.size === 0);
+  if (unsized.length > 0) {
+    const share = Math.max(0, content - settled) / unsized.length;
+    for (const index of unsized) {
+      const entry = basis[index]!;
+      sized[index] = Math.max(entry.min, Math.min(entry.max, share));
+    }
+  }
+  const claimed = sized.reduce((total, size) => total + size, 0);
+  let room = content - claimed;
+  const order = basis.map((_, index) => index).reverse();
+  const capable = (index: number, sign: 1 | -1): number => {
+    if (folded[index] === true) return 0;
+    const entry = basis[index]!;
+    return sign > 0
+      ? Math.max(0, entry.max - sized[index]!)
+      : Math.max(0, sized[index]! - entry.min);
+  };
+  while (room > 0) {
+    const next = order.find((index) => capable(index, 1) > 0);
+    if (next === undefined) break;
+    const take = Math.min(room, capable(next, 1));
+    sized[next] = sized[next]! + take;
+    room -= take;
+  }
+  while (room < 0) {
+    const next = order.find((index) => capable(index, -1) > 0);
+    if (next === undefined) break;
+    const give = Math.min(-room, capable(next, -1));
+    sized[next] = sized[next]! - give;
+    room += give;
+  }
+  return sized;
+}
+
 /**
  * Give a split's extent to its children.
  *
@@ -1263,16 +1334,28 @@ export function resolveSizes(state: LayoutState, width: number, height: number):
   const visit = (node: LayoutNode, w: number, h: number): void => {
     if (node.type === "region") {
       out.set(node.id, { width: w, height: h });
-      // A selector region hands its whole box to the child it shows.
+      // A selector region hands its child the box **minus the bar it draws** when it shows one: the
+      // bar is real pixels (the frame draws it as soon as there are two children to choose between),
+      // and a stack drawn from the allocation would otherwise overflow its container by that much.
       const child = activeChild(state, node);
-      if (child !== null) visit(child, w, h);
+      if (child !== null) {
+        const bar = (node.children?.length ?? 0) > 1 ? HEADER_HEIGHT : 0;
+        visit(child, w, Math.max(0, h - bar));
+      }
       return;
     }
     const present = node.children.filter((child) => isPresent(state, child));
     const extent = node.dir === "row" ? w : h;
     const sashes = Math.max(0, present.length - 1) * SASH_SIZE;
     const content = Math.max(0, extent - sashes);
-    const sizes = allocateContent(present.map(nodeBasis), content);
+    const basis = present.map(nodeBasis);
+    const sizes = isStackSplit(node, present)
+      ? allocateStack(
+          basis,
+          content,
+          present.map((child) => child.type === "region" && child.collapsed === true),
+        )
+      : allocateContent(basis, content);
     present.forEach((child, index) => {
       const main = sizes[index] ?? 0;
       if (node.dir === "row") visit(child, main, h);
@@ -1661,79 +1744,6 @@ export const HEADER_HEIGHT = 20;
  * the header and a sliver of content reachable.
  */
 export const MIN_ENTRY = 48;
-
-/**
- * The heights to draw for a stack that has folds or hand-set sizes in it.
- *
- * Upstream's rule, from `SplitView.distributeEmptySpace` (`splitview.ts:1329-1355`): the empty
- * space travels **toward the bottom** — it is handed to the entries *below* the fold, and when
- * nothing is below, to the entries *above*, which is what pushes a folded bottom entry's header
- * down to the bottom instead of leaving a blank strip. Space going the other way (a window that
- * shrank) shrinks everything proportionally, never below a floor.
- *
- * A flat stack — no folds, no sizes — is left to flex: it is the equal share it always had, and it
- * follows a resize for free.
- *
- * @param views - the stack's visible views, top-down.
- * @param state - the layout state (each view's stored size and fold).
- * @param measured - heights from the previous frame, for entries nobody has sized.
- * @param height - the height the stack really has (measured, not the frame's stale table).
- * @returns the height to draw each entry at, folded ones included.
- */
-export function allocateStack(
-  views: readonly string[],
-  state: LayoutState,
-  measured: ReadonlyMap<string, number>,
-  height: number,
-): Map<string, number> {
-  const drawn = new Map<string, number>();
-  const folded = views.filter((viewId) => state.views[viewId]?.collapsed === true);
-  const open = views.filter((viewId) => state.views[viewId]?.collapsed !== true);
-  for (const viewId of folded) drawn.set(viewId, HEADER_HEIGHT);
-  if (open.length === 0) return drawn;
-  const available = Math.max(open.length * MIN_ENTRY, height - folded.length * HEADER_HEIGHT);
-  // Entries nobody sized take what the sized ones leave: on the first frame after a load there is
-  // nothing measured yet, and an equal share of the **whole** stack would make the sizes that were
-  // written down come out smaller than they are (measured: a written 210 drawn at ~180).
-  const fixedTotal = open.reduce((total, viewId) => total + (state.views[viewId]?.size ?? 0), 0);
-  const flexible = open.filter((viewId) => state.views[viewId]?.size === undefined).length;
-  const fallback =
-    flexible > 0
-      ? Math.max(MIN_ENTRY, Math.round((available - fixedTotal) / flexible))
-      : Math.round(available / open.length);
-  for (const viewId of open) {
-    drawn.set(viewId, state.views[viewId]?.size ?? measured.get(viewId) ?? fallback);
-  }
-  const wanted = open.reduce((total, viewId) => total + (drawn.get(viewId) ?? 0), 0);
-  if (wanted > available) {
-    const scale = available / wanted;
-    for (const viewId of open) {
-      drawn.set(viewId, Math.max(MIN_ENTRY, Math.round((drawn.get(viewId) ?? 0) * scale)));
-    }
-  }
-  const leftover = available - open.reduce((total, viewId) => total + (drawn.get(viewId) ?? 0), 0);
-  if (leftover <= 0) return drawn;
-  // Room left over goes to the rows that can still take it, **from the last one back**, each up to
-  // its own ceiling — `distributeEmptySpace`'s order (`splitview.ts:1349-1355`). It is deliberately
-  // **not** a proportional re-share: `saveProportions`/`proportionalLayout` (`:880-883`) is a
-  // different mechanism (how a split view re-lays itself out), and folding a row is not a resize of
-  // the container. A row only stops taking room when it declares a ceiling; none does today, so the
-  // last capable row takes what is left (that is what VS Code's uncapped viewlets do — collapsing
-  // one lets its neighbour grow). A folded row can take nothing: it is a header.
-  let remaining = leftover;
-  for (let index = open.length - 1; index >= 0 && remaining > 0; index -= 1) {
-    const viewId = open[index];
-    if (viewId === undefined) continue;
-    const size = drawn.get(viewId) ?? 0;
-    const ceiling = state.views[viewId]?.max ?? Number.POSITIVE_INFINITY;
-    const room = Math.max(0, Math.round(ceiling) - size);
-    if (room <= 0) continue;
-    const give = Math.min(remaining, room);
-    drawn.set(viewId, size + give);
-    remaining -= give;
-  }
-  return drawn;
-}
 
 /**
  * What every entry of a stack becomes when one entry is dragged to `target`.

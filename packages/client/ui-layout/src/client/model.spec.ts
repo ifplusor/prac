@@ -10,7 +10,7 @@ import {
   type RegionNode,
 } from "./contract.js";
 import {
-  stackEntries,
+  HEADER_HEIGHT,
   activeChild,
   defaultTree,
   findRegion,
@@ -21,21 +21,22 @@ import {
   isStacked,
   nodeBasis,
   place,
+  pruneEmbedderRegions,
   regionInfos,
   regionNode,
+  removeRegion,
   removeView,
-  setFront,
   resolveSizes,
   sashSizes,
   selectChild,
-  setRegionChildren,
-  showsTabStrip,
   setCollapsed,
+  setFront,
+  setRegionChildren,
   setRegionSize,
+  showsTabStrip,
   sideGeometry,
-  pruneEmbedderRegions,
-  removeRegion,
   splitRegionWith,
+  stackEntries,
   subtreeMin,
   visibleViews,
 } from "./model.js";
@@ -549,10 +550,13 @@ describe("nested regions (containers)", () => {
     expect(activeChild(plain, findRegion(plain.tree, "left")!)).toBeNull();
   });
 
-  it("hands the selector's box to the child it shows", () => {
+  it("hands the selector's box to the child it shows, below the bar it draws", () => {
     const tree = selectChild(withContainers(), "left", "left.search");
     const sizes = resolveSizes(state(tree, bothFilled), 1000, 800);
-    expect(sizes.get("left")).toEqual(sizes.get("left.search"));
+    // The region owns the bar as well as the child (the frame draws both inside it), so the child's
+    // slot is what is left under the bar — "what is on screen is what the model says".
+    expect(sizes.get("left.search")?.width).toBe(sizes.get("left")?.width);
+    expect(sizes.get("left.search")?.height).toBe((sizes.get("left")?.height ?? 0) - HEADER_HEIGHT);
   });
 
   it("needs the widest child's room, since only one is shown", () => {

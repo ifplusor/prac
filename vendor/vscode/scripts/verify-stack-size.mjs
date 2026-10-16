@@ -115,8 +115,13 @@ const measure = (page) =>
     const region = globalThis.__deep.one(
       '[data-prac-region="left/container:workbench.view.explorer"], [data-prac-split="left/container:workbench.view.explorer"]',
     );
+    // The stack's own box is the box the entries live in — the container's id may name the region
+    // around them (a bar's worth of chrome taller), and the entries have to add up to **their** parent.
+    const stackBox =
+      region?.querySelector("[data-prac-stack-entry]")?.parentElement?.getBoundingClientRect() ??
+      null;
     return {
-      stackHeight: region ? Math.round(region.getBoundingClientRect().height) : null,
+      stackHeight: stackBox ? Math.round(stackBox.height) : null,
       fileView: height(view),
       neighbour: height("vscode:view:outline"),
       persisted: (() => {
@@ -274,7 +279,6 @@ await seventh.page.evaluate(() => {
 await seventh.page.reload({ waitUntil: "load" });
 await seventh.boot();
 await seventh.show();
-const sized = await measure(seventh.page);
 // The full id: the measured list truncates names for readability.
 const bottomView = await seventh.page.evaluate(() => {
   const region = globalThis.__deep.one(

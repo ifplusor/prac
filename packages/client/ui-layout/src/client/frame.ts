@@ -54,14 +54,12 @@ import {
   findSplit,
   isPresent,
   frontView,
-  isStacked,
   resizeBoundary,
   resolveSizes,
   setFront,
   selectChild,
   showsTabStrip,
   visibleViews,
-  allocateStack,
   MIN_ENTRY,
   HEADER_HEIGHT,
   redistributeOnDrag,
@@ -375,22 +373,6 @@ let reorderDrag: {
   target: { reference: string; direction: "up" | "down" } | null;
 } | null = null;
 
-let entryDrag: {
-  viewId: string;
-  pointerId: number;
-  origin: number;
-  start: number;
-  limit: number;
-  /** Every entry of this stack, top-down: the ones below give up the room a drag takes. */
-  peers: { viewId: string; height: number }[];
-  /** The same entries including the folded ones, which a snap has to be able to open. */
-  rows: { viewId: string; height: number; folded: boolean }[];
-  /** The element the entries live in, so a snap can re-read the stack it just changed. */
-  container: { querySelectorAll(selectors: string): readonly StackEntryNode[] } | null;
-  /** What every entry measured when the drag began: the height a folded entry comes back at. */
-  startRows: { viewId: string; height: number }[];
-} | null = null;
-
 /** What a stack entry looks like through the little of the DOM this file touches. */
 interface StackEntryNode {
   getBoundingClientRect(): { readonly bottom: number; readonly height: number };
@@ -463,6 +445,21 @@ function startEntryDrag(
     if (rowDrag !== drag || moveEvent.pointerId !== drag.pointerId) return;
     moveEvent.preventDefault();
     const pointerDelta = moveEvent.clientY - drag.origin;
+    // Holding Alt drags the boundary as a plain resize: no folding, the way VS Code drops its snap
+    // state while the modifier is down (`splitview.ts:929`, design B6).
+    if (moveEvent.altKey === true) {
+      const target = Math.max(
+        MIN_ENTRY,
+        Math.min(drag.limit, Math.round(drag.start + pointerDelta)),
+      );
+      const sizes = redistributeOnDrag(drag.rows, drag.draggedId, target);
+      store.update((state) => {
+        let next = state;
+        for (const [id, height] of sizes) next = setEntryHeight(next, id, height);
+        return next;
+      });
+      return;
+    }
     const snap =
       dragSnapTarget(drag.rows, drag.draggedId, pointerDelta) ??
       ((): { viewId: string; collapsed: boolean } | undefined => {
@@ -512,6 +509,17 @@ function startEntryDrag(
   const stop = (upEvent: PointerEvent): void => {
     if (rowDrag !== drag || upEvent.pointerId !== drag.pointerId) return;
     rowDrag = null;
+    // "What is on screen is what the state says" (D2): the drag wrote the two rows it moved, and the
+    // rows it did not touch may still claim a height the allocation has since re-fitted — write what
+    // each of them is actually drawn at, so the claims and the screen agree again.
+    const settled = readStackRows(drag.container);
+    store.update((state) => {
+      let next = state;
+      for (const row of settled) {
+        if (row.height > 0) next = setEntryHeight(next, row.viewId, row.height);
+      }
+      return next;
+    });
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", stop);
     window.removeEventListener("pointercancel", stop);
@@ -735,8 +743,9 @@ const FRAME_STYLES = `
 [data-prac-sash][data-prac-sash-dir="row"] { cursor: col-resize; }
 [data-prac-sash][data-prac-sash-dir="column"] { cursor: row-resize; }
 [data-prac-sash]:hover { background: rgba(127, 127, 127, 0.35); }
-[data-prac-stack-entry]::after { content: ""; cursor: row-resize; position: absolute; left: 0; right: 0; bottom: 0; height: ${SASH_SIZE}px; z-index: 5; cursor: row-resize; }
-[data-prac-stack-entry]:hover::after { background: rgba(127, 127, 127, 0.35); }
+[data-prac-stack-entry]::after { content: ""; cursor: default; position: absolute; left: 0; right: 0; bottom: 0; height: ${SASH_SIZE}px; z-index: 5; cursor: row-resize; }
+[data-prac-stack-entry][data-prac-stack-handle="true"]::after { cursor: row-resize; }
+[data-prac-stack-entry][data-prac-stack-handle="true"]:hover::after { background: rgba(127, 127, 127, 0.35); }
 `;
 
 /** Inject the frame's stylesheet once. */
@@ -754,7 +763,7 @@ export function ensureStyles(): void {
  * @param node - the region to style.
  * @param dir - the parent split's axis (the axis the minimum belongs on).
  */
-function regionStyle(node: RegionNode, dir: Dir, fill = false): StyleObject {
+function regionStyle(node: RegionNode, dir: Dir, fill = false, allocated?: number): StyleObject {
   if (node.collapsed) {
     // A folded stack row is **only its header** — a row that vanished entirely would lose the fold
     // switch that opens it again (design B4/D1).
@@ -775,6 +784,17 @@ function regionStyle(node: RegionNode, dir: Dir, fill = false): StyleObject {
   // A selector's child is not sized by a split — the selector hands it the whole
   // box — so it always fills, whatever basis it carries.
   if (fill) return { flex: "1 1 0", ...minimum, overflow: "hidden", ...stack };
+  // A stack row is **drawn** at what the allocation gave it. The tree's `size` is only that row's
+  // claim: the room a region gains has to end up in exactly one row (C6/C8), and which row that is
+  // was decided by `allocateStack`, so the style has to follow the allocation rather than the claim.
+  if (allocated !== undefined) {
+    return {
+      flex: `0 0 ${Math.round(allocated)}px`,
+      ...minimum,
+      overflow: "hidden",
+      ...stack,
+    };
+  }
   if (node.flex) return { flex: "1 1 0", ...minimum, overflow: "hidden", ...stack };
   return { flex: `0 0 ${node.size}px`, ...minimum, overflow: "hidden", ...stack };
 }
@@ -1035,337 +1055,6 @@ export function createFrame(
       down.preventDefault();
     };
 
-    const stackEntry = (
-      viewId: string,
-      box: Box,
-      handle: boolean,
-      allocated: number | undefined = undefined,
-    ): ReactElement => {
-      const collapsed = state.views[viewId]?.collapsed === true;
-      const size = allocated ?? state.views[viewId]?.size;
-      // The bottom `SASH_SIZE` px of the entry are its resize handle — **no extra element
-      // anywhere**, so the stack's children stay exactly its entries and the view body keeps its
-      // shape. The listener is on the **capture** phase: the press lands on the view's own DOM
-      // (the workbench's tree), which is free to `stopPropagation`, and a bubbling listener
-      // would never hear about it.
-      /**
-       * A double-click on the boundary (its bottom `SASH_SIZE` px) evens out the two rows it
-       * separates — upstream's sash reset (`onDidReset`, `splitview.ts:1186`), which also refuses
-       * when a whole side is folded. A double-click anywhere else on the entry does nothing.
-       */
-      const onDoubleClickCapture = (event: PointerDragEvent): void => {
-        if (event.button !== 0) return;
-        const element = event.currentTarget as HTMLElement;
-        const rect = element.getBoundingClientRect();
-        if (event.clientY < rect.bottom - SASH_SIZE) return;
-        const reset = resetStackBoundary(
-          readStackRows(element.parentElement as unknown as StackContainer),
-          viewId,
-        );
-        if (reset.length === 0) return;
-        store.update((state) => {
-          const views = { ...state.views };
-          for (const { viewId: id, height } of reset) {
-            const view = views[id];
-            if (view !== undefined && view.collapsed !== true)
-              views[id] = { ...view, size: height };
-          }
-          return { ...state, views };
-        });
-      };
-
-      const onPointerDownCapture = (event: PointerDragEvent): void => {
-        // Only an entry with an entry **below** it has a boundary to drag: the stack's last
-        // entry ends at the stack's own edge, where a drag has nothing to give (and would eat
-        // the bottom 5px of the view's content).
-        if (event.button !== 0) return;
-        const rect = event.currentTarget.getBoundingClientRect();
-        // The bottom `SASH_SIZE` px is the resizing sash; the fold switch is the button. Everywhere
-        // else on the header row is the reorder handle (upstream's sash is its own element and takes
-        // precedence where it overlaps, `splitview.ts:1168-1173`).
-        if (event.clientY >= rect.bottom - SASH_SIZE) {
-          if (!handle) return;
-          // A boundary that can move nothing is not draggable (B4): both sides are folded or already
-          // at their floor. `redistributeOnDrag` reports only the rows that would actually move.
-          const here = readStackRows(
-            (event.currentTarget as HTMLElement).parentElement as unknown as StackContainer,
-          );
-          if (
-            [...redistributeOnDrag(here, viewId, 1)].length === 0 &&
-            [...redistributeOnDrag(here, viewId, -1)].length === 0
-          ) {
-            return;
-          }
-        } else {
-          // Only the header row is a handle. A press in the entry's **body** belongs to the view
-          // (the file tree, the editor) and must not be swallowed: doing that made a click in the
-          // content fold the entry (caught by verify:timeline).
-          const target = (event as unknown as { target: EventTarget | null }).target;
-          const header =
-            target instanceof HTMLElement ? target.closest("[data-prac-stack-header]") : null;
-          if (header === null) return;
-          const onToggle =
-            target instanceof HTMLElement ? target.closest("[data-prac-stack-toggle]") : null;
-          if (onToggle !== null) return;
-          beginReorder(event, viewId);
-          return;
-        }
-        // The move/up listeners go on the **window**: a store update re-renders the frame and
-        // the entry element can be replaced mid-drag, dropping pointer capture.
-        const move = (moveEvent: PointerEvent): void => {
-          if (entryDrag === null || entryDrag.pointerId !== moveEvent.pointerId) return;
-          moveEvent.preventDefault();
-          const drag = entryDrag;
-          const pointerDelta = moveEvent.clientY - drag.origin;
-          const snap =
-            dragSnapTarget(drag.rows, drag.viewId, pointerDelta) ??
-            // No threshold crossed yet: when the entries below have no room left, the drag keeps
-            // going by folding the next one down (the chain the person described: file view, open
-            // editors, timeline), while the entries above are never touched.
-            ((): { viewId: string; collapsed: boolean } | undefined => {
-              const chain = dragChainTarget(
-                drag.rows,
-                drag.viewId,
-                Math.round(drag.start + pointerDelta),
-              );
-              return chain === undefined ? undefined : { viewId: chain, collapsed: true };
-            })();
-          if (snap !== undefined) {
-            // Upstream snaps a view in or out and then lays the split view out again with the new
-            // visibility (`splitview.ts:1298-1307`). Same here: fold it, re-read the stack and
-            // re-anchor the drag, so the band is measured from where the stack now is.
-            // Folding remembers the height the entry had when the **drag began**, the way upstream
-            // hands `setVisible` the size captured at drag start (`splitview.ts:946`) — not the
-            // height it was squeezed to by the time the threshold was crossed.
-            const atStart = drag.startRows.find((row) => row.viewId === snap.viewId)?.height;
-            store.update((state) => {
-              const folded = setViewCollapsed(state, snap.viewId, snap.collapsed);
-              const view = folded.views[snap.viewId];
-              return view === undefined || atStart === undefined || view.size === atStart
-                ? folded
-                : {
-                    ...folded,
-                    views: { ...folded.views, [snap.viewId]: { ...view, size: atStart } },
-                  };
-            });
-            // The fold only reaches the DOM on the next render, so the immediately re-read rows
-            // still show the entry as it was: drop the one just folded by hand, or the very next
-            // move would resize it as if it were an ordinary entry (measured: it wrote the folded
-            // entry's floor over the height it was folded with — 107 became 48).
-            const rows = readStackRows(drag.container).filter(
-              (row) => !row.folded && !(snap.collapsed && row.viewId === snap.viewId),
-            );
-            drag.rows = rows;
-            drag.peers = rows;
-            // And read the stack once more after the render, so an entry the drag just opened
-            // joins the arithmetic too.
-            requestAnimationFrame(() => {
-              if (entryDrag !== drag) return;
-              const settled = readStackRows(drag.container);
-              drag.rows = settled;
-              drag.peers = settled.filter((row) => !row.folded);
-            });
-            drag.start = rows.find((row) => row.viewId === drag.viewId)?.height ?? drag.start;
-            drag.origin = moveEvent.clientY;
-            const below = drag.peers.slice(
-              drag.peers.findIndex((peer) => peer.viewId === drag.viewId) + 1,
-            );
-            drag.limit = Math.max(
-              MIN_ENTRY,
-              drag.start +
-                below.reduce((total, peer) => total + Math.max(0, peer.height - MIN_ENTRY), 0),
-            );
-            return;
-          }
-          const wanted = Math.round(drag.start + pointerDelta);
-          const target = Math.max(MIN_ENTRY, Math.min(drag.limit, wanted));
-          // Upstream's rule (`SplitView.resize`): the dragged entry and the ones above it take the
-          // delta, the ones below give it up — several sizes move, and the stack keeps its height.
-          const sizes = redistributeOnDrag(drag.rows, drag.viewId, target);
-          store.update((state) => {
-            let views = state.views;
-            let changed = false;
-            for (const [id, size] of sizes) {
-              const view = views[id];
-              if (view === undefined || view.size === size) continue;
-              if (!changed) {
-                views = { ...views };
-                changed = true;
-              }
-              views[id] = { ...view, size };
-            }
-            return changed ? { ...state, views } : state;
-          });
-        };
-        const finish = (upEvent: PointerEvent): void => {
-          if (entryDrag === null || entryDrag.pointerId !== upEvent.pointerId) return;
-          entryDrag = null;
-          window.removeEventListener("pointermove", move);
-          window.removeEventListener("pointerup", finish);
-          window.removeEventListener("pointercancel", finish);
-        };
-        // Read the stack as it stands: a drag takes room from the entries **below** it, each
-        // down to its floor, and the new sizes are written back together — so the entries always
-        // add up to the stack and no later pass has to clamp anything (upstream's rule, see the
-        // worklog: the drag is bounded by the neighbours' own slack).
-        const container = event.currentTarget.parentElement;
-        const all = [...(container?.querySelectorAll("[data-prac-stack-entry]") ?? [])].map(
-          (node) => ({
-            viewId:
-              node.getAttribute("data-prac-stack-row") ??
-              node.getAttribute("data-prac-stack-entry") ??
-              "",
-            height: Math.round(node.getBoundingClientRect().height),
-            /** A folded entry is a header: it owns no height to give and must not be written to. */
-            folded: node.getAttribute("data-prac-stack-collapsed") === "true",
-          }),
-        );
-        const self = all.find((entry) => entry.viewId === viewId);
-        // A folded entry has no body to drag, and its height is a header — writing a size for it
-        // is what left an entry stuck at ~18px, unable to unfold again (measured).
-        if (self === undefined || self.folded) return;
-        const peers = all.filter((entry) => !entry.folded);
-        const below = peers.slice(peers.findIndex((peer) => peer.viewId === viewId) + 1);
-        const slack = below.reduce(
-          (total, peer) => total + Math.max(0, peer.height - MIN_ENTRY),
-          0,
-        );
-        // A drag needs somewhere to put (or take) room: either the entries below can give, or
-        // this entry can shrink into them. With neither, the press belongs to the view under it.
-        if (slack <= 0 && rect.height <= MIN_ENTRY + 1) return;
-        entryDrag = {
-          viewId,
-          pointerId: event.pointerId,
-          origin: event.clientY,
-          start: rect.height,
-          limit: Math.max(MIN_ENTRY, rect.height + slack),
-          peers,
-          rows: all,
-          container: container ?? null,
-          startRows: all.map((row) => ({ viewId: row.viewId, height: row.height })),
-        };
-        window.addEventListener("pointermove", move);
-        window.addEventListener("pointerup", finish);
-        window.addEventListener("pointercancel", finish);
-        event.preventDefault();
-      };
-      return createElement(
-        "div",
-        {
-          key: viewId,
-          "data-prac-stack-entry": viewId,
-          "data-prac-stack-handle": handle ? "true" : "false",
-          onPointerDownCapture,
-          "data-prac-stack-collapsed": collapsed ? "true" : "false",
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          onDoubleClick: onDoubleClickCapture as any,
-          style: {
-            // A person may have dragged this entry's bottom edge: then it keeps that height and
-            // its neighbours share the rest. Otherwise every entry shares equally.
-            position: "relative",
-            flex: collapsed ? "0 0 auto" : size === undefined ? "1 1 0" : `0 0 ${size}px`,
-            minHeight: 0,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          },
-        },
-        createElement(
-          "div",
-          {
-            key: "header",
-            "data-prac-stack-header": viewId,
-            style: { ...STACK_HEADER_STYLE, display: "flex", alignItems: "center", gap: "2px" },
-          },
-          createElement(
-            "button",
-            {
-              key: "toggle",
-              type: "button",
-              "data-prac-stack-toggle": viewId,
-              "aria-expanded": collapsed ? "false" : "true",
-              title: collapsed ? "Expand" : "Collapse",
-              onClick: (event: ReactMouseEvent<HTMLElement>) => {
-                // What the entry is drawn at right now: the fold remembers it the way upstream's
-                // hidden view keeps its size, so unfolding gives the same height back.
-                const entry = (event.currentTarget as HTMLElement).closest(
-                  "[data-prac-stack-entry]",
-                );
-                if (entry === null) return;
-                const height = entry.getBoundingClientRect().height;
-                store.update((current) =>
-                  setViewCollapsed(
-                    current,
-                    viewId,
-                    current.views[viewId]?.collapsed !== true,
-                    height,
-                  ),
-                );
-              },
-              style: {
-                background: "none",
-                border: "none",
-                color: "inherit",
-                cursor: "pointer",
-                padding: "0 2px",
-                font: "inherit",
-              },
-            },
-            collapsed ? "\u25b8" : "\u25be",
-          ),
-          createElement(
-            "span",
-            {
-              key: "title",
-              "data-prac-stack-title": viewId,
-              style: {
-                flex: "1 1 auto",
-                cursor: "pointer",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              },
-            },
-            `${state.views[viewId]?.flags?.dirty === true ? "\u25cf " : ""}${viewLabel(viewId)}`,
-          ),
-        ),
-        collapsed
-          ? null
-          : createElement(
-              "div",
-              {
-                key: "body",
-                "data-prac-stack-body": viewId,
-                // A **flex container**, not a block: the view host inside carries
-                // `flex: 1 1 auto`, which is inert under a block parent — the host then
-                // sizes to whatever its content reports and the pane collapses to its
-                // header. Measured on a restored layout: entry 147 → body 129 → host 22
-                // (a fresh page only looked right because the part inside reported a
-                // height first). With the body flexible, the host takes the body's box
-                // whatever the content measures.
-                style: {
-                  display: "flex",
-                  flexDirection: "column",
-                  flex: "1 1 auto",
-                  minHeight: 0,
-                  position: "relative",
-                  overflow: "hidden",
-                },
-              },
-              createElement(
-                IsolatedView,
-                null,
-                createElement(View, {
-                  viewId,
-                  renderSlot,
-                  box,
-                  viewportWidth: state.viewportWidth,
-                }),
-              ),
-            ),
-      );
-    };
-
     /**
      * One region's tab strip: the visible views in order, the front one active.
      *
@@ -1587,7 +1276,12 @@ export function createFrame(
           {
             key: node.id,
             "data-prac-region": node.id,
-            style: regionStyle(node, dir, fill),
+            style: regionStyle(
+              node,
+              dir,
+              fill,
+              node.entry === true ? sizes.get(node.id)?.height : undefined,
+            ),
           },
           [
             (node.children?.length ?? 0) > 1 ? containerBar(node, child.id) : null,
@@ -1597,7 +1291,6 @@ export function createFrame(
         );
       }
       const views = visibleViews(state, node.id);
-      const stacked = isStacked(state, node);
       return createElement(
         "div",
         {
@@ -1652,17 +1345,31 @@ export function createFrame(
                 // way); the frame's own helpers key on the region, in `data-prac-stack-row`.
                 "data-prac-stack-entry": views[0] ?? "",
                 "data-prac-stack-row": node.id,
-                // The **last** row has no boundary (design B7); readers ask with this marker.
+                // The boundary under this row: it exists unless this is the **last** row (B7), and it
+                // is **usable** only when a row above can still give and a row below can still take
+                // (B2/B4) — so a run of folded rows has no usable boundary at its edge, and a stack
+                // that is folded shut has none at all. Readers ask with this marker.
                 "data-prac-stack-handle": (() => {
                   const parent = findParentSplit(state.tree, node.id);
                   const siblings = parent === null ? [] : stackEntries(parent);
                   const at = siblings.findIndex((row) => row.id === node.id);
-                  return at >= 0 && at < siblings.length - 1 ? "true" : "false";
+                  if (at < 0 || at >= siblings.length - 1) return "false";
+                  const open = (row: (typeof siblings)[number]): boolean => row.collapsed !== true;
+                  return siblings.slice(0, at + 1).some(open) && siblings.slice(at + 1).some(open)
+                    ? "true"
+                    : "false";
                 })(),
                 "data-prac-stack-collapsed": node.collapsed === true ? "true" : "false",
               }
             : {}),
-          style: regionStyle(node, dir, fill),
+          style: regionStyle(
+            node,
+            dir,
+            fill,
+            // A row is drawn at its allocated extent (C6/C8): the gain a region made belongs to one
+            // row, and the allocation is what says which.
+            node.entry === true ? sizes.get(node.id)?.height : undefined,
+          ),
         },
         showsTabStrip(state, node)
           ? [tabStrip(views, node.id), viewBody(frontView(state, node.id) ?? views[0] ?? "", box)]
@@ -1688,31 +1395,11 @@ export function createFrame(
                       viewBody(views[0] ?? "", box),
                     ),
               ]
-            : stacked
-              ? (() => {
-                  // A plain stack shares the height through flex; once something is folded or sized
-                  // the distribution has to be explicit (`allocateStack`).
-                  const allocated = views.some(
-                    (viewId) =>
-                      state.views[viewId]?.size !== undefined ||
-                      state.views[viewId]?.collapsed === true,
-                  )
-                    ? allocateStack(
-                        views,
-                        state,
-                        measuredEntries.current,
-                        measuredRegions.current.get(node.id) ?? box.height,
-                      )
-                    : undefined;
-                  return views.map((viewId, position) =>
-                    stackEntry(viewId, box, position < views.length - 1, allocated?.get(viewId)),
-                  );
-                })()
-              : // No strip: the region still shows its **front** view. It used to take the
-                // first by order, which is a different question — measured with a region a
-                // view had just been split into: the file that was copied in was front, the
-                // region rendered its neighbour, and the new file's view got no surface.
-                [viewBody(frontView(state, node.id) ?? views[0] ?? "", box)],
+            : // No strip: the region still shows its **front** view. It used to take the
+              // first by order, which is a different question — measured with a region a
+              // view had just been split into: the file that was copied in was front, the
+              // region rendered its neighbour, and the new file's view got no surface.
+              [viewBody(frontView(state, node.id) ?? views[0] ?? "", box)],
       );
     };
 

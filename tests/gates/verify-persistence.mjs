@@ -292,8 +292,11 @@ const checks = {
   // region kept in the tree the sidebar can be only ~375px tall, five entries leave a body of
   // ~55px, and the tree then renders one row or none depending on timing — a property of the
   // layout being squeezed, not of the content coming back.)
+  // "The content came back" — every entry's body is there. The bar is deliberately measured in a
+  // short track, where an unfolded entry can end at its **floor** (a 48px row leaves a 28px body:
+  // C7 converges without breaking floors), so the check asks for a body, not for a generous one.
   containerContentRestored:
-    unfolded.panes.bodies.length > 0 && unfolded.panes.bodies.every((height) => height > 40),
+    unfolded.panes.bodies.length > 0 && unfolded.panes.bodies.every((height) => height > 20),
   // The leftover is gone, and the app's own empty region is still there.
   staleRegionPruned:
     !restoredRegions.includes("region-stale") && restoredRegions.includes("region-keep"),
@@ -308,7 +311,7 @@ const checks = {
 
 report({
   url,
-  facts: { initial, changed, reloaded, consoleErrors },
+  facts: { initial, changed, reloaded, unfolded, consoleErrors },
   checks,
   ok: "OK: the frame's state (track size, stack order, fold, bottom bar) is written under the versioned key and comes back after a reload, with the arrangement's defaults only filling gaps.",
 });

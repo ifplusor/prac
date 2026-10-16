@@ -69,6 +69,9 @@ async function sample() {
       entries: [...(host?.querySelectorAll("[data-prac-stack-entry]") ?? [])].map((entry) => ({
         view: entry.getAttribute("data-prac-stack-entry"),
         collapsed: entry.getAttribute("data-prac-stack-collapsed") === "true",
+        // "false" means the boundary under this row cannot move (B4): the last row has none, and a
+        // run of folded rows has nothing left to trade.
+        handle: entry.getAttribute("data-prac-stack-handle"),
         entry: box(entry),
         header: box(entry.querySelector("[data-prac-stack-toggle]")),
         body: box(entry.querySelector("[data-prac-stack-body]")),
@@ -109,6 +112,50 @@ await page.click(`[data-prac-stack-toggle="${BASE_VIEW}"]`);
 await page.waitForTimeout(600);
 const clicked = await sample();
 
+// ── 5. folded shut: nothing left to trade, and the room stays blank (B4/H3) ──
+await page.evaluate(
+  (views) => {
+    for (const view of views) globalThis.__pracLayout.setViewCollapsed(view, true);
+  },
+  [BASE_VIEW, ADDED_VIEW],
+);
+await page.waitForTimeout(900);
+const shut = await sample();
+
+await page.evaluate(
+  (views) => {
+    for (const view of views) globalThis.__pracLayout.setViewCollapsed(view, false);
+  },
+  [BASE_VIEW, ADDED_VIEW],
+);
+await page.waitForTimeout(900);
+const opened = await sample();
+
+// ── 6. Alt drags the boundary without folding anything (B6) ──────────────────
+const beforeAlt = await sample();
+const altPoint = await page.evaluate((view) => {
+  const host = document.querySelector(`[data-prac-stack-entry="${view}"]`);
+  const rect = host?.getBoundingClientRect();
+  return rect ? { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.bottom - 2) } : null;
+}, BASE_VIEW);
+if (altPoint !== null) {
+  await page.keyboard.down("Alt");
+  await page.mouse.move(altPoint.x, altPoint.y);
+  await page.mouse.down();
+  for (let step = 1; step <= 8; step += 1) {
+    await page.mouse.move(altPoint.x, altPoint.y - (90 * step) / 8, { steps: 1 });
+  }
+  await page.mouse.up();
+  await page.keyboard.up("Alt");
+  await page.waitForTimeout(800);
+}
+const afterAlt = await sample();
+
+// ── 7. the region grows: **one** row takes it, the others stay (C6/C8) ───────
+await page.setViewportSize({ width: 1600, height: 1200 });
+await page.waitForTimeout(1000);
+const grown = await sample();
+
 await close();
 
 const entryOf = (facts, view) => facts.entries.find((entry) => entry.view === view) ?? null;
@@ -118,6 +165,10 @@ const bodyHeight = (facts, view) => entryOf(facts, view)?.body?.h ?? 0;
 // two visible views, and not one with one) is a unit test. What stays here is the
 // rendering of that decision — headers appear, bodies have height, folding keeps
 // the header and hands the space over, and a click on the header toggles.
+const heightOf = (facts, view) => facts.entries.find((entry) => entry.view === view)?.entry?.h ?? 0;
+const sumOf = (facts) => facts.entries.reduce((total, entry) => total + (entry.entry?.h ?? 0), 0);
+const openIn = (facts) => facts.entries.filter((entry) => entry.collapsed !== true).length;
+
 const checks = {
   // 1. The default layout is untouched: one visible view, no headers.
   defaultIsBare: initial.entries.length === 0,
@@ -144,6 +195,24 @@ const checks = {
     bodyHeight(folded, ADDED_VIEW) <= 2 &&
     bodyHeight(folded, BASE_VIEW) > bodyHeight(stacked, BASE_VIEW),
   // 4. The header itself toggles (the UI path, not just the face).
+  // 5. Folded shut: every boundary is dead, and the stack does not pretend to fill itself.
+  aShutStackHasNoUsableBoundary:
+    shut.entries.length > 0 && shut.entries.every((entry) => entry.handle === "false"),
+  aShutStackLeavesItsRoomBlank: sumOf(shut) + 40 < (shut.region?.h ?? 0),
+  // 6. Alt is a plain resize: the drag moves the boundary and folds nothing.
+  altDragFoldsNothing:
+    afterAlt.entries.length === beforeAlt.entries.length &&
+    openIn(afterAlt) === openIn(beforeAlt) &&
+    afterAlt.entries.every((entry) => entry.collapsed === false),
+  // 7. The region grew: one row took the room, the other rows are where they were.
+  oneRowTakesTheGrowth: (() => {
+    const gains = grown.entries.map((entry) => {
+      const before = beforeAlt.entries.find((old) => old.view === entry.view)?.entry?.h ?? 0;
+      return (entry.entry?.h ?? 0) - before;
+    });
+    const took = gains.filter((gain) => gain > 60);
+    return took.length === 1 && gains.every((gain) => gain >= -2);
+  })(),
   clickToggles:
     entryOf(clicked, BASE_VIEW)?.collapsed === true && bodyHeight(clicked, BASE_VIEW) <= 2,
   // Only this feature's own failures; the page's known noise is not ours.
@@ -152,7 +221,19 @@ const checks = {
 
 report({
   url,
-  facts: { region: REGION, initial, stacked, folded, clicked, consoleErrors },
+  facts: {
+    region: REGION,
+    initial,
+    stacked,
+    folded,
+    clicked,
+    shut,
+    opened,
+    beforeAlt,
+    afterAlt,
+    grown,
+    consoleErrors,
+  },
   checks,
   ok: "OK: one view renders bare, two stack with headers, folding keeps the header and hands the space over, and the header toggles on click.",
 });

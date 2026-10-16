@@ -12,139 +12,76 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { LayoutState } from "./contract.js";
 import {
-  MIN_ENTRY,
   allocateStack,
   dragChainTarget,
   dragSnapTarget,
-  redistributeOnDrag,
-  setViewCollapsed,
-  moveViewInRegion,
-  resetStackBoundary,
-  ensureStackShape,
-  findSplit,
-  stackEntries,
-  setEntryHeight,
-  setEntryFolded,
-  moveEntry,
-  visibleViews,
-  findRegion,
   HEADER_HEIGHT,
+  ensureStackShape,
+  findRegion,
+  findSplit,
+  moveEntry,
+  moveViewInRegion,
+  redistributeOnDrag,
+  resetStackBoundary,
+  setEntryFolded,
+  setEntryHeight,
+  setViewCollapsed,
+  stackEntries,
+  visibleViews,
+  type Basis,
 } from "./model.js";
 
-const HEIGHT = 734;
-
-/** A state with just the view records `allocateStack` reads. */
+/** A state with just the view records the fold helpers read. */
 const stateOf = (
   views: Record<string, { size?: number; collapsed?: boolean; max?: number; cachedSize?: number }>,
 ): LayoutState => ({ views }) as unknown as LayoutState;
 
-const heights = (views: readonly string[], drawn: ReadonlyMap<string, number>): number[] =>
-  views.map((viewId) => drawn.get(viewId) ?? 0);
+describe("allocateStack (C1/C5/C6/C8: the stack shares, one row at a time)", () => {
+  /** One claim per row: `size` 0 means "nobody has sized this one". */
+  const rows = (spec: readonly { size?: number; min?: number; max?: number }[]): Basis[] =>
+    spec.map((entry) => ({
+      flex: false,
+      size: entry.size ?? 0,
+      min: entry.min ?? 48,
+      max: entry.max ?? Number.POSITIVE_INFINITY,
+      priority: "normal" as const,
+    }));
 
-describe("allocateStack", () => {
   it("shares the height equally when nobody has sized anything", () => {
-    const views = ["a", "b", "c"];
-    const drawn = allocateStack(views, stateOf({ a: {}, b: {}, c: {} }), new Map(), 300);
-    expect(heights(views, drawn)).toEqual([100, 100, 100]);
+    expect(allocateStack(rows([{}, {}, {}]), 600)).toEqual([200, 200, 200]);
   });
 
-  it("keeps the sizes people set and lets the rest share what is left", () => {
-    const views = ["a", "b", "c", "d"];
-    const drawn = allocateStack(
-      views,
-      stateOf({ a: { size: 400 }, b: {}, c: {}, d: {} }),
-      new Map(),
-      HEIGHT,
-    );
-    // A size is a starting point, not a promise: room left over is shared in proportion, so a
-    // sized entry can move by the rounding of its share (upstream relayouts proportionally too).
-    expect(Math.abs((drawn.get("a") ?? 0) - 400)).toBeLessThanOrEqual(1);
-    for (const viewId of ["b", "c", "d"]) {
-      expect(drawn.get(viewId) ?? 0).toBeGreaterThanOrEqual(MIN_ENTRY);
-    }
-    expect(heights(views, drawn).reduce((total, size) => total + size, 0)).toBeLessThanOrEqual(
-      HEIGHT,
-    );
+  it("keeps the sizes people set and lets the unsized rows share what is left", () => {
+    expect(allocateStack(rows([{ size: 200 }, {}, {}]), 600)).toEqual([200, 200, 200]);
   });
 
-  it("scales sizes that cannot all fit, and never below the floor", () => {
-    const views = ["a", "b", "c", "d", "e"];
-    const drawn = allocateStack(
-      views,
-      stateOf({ a: { size: 600 }, b: { size: 600 }, c: {}, d: {}, e: {} }),
-      new Map(),
-      HEIGHT,
-    );
-    expect(drawn.get("a") ?? 0).toBeLessThan(600);
-    expect(drawn.get("b") ?? 0).toBeLessThan(600);
-    for (const viewId of views) {
-      expect(drawn.get(viewId) ?? 0).toBeGreaterThanOrEqual(MIN_ENTRY);
-    }
+  it("never leaves a row under its floor, even when the stack is too short", () => {
+    const sizes = allocateStack(rows([{ size: 300 }, { size: 300 }]), 200);
+    // The room is taken from the last row back (C6/C8), and neither ends under its floor.
+    expect(sizes).toEqual([152, 48]);
   });
 
   it("hands room left over to the rows that can take it, from the last one back", () => {
-    const views = ["a", "b", "c", "d"];
-    // 300 + 100 + 100 + 100 = 600 of the stack, so 134 is genuinely left over.
-    const drawn = allocateStack(
-      views,
-      stateOf({ a: { size: 300 }, b: {}, c: {}, d: {} }),
-      new Map([
-        ["b", 100],
-        ["c", 100],
-        ["d", 100],
-      ]),
-      HEIGHT,
-    );
-    // Nobody declares a ceiling here, so the **last** capable row takes the whole remainder — the
-    // order `distributeEmptySpace` walks in. It is not a proportional re-share.
-    expect(drawn.get("a")).toBe(300);
-    expect(drawn.get("b")).toBe(100);
-    expect(drawn.get("c")).toBe(100);
-    expect(drawn.get("d")).toBe(100 + (HEIGHT - 600));
-    expect(heights(views, drawn).reduce((total, size) => total + size, 0)).toBe(HEIGHT);
+    // Everything is sized and the stack grew: one row takes the whole of it (C6/C8).
+    expect(allocateStack(rows([{ size: 200 }, { size: 200 }, { size: 200 }]), 700)).toEqual([
+      200, 200, 300,
+    ]);
   });
 
   it("stops at a declared ceiling and moves on to the next capable row", () => {
-    const views = ["a", "b", "c"];
-    const drawn = allocateStack(
-      views,
-      stateOf({ a: {}, b: {}, c: { max: 300 } }),
-      new Map([
-        ["a", 100],
-        ["b", 100],
-        ["c", 100],
-      ]),
-      HEIGHT,
-    );
-    // `c` walks up to its own ceiling; what is left goes to `b`, the next row back.
-    expect(drawn.get("c")).toBe(300);
-    expect(drawn.get("b")).toBe(HEIGHT - 400);
-    expect(drawn.get("a")).toBe(100);
+    expect(
+      allocateStack(rows([{ size: 200 }, { size: 200 }, { size: 200, max: 250 }]), 700),
+    ).toEqual([200, 250, 250]);
   });
 
   it("gives a fold's room to the rows that can take it, from the last one back", () => {
-    const views = ["a", "b", "c"];
-    const foldedLast = allocateStack(
-      views,
-      stateOf({ a: {}, b: {}, c: { collapsed: true } }),
-      new Map([
-        ["a", 40],
-        ["b", 40],
-      ]),
-      HEIGHT,
-    );
-    const available = Math.max(2 * MIN_ENTRY, HEIGHT - HEADER_HEIGHT);
-    // The folded row is a header and takes nothing; the room goes to `b` (the last row that can
-    // still grow) — not in proportion to what the rows already hold.
-    expect(foldedLast.get("c")).toBe(HEADER_HEIGHT);
-    expect(foldedLast.get("b")).toBe(40 + (available - 80));
-    expect(foldedLast.get("a")).toBe(40);
-    // The folded row still holds its header line, so the stack's own height is `available` + it.
-    expect(heights(views, foldedLast).reduce((total, size) => total + size, 0)).toBe(
-      available + HEADER_HEIGHT,
-    );
+    // The last row is folded into its header: the room it had goes to the row above it.
+    expect(
+      allocateStack(rows([{ size: 200 }, { size: 400 }, { size: 300 }]), 700, [false, false, true]),
+    ).toEqual([200, 480, 20]);
   });
 });
+
 describe("redistributeOnDrag (SplitView.resize, splitview.ts:1308-1325)", () => {
   const entries = (...rows: [number, boolean][]) =>
     rows.map(([height, folded], index) => ({ viewId: `v${index}`, height, folded }));
