@@ -30,6 +30,17 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { installDeepDom } from "./deep-dom.mjs";
 
+/**
+ * Unfold a view the Explorer starts folded (VS Code's Explorer shows Outline and Timeline as headers
+ * until you open them, and prac's arrangement now declares the same default).
+ *
+ * @param view - the view id to open.
+ */
+async function unfold(view) {
+  await page.evaluate((id) => globalThis.__pracLayout.setViewCollapsed(id, false), view);
+  await page.waitForTimeout(600);
+}
+
 const packageDir = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(packageDir, "../..");
 const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vscode"));
@@ -154,6 +165,14 @@ async function opened(fixture) {
   const wanted = fixture.symbols.length;
   for (let attempt = 0; attempt < 40; attempt++) {
     await page.waitForTimeout(1000);
+    await unfold("vscode:view:outline");
+    // A section that starts folded comes back at its floor; give it room the way a person would drag it
+    // open, so the pane has somewhere to render (the claim itself is a face call, not a layout guess).
+    await page.evaluate(
+      (id) => globalThis.__pracLayout.setViewSize(id, 320),
+      "vscode:view:outline",
+    );
+    await page.waitForTimeout(800);
     const facts = await outline();
     if (facts.symbols.filter((row) => row !== "").length >= wanted) return facts;
   }

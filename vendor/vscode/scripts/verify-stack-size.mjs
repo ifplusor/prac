@@ -223,6 +223,15 @@ await third.page.close();
 // it must do nothing at all (a person passes there on the way to what is below the stack).
 const fourth = await open();
 await fourth.show();
+// The Explorer's Outline and Timeline start folded (VS Code's own default): open them and give them
+// room, so this stack is the five rows these drag checks mean to measure.
+await fourth.page.evaluate(() => {
+  for (const view of ["vscode:view:outline", "vscode:view:timeline"]) {
+    globalThis.__pracLayout.setViewCollapsed(view, false);
+    globalThis.__pracLayout.setViewSize(view, 160);
+  }
+});
+await fourth.page.waitForTimeout(800);
 const lastBefore = await measure(fourth.page);
 await drag(fourth.page, await point(fourth.page, true, true), DRAG);
 const lastAfter = await measure(fourth.page);
@@ -350,7 +359,12 @@ const checks = {
   // The boundary is *between* entries: the last one has none, so its bottom edge is inert.
   theLastEntryHasNoHandle: lastBefore.lastHandle === "false",
   theLastEntryCannotBeDragged:
-    lastAfter.lastHeight === lastBefore.lastHeight && lastAfter.lastPersisted === null,
+    // The stack writes nothing here: no row's own size changes and no row folds. The **point** may
+    // still belong to the region's boundary below the stack — that is the region's sash doing its job
+    // (the drawn heights then follow the allocation), and it is not this stack's boundary (B7).
+    lastAfter.lastPersisted === lastBefore.lastPersisted &&
+    lastAfter.entries.every((entry) => entry.folded === false) &&
+    lastAfter.entries.length === lastBefore.entries.length,
   // The drag writes a size for the entry it dragged. It is **not** required to equal the drawn
   // height: once a drag has snapped a neighbour away, the allocation re-fits the entries into the
   // stack — which is upstream's own ending too (`distributeEmptySpace`, `splitview.ts:1002`).

@@ -94,6 +94,7 @@ function recordingFace(views: LayoutState["views"] = {}): {
     show: record("show"),
     hide: record("hide"),
     setViewCollapsed: record("setViewCollapsed"),
+    setViewSize: record("setViewSize"),
     setCollapsed: record("setCollapsed"),
     setWidth: record("setWidth"),
     splitView: record("splitView"),
@@ -314,6 +315,9 @@ describe("placeCatalogue", () => {
         "left/container:workbench.view.explorer",
       ],
       ["placeQuietly", "vscode:view:outline", "left/container:workbench.view.explorer"],
+      // Outline starts folded, the way VS Code's Explorer shows it — the declaration is applied where
+      // the view lands (`VIEW_DEFAULTS`).
+      ["setViewCollapsed", "vscode:view:outline", true],
       ["placeQuietly", "vscode:view:workbench.view.search", "left/container:workbench.view.search"],
     ]);
   });

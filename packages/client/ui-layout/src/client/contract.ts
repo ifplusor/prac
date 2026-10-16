@@ -540,6 +540,8 @@ export interface PracLayoutFace {
    * @param collapsed - the requested state.
    */
   setViewCollapsed(viewId: string, collapsed: boolean): void;
+  /** Declare the height a view wants as a stack row; the layout only reads it. */
+  setViewSize(viewId: string, size: number): void;
   /**
    * Collapse a region to nothing (remembering its size) or restore it.
    *

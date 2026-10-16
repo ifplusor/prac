@@ -137,6 +137,19 @@ const viewLabel = (viewId: string): string =>
  * @param layout - the mechanism's placement face.
  * @param entries - the app's catalogue.
  */
+/**
+ * The heights VS Code's own Explorer starts its views at.
+ *
+ * The Explorer is a stack of sections there: **Open Editors** is a short list, the **file tree** takes
+ * what is left, and **Outline** / **Timeline** start **folded** — headers you click to open. prac reads
+ * these the way it reads every other declaration: the view says what it wants, the layout obeys.
+ */
+const VIEW_DEFAULTS: Readonly<Record<string, { size?: number; folded?: boolean }>> = {
+  "vscode:view:workbench.explorer.openEditorsView": { size: 120 },
+  "vscode:view:outline": { folded: true },
+  "vscode:view:timeline": { folded: true },
+};
+
 export function placeCatalogue(layout: PracLayout, entries: readonly VscodeCatalogueEntry[]): void {
   const groups = new Map<string, Map<string, { label: string; views: string[] }>>();
   for (const entry of entries) {
@@ -185,6 +198,10 @@ export function placeCatalogue(layout: PracLayout, entries: readonly VscodeCatal
       for (const view of bucket.views) {
         if (known[view] !== undefined) continue;
         layout.placeQuietly(view, childRegionId(region, key));
+        // What this view declares about its height — the layout only reads it (see `VIEW_DEFAULTS`).
+        const declared = VIEW_DEFAULTS[view];
+        if (declared?.size !== undefined) layout.setViewSize(view, declared.size);
+        if (declared?.folded === true) layout.setViewCollapsed(view, true);
       }
     }
   }

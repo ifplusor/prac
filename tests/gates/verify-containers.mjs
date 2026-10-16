@@ -207,23 +207,32 @@ const deferred = DEFERRED.map(
   (id) => views.find((view) => view.id === id) ?? { id, region: "absent" },
 );
 
-const facts = {
-  bars,
-  visits,
-  screens: { borrowed: placed.length, containers: bars.flatMap((bar) => borrowed(bar.bar)).length },
-  colours,
-  deferred,
-};
+// The Explorer's own sections, the way VS Code arranges them: the file tree takes the room, and
+// Outline / Timeline sit folded as headers until someone opens them. The container has to be **shown**
+// first — a container that is not selected is not rendered at all.
+await page.evaluate((id) => {
+  document.querySelector(`[data-prac-container-bar="left"] [data-prac-container="${id}"]`)?.click();
+}, EXPLORER);
+await page.waitForTimeout(1500);
+const explorerSections = await page.evaluate(() => {
+  const rows = [...document.querySelectorAll("[data-prac-stack-entry]")];
+  const at = (view) => {
+    const row = rows.find((entry) => entry.getAttribute("data-prac-stack-entry") === view);
+    return row ? Math.round(row.getBoundingClientRect().height) : null;
+  };
+  return {
+    file: at("vscode:view:workbench.explorer.fileView"),
+    outline: at("vscode:view:outline"),
+    timeline: at("vscode:view:timeline"),
+  };
+});
 
-// ── an empty container says so, instead of the track quietly showing another ──
+// Empty the container the way a session ends up when its views have been hidden.
 await page.evaluate((id) => {
   for (const view of globalThis.__pracLayout.listViews()) {
     if ((view.region ?? "").includes("explorer")) globalThis.__pracLayout.hide(view.id);
   }
-  const item = document.querySelector(
-    `[data-prac-container-bar="left"] [data-prac-container="${id}"]`,
-  );
-  item?.click();
+  document.querySelector(`[data-prac-container-bar="left"] [data-prac-container="${id}"]`)?.click();
 }, EXPLORER);
 await page.waitForTimeout(1200);
 const emptyState = await page.evaluate((id) => {
@@ -244,6 +253,16 @@ const emptyState = await page.evaluate((id) => {
 
 await close();
 
+const facts = {
+  explorerSections,
+  emptyState,
+  bars,
+  visits,
+  screens: { borrowed: placed.length, containers: bars.flatMap((bar) => borrowed(bar.bar)).length },
+  colours,
+  deferred,
+};
+
 report({
   url,
   facts,
@@ -261,6 +280,10 @@ report({
         bar.labels.length === bar.items.length &&
         bar.labels.every((label) => label.length > 0 && !label.startsWith("workbench.view.")),
     ),
+    "the Explorer's tree takes the room, its sections start folded":
+      (explorerSections.file ?? 0) >= 200 &&
+      (explorerSections.outline ?? 99) <= 24 &&
+      (explorerSections.timeline ?? 99) <= 24,
     // An emptied container is named on the bar and, when picked, says so itself: the click lands on
     // the container the person chose instead of the track silently showing a different one.
     "an empty container is marked and says so when picked":

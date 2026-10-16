@@ -2106,6 +2106,32 @@ export function dragChainTarget(
  * @param measuredHeight - what the entry is drawn at right now, if the caller can see it.
  * @returns the state with the view folded, and with the size it should come back at.
  */
+/**
+ * Declare the height a view wants when it is a row of a stack.
+ *
+ * The declaration is the view's (or the app's on its behalf) — the layout only reads it, the same rule
+ * `max` follows. A view that already has a row sizes **that row**; one that does not leaves the number
+ * on its record, where shaping picks it up when the row appears.
+ *
+ * @param state - the layout state.
+ * @param viewId - the view whose height is being declared.
+ * @param size - the height in px.
+ * @returns the state, or the same state when there is nothing to change.
+ */
+export function setViewSize(state: LayoutState, viewId: string, size: number): LayoutState {
+  const view = state.views[viewId];
+  if (view === undefined) return state;
+  const wanted = Math.max(0, Math.round(size));
+  const home = view.region === undefined ? null : findRegion(state.tree, view.region);
+  if (home?.entry === true) {
+    return {
+      ...state,
+      tree: updateRegion(state.tree, home.id, (row) => ({ ...row, size: wanted, flex: false })),
+    };
+  }
+  return { ...state, views: { ...state.views, [viewId]: { ...view, size: wanted } } };
+}
+
 export function setViewCollapsed(
   state: LayoutState,
   viewId: string,

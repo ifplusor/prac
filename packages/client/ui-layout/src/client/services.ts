@@ -55,6 +55,7 @@ import {
   regionNode,
   setCollapsed,
   setViewCollapsed,
+  setViewSize,
   setFront,
   setRegionChildren,
   setRegionSize,
@@ -292,6 +293,10 @@ export function createServices(
     },
     setFront(viewId: string): void {
       store.update((state) => setFront(state, viewId));
+    },
+    /** Declare the height a view wants as a stack row (see the model's doc). */
+    setViewSize(viewId: string, size: number): void {
+      store.update((state) => setViewSize(state, viewId, size));
     },
     /** Show/hide a view without moving it. */
     show(viewId: string): void {
