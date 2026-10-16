@@ -387,10 +387,17 @@ describe("setRegionSize / nodeBasis / subtreeMin", () => {
     expect(nodeBasis({ type: "split", id: "s", dir: "row", children: [] })).toEqual({
       flex: true,
       size: 0,
+      min: 0,
+      max: Number.POSITIVE_INFINITY,
+      priority: "normal",
     });
+    // A collapsed region claims nothing at all: no size to share, no room to give.
     expect(nodeBasis(regionNode("r", 300, { collapsed: true, cachedSize: 300 }))).toEqual({
       flex: false,
       size: 0,
+      min: 0,
+      max: 0,
+      priority: "normal",
     });
   });
 

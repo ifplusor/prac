@@ -55,13 +55,11 @@ import {
   isPresent,
   frontView,
   isStacked,
+  resizeBoundary,
   resolveSizes,
   setFront,
-  sashSizes,
   selectChild,
-  setRegionSize,
   showsTabStrip,
-  subtreeMin,
   visibleViews,
   allocateStack,
   MIN_ENTRY,
@@ -522,10 +520,10 @@ interface DragState {
   pointerId: number;
   /** Pointer position along the split axis when the drag started. */
   origin: number;
-  a: RegionNode;
-  b: RegionNode;
-  /** The extent this pair may share (see {@link sashSizes}). */
-  budget: number;
+  /** Which boundary of the split moved: the one after this child of its present children. */
+  index: number;
+  /** What the split's present children were drawn at when the drag started. */
+  drawn: ReadonlyMap<string, number>;
 }
 
 /** Props of one draggable boundary. */
@@ -580,20 +578,21 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
       event.preventDefault();
       return;
     }
-    const extent = dir === "row" ? container!.clientWidth : container!.clientHeight;
-    const present = split.children.filter((child) => isPresent(state, child));
-    const sashes = Math.max(0, present.length - 1) * SASH_SIZE;
-    // Every *other* child keeps its minimum: clamping against the adjacent
-    // region alone lets a growing fixed region starve its flex siblings to zero.
-    const reserve = present
-      .filter((child) => child.id !== leftId && child.id !== rightId)
-      .reduce((total, child) => total + subtreeMin(child), 0);
+    // A drag starts from the pixels: a flexible child claims nothing in the tree, so its drawn
+    // extent is the only honest starting point.
+    const drawn = new Map<string, number>();
+    for (const child of split.children.filter((entry) => isPresent(state, entry))) {
+      const element =
+        document.querySelector(`[data-prac-region="${CSS.escape(child.id)}"]`) ??
+        document.querySelector(`[data-prac-split="${CSS.escape(child.id)}"]`);
+      const rect = element?.getBoundingClientRect();
+      if (rect !== undefined) drawn.set(child.id, dir === "row" ? rect.width : rect.height);
+    }
     drag.current = {
       pointerId: event.pointerId,
       origin: dir === "row" ? event.clientX : event.clientY,
-      a,
-      b,
-      budget: Math.max(a.min + b.min, extent - sashes - reserve),
+      index,
+      drawn,
     };
     element.setPointerCapture(event.pointerId);
     event.preventDefault();
@@ -604,14 +603,19 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
     if (!current || current.pointerId !== event.pointerId) return;
     event.preventDefault();
     const point = dir === "row" ? event.clientX : event.clientY;
-    const next = sashSizes(current.a, current.b, point - current.origin, current.budget);
-    if (!next) return;
-    store.update((state) => {
-      let tree = state.tree;
-      if (next.a !== undefined) tree = setRegionSize(tree, current.a.id, next.a);
-      if (next.b !== undefined) tree = setRegionSize(tree, current.b.id, next.b);
-      return tree === state.tree ? state : { ...state, tree };
-    });
+    // The model moves the boundary: the drag is clamped to what the two sides can do (`min` / `max`)
+    // and the space is handed out by `Sizing` — `distribute` spreads it over the whole side in
+    // proportion (the default), `expand` pushes the neighbour only.
+    store.update((state) =>
+      resizeBoundary(
+        state,
+        splitId,
+        current.index,
+        point - current.origin,
+        "distribute",
+        current.drawn,
+      ),
+    );
   };
 
   const onPointerUp = (event: PointerDragEvent): void => {

@@ -413,6 +413,9 @@ states.newPanePaint = await paintAt(page, newPane, `[data-prac-region="${newRegi
 states.sourcePanePaint = await paintAt(page, states.split.right, '[data-prac-region="right"] > *');
 
 // ── 9. 收起 / 展开 a region from the UI ─────────────────────────────────────
+// The width to come back to is **the width it had**, whatever the drags before did to it (a
+// `Distribute` drag moves every block on the side, not just the two beside the sash).
+states.regionOpenBeforeCollapse = await sample(page);
 await toggleRecall(page);
 await page.click(collapseOf("left"));
 await page.waitForTimeout(800);
@@ -533,7 +536,7 @@ const checks = {
   collapseThenExpandFromTheUi:
     states.regionCollapsed.left?.w === 0 &&
     states.regionCollapsedOpen.regionCollapseStates.left === "true" &&
-    states.regionExpanded.left?.w === 280,
+    states.regionExpanded.left?.w === states.regionOpenBeforeCollapse.left?.w,
   regionCollapseStillPaints: painted(states.regionCollapsedPaint),
 };
 

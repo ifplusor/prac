@@ -12,7 +12,8 @@
     "verify:bottom": "node tests/gates/verify-bottom.mjs",
     "verify:containers": "node tests/gates/verify-containers.mjs",
     "verify:persistence": "node tests/gates/verify-persistence.mjs",
-    "verify:split": "node tests/gates/verify-split.mjs"
+    "verify:split": "node tests/gates/verify-split.mjs",
+    "verify:resize": "node tests/gates/verify-resize.mjs"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

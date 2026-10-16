@@ -15,6 +15,8 @@ import {
   CENTER_REGION,
   DEFAULT_MIN,
   SASH_SIZE,
+  type LayoutPriority,
+  type Sizing,
   type Box,
   type Dir,
   type LayoutNode,
@@ -92,17 +94,26 @@ export function defaultTree(): SplitNode {
         id: "top",
         dir: "row",
         children: [
-          regionNode("left", 280, { stack: true }),
+          // VS Code's own convention, straight from its parts: the editor group is `High`
+          // (`editorPart.ts`), the side bars and the panel are `Low` (`sidebarPart.ts`). A `High`
+          // block is resized first, so when the window runs short the centre gives way and the
+          // tracks keep their size.
+          regionNode("left", 280, { stack: true, priority: "low" }),
           // The centre is the editor group of this layout: it gets the tab strip
           // (VS Code's default `showTabs: "multiple"`), and it stays flexible so an
           // empty work area is still present.
-          regionNode(CENTER_REGION, 0, { flex: true, min: CENTER_MIN, tabs: "multiple" }),
-          regionNode("right", 420, { stack: true }),
+          regionNode(CENTER_REGION, 0, {
+            flex: true,
+            min: CENTER_MIN,
+            tabs: "multiple",
+            priority: "high",
+          }),
+          regionNode("right", 420, { stack: true, priority: "low" }),
         ],
       },
       // Empty at boot: an empty region is not rendered, so this costs the default
       // layout nothing and appears (at its size) as soon as something lands in it.
-      regionNode(BOTTOM_REGION, 240, { stack: true }),
+      regionNode(BOTTOM_REGION, 240, { stack: true, priority: "low" }),
     ],
   };
 }
@@ -218,7 +229,133 @@ export function updateRegion(
  * @param size - requested size in px (rounded, clamped at 0).
  */
 export function setRegionSize(tree: LayoutNode, id: string, size: number): LayoutNode {
+  // Never negative, and **not** clamped to `min`: collapse writes 0 through the same door, and keeping
+  // a drag inside `min` / `max` is `resizeBoundary`'s job.
   return updateRegion(tree, id, (node) => ({ ...node, size: Math.max(0, Math.round(size)) }));
+}
+
+/**
+ * Write a child's extent along its parent's axis, for a region **or** a split standing in for one.
+ *
+ * `flex` is left as it was: a child that shared the leftover keeps doing so, now with the size it was
+ * given as its weight, which is how a dragged boundary keeps its proportions when the frame changes.
+ *
+ * @param tree - the tree to edit.
+ * @param id - the child to size.
+ * @param size - the wanted extent in px.
+ * @returns the tree, or the same tree when nothing moved.
+ */
+export function setNodeSize(tree: LayoutNode, id: string, size: number): LayoutNode {
+  const wanted = Math.max(0, Math.round(size));
+  const current = findNode(tree, id);
+  if (current === null) return tree;
+  const basis = nodeBasis(current);
+  const next = Math.min(basis.max, Math.max(0, wanted));
+  if (basis.size === next) return tree;
+  return replaceNode(tree, id, (node) =>
+    node.type === "split" ? { ...node, size: next } : { ...node, size: next },
+  );
+}
+
+/**
+ * Move the boundary between two children of a split.
+ *
+ * The two sides of the sash are ordered **nearest first**, with `priority` deciding who is consider-
+ * first (`high` first, `low` last — VS Code's `LayoutPriority`); the drag is clamped to what the pair
+ * can actually do (`max` on the side that grows, `min` on the side that shrinks), and the space is
+ * handed out by `sizing`: `"distribute"` spreads it over the whole side **in proportion** (VS Code
+ * `DistributeSizing`, the default), `"expand"` pushes the nearest child only, one at a time.
+ *
+ * @param state - the layout state.
+ * @param splitId - the split whose boundary moves.
+ * @param index - the boundary's position: the index of the child **after** it, among the split's
+ * present children (so the first boundary is 1, as the frame numbers its sashes).
+ * @param delta - how far the boundary moves, in px (positive grows the children before it).
+ * @param sizing - how the space is handed out.
+ * @param current - what the children are **drawn** at, when the caller knows (a DOM drag does). The
+ * tree's own `size` is only a claim: a flexible block that nobody has dragged claims nothing at all,
+ * so a drag has to start from the pixels on screen.
+ * @returns the state, or the same state when nothing moved.
+ */
+export function resizeBoundary(
+  state: LayoutState,
+  splitId: string,
+  index: number,
+  delta: number,
+  sizing: Sizing = "distribute",
+  current?: ReadonlyMap<string, number>,
+): LayoutState {
+  const node = findNode(state.tree, splitId);
+  if (node === null || node.type !== "split") return state;
+  const present = node.children.filter((child) => isPresent(state, child));
+  if (index < 1 || index >= present.length) return state;
+
+  const ordered = (list: readonly LayoutNode[]): LayoutNode[] =>
+    [...list].sort(
+      (a, b) => priorityRank(nodeBasis(a).priority) - priorityRank(nodeBasis(b).priority),
+    );
+  const up = ordered(present.slice(0, index).reverse());
+  const down = ordered(present.slice(index));
+  const sizes = new Map<string, number>(
+    present.map((child) => [child.id, current?.get(child.id) ?? nodeBasis(child).size]),
+  );
+  const headroom = (list: readonly LayoutNode[], sign: 1 | -1): number =>
+    list.reduce((total, child) => {
+      const basis = nodeBasis(child);
+      const head = sign > 0 ? basis.max - sizes.get(child.id)! : sizes.get(child.id)! - basis.min;
+      return total + Math.max(0, head);
+    }, 0);
+  const moved = Math.max(-headroom(down, -1), Math.min(headroom(up, 1), delta));
+
+  if (moved !== 0) {
+    if (sizing === "expand") {
+      let room = moved;
+      for (const child of up) {
+        const basis = nodeBasis(child);
+        const next = clampClaim(basis, sizes.get(child.id)! + room);
+        room -= next - sizes.get(child.id)!;
+        sizes.set(child.id, next);
+      }
+      let taken = moved;
+      for (const child of down) {
+        const basis = nodeBasis(child);
+        const next = clampClaim(basis, sizes.get(child.id)! - taken);
+        taken -= sizes.get(child.id)! - next;
+        sizes.set(child.id, next);
+      }
+    } else {
+      const spread = (list: readonly LayoutNode[], amount: number): void => {
+        let left = Math.abs(amount);
+        let open = [...list];
+        while (left > 1e-6 && open.length > 0) {
+          const held = open.map((child) => sizes.get(child.id)!);
+          const weights = held.some((size) => size > 0) ? held : open.map(() => 1);
+          const total = weights.reduce((sum, weight) => sum + weight, 0);
+          let used = 0;
+          const next: LayoutNode[] = [];
+          open.forEach((child, position) => {
+            const basis = nodeBasis(child);
+            const share = (left * weights[position]!) / total;
+            const head =
+              amount > 0 ? basis.max - sizes.get(child.id)! : sizes.get(child.id)! - basis.min;
+            const take = Math.max(0, Math.min(share, head));
+            sizes.set(child.id, sizes.get(child.id)! + Math.sign(amount) * take);
+            used += take;
+            if (head - take > 1e-6) next.push(child);
+          });
+          left -= used;
+          open = next;
+          if (used <= 1e-6) break;
+        }
+      };
+      spread(up, moved);
+      spread(down, -moved);
+    }
+  }
+
+  let tree = state.tree;
+  for (const [id, size] of sizes) tree = setNodeSize(tree, id, size);
+  return tree === state.tree ? state : { ...state, tree };
 }
 
 /**
@@ -314,12 +451,133 @@ export function revealRegion(tree: LayoutNode, id: string): LayoutNode {
  *
  * @param node - the child node.
  */
-export function nodeBasis(node: LayoutNode): { flex: boolean; size: number } {
+export function nodeBasis(node: LayoutNode): Basis {
   // A split without them shares the leftover, exactly as before they existed; a split standing in
   // for a fixed-size region carries that region's basis instead.
-  if (node.type === "split") return { flex: node.flex ?? true, size: node.size ?? 0 };
-  if (node.collapsed) return { flex: false, size: 0 };
-  return { flex: node.flex, size: node.size };
+  if (node.type === "split") {
+    return {
+      flex: node.flex ?? true,
+      size: node.size ?? 0,
+      min: 0,
+      max: node.max ?? Number.POSITIVE_INFINITY,
+      priority: node.priority ?? "normal",
+    };
+  }
+  if (node.collapsed)
+    return { flex: false, size: 0, min: 0, max: 0, priority: node.priority ?? "normal" };
+  return {
+    flex: node.flex,
+    size: node.size,
+    min: node.min,
+    max: node.max ?? Number.POSITIVE_INFINITY,
+    priority: node.priority ?? "normal",
+  };
+}
+
+/** What one child claims of its split's extent (VS Code: `size` / `minimumSize` / `maximumSize`). */
+export interface Basis {
+  readonly flex: boolean;
+  readonly size: number;
+  readonly min: number;
+  readonly max: number;
+  readonly priority: LayoutPriority;
+}
+
+/** VS Code's order: `high` is resized first, so it is the first to give way and the last to get room. */
+const priorityRank = (priority: LayoutPriority | undefined): number =>
+  priority === "high" ? 0 : priority === "low" ? 2 : 1;
+
+/** A claim clamped into its own bounds. */
+const clampClaim = (basis: Basis, size: number): number =>
+  Math.min(basis.max, Math.max(basis.min, Math.round(size)));
+
+/**
+ * Give a split's extent to its children.
+ *
+ * Each child starts at its own claim, clamped; what is left over goes to the **flexible** ones, in
+ * proportion to what they already claim (a child that claims nothing counts as one unit, which is how
+ * a stack's untouched rows share equally). Too little room is taken back in priority order — `high`
+ * first, `low` last, never under a `min` — so "who gives way" is a property of the tree, not an
+ * accident of the arithmetic.
+ *
+ * @param basis - one claim per child, in the split's order.
+ * @param content - the extent to share out, sashes already taken off.
+ * @returns one size per child.
+ */
+export function allocateContent(basis: readonly Basis[], content: number): number[] {
+  // A fixed child is honoured (clamped); a flexible one starts at what it claims — nothing, for a
+  // sibling nobody has touched — so untouched siblings share **evenly**, and a dragged split (whose
+  // children now claim their sizes) keeps its proportions when the frame changes.
+  const sizes = basis.map((entry) =>
+    entry.flex ? Math.min(entry.size, entry.max) : clampClaim(entry, entry.size),
+  );
+  const grow = (amount: number): void => {
+    let room = amount;
+    let open = basis.map((_, index) => index).filter((index) => basis[index]!.flex);
+    while (room > 1e-6 && open.length > 0) {
+      // In proportion to what each holds; siblings nobody has sized count as one unit each, which is
+      // how a fresh split comes out even.
+      const held = open.map((index) => sizes[index]!);
+      const weights = held.some((size) => size > 0) ? held : open.map(() => 1);
+      const total = weights.reduce((sum, weight) => sum + weight, 0);
+      let moved = 0;
+      const next: number[] = [];
+      open.forEach((index, position) => {
+        const entry = basis[index]!;
+        const share = (room * weights[position]!) / total;
+        const take = Math.min(share, entry.max - sizes[index]!);
+        sizes[index] = sizes[index]! + take;
+        moved += take;
+        if (sizes[index]! < entry.max) next.push(index);
+      });
+      room -= moved;
+      open = next;
+      if (moved <= 1e-6) break;
+    }
+  };
+
+  const claimed = sizes.reduce((total, size) => total + size, 0);
+  if (content - claimed > 0) {
+    grow(content - claimed);
+    // A floor is a promise, not a preference: whatever ended up under its `min` is raised, and the
+    // room comes from the siblings with the most to spare.
+    for (let round = 0; round < basis.length; round += 1) {
+      const short = basis
+        .map((_, index) => index)
+        .filter((index) => basis[index]!.flex && sizes[index]! < basis[index]!.min);
+      if (short.length === 0) break;
+      let need = short.reduce((total, index) => total + (basis[index]!.min - sizes[index]!), 0);
+      const donors = basis
+        .map((_, index) => index)
+        .filter((index) => sizes[index]! - basis[index]!.min > 0)
+        .sort((a, b) => sizes[b]! - basis[b]!.min - (sizes[a]! - basis[a]!.min));
+      for (const index of donors) {
+        if (need <= 1e-6) break;
+        const spare = sizes[index]! - basis[index]!.min;
+        const give = Math.min(need, spare);
+        sizes[index] = sizes[index]! - give;
+        need -= give;
+      }
+      const total = short.reduce((sum, index) => sum + (basis[index]!.min - sizes[index]!), 0);
+      if (total <= 1e-6) break;
+      for (const index of short)
+        sizes[index] = Math.min(basis[index]!.min, sizes[index]! + total / short.length);
+    }
+    return sizes;
+  }
+
+  let need = -(content - claimed);
+  const order = basis
+    .map((_, index) => index)
+    .sort((a, b) => priorityRank(basis[a]!.priority) - priorityRank(basis[b]!.priority) || b - a);
+  for (const index of order) {
+    if (need <= 1e-6) break;
+    const give = Math.min(need, sizes[index]! - basis[index]!.min);
+    if (give <= 0) continue;
+    sizes[index] = sizes[index]! - give;
+    need -= give;
+  }
+  return sizes;
 }
 
 // ── placement & visibility ────────────────────────────────────────────
@@ -657,6 +915,8 @@ export function ensureStackShape(state: LayoutState): LayoutState {
         ...(sized !== undefined && view?.collapsed !== true ? { size: sized } : {}),
         ...(view?.collapsed === true ? { collapsed: true } : {}),
         ...(view?.cachedSize !== undefined ? { cachedSize: view.cachedSize } : {}),
+        // The ceiling is the view's to declare; the layout only reads it.
+        ...(view?.max === undefined ? {} : { max: view.max }),
       },
     );
     const record = views[viewId];
@@ -1011,12 +1271,9 @@ export function resolveSizes(state: LayoutState, width: number, height: number):
     const extent = node.dir === "row" ? w : h;
     const sashes = Math.max(0, present.length - 1) * SASH_SIZE;
     const content = Math.max(0, extent - sashes);
-    const basis = present.map(nodeBasis);
-    const fixedTotal = basis.reduce((total, entry) => total + (entry.flex ? 0 : entry.size), 0);
-    const flexCount = basis.filter((entry) => entry.flex).length;
-    const share = flexCount > 0 ? Math.max(0, content - fixedTotal) / flexCount : 0;
+    const sizes = allocateContent(present.map(nodeBasis), content);
     present.forEach((child, index) => {
-      const main = basis[index].flex ? share : basis[index].size;
+      const main = sizes[index] ?? 0;
       if (node.dir === "row") visit(child, main, h);
       else visit(child, w, main);
     });

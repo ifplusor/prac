@@ -57,6 +57,25 @@ export type Dir = "row" | "column";
  */
 export type Side = "left" | "right" | "up" | "down";
 
+/**
+ * How hard a region is to squeeze when the split it lives in has to change size.
+ *
+ * The values and their meaning are VS Code's `LayoutPriority`: a view with **higher** priority is
+ * resized first, so when space runs short the high-priority one gives way first and the low-priority
+ * ones keep their size. The convention the arrangement follows is VS Code's own —
+ * `editorPart = High`, `sidebarPart = Low`.
+ */
+export type LayoutPriority = "normal" | "low" | "high";
+
+/**
+ * How dragging a sash moves the space.
+ *
+ * - `"distribute"` (VS Code's `DistributeSizing`, the default): every block on the axis absorbs the
+ *   change **in proportion**, each clamped to its own `min` / `max`;
+ * - `"expand"`: only the neighbour is pushed, one block at a time (VS Code `SplitView.resize`).
+ */
+export type Sizing = "distribute" | "expand";
+
 /** A sized region for one visible view. */
 export interface RegionNode {
   readonly type: "region";
@@ -71,6 +90,15 @@ export interface RegionNode {
   cachedSize: number;
   /** Smallest size this region may be squeezed to, in px. */
   min: number;
+  /**
+   * Largest size this region may grow to, in px.
+   *
+   * Absent means "no bound of its own" (VS Code's `maximumSize` defaults to infinity). The layout
+   * only reads it — a view that wants a ceiling declares one.
+   */
+  readonly max?: number;
+  /** How hard this region is to squeeze; absent means `"normal"`. */
+  readonly priority?: LayoutPriority;
   /**
    * Whether the region **stacks** all its visible views instead of showing only
    * the front one.
@@ -179,6 +207,10 @@ export interface SplitNode {
    */
   readonly size?: number;
   readonly flex?: boolean;
+  /** Largest extent this split may grow to; absent means no bound. */
+  readonly max?: number;
+  /** How hard this split is to squeeze; absent means `"normal"`. */
+  readonly priority?: LayoutPriority;
   readonly children: LayoutNode[];
 }
 
