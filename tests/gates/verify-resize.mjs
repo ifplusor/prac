@@ -92,6 +92,28 @@ const shrank = (after, before) => (before?.w ?? 0) - (after?.w ?? 0);
 /** A region that is not rendered at all means "no block there", which the checks below allow. */
 const drawn = (box) => box === null || (box?.w ?? 0) > 40;
 
+// ── the edge: drag a block away and bring it back (VS Code's sash snap) ──────
+/** Double-click the sash, the way a person resets a boundary. */
+async function resetSash(selector) {
+  const point = await page.evaluate((sel) => {
+    const sash = document.querySelector(sel);
+    if (!sash) return null;
+    const rect = sash.getBoundingClientRect();
+    return { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) };
+  }, selector);
+  if (!point) throw new Error(`no sash matching "${selector}"`);
+  await page.mouse.dblclick(point.x, point.y);
+  await page.waitForTimeout(800);
+}
+
+const beforeSnap = await sample();
+await dragSash(`[data-prac-sash-left="${LEFT}"]`, -400);
+const snapped = await sample();
+await dragSash(`[data-prac-sash-left="${LEFT}"]`, 400);
+const brought = await sample();
+await resetSash(`[data-prac-sash-left="${LEFT}"]`);
+const reset = await sample();
+
 const checks = {
   // 1. Bounds: the tracks start at their designed widths and nobody ends up empty.
   // `right` is empty in the default arrangement, so it draws nothing: the check is that a track that
@@ -119,6 +141,14 @@ const checks = {
     (tight.right === null || Math.abs(grew(tight.right, dragged.right)) <= 2),
   theCentreStayedOnScreen:
     (tight.center?.w ?? 0) > 40 && (tight.center?.h ?? 0) === Math.round(stage),
+  // 4. The edge: a block dragged away leaves no room behind, and coming back restores its size.
+  aDraggedBlockGoesAway:
+    (snapped.left?.w ?? -1) === 0 && grew(snapped.center, beforeSnap.center) >= 200,
+  // It comes back at the width it had when it went away and **keeps following the drag** (VS Code
+  // re-runs the resize with the same delta), so the check is "at least as wide as it was".
+  draggingBackBringsItBack: (brought.left?.w ?? 0) >= (beforeSnap.left?.w ?? 0),
+  // 5. A double click on the boundary evens the two blocks out.
+  resetEvensesThePair: Math.abs((reset.left?.w ?? 0) - (reset.center?.w ?? 0)) <= 1,
   noErrors:
     own("__pracLayout").length === 0 &&
     own("prac-client-ui-layout").length === 0 &&
@@ -129,7 +159,7 @@ await close();
 
 report({
   url,
-  facts: { initial, dragged, tight, consoleErrors },
+  facts: { initial, dragged, tight, beforeSnap, snapped, brought, reset, consoleErrors },
   checks,
   ok: "OK: the default row sizes to its tracks, a boundary drag spreads over the whole side inside every floor, and a tight window is paid for by the centre",
 });

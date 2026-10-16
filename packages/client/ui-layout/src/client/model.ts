@@ -98,7 +98,7 @@ export function defaultTree(): SplitNode {
           // (`editorPart.ts`), the side bars and the panel are `Low` (`sidebarPart.ts`). A `High`
           // block is resized first, so when the window runs short the centre gives way and the
           // tracks keep their size.
-          regionNode("left", 280, { stack: true, priority: "low" }),
+          regionNode("left", 280, { stack: true, priority: "low", snap: true }),
           // The centre is the editor group of this layout: it gets the tab strip
           // (VS Code's default `showTabs: "multiple"`), and it stays flexible so an
           // empty work area is still present.
@@ -107,13 +107,14 @@ export function defaultTree(): SplitNode {
             min: CENTER_MIN,
             tabs: "multiple",
             priority: "high",
+            snap: true,
           }),
-          regionNode("right", 420, { stack: true, priority: "low" }),
+          regionNode("right", 420, { stack: true, priority: "low", snap: true }),
         ],
       },
       // Empty at boot: an empty region is not rendered, so this costs the default
       // layout nothing and appears (at its size) as soon as something lands in it.
-      regionNode(BOTTOM_REGION, 240, { stack: true, priority: "low" }),
+      regionNode(BOTTOM_REGION, 240, { stack: true, priority: "low", snap: true }),
     ],
   };
 }
@@ -1285,6 +1286,112 @@ export function resolveSizes(state: LayoutState, width: number, height: number):
 // ── collapse & split ──────────────────────────────────────────────────
 
 /**
+ * A block a drag may take away (VS Code's sash snap, `splitview.ts:937-957`).
+ *
+ * The threshold is the block's **own** extent: the drag computes what the block would be left with,
+ * and it goes away once that is under half its minimum, coming back once the drag brings it over
+ * again. The two limits differ by the block's minimum — that band is what keeps the flip from
+ * chattering — and `size` is the extent it had when the drag started, which is what it returns to.
+ */
+export interface SnapTarget {
+  readonly id: string;
+  readonly hidden: boolean;
+  /** Which side of the boundary it is on: the space it takes grows with a positive / negative drag. */
+  readonly side: "before" | "after";
+  /** Half its own minimum: the threshold it flips across. */
+  readonly half: number;
+  /** The extent it had when the drag started. */
+  readonly size: number;
+}
+
+/** The extent a list of children is drawn at, preferring what the caller measured. */
+const extentOf = (child: LayoutNode, drawn?: ReadonlyMap<string, number>): number =>
+  drawn?.get(child.id) ?? nodeBasis(child).size;
+
+/**
+ * Which block on each side of a boundary a drag may take away.
+ *
+ * The candidate is the nearest **visible** block that opted in (`snap: true`), or — when none on that
+ * side is visible — the nearest hidden one, so a block that went away can be brought back by the same
+ * gesture.
+ *
+ * @param state - the layout state.
+ * @param splitId - the split whose boundary is being dragged.
+ * @param index - the boundary's position (the child **after** it, as the frame numbers sashes).
+ * @param drawn - the extents on screen, when the caller knows them.
+ * @returns the targets, if either side has one.
+ */
+export function snapTargets(
+  state: LayoutState,
+  splitId: string,
+  index: number,
+  drawn?: ReadonlyMap<string, number>,
+): { before?: SnapTarget; after?: SnapTarget } {
+  const node = findNode(state.tree, splitId);
+  if (node === null || node.type !== "split") return {};
+  const present = node.children.filter((child) => isPresent(state, child));
+  if (index < 1 || index >= present.length) return {};
+  const candidate = (list: readonly LayoutNode[]): RegionNode | undefined => {
+    const willing = list.filter(
+      (child): child is RegionNode => child.type === "region" && child.snap === true,
+    );
+    return (
+      willing.find((child) => child.collapsed !== true) ??
+      willing.find((child) => child.collapsed === true)
+    );
+  };
+  const target = (
+    region: RegionNode | undefined,
+    side: "before" | "after",
+  ): SnapTarget | undefined =>
+    region === undefined
+      ? undefined
+      : {
+          id: region.id,
+          hidden: region.collapsed === true,
+          side,
+          half: Math.floor(region.min / 2),
+          size: extentOf(region, drawn),
+        };
+  const before = target(candidate(present.slice(0, index).reverse()), "before");
+  const after = target(candidate(present.slice(index)), "after");
+  return { ...(before === undefined ? {} : { before }), ...(after === undefined ? {} : { after }) };
+}
+
+/**
+ * Give every block of a split the same extent.
+ *
+ * This is the last of the three answers VS Code gives a sash reset (`grid.ts:714`): a block with a
+ * size it prefers gets that, and failing both sides, the split's blocks share what there is evenly.
+ *
+ * @param state - the layout state.
+ * @param splitId - the split to even out.
+ * @param drawn - the extents on screen, when the caller knows them.
+ * @returns the state, or the same state when nothing moved.
+ */
+export function distributeSplitEvenly(
+  state: LayoutState,
+  splitId: string,
+  drawn?: ReadonlyMap<string, number>,
+): LayoutState {
+  const node = findNode(state.tree, splitId);
+  if (node === null || node.type !== "split") return state;
+  const present = node.children.filter((child) => isPresent(state, child));
+  const content = present.reduce((total, child) => total + extentOf(child, drawn), 0);
+  if (present.length === 0 || content <= 0) return state;
+  const even = content / present.length;
+  const sizes = allocateContent(
+    present.map((child) => ({ ...nodeBasis(child), flex: true, size: even })),
+    content,
+  );
+  let tree = state.tree;
+  present.forEach((child, at) => {
+    tree = setNodeSize(tree, child.id, sizes[at] ?? even);
+  });
+  return tree === state.tree ? state : { ...state, tree };
+}
+
+/**
  * Collapse or expand a region.
  *
  * Collapsing stores the current size in `cachedSize` and drops the size to
@@ -1300,6 +1407,7 @@ export function setCollapsed(
   state: LayoutState,
   regionId: string,
   collapsed: boolean,
+  remember?: number,
 ): LayoutState {
   const node = findRegion(state.tree, regionId);
   if (!node || node.collapsed === collapsed) return state;
@@ -1308,7 +1416,14 @@ export function setCollapsed(
       ? {
           ...target,
           collapsed: true,
-          cachedSize: target.size > 0 ? target.size : target.cachedSize,
+          // What to come back to: the size the caller names (a drag remembers the extent the block
+          // had when the drag started, VS Code's `snapBefore.size`), else what it has now.
+          cachedSize:
+            remember !== undefined && remember > 0
+              ? Math.round(remember)
+              : target.size > 0
+                ? target.size
+                : target.cachedSize,
           size: 0,
         }
       : {

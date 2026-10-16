@@ -11,7 +11,17 @@
  */
 
 import { describe, expect, it } from "vite-plus/test";
-import { allocateContent, type Basis, regionNode, resizeBoundary, resolveSizes } from "./model.js";
+import {
+  allocateContent,
+  type Basis,
+  distributeSplitEvenly,
+  findRegion,
+  regionNode,
+  resizeBoundary,
+  resolveSizes,
+  setCollapsed,
+  snapTargets,
+} from "./model.js";
 import type { Dir, LayoutNode, LayoutState, RegionNode, SplitNode } from "./contract.js";
 
 const claim = (size: number, extra: Partial<Basis> = {}): Basis => ({
@@ -143,5 +153,48 @@ describe("resizeBoundary", () => {
     expect(resizeBoundary(state, "root", 0, 90)).toBe(state);
     expect(resizeBoundary(state, "root", 3, 90)).toBe(state);
     expect(resizeBoundary(state, "nope", 0, 90)).toBe(state);
+  });
+});
+
+describe("snapTargets and distributeSplitEvenly", () => {
+  const state = (extra: Partial<RegionNode> = {}): LayoutState =>
+    ({
+      tree: split([box("a", 300, { snap: true, ...extra }), box("b", 300, { snap: true })]),
+      views: {},
+    }) as unknown as LayoutState;
+  // What the two are actually drawn at: the split is 900 wide, less its sash.
+  const drawn = new Map([
+    ["a", 447.5],
+    ["b", 447.5],
+  ]);
+
+  it("offers the block a drag may take away, with the threshold half its own minimum", () => {
+    const targets = snapTargets(state(), "root", 1, drawn);
+    expect(targets.before?.id).toBe("a");
+    expect(targets.before?.side).toBe("before");
+    expect(targets.before?.hidden).toBe(false);
+    // Half of `a`'s floor is 20, and it is drawn at 447.5: the drag takes it away once what is left
+    // would be under that.
+    expect(targets.before?.half).toBe(20);
+    expect(targets.before?.size).toBe(447.5);
+    expect(targets.after?.id).toBe("b");
+    expect(targets.after?.side).toBe("after");
+    expect(targets.after?.size).toBe(447.5);
+  });
+
+  it("offers the hidden block when none on that side is visible, so a drag can bring it back", () => {
+    const hidden = setCollapsed(state(), "a", true, 447.5);
+    const targets = snapTargets(hidden, "root", 1, new Map([["b", 890]]));
+    expect(targets.before?.id).toBe("a");
+    expect(targets.before?.hidden).toBe(true);
+    // It comes back at the extent it had when it went away, not at the sliver it shrank to.
+    expect(findRegion(hidden.tree, "a")?.cachedSize).toBe(448);
+  });
+
+  it("evens a split out, inside every floor", () => {
+    const even = distributeSplitEvenly(state(), "root", drawn);
+    const [a, b] = widths(even, ["a", "b"]);
+    // Rounding to whole pixels is fine; what matters is that nobody is left out.
+    expect(Math.abs((a ?? 0) - (b ?? 0))).toBeLessThanOrEqual(1);
   });
 });

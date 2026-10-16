@@ -100,6 +100,13 @@ export interface RegionNode {
   /** How hard this region is to squeeze; absent means `"normal"`. */
   readonly priority?: LayoutPriority;
   /**
+   * Whether a drag may take this region away entirely (VS Code's `IView.snap`).
+   *
+   * With it, dragging the boundary past the region's own limit **hides** the region — its size is
+   * remembered, so dragging back brings it in again. Without it the region only ever gets smaller.
+   */
+  readonly snap?: boolean;
+  /**
    * Whether the region **stacks** all its visible views instead of showing only
    * the front one.
    *
@@ -211,6 +218,8 @@ export interface SplitNode {
   readonly max?: number;
   /** How hard this split is to squeeze; absent means `"normal"`. */
   readonly priority?: LayoutPriority;
+  /** Whether a drag may take this split away entirely (see {@link RegionNode.snap}). */
+  readonly snap?: boolean;
   readonly children: LayoutNode[];
 }
 

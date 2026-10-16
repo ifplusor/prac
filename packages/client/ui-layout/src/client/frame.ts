@@ -73,6 +73,11 @@ import {
   setEntryFolded,
   moveEntry,
   setEntryHeight,
+  setCollapsed,
+  findNode,
+  distributeSplitEvenly,
+  type SnapTarget,
+  snapTargets,
 } from "./model.js";
 import { type LayoutStore, useLayout } from "./store.js";
 import type { LayoutState } from "./contract.js";
@@ -81,6 +86,8 @@ import type { LayoutState } from "./contract.js";
 interface PointerDragEvent {
   readonly pointerId: number;
   readonly button: number;
+  /** Alt turns the sash snap off, the way VS Code does (`splitview.ts:929`). */
+  readonly altKey?: boolean;
   readonly clientX: number;
   readonly clientY: number;
   readonly currentTarget: {
@@ -524,6 +531,10 @@ interface DragState {
   index: number;
   /** What the split's present children were drawn at when the drag started. */
   drawn: ReadonlyMap<string, number>;
+  /** Set while the frame re-renders after a block went in or out, so the drag re-reads the pixels. */
+  settling?: boolean;
+  /** The blocks this drag may take away, and which side of their limits it is on. */
+  snap: { before?: SnapTarget; after?: SnapTarget };
 }
 
 /** Props of one draggable boundary. */
@@ -557,7 +568,9 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
     const split = findSplit(state.tree, splitId);
     const a = findRegion(state.tree, leftId);
     const b = findRegion(state.tree, rightId);
-    if (!split || !a || !b || a.collapsed || b.collapsed) return;
+    // A collapsed block is deliberately draggable: that is how a drag brings it back (VS Code keeps
+    // the sash usable for exactly this, `splitview.ts:1417-1420`).
+    if (!split || !a || !b) return;
     const element = event.currentTarget;
     const container = element.parentElement;
     if (a.entry === true && b.entry === true && container !== null) {
@@ -580,41 +593,86 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
     }
     // A drag starts from the pixels: a flexible child claims nothing in the tree, so its drawn
     // extent is the only honest starting point.
+    const drawn = readDrawn();
+    drag.current = {
+      pointerId: event.pointerId,
+      origin: dir === "row" ? event.clientX : event.clientY,
+      index,
+      drawn,
+      snap: snapTargets(state, splitId, index, drawn),
+    };
+    element.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  };
+
+  /** What the split's present children are drawn at right now. */
+  const readDrawn = (): Map<string, number> => {
+    const state = store.get();
+    const node = findNode(state.tree, splitId);
     const drawn = new Map<string, number>();
-    for (const child of split.children.filter((entry) => isPresent(state, entry))) {
+    if (node === null || node.type !== "split") return drawn;
+    for (const child of node.children.filter((entry) => isPresent(state, entry))) {
       const element =
         document.querySelector(`[data-prac-region="${CSS.escape(child.id)}"]`) ??
         document.querySelector(`[data-prac-split="${CSS.escape(child.id)}"]`);
       const rect = element?.getBoundingClientRect();
       if (rect !== undefined) drawn.set(child.id, dir === "row" ? rect.width : rect.height);
     }
-    drag.current = {
-      pointerId: event.pointerId,
-      origin: dir === "row" ? event.clientX : event.clientY,
-      index,
-      drawn,
-    };
-    element.setPointerCapture(event.pointerId);
-    event.preventDefault();
+    return drawn;
   };
 
   const onPointerMove = (event: PointerDragEvent): void => {
     const current = drag.current;
     if (!current || current.pointerId !== event.pointerId) return;
     event.preventDefault();
+    // While the frame re-renders after a block went in or out, the pixels under the pointer are not
+    // ours to read: the next move picks the drag up again from the new base.
+    if (current.settling === true) return;
     const point = dir === "row" ? event.clientX : event.clientY;
+    const delta = point - current.origin;
+    // VS Code's sash snap, unless Alt is held (`splitview.ts:929`): past the limit the block goes
+    // away with its size remembered, and back across the limit it returns. The band between the two
+    // limits is the block's own minimum, which is what keeps the flip from chattering.
+    if (!event.altKey) {
+      const before = current.snap.before;
+      const after = current.snap.after;
+      // What the drag would leave the block with: it grows with a positive delta on the near side and
+      // shrinks with one on the far side. Under half its own minimum it goes away; over it, it returns.
+      const wantedBeforeHidden = before !== undefined && before.size + delta < before.half;
+      const wantedAfterHidden = after !== undefined && after.size - delta < after.half;
+      const flipBefore = before !== undefined && before.hidden !== wantedBeforeHidden;
+      const flipAfter = after !== undefined && after.hidden !== wantedAfterHidden;
+      if (flipBefore || flipAfter) {
+        store.update((state) => {
+          let next = state;
+          if (flipBefore && before !== undefined) {
+            next = setCollapsed(next, before.id, wantedBeforeHidden, before.size);
+          }
+          if (flipAfter && after !== undefined) {
+            next = setCollapsed(next, after.id, wantedAfterHidden, after.size);
+          }
+          return next;
+        });
+        // The boundary moved on its own: the rest of the drag starts from here, with the pixels and
+        // the limits re-read once the frame has re-rendered.
+        current.settling = true;
+        const from = point;
+        requestAnimationFrame(() => {
+          if (drag.current !== current) return;
+          current.settling = false;
+          current.origin = from;
+          current.drawn = readDrawn();
+          current.snap = snapTargets(store.get(), splitId, current.index, current.drawn);
+        });
+        return;
+      }
+    }
     // The model moves the boundary: the drag is clamped to what the two sides can do (`min` / `max`)
     // and the space is handed out by `Sizing` — `distribute` spreads it over the whole side in
-    // proportion (the default), `expand` pushes the neighbour only.
+    // proportion (the default), `expand` pushes the neighbour only. `drawn` stays the base the drag
+    // started from: `delta` is measured from the same pointer, so both have to be one coordinate.
     store.update((state) =>
-      resizeBoundary(
-        state,
-        splitId,
-        current.index,
-        point - current.origin,
-        "distribute",
-        current.drawn,
-      ),
+      resizeBoundary(state, splitId, current.index, delta, "distribute", current.drawn),
     );
   };
 
@@ -631,7 +689,15 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
     const state = store.get();
     const a = findRegion(state.tree, leftId);
     const b = findRegion(state.tree, rightId);
-    if (a?.entry !== true || b?.entry !== true) return;
+    if (a?.entry !== true || b?.entry !== true) {
+      // A region boundary: a reset never lands on a **hidden** neighbour (VS Code returns early
+      // there, `splitview.ts:1193-1199`); otherwise the split's blocks share what there is evenly.
+      const drawn = readDrawn();
+      const { before, after } = snapTargets(state, splitId, index, drawn);
+      if (before?.hidden === true || after?.hidden === true) return;
+      store.update((next) => distributeSplitEvenly(next, splitId, drawn));
+      return;
+    }
     // A row's parent element is the split's container, which is what `readStackRows` walks.
     const container = document.querySelector(
       `[data-prac-region="${CSS.escape(leftId)}"]`,
