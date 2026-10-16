@@ -98,6 +98,10 @@ const bars = await page.evaluate(() =>
     items: [...bar.querySelectorAll("[data-prac-container]")].map((item) =>
       item.getAttribute("data-prac-container"),
     ),
+    /** The names the bar shows, in the same order as `items`. */
+    labels: [...bar.querySelectorAll("[data-prac-container]")].map((item) =>
+      (item.textContent ?? "").trim(),
+    ),
     active: [...bar.querySelectorAll('[data-prac-container-active="true"]')].map((item) =>
       item.getAttribute("data-prac-container"),
     ),
@@ -221,6 +225,13 @@ report({
       (byId.get(BOTTOM)?.items ?? []).includes(TERMINAL) && borrowed(BOTTOM).length >= 3,
     "each bar marks exactly one entry as shown":
       bars.length > 0 && bars.every((bar) => bar.active.length === 1),
+    // A container that became a stack must still be **named**: the bar switching between a region's
+    // children reads labels, and a split without one shows up as its raw id (`workbench.view.…`).
+    "every bar entry is named, none by its raw id": bars.every(
+      (bar) =>
+        bar.labels.length === bar.items.length &&
+        bar.labels.every((label) => label.length > 0 && !label.startsWith("workbench.view.")),
+    ),
     "one container at a time, and it is the one clicked":
       visits.length >= 8 &&
       visits.every((visit) => visit.shown.length === 1 && visit.shown[0] === visit.container),

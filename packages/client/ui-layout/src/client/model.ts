@@ -1015,7 +1015,12 @@ export function ensureStackShape(state: LayoutState): LayoutState {
     // Nothing left to show: the leftover must not hold space. A **flexible** region counts as present
     // while empty (`isPresent`), which would leave an empty bottom bar on screen.
     if (kept === undefined) {
-      return regionNode(node.id, size, { flex: false, min: MIN_ENTRY, stack: true });
+      return regionNode(node.id, size, {
+        flex: false,
+        min: MIN_ENTRY,
+        stack: true,
+        ...(node.label === undefined ? {} : { label: node.label }),
+      });
     }
     const view = visibleIn(kept.id)[0];
     if (view !== undefined) {
@@ -1029,6 +1034,7 @@ export function ensureStackShape(state: LayoutState): LayoutState {
       flex,
       min: MIN_ENTRY,
       stack: true,
+      ...(node.label === undefined ? {} : { label: node.label }),
       ...(kept.collapsed === true ? { collapsed: true } : {}),
       ...(kept.cachedSize !== undefined ? { cachedSize: kept.cachedSize } : {}),
     });
@@ -1089,6 +1095,9 @@ export function ensureStackShape(state: LayoutState): LayoutState {
       dir: "column",
       size: region.size,
       flex: region.flex === true,
+      // The split stands in for the region, name included: a bar that lists this region's children
+      // reads the label, and a container that became a stack must not turn into its raw id.
+      ...(region.label === undefined ? {} : { label: region.label }),
       children: visible.map((viewId) => leafFor(region.id, viewId)),
     };
   };
@@ -1656,6 +1665,9 @@ export function splitRegionWith(
     type: "split",
     id: splitId,
     dir,
+    // The node that used to sit here is now a child, so its name moves up to the split that replaced
+    // it — callers that address the id (a bar listing this region's children) still get the name.
+    ...(node.label === undefined ? {} : { label: node.label }),
     children: before ? [fresh, node] : [node, fresh],
   };
   return { ...state, tree: replaceNode(state.tree, regionId, () => replacement) };

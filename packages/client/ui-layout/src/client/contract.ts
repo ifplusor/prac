@@ -218,6 +218,14 @@ export interface SplitNode {
   readonly max?: number;
   /** How hard this split is to squeeze; absent means `"normal"`. */
   readonly priority?: LayoutPriority;
+  /**
+   * The display name of the **region this split stands in for**.
+   *
+   * A stack takes a region's place and keeps its id, so it has to keep its name as well: the bar that
+   * switches between a region's children reads labels, and a container that became a stack without one
+   * would show up as its raw id.
+   */
+  readonly label?: string;
   /** Whether a drag may take this split away entirely (see {@link RegionNode.snap}). */
   readonly snap?: boolean;
   readonly children: LayoutNode[];

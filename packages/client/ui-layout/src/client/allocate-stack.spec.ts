@@ -17,6 +17,10 @@ import {
   dragSnapTarget,
   HEADER_HEIGHT,
   ensureStackShape,
+  regionNode,
+  defaultTree,
+  findNode,
+  setRegionChildren,
   findRegion,
   findSplit,
   moveEntry,
@@ -35,6 +39,26 @@ import {
 const stateOf = (
   views: Record<string, { size?: number; collapsed?: boolean; max?: number; cachedSize?: number }>,
 ): LayoutState => ({ views }) as unknown as LayoutState;
+
+describe("a stack keeps the name of the region it stands in for", () => {
+  it("carries the label onto the split it becomes", () => {
+    const tree = setRegionChildren(defaultTree(), "left", [
+      regionNode("left.explorer", 0, { label: "Explorer", stack: true }),
+    ]);
+    const shaped = ensureStackShape({
+      tree,
+      views: {
+        a: { region: "left.explorer", order: 0, hidden: false },
+        b: { region: "left.explorer", order: 1, hidden: false },
+      },
+    } as unknown as LayoutState);
+    // The region became a `column` split of two rows; the name has to come with the shape, or the bar
+    // that switches between this region's children shows the raw id instead.
+    const node = findNode(shaped.tree, "left.explorer");
+    expect(node?.type).toBe("split");
+    expect(node?.label).toBe("Explorer");
+  });
+});
 
 describe("allocateStack (C1/C5/C6/C8: the stack shares, one row at a time)", () => {
   /** One claim per row: `size` 0 means "nobody has sized this one". */

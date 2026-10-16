@@ -1192,7 +1192,9 @@ export function createFrame(
                 }),
               style: { ...TAB_STYLE, ...(child.id === activeId ? TAB_ACTIVE_STYLE : {}) },
             },
-            (child.type === "region" ? child.label : undefined) ?? viewLabel(child.id),
+            // Either shape may carry the name (a child that became a stack is a split — see
+            // `SplitNode.label`), and the id is only the last resort.
+            child.label ?? viewLabel(child.id),
           ),
         ),
       );

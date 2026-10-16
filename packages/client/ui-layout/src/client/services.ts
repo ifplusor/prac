@@ -265,7 +265,13 @@ export function createServices(
           // that took the region's place), and rebuilding it as a fresh region would throw its rows
           // away. The caller read the children, other placements happened, then it wrote.
           const existing = findNode(state.tree, child.id);
-          if (existing !== null) return existing;
+          if (existing !== null) {
+            // Keep the shape it already has (it may be a `column` split), but take the name the
+            // caller knows: a container that became a stack must not show up as its raw id.
+            return child.label === undefined || existing.label === child.label
+              ? existing
+              : { ...existing, label: child.label };
+          }
           return regionNode(child.id, 0, {
             label: child.label,
             stack: true,
@@ -280,7 +286,8 @@ export function createServices(
       const node = findRegion(store.get().tree, regionId);
       return (node?.children ?? []).map((child) => ({
         id: child.id,
-        label: child.type === "region" ? child.label : undefined,
+        // A child that became a stack is a split carrying the region's name (see `SplitNode.label`).
+        label: child.label,
       }));
     },
     setFront(viewId: string): void {
