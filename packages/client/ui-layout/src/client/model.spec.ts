@@ -12,6 +12,7 @@ import {
 import {
   HEADER_HEIGHT,
   activeChild,
+  chosenChild,
   defaultTree,
   findRegion,
   findSplit,
@@ -537,6 +538,16 @@ describe("nested regions (containers)", () => {
     const tree = selectChild(withContainers(), "left", "left.explorer");
     const both = state(tree, bothFilled);
     expect(activeChild(both, findRegion(tree, "left")!)?.id).toBe("left.explorer");
+  });
+
+  it("still reports the recorded choice when it has nothing to show", () => {
+    const tree = selectChild(withContainers(), "left", "left.explorer");
+    // Only `search` has a view: the screen falls back to it, but the **record** is what the bar marks
+    // and what the empty pane is named after, so it has to survive.
+    const only = state(tree, { b: bothFilled.b });
+    const node = findRegion(tree, "left")!;
+    expect(activeChild(only, node)?.id).toBe("left.search");
+    expect(chosenChild(only, node)?.id).toBe("left.explorer");
   });
 
   it("falls back when the recorded choice is no longer present", () => {

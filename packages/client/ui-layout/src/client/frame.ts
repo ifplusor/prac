@@ -49,6 +49,7 @@ import {
   stackEntries,
   findParentSplit,
   activeChild,
+  chosenChild,
   edgeRegion,
   findRegion,
   findSplit,
@@ -1173,6 +1174,35 @@ export function createFrame(
      * @param node - the selector region.
      * @param activeId - the child currently shown.
      */
+    /**
+     * The pane shown when a container is picked but has nothing visible in it.
+     *
+     * An empty region is not rendered (H1), so without this the track would fall back to another
+     * container and the click would look like it went somewhere else.
+     *
+     * @param id - the container that was picked.
+     */
+    const emptyPane = (id: string): ReactElement =>
+      createElement(
+        "div",
+        {
+          key: `empty:${id}`,
+          "data-prac-empty-pane": id,
+          style: {
+            display: "flex",
+            flex: "1 1 auto",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: 0,
+            padding: "0 12px",
+            textAlign: "center",
+            opacity: 0.6,
+            fontSize: "calc(var(--vscode-font-size, 13px) - 1px)",
+          },
+        },
+        "Nothing in this container yet",
+      );
+
     const containerBar = (node: RegionNode, activeId: string): ReactElement =>
       createElement(
         "div",
@@ -1185,12 +1215,20 @@ export function createFrame(
               type: "button",
               "data-prac-container": child.id,
               "data-prac-container-active": child.id === activeId ? "true" : "false",
+              // An entry whose container has nothing visible is **shown** as empty rather than
+              // silently skipped: clicking it still selects it, and the pane says so.
+              "data-prac-container-empty": isPresent(state, child) ? "false" : "true",
+              ...(isPresent(state, child) ? {} : { title: "Nothing in this container yet" }),
               onClick: () =>
                 store.update((current) => {
                   const tree = selectChild(current.tree, node.id, child.id);
                   return tree === current.tree ? current : { ...current, tree };
                 }),
-              style: { ...TAB_STYLE, ...(child.id === activeId ? TAB_ACTIVE_STYLE : {}) },
+              style: {
+                ...TAB_STYLE,
+                ...(child.id === activeId ? TAB_ACTIVE_STYLE : {}),
+                ...(isPresent(state, child) ? {} : { opacity: 0.55 }),
+              },
             },
             // Either shape may carry the name (a child that became a stack is a split — see
             // `SplitNode.label`), and the id is only the last resort.
@@ -1272,7 +1310,12 @@ export function createFrame(
     const renderRegion = (node: RegionNode, dir: Dir, fill = false): ReactElement => {
       const box = sizes.get(node.id) ?? ZERO_BOX;
       const child = activeChild(state, node);
-      if (child !== null) {
+      const chosen = chosenChild(state, node);
+      // The pane follows what was **picked**: a container with nothing in it says so, instead of the
+      // track quietly rendering a different container. The fallback still covers the other case — the
+      // record names nothing that is in the tree any more — where there is nothing to name a pane after.
+      const shown = chosen ?? child;
+      if (shown !== null) {
         return createElement(
           "div",
           {
@@ -1286,9 +1329,17 @@ export function createFrame(
             ),
           },
           [
-            (node.children?.length ?? 0) > 1 ? containerBar(node, child.id) : null,
-            // The chosen child may be a split (a stack took a region's place in this list).
-            child.type === "split" ? renderNode(child, dir) : renderRegion(child, dir, true),
+            // The bar marks what the person **picked**; when nothing of it is on screen the pane
+            // below says why instead of the track quietly showing a different container.
+            (node.children?.length ?? 0) > 1 ? containerBar(node, shown.id) : null,
+            chosen !== null && !isPresent(state, chosen)
+              ? emptyPane(chosen.id)
+              : child === null
+                ? null
+                : // The chosen child may be a split (a stack took a region's place in this list).
+                  child.type === "split"
+                  ? renderNode(child, dir)
+                  : renderRegion(child, dir, true),
           ],
         );
       }

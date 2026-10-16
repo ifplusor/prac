@@ -68,6 +68,23 @@ function childNodes(node: LayoutNode): readonly LayoutNode[] {
  * @param state - current state.
  * @param node - the region to look into.
  */
+/**
+ * The child a selector region **records** as its choice, whether or not it has anything to show.
+ *
+ * `activeChild` answers "what should be on screen", and falls back when the recorded choice is empty
+ * (an empty region is not rendered — H1). This answers the other question — "what did the person
+ * pick" — which is what the bar marks as active and what an empty pane is named after.
+ *
+ * @param state - the layout state.
+ * @param node - the selector region.
+ * @returns the recorded child, or null when there is none (or nothing is recorded).
+ */
+export function chosenChild(state: LayoutState, node: RegionNode): LayoutNode | null {
+  const children = node.children;
+  if (children === undefined || node.active === undefined) return null;
+  return children.find((child) => child.id === node.active) ?? null;
+}
+
 export function activeChild(state: LayoutState, node: RegionNode): LayoutNode | null {
   const children = node.children;
   if (children === undefined || children.length === 0) return null;

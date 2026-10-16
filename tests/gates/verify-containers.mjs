@@ -215,6 +215,33 @@ const facts = {
   deferred,
 };
 
+// ── an empty container says so, instead of the track quietly showing another ──
+await page.evaluate((id) => {
+  for (const view of globalThis.__pracLayout.listViews()) {
+    if ((view.region ?? "").includes("explorer")) globalThis.__pracLayout.hide(view.id);
+  }
+  const item = document.querySelector(
+    `[data-prac-container-bar="left"] [data-prac-container="${id}"]`,
+  );
+  item?.click();
+}, EXPLORER);
+await page.waitForTimeout(1200);
+const emptyState = await page.evaluate((id) => {
+  const item = document.querySelector(
+    `[data-prac-container-bar="left"] [data-prac-container="${id}"]`,
+  );
+  const active = document
+    .querySelector('[data-prac-container-active="true"]')
+    ?.getAttribute("data-prac-container");
+  return {
+    markedEmpty: item?.getAttribute("data-prac-container-empty") === "true",
+    active,
+    pane: document.querySelector(`[data-prac-empty-pane="${id}"]`) !== null,
+  };
+}, EXPLORER);
+
+await close();
+
 report({
   url,
   facts,
@@ -232,6 +259,10 @@ report({
         bar.labels.length === bar.items.length &&
         bar.labels.every((label) => label.length > 0 && !label.startsWith("workbench.view.")),
     ),
+    // An emptied container is named on the bar and, when picked, says so itself: the click lands on
+    // the container the person chose instead of the track silently showing a different one.
+    "an empty container is marked and says so when picked":
+      emptyState.markedEmpty && emptyState.active === EXPLORER && emptyState.pane,
     "one container at a time, and it is the one clicked":
       visits.length >= 8 &&
       visits.every((visit) => visit.shown.length === 1 && visit.shown[0] === visit.container),
@@ -254,5 +285,3 @@ report({
   },
   ok: "OK: the borrowed containers are named child regions, one is shown at a time, and every view they hold mounts and paints",
 });
-
-await close();
