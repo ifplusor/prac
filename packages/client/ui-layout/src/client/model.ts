@@ -1920,6 +1920,26 @@ export function findParentSplit(node: LayoutNode, id: string): SplitNode | null 
   return null;
 }
 
+/**
+ * Whether the boundary **under** a stack row can move at all (design B2/B4).
+ *
+ * A boundary trades room between its two sides, so each side needs a row that is still open: folded
+ * rows hold only their header and can neither give nor take (B3), and the **last** row of a stack has
+ * no boundary to begin with (B7).
+ *
+ * @param state - the layout state.
+ * @param rowId - the row whose bottom edge is in question.
+ * @returns true when the boundary under that row can move.
+ */
+export function entryBoundary(state: LayoutState, rowId: string): boolean {
+  const parent = findParentSplit(state.tree, rowId);
+  const siblings = parent === null ? [] : stackEntries(parent);
+  const at = siblings.findIndex((row) => row.id === rowId);
+  if (at < 0 || at >= siblings.length - 1) return false;
+  const open = (row: RegionNode): boolean => row.collapsed !== true;
+  return siblings.slice(0, at + 1).some(open) && siblings.slice(at + 1).some(open);
+}
+
 export function stackEntries(node: LayoutNode): RegionNode[] {
   if (node.type !== "split" || node.dir !== "column") return [];
   const entries = node.children.filter(

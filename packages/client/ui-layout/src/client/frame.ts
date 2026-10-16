@@ -46,8 +46,7 @@ import {
 } from "./contract.js";
 import { mountIsolated, releaseIsolated } from "./isolation.js";
 import {
-  stackEntries,
-  findParentSplit,
+  entryBoundary,
   activeChild,
   chosenChild,
   edgeRegion,
@@ -1407,16 +1406,7 @@ export function createFrame(
                 // is **usable** only when a row above can still give and a row below can still take
                 // (B2/B4) — so a run of folded rows has no usable boundary at its edge, and a stack
                 // that is folded shut has none at all. Readers ask with this marker.
-                "data-prac-stack-handle": (() => {
-                  const parent = findParentSplit(state.tree, node.id);
-                  const siblings = parent === null ? [] : stackEntries(parent);
-                  const at = siblings.findIndex((row) => row.id === node.id);
-                  if (at < 0 || at >= siblings.length - 1) return "false";
-                  const open = (row: (typeof siblings)[number]): boolean => row.collapsed !== true;
-                  return siblings.slice(0, at + 1).some(open) && siblings.slice(at + 1).some(open)
-                    ? "true"
-                    : "false";
-                })(),
+                "data-prac-stack-handle": entryBoundary(state, node.id) ? "true" : "false",
                 "data-prac-stack-collapsed": node.collapsed === true ? "true" : "false",
               }
             : {}),
