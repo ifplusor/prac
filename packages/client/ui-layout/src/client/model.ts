@@ -1362,6 +1362,23 @@ export function resetStackBoundary(
  * @param node - the subtree to look in.
  * @returns the leaves the normalizer made (empty for anything that is not a stack split).
  */
+/**
+ * The split that holds this id as its child, if any.
+ *
+ * @param node - the subtree to search.
+ * @param id - the child to find.
+ * @returns the parent split, or null.
+ */
+export function findParentSplit(node: LayoutNode, id: string): SplitNode | null {
+  if (node.type !== "split") return null;
+  if (node.children.some((child) => child.id === id)) return node;
+  for (const child of node.children) {
+    const hit = findParentSplit(child, id);
+    if (hit !== null) return hit;
+  }
+  return null;
+}
+
 export function stackEntries(node: LayoutNode): RegionNode[] {
   if (node.type !== "split" || node.dir !== "column") return [];
   const entries = node.children.filter(
@@ -1403,32 +1420,65 @@ export function setEntryFolded(
 ): LayoutState {
   const node = findRegion(state.tree, entryId);
   if (node === null || (node.collapsed === true) === collapsed) return state;
-  if (collapsed) {
-    const remembered = measuredHeight ?? node.size ?? node.cachedSize;
-    const cachedSize = remembered === undefined ? undefined : Math.round(remembered);
-    return {
-      ...state,
-      tree: updateRegion(state.tree, entryId, (node) => ({
-        ...node,
-        collapsed: true,
-        size: HEADER_HEIGHT,
-        // `cachedSize` is optional: omit it rather than write an undefined into a required field.
-        ...(cachedSize === undefined ? {} : { cachedSize }),
-      })),
+  const before = node.size;
+  const remembered = measuredHeight ?? node.size ?? node.cachedSize;
+  const cachedSize = remembered === undefined ? undefined : Math.round(remembered);
+  const size = collapsed
+    ? HEADER_HEIGHT
+    : node.cachedSize === undefined
+      ? MIN_ENTRY
+      : Math.max(MIN_ENTRY, Math.round(node.cachedSize));
+
+  // The row's own new height…
+  let tree = updateRegion(state.tree, entryId, (entry) => ({
+    ...entry,
+    collapsed,
+    size,
+    // A folded row keeps the height it remembered; an open one mirrors `size`, the way `regionNode`
+    // does. `cachedSize` is optional: omit it rather than write an undefined.
+    ...(collapsed ? (cachedSize === undefined ? {} : { cachedSize }) : { cachedSize: size }),
+  }));
+
+  // …and where the difference goes (design C5/C6). A stack keeps its extent, so what a row gives up
+  // goes to the rows **below it**, from the last one back, whole (no caps, not in proportion); what
+  // it needs comes from the same rows, and none of them may be squeezed under the floor. When there
+  // is nothing below, the room goes the same way **above** — the extent still has to be filled.
+  const delta = before - size;
+  if (delta !== 0) {
+    const parent = findParentSplit(tree, entryId);
+    const rows = parent === null ? [] : stackEntries(parent);
+    const at = rows.findIndex((row) => row.id === entryId);
+    const below = rows.slice(at + 1).reverse();
+    const above = rows.slice(0, Math.max(0, at)).reverse();
+    const take = (order: readonly RegionNode[], from: number): number => {
+      for (const row of order) {
+        if (from === 0) break;
+        if (from > 0) {
+          const give = from;
+          tree = updateRegion(tree, row.id, (entry) => ({
+            ...entry,
+            size: entry.size + give,
+            flex: false,
+          }));
+          from = 0;
+        } else {
+          const room = Math.max(0, row.size - MIN_ENTRY);
+          const given = Math.min(room, -from);
+          if (given === 0) continue;
+          tree = updateRegion(tree, row.id, (entry) => ({
+            ...entry,
+            size: entry.size - given,
+            flex: false,
+          }));
+          from += given;
+        }
+      }
+      return from;
     };
+    const left = take(below, delta);
+    take(above, left);
   }
-  const size =
-    node.cachedSize === undefined ? MIN_ENTRY : Math.max(MIN_ENTRY, Math.round(node.cachedSize));
-  return {
-    ...state,
-    // Unfolded, `cachedSize` follows the same convention `regionNode` uses: it mirrors `size`.
-    tree: updateRegion(state.tree, entryId, (node) => ({
-      ...node,
-      collapsed: false,
-      size,
-      cachedSize: size,
-    })),
-  };
+  return { ...state, tree };
 }
 
 /**

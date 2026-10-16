@@ -21,6 +21,7 @@ import {
   moveViewInRegion,
   resetStackBoundary,
   ensureStackShape,
+  findSplit,
   stackEntries,
   setEntryHeight,
   setEntryFolded,
@@ -521,5 +522,54 @@ describe("stack entries (S2: the rows are leaf regions)", () => {
       "left/stack/a",
     ]);
     expect(moveEntry(state, "left/stack/a", "left/stack/b", "up")).toBe(state);
+  });
+});
+
+describe("setEntryFolded routes the difference (design C5/C6)", () => {
+  const stack = (sizes: Record<string, number>) =>
+    ensureStackShape({
+      tree: {
+        type: "region",
+        id: "left",
+        size: 600,
+        flex: false,
+        collapsed: false,
+        cachedSize: 600,
+        min: 40,
+        stack: true,
+      },
+      views: Object.fromEntries(
+        Object.entries(sizes).map(([id, size], order) => [
+          id,
+          { region: "left", order, hidden: false, size },
+        ]),
+      ),
+    } as unknown as LayoutState);
+  const heights = (state: LayoutState) =>
+    Object.fromEntries(
+      stackEntries(findSplit(state.tree, "left")!).map((row) => [
+        row.id.split("/").pop(),
+        row.size,
+      ]),
+    );
+
+  it("gives a folded row's room to the rows below, whole, from the last one back", () => {
+    const folded = setEntryFolded(stack({ a: 200, b: 200, c: 200 }), "left/stack/a", true, 200);
+    // `a` is a header; the last row took the 180 the fold freed — not a share of it.
+    expect(heights(folded)).toEqual({ a: 20, b: 200, c: 380 });
+  });
+
+  it("takes what an unfolded row needs from below, never under the floor", () => {
+    const state = stack({ a: 200, b: 60, c: 340 });
+    const folded = setEntryFolded(state, "left/stack/a", true, 200);
+    expect(heights(folded).c).toBe(520);
+    const opened = setEntryFolded(folded, "left/stack/a", false);
+    // `a` remembers 200: the last row gives it back.
+    expect(heights(opened)).toEqual({ a: 200, b: 60, c: 340 });
+  });
+
+  it("falls back to the rows above when there is nothing below, nearest first", () => {
+    const folded = setEntryFolded(stack({ a: 200, b: 200, c: 200 }), "left/stack/c", true, 200);
+    expect(heights(folded)).toEqual({ a: 200, b: 380, c: 20 });
   });
 });
