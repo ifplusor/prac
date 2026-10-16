@@ -1188,19 +1188,24 @@ export function createFrame(
         {
           key: `empty:${id}`,
           "data-prac-empty-pane": id,
+          // VS Code's own presentation for an empty pane: a centred message with a 12px margin
+          // (`paneCompositePart.css:365-384`). No dimming — upstream lets it inherit the foreground.
           style: {
             display: "flex",
             flex: "1 1 auto",
             alignItems: "center",
+            alignContent: "center",
             justifyContent: "center",
             minHeight: 0,
-            padding: "0 12px",
-            textAlign: "center",
-            opacity: 0.6,
-            fontSize: "calc(var(--vscode-font-size, 13px) - 1px)",
+            width: "100%",
           },
         },
-        "Nothing in this container yet",
+        createElement(
+          "span",
+          { style: { margin: "12px", textAlign: "center" } },
+          // VS Code's wording, verbatim (`paneCompositePart.ts:260`, `pane.emptyMessage`).
+          "Drag a view here to display.",
+        ),
       );
 
     const containerBar = (node: RegionNode, activeId: string): ReactElement =>

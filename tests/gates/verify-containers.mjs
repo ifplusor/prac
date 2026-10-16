@@ -237,6 +237,8 @@ const emptyState = await page.evaluate((id) => {
     markedEmpty: item?.getAttribute("data-prac-container-empty") === "true",
     active,
     pane: document.querySelector(`[data-prac-empty-pane="${id}"]`) !== null,
+    // The wording is VS Code's own (`paneCompositePart.ts:260`), not ours to invent.
+    text: document.querySelector(`[data-prac-empty-pane="${id}"]`)?.textContent ?? "",
   };
 }, EXPLORER);
 
@@ -262,7 +264,10 @@ report({
     // An emptied container is named on the bar and, when picked, says so itself: the click lands on
     // the container the person chose instead of the track silently showing a different one.
     "an empty container is marked and says so when picked":
-      emptyState.markedEmpty && emptyState.active === EXPLORER && emptyState.pane,
+      emptyState.markedEmpty &&
+      emptyState.active === EXPLORER &&
+      emptyState.pane &&
+      emptyState.text.trim() === "Drag a view here to display.",
     "one container at a time, and it is the one clicked":
       visits.length >= 8 &&
       visits.every((visit) => visit.shown.length === 1 && visit.shown[0] === visit.container),
