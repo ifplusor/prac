@@ -96,8 +96,8 @@ Server（node）
 | 对象 | 在哪 | 持有什么 | 谁调用 |
 | --- | --- | --- | --- |
 | `PracVscodeFace` | `packages/client/vscode-host/src/client/public.ts` | catalogue、`hostFor`、`focusView`、`runCommand`、file placement、capabilities | consumers、诊断/门 |
-| `VscodeEmbedHandle` | `vendor/vscode-embed/src/client/index.ts` | boot、`partHost`、`view`、`file`、`placements`、`views`、`floatHost`、group region channel | `vscode-host` |
-| `PartHostFace` | `vendor/vscode/overlay/embedBridge.ts` | workbench 侧的 mount/focus/release/list、file placements、capabilities | `vscode-embed` |
+| `VscodeEmbedHandle` | `vendor/vscode-embed/src/client/index.ts` | boot、`view`、`file`、`placements`、`views`、`floatHost`、group region channel | `vscode-host` |
+| `PartHostFace`（现名；只承载 workbench → embedder 的 view/file/capability face） | `vendor/vscode/overlay/embedBridge.ts` | view/file mount、focus/release、placements、capabilities；**不承载 part mount** | `vscode-embed` |
 | `EmbeddedWorkbench` | `vendor/vscode/overlay/embeddedWorkbench.ts` | workbench 服务、`IWorkbenchLayoutService`、view/editor host、overlay | `PartHostFace` |
 | `PracEditorHost` | `vendor/vscode/overlay/pracEditorHost.ts` | `IEditorGroupsService`、group / region、editor group model/panes | workbench、`vscode-host` 的 region channel |
 | `ViewPane` / `ViewPaneContainer` | 上游 workbench | 一个 view 的 pane / 一个 container 的运行时 | `tryMountView` / container context |
@@ -123,7 +123,7 @@ Server（node）
 ### 3.1 已有契约
 
 - **`PartHostFace` / `VscodeEmbedHandle`**：mechanism 面。
-  - 宿主元素（partHost / view host / float host）；
+  - 宿主元素（view host / file host / float host）；**不暴露 part host**；
   - 命令面；
   - focus / layout；
   - 不涉及 prac 的布局。
@@ -158,7 +158,7 @@ Server（node）
 3. 等 `ctx.workspaces` + `ctx.uiSession` 给出当前 workspace；
 4. `embed.boot({ workspacePath, configurationDefaults })`；机制侧只 boot 一次；
 5. `EmbeddedWorkbench` 起 workbench 服务、`PracEditorHost`（`IEditorGroupsService`）、overlay/float host；
-6. `PartHostFace` 发布；`pracVscode` service 发布；
+6. `PartHostFace`（workbench → embedder 的 view/file/capability face）发布；`pracVscode` service 发布；
 7. consumers 注入 `pracVscode`；`ui-vscode-views` / `ui-vscode-editor` 读 catalogue 并注册 `prac.view`；
 8. arrangement 落位；frame 渲染区域/stack；`hostFor(view)` 给宿主元素。
 
@@ -250,6 +250,8 @@ architecture 只定形状，不定机制：
 - 不往 DSH 加能力；
 - 不让 frame 认识 VS Code 的 part / container / pane / editor group；
 - 不把 container 的 owner 放回 frame。
+- 不暴露 part host，也不把整块 VS Code part 当兜底；prac 只组合 view、editor placement、overlay。
+- 如果将来要“part 作为高级形态”，另立设计；不保留一个现在就在的 fallback。
 
 ## 7. Steps
 
