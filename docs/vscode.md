@@ -134,7 +134,7 @@ Overlays（不是 Part）：
 
 ### 5. Overlay
 
-- **全局 overlay**：Quick Input、Context View（菜单）、Hover、Notifications、Dialogs；不在 grid 里，住在 workbench 的 `mainContainer`（prac 里是 float host / `shell.overlay`），按视口坐标定位。
+- **全局 overlay**：Quick Input、Context View（菜单）、Hover、Notifications、Dialogs；不在 grid 里，住在 workbench 的 `mainContainer`，按视口坐标定位。
 - **view 内部的浮层**：补全列表、webview 自己的 overlay 等，归 view 自己的隔离盒子，不和全局 overlay 同层。
 
 ## 4. 扩展宿主协议与物理通道
@@ -162,7 +162,7 @@ Overlays（不是 Part）：
 - **完整的那一份在哪个进程**：`IMarkerService` 的唯一实现是 `MarkerService`（`platform/markers/common/markerService.ts:150`），**构造函数零依赖**（纯内存 `DoubleResourceMap` + `MicrotaskEmitter`，`:152-158`），本身不依赖 DOM；但上游**只在渲染器 / 独立编辑器的 main 文件里注册它**（`workbench/workbench.common.main.ts:189`、`sessions/sessions.common.main.ts:188`、`editor/standalone/browser/standaloneServices.ts:1191`），扩展宿主和服务端都没注册。⇒ 扩展宿主进程里实际存在的，只有它自己那两张本地表。
 - **语言服务器也只是众多来源之一**：language server 的诊断在 VS Code 这一侧**没有特权**——`vscode-languageclient` 的 diagnostics 功能一样是 `languages.createDiagnosticCollection(diagnosticCollectionName)` 再 `set()`（`DefaultDiagnosticCollectionProvider.create`），最后走同一条 `MainThreadDiagnostics.$changeMany`。三处差别值得记住：① 客户端可以在 `middleware.handleDiagnostics` 里**把诊断截下来**（装了 cSpell 4.9.3 的那份产物里，中间件只 `diagEmitter.fire(...)`、**不调 `next`**，转发回 collection 还是自己染色由它决定；内置 json 扩展也在 `handleDiagnostics` 里改写，`json-language-features/client/src/jsonClient.ts:306`）；② **LSP 的 `version` 落不到 marker 上**——服务端会发（cSpell 的服务端 `sendDiagnostics({uri, version, diagnostics})`，并自己用它做陈旧判断：`validateTextDocument stale …`），但 `DiagnosticCollection.set(uri, diagnostics)` 没有版本参数，marker 的 `modelVersionId` 是扩展宿主在 `set()` 那一刻按**本地**文档版本盖的（`extHostDiagnostics.ts:140`/`:158`），所以服务端算的是哪个版本，过这道门就丢了；③ **修复不在诊断里**：它走 `CodeActionProvider`（cSpell 服务端注册 `codeActionProvider: { codeActionKinds: [QuickFix] }`）。
 - **读诊断的那一侧**（以 Error Lens 3.28.0 为例，`~/.vscode/extensions/usernamehw.errorlens-3.28.0/dist/extension.js` 没混淆）：它 `createDiagnosticCollection` 出现 **0 次**，**只读不写**。读法就是拉：`languages.getDiagnostics()`（不带参数 = 全部，状态栏计数用它；按 uri 拉用来画装饰），订阅 `languages.onDidChangeDiagnostics`，自带 delay / debounce（`errorLens.delay` / `delayMode`；`onSave` 模式下打字时**先把装饰清掉**、保存后再画）。它的输出全在界面侧：按严重度的行尾 `after.contentText`、整行背景、problem range、gutter 图标（运行时生成 SVG data URI）、`hoverMessage`（Markdown + `command:` 按钮）、CodeLens、状态栏两个计数 + 一条消息。它的输出循环都从 `window.visibleTextEditors` / `activeTextEditor` 出发，**没有编辑器就什么都不画**（不是报错，是什么都不做）；装饰真正落到屏幕上靠 `MainThreadTextEditors.$trySetDecorations`（`api/browser/mainThreadEditors.ts:304-311`，渲染器里找不到那个 editor id 就直接 `reject(illegalArgument('TextEditor(<id>)'))`；注册装饰类型是 `$registerTextEditorDecorationType`，`extHost.protocol.ts:349`）。⇒ **扩展可以在 server 侧的扩展宿主里跑，装饰由主线程代理到渲染器**——它的 `extensionKind: ["ui","workspace"]`，`main` 与 `browser` 指向同一个入口，两边都能跑。
-- 还没核实：客户端**启用 pull**（`textDocument/diagnostic`）的具体路径。`vscode-languageclient` 不在 VS Code checkout 里，上面关于它和 cSpell 的结论来自**已安装的那份产物**（`~/.local/share/prac/code-server/extensions/streetsidesoftware.code-spell-checker-4.9.3/packages/{client,_server}/dist/*`），不是库的源码。
+- 还没核实：客户端**启用 pull**（`textDocument/diagnostic`）的具体路径。`vscode-languageclient` 不在 VS Code checkout 里，上面关于它和 cSpell 的结论来自**本地已安装的 cSpell 产物**，不是库的源码。
 
 ## 6. 激活
 
