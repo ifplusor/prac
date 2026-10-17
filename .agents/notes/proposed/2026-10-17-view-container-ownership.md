@@ -2,55 +2,72 @@
 status: proposed
 ---
 
-# Agent Note: view container 的 ownership —— prac 的 container region 与 VS Code 的 ViewPaneContainer
+# Agent Note: view title action 的 scope —— 容器不是 owner
 
-> **这是哪件工作**：prac 的 frame 已经在任意 region/stack 里摆 VS Code 的单个 view；这一层没有 owner 的设计。umbrella 见 [2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)。
+> **这是哪件工作**：prac 的 frame 按 view 组合 VS Code 内容；VS Code 的 view title menu 里混着 view 级和 container 级 action，需要一层 scope 规则。umbrella 见 [2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)。
 > **状态**：提出，未裁。
 
 ## Problem
 
-当前 embedded host 把 VS Code 的 **`ViewPane` 直接挂进 frame 的 view host**，因此 **`ViewPaneContainer` 这一层不存在**。
+当前 frame 把 VS Code 的**单个 `ViewPane`** 挂进 region/stack；**`ViewPaneContainer` 这一层不存在**。
 
-prac 的 `container:<id>` region 是**视觉 selector**：一个具名子区域，带容器条，在容器之间选一。VS Code 的 `ViewPaneContainer` 是**view 的所有者**：它创建/持有 view，管可见性、尺寸、focus、container 级 menu/action，并把自己注册进 `IViewsService`。
+于是 view title menu（`MenuId.ViewTitle`）里那些**以 container 为 owner 的命令**会失效。`Collapse Folders in Explorer` 是最直接的例子：
 
-两者名字都叫 container，但**不是同一个东西**。
+```ts
+const view = viewsService.getViewWithId(VIEW_ID); // null
+if (view !== null) (view as ExplorerView).collapseAll();
+```
 
-于是：
+命令执行了，但 `getViewWithId` 返回 `null`，`collapseAll()` 静默不跑。
 
-- view 的内容、tree、title action 都工作；
-- 但依赖 owner 的 container 级服务和命令会拿不到 view，或走错上下文；
-- `Collapse Folders in Explorer` 是最直接的例子：命令能执行，`viewsService.getViewWithId(VIEW_ID)` 却返回 `null`，`collapseAll()` 静默不跑。
+但这不是“少了 `ViewPaneContainer`，要补一个 owner”。prac 已经裁决：
 
-这不是一个 command 的 bug，而是 **container 的 ownership 没有定义**。
+- **视图是唯一可显示的单位**；
+- **区域是唯一的排布单位**；
+- **容器 = 一个具名子区域**（视觉分组），不是新的 owner；
+- **part 是可选的高级形态，不是组合的单位**；
+- **现在是按视图组合就够**（`docs/architecture.md` §7 #6 仍是开放问题，不是已定的下一步）。
 
-## 当前实际结构
+所以真正的问题不是“container ownership 缺失”，而是：
+
+> **我们把 container-scoped action 当成 view action 暴露在 view 的标题条里。**
+
+## 已有的设计约束
+
+- **frame 不认识来源**：它只见 `prac.view` 注册表。
+- **容器不越过编排**：机制只报 `containerId` / `containerTitle`；**编排**把它落成“选一的子区域（带名字）”。
+- **activity bar 不继承**：切换的载体是区域头部的容器条。
+- **不要让 VS Code 的布局主导 frame**（`docs/architecture.md` §2.2）。
+- **view 是单位**：`dsh:*` 与 `vscode:*` 一视同仁；`editor` 也是一个文件一个 view，不是 editor group。
+
+因此，`ViewPaneContainer` 不是“应该补上的层”，而是 **prac 当前明确不采用的 VS Code 高级形态**。
+
+## 当前实现的事实
 
 VS Code 原生：
 
 ```
 ViewDescriptorService
-  └─ ViewContainer（例如 workbench.view.explorer）
-       └─ ViewPaneContainer（part 里真正拥有这些 view 的容器）
-            └─ ViewPane（Open Editors / Folders / Outline / Timeline）
+  └─ ViewContainer（workbench.view.explorer）
+       └─ ViewPaneContainer（owner）
+            └─ ViewPane
 ```
 
-embedded host 实际：
+embedded host：
 
 ```
 ViewDescriptorService
   └─ ViewDescriptor
-       └─ ViewPane（embeddedWorkbench.tryMountView 直接 createInstance）
-            └─ .monaco-pane-view 包裹
+       └─ ViewPane（tryMountView 直接 createInstance）
+            └─ .monaco-pane-view
                  └─ frame 的 IsolatedView host
 ```
 
-`tryMountView` 的注释写的是 **“Mirrors `ViewPaneContainer.createView`”**：ctor、options、`setVisible(true)`、`.monaco-pane-view`、layout 都手动补了；缺的正是 `ViewPaneContainer` 本身。
-
-prac frame 的 region：
+prac：
 
 ```
 left
-  └─ container:workbench.view.explorer   ← 视觉 selector（prac 的 container）
+  └─ container:workbench.view.explorer   ← 具名子区域（视觉分组）
        └─ stack
             ├─ row: Open Editors
             ├─ row: Folders
@@ -58,142 +75,101 @@ left
             └─ row: Timeline
 ```
 
-| prac | VS Code |
-| --- | --- |
-| `left` region | sidebar part（未真正挂载） |
-| `container:<id>` | `ViewContainer` 的描述 + 视觉 selector |
-| `stack` | 该 container 下的 `ViewPane` 集合 |
-| 每个 stack row | 一个 `ViewPane` |
-| `IsolatedView` | view host |
-| **缺失** | **`ViewPaneContainer`** |
+- `ViewPane` 是 view 的 surface；
+- `ViewPaneContainer` 是 VS Code 的 owner；
+- prac 的 container 是**视觉分组**，不是 owner；
+- `IViewsService.getViewWithId` 依赖 `ViewPaneContainer`，所以对 mounted view 返回 `null`。
 
-`IViewsService.getViewWithId` 不是从 active composite 取，而是：
-
-```ts
-const viewContainer = this.viewDescriptorService.getViewContainerByViewId(id);
-const viewPaneContainer = this.viewPaneContainers.get(viewContainer.id);
-return viewPaneContainer?.getView(id) ?? null;
-```
-
-`viewPaneContainers` 由 `ViewPaneContainer` 构造时注册；frame 不创建 container，所以 mounted view 对全局视图服务不可见。
-
-## 为什么这不顺
-
-1. **container 是名字，不是 owner**
-   - prac 的 container region 管“显示哪个容器/哪个 view”；
-   - VS Code 的 container 管“谁拥有这些 view”；
-   - 当前只有前者，后者被 `tryMountView` 旁路了。
-
-2. **全局服务与 per-view 挂载不一致**
-   - `getViewWithId` / `getActiveViewPaneContainerWithId` / container-scoped command 都假设 owner 存在；
-   - mounted view 只在 frame 的 `mountedViews` 里；
-   - 于是“view 自己能做的事”正常，“container 代表 view 做的事”失效。
-
-3. **两个权威**
-   - frame 管 layout / stack / fold / sash；
-   - `ViewPaneContainer` 本来也管 view 的可见性、尺寸、focus；
-   - 当前 frame 手动 `setVisible` / `layout`，等于用 per-view 挂载模拟 owner，但没有把它建模。
-
-4. **container 级能力缺失**
-   - container title / menu、view visibility、拖放、container action、focus 语义；
-   - 单 view 的 title action 还能工作，但 container 级的会缺。
-
-5. **命名碰撞**
-   - `container` 在 prac 和 VS Code 里是两个概念；
-   - 讨论里很容易把“视觉容器”当成“view owner”，collapse 就是这个词义混淆的症状。
+这个 `null` 是**当前模型的必然结果**，不是漏了一层。
 
 ## 设计问题
 
-**prac 的 container region 是否应该成为 VS Code container 的 owner？**
+**view title 条里，哪些 action 是 view-scoped，哪些是 container-scoped？**
 
-具体是：
+`MenuId.ViewTitle` 在 VS Code 里把两类混在一起：
 
-- container region 只负责“选哪个容器/哪个 view”，view 的 owner 交给一个 headless container host？
-- 还是 container region 本身就是 owner，stack 是它内部的 view 排布？
-- 还是保持 per-view 挂载，明确不提供 container 级服务，只补 view-scoped action？
+- view 自己的 action：New File、New Folder、Refresh、Filter、Pin、View as List…
+- container/上下文 action：Collapse Folders、container menu、与 container 的 view 集合/可见性相关的命令。
+
+prac 把 view 拿出来单独摆，**container 的 owner 语义没有跟过来**；所以：
+
+- view 自己的 action 应该继续工作；
+- container-scoped action 要么**不要出现在 view 标题条**，要么**由 prac 显式重实现为 view-scoped action**；
+- 不能靠引入 `ViewPaneContainer` 让所有 container 命令“碰巧”工作。
 
 ## Proposal
 
-### A. container host（推荐作为长期方向）
+### A. view-scoped action（推荐，当前架构）
 
-每个 prac 的 `container:<id>` region 对应一个 **headless container host**，由 `vscode-host` 创建并持有：
-
-- host 从 `ViewDescriptorService` 拿 container 的 view descriptors；
-- view 的创建走 host 的 `createView`（把 `tryMountView` 的逻辑收进来）；
-- host 持有 mounted `ViewPane` 集合，并向 `IViewsService` 注册一个最小的 `IViewPaneContainer`（`getView` / `views` / `onDidAddViews` / `onDidRemoveViews` / `focus` / `getActionsContext` / `toggleViewVisibility`）；
-- frame 仍然管 region / stack / fold / sash / 拖拽；
-- host 管 view 的 owner 语义：create、visible、size、focus、container menu/action。
-
-关键边界：
-
-- **host 不挂 pane composite / part**，只拥有 view；
-- **frame 不碰 view 内部**，只给 host 盒子；
-- **container 的可见性/顺序**：frame 的 stack 是排布，host 的 view 集合是成员；两者需要明确谁写、谁读；
-- **editor groups 不在这条链上**：编辑器由 `PracEditorHost` 走另一条 owner 路径。
-
-### B. per-view 挂载 + view-scoped action（过渡）
-
-保持当前 per-view mount，不改全局 `IViewsService`：
+保持 view 是单位，不改全局 `IViewsService`：
 
 - `vscode-host` 维护 mounted `ViewPane`；
 - view title action 由 host 用 mounted view 执行；
-- container-scoped command 明确不支持，或逐个补 adapter。
+- collapse 这类“作用在 view 自身内容上”的动作，走 mounted `ExplorerView.collapseAll()`；
+- 其他真正的 container/global 命令，不由 view 标题条代理。
 
-代价：container 级能力仍然缺；collapse 能修，但下一个 container 命令还会遇到同样的洞。
+这样 action 语义仍然落在 view 上，不引入 container owner。
 
-### C. 真实 `ViewPaneContainer` / pane composite
+### B. container-scoped command 的过滤/声明（推荐，补 A）
 
-语义最正确，但把 part/container 的 layout 和生命周期也带进来：
+view 标题条只暴露 **view-scoped** action。需要一层 scope 声明，因为 `MenuId.ViewTitle` 本身不区分：
 
-- 和 frame 的 per-view stack 抢布局；
-- 为了 owner 重建整个 part，成本高；
-- 不作为当前方向。
+- 由 `ui-vscode-views`/host 给 action 标 `scope: "view" | "container" | "global"`；
+- 或者维护一份“在 prac 的 view 条里不出现”的 container action 列表；
+- container 级 action 留在 container 条/容器菜单，不进入 view 行头。
 
-### D. container region 即 owner
+否则每个 container 命令都会以同样的方式坏掉。
 
-把 prac 的 `container` region 直接升级为 owner：
+### C. container host（未来高级形态）
 
-- region 的 backing object 就是 host；
-- stack 是 host 的 view 排布；
-- 概念上最一致，但需要 frame 的 region 模型接受一个“外部 owner”对象，和 A 是同一件事的两种落法。
+如果将来真的采用 container/part 作为**可选高级形态**（`docs/architecture.md` §7 #6 的开放问题），再设计一个 headless container host：
+
+- host 持有 mounted views，向 `IViewsService` 注册最小 `IViewPaneContainer`；
+- frame 仍然管 layout；
+- 这是一次**架构扩展**，不是 collapse 的修法。
+
+### D. 真实 `ViewPaneContainer` / pane composite
+
+语义最完整，但会把 part/container 的 layout 和生命周期带回来，和“view 是单位”冲突。不作为当前方向。
 
 ## 比较
 
-| | ownership | frame layout | VS Code container 服务 | 成本 | 风险 |
+| | view 是单位 | container owner | 当前 collapse | 成本 | 架构影响 |
 | --- | --- | --- | --- | --- | --- |
-| A container host | 完整 | 保留 | 可恢复 | 中 | 需要最小 `IViewPaneContainer` 注册 |
-| B per-view + action | 部分 | 保留 | 缺失 | 低 | container 命令逐个漏 |
-| C 真实 container/part | 完整 | 冲突 | 完整 | 高 | 与 frame 抢布局 |
-| D region 即 owner | 完整 | 保留 | 可恢复 | 中 | 需要 region 模型支持 owner |
+| A view-scoped action | 保持 | 不需要 | 可修 | 低 | 小 |
+| B 过滤/声明 scope | 保持 | 不需要 | 防同类 | 中 | 小 |
+| C container host | 保持 frame | 引入 | 可修 | 中 | 大；要等 §7 #6 裁决 |
+| D 真实 container/part | 冲突 | 引入 | 可修 | 高 | 大；不取 |
 
 ## 推荐
 
-- **长期：A / D**。container region 和 VS Code container 应该是同一个 ownership 边界；stack 只是它的 view 排布。
-- **短期：B**，只修当前 view-scoped 的 collapse，不动全局 `getViewWithId`。
-- **不取：C**——为了 owner 重建 part，会把 layout 权威搞成两个。
-- **不取**：把 mounted view 塞进全局 `getViewWithId`；那会让所有调用者拿到一个没有 container 的 view，污染面更大。
+- **A + B**：view-scoped action 走 mounted view；container-scoped command 从 view 标题条过滤或显式声明。
+- **C 只在 §7 #6 被裁决为“需要高级形态”后**再设计；不能因为一个 collapse 反向推动架构。
+- **D 不取**。
 
 ## 验收
 
-- `IViewsService.getViewWithId(VIEW_ID)` 返回 mounted `ExplorerView`；
-- collapse 真正执行，树收起；
-- view title actions、container title/menu、focus、visibility 至少各有一次 live 验证；
+- `Collapse Folders` 通过 mounted `ExplorerView.collapseAll()` 生效；
+- New File / New Folder / Refresh 等 view-scoped action 不受影响；
+- view 标题条不再出现无法工作的 container-scoped action；
 - `verify:stack` 17/17、`verify:views` / `verify-focus` / `verify-layout` 保持；
-- frame 的 fold/sash/drag 不因 host 引入而退化。
+- frame 的 fold/sash/drag 不退化；
+- 不引入 `ViewPaneContainer`，不改全局 `IViewsService.getViewWithId` 的语义。
 
 ## Open questions
 
-- `ViewPaneContainer` 是具体类，`IViewsService.viewPaneContainers` 是私有的；最小注册点放在哪里？需要 subclass、还是另开一个 `IViewPaneContainer` 注册缝？
-- frame 的 stack 顺序/折叠与 host 的 view 集合，谁是权威？折叠是 frame 的 B4/D1，view 的显示/隐藏是 container 的；两张状态表如何不打架？
-- container 的可见性/尺寸/focus：host 是否需要接管 `ViewPane.setVisible` / `layout`，还是继续由 frame 驱动？
-- container 级 menu/action（title/menu）要不要一起接？
-- `prac.view` 目录里的 `containerId` 只是元数据；host 建立后，它是否要升级为“container host 的 key”？
-- 编辑器组（`PracEditorHost`）与 view container host 是否共用 ownership 抽象，还是保持两条链？
-- DSH 自己的 view container（如果将来有）是否也要 host，还是只有 VS Code 的容器需要？
+- `MenuId.ViewTitle` 没有 scope 元数据；scope 由谁声明：`ui-vscode-views` 的映射、host 的 action 表，还是 action id 的命名约定？
+- “Collapse Folders”到底算 view-scoped 还是 container-scoped？它作用于 view 的树，但 owner 是 container；这决定它是 A 还是 B。
+- container 条/容器菜单将来要不要承接 container-scoped action？如果要，它属于“具名子区域”的装饰，不是 view 行头。
+- `view` 的 action 集合会随 `when`/context 变化；scope 是否也要随 context 变？
+- DSH 自己的 view 有没有 scope 概念？还是只有 VS Code 借来的 view 需要这层？
+- 如果将来采用 container 高级形态，A/B 的 scope 层是否可以直接升级为 host 的 owner 语义？
 
 ## Related
 
-- [视图的隔离与对等 —— 区域骨架、视图是单位](../in-progress/2026-10-05-vscode-dsh-layout-boundary.md)：container = 具名子区域；视图是单位。
-- [VS Code 的视图进 prac 的视图目录](../in-progress/2026-10-06-vscode-view-catalogue.md)：容器本身不进目录，`containerId` 只是分组元数据。
-- [prac 自己的编辑器宿主](../in-progress/2026-10-07-editor-host.md)：编辑器 group 的 ownership，是另一条链。
-- [VS Code × DSH 集成](../in-progress/2026-09-09-vscode-dsh-integration.md)：umbrella。
+- [docs/architecture.md](../../../docs/architecture.md) §2.2 / §3.1 / §3.2 / §7 #6：view 是单位；容器 = 具名子区域；part 是可选高级形态。
+- [docs/concepts.md](../../../docs/concepts.md) 七：容器 = 区域的孩子；不是新对象。
+- [2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md) §3.2：容纳单位 = view；container/part 不是单位。
+- [2026-10-05-vscode-dsh-layout-boundary.md](../in-progress/2026-10-05-vscode-dsh-layout-boundary.md)：容器 = 具名子区域；activity bar 不继承。
+- [2026-10-06-vscode-view-catalogue.md](../in-progress/2026-10-06-vscode-view-catalogue.md)：容器本身不进目录；`containerId` 只是元数据。
+- [2026-10-07-editor-host.md](../in-progress/2026-10-07-editor-host.md)：编辑器组是另一条 owner 链，不是 view container 的模板。
