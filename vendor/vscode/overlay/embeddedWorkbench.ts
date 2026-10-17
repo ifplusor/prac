@@ -44,6 +44,7 @@ import { IThemeService } from "../../platform/theme/common/themeService.js";
 import { IHostService } from "../services/host/browser/host.js";
 import { INotificationService } from "../../platform/notification/common/notification.js";
 import { ICommandService } from "../../platform/commands/common/commands.js";
+import { IViewsService } from "../../workbench/services/views/common/viewsService.js";
 import { IEditorService } from "../services/editor/common/editorService.js";
 import { IEditorResolverService } from "../services/editor/common/editorResolverService.js";
 import { IUntitledTextEditorService } from "../services/untitled/common/untitledTextEditorService.js";
@@ -525,6 +526,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
               this.movePartInto(partId, element),
             mountViewInto: (viewId: string, element: HTMLElement) =>
               this.mountViewInto(viewId, element),
+            focusView: (viewId: string) => this.focusView(viewId),
             releaseView: (viewId: string) => this.releaseView(viewId),
             listViews: () => this.listViews(),
             onDidChangeViews: (listener: () => void) => this.onDidChangeViews(listener),
@@ -712,6 +714,14 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    * what it gets. Mounting the same view again re-parents the pane it already
    * has rather than creating a second one — a view instance holds services.
    */
+  focusView(viewId: string): void {
+    const instantiationService = this.instantiationService;
+    if (!instantiationService) return;
+    instantiationService.invokeFunction((accessor) => {
+      accessor.get(IViewsService).getViewWithId(viewId)?.focus();
+    });
+  }
+
   mountViewInto(viewId: string, element: HTMLElement): void {
     const mounted = this.mountedViews.get(viewId);
     if (mounted) {

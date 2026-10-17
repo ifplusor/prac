@@ -260,6 +260,12 @@ export function apply(ctx: Context): void {
       const vscodeView = vscodeViewIdOf(view);
       return vscodeView === undefined ? () => null : embed.view(vscodeView);
     },
+    focusView: (view: string): void => {
+      const vscodeView = vscodeViewIdOf(view);
+      if (vscodeView !== undefined) embed.focusView(vscodeView);
+    },
+    runCommand: (command: string, ...args: unknown[]): Promise<unknown> =>
+      embed.runCommand(command, ...args),
     /**
      * Register the gate-only timeline provider (see the workbench's face doc): a Timeline pane
      * with nothing in it cannot be told apart from a broken one.
@@ -289,6 +295,9 @@ export function apply(ctx: Context): void {
     },
   };
   ctx.effect(() => ctx.provide("pracVscode", face), `${name}: pracVscode service`);
+  // Diagnostics hook: lets a live gate exercise the command path directly,
+  // without pretending a DOM click reached the workbench.
+  (globalThis as { __pracVscodeFace?: PracVscodeFace }).__pracVscodeFace = face;
 
   // The app's own root goes into the frame's floating layer. Registering it here
   // (and not in a consumer) is the mechanism's business: the layer is where the

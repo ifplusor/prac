@@ -60,6 +60,20 @@ export interface PracVscodeFace {
    */
   hostFor(view: string): () => ReactElement | null;
   /**
+   * Focus the workbench view behind a view id, so its title actions run in the
+   * view's own context.
+   *
+   * @param view - a `prac.view` view id.
+   */
+  focusView(view: string): void;
+  /**
+   * Execute a workbench command (diagnostics / direct command paths).
+   *
+   * @param command - the command id.
+   * @param args - forwarded arguments.
+   */
+  runCommand(command: string, ...args: unknown[]): Promise<unknown>;
+  /**
    * The app's **placement** behind a view id, or `undefined` when the id is not a
    * file view.
    *

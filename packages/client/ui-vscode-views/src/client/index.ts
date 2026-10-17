@@ -147,7 +147,18 @@ export function apply(ctx: Context): void {
             observer.observe(root, { childList: true, subtree: true, characterData: true });
             return () => observer.disconnect();
           }, [view]);
-          return createElement("div", { ref, style: { display: "contents" } }, createElement(View));
+          return createElement(
+            "div",
+            {
+              ref,
+              style: { display: "contents" },
+              // The title actions run in the view's own context. The pane header
+              // cannot take focus here (its title/twisty are hidden), so focus the
+              // view before the action's click reaches the command.
+              onPointerDownCapture: () => host.focusView(view),
+            },
+            createElement(View),
+          );
         }
         sync();
         const stop = host.onDidChangeCatalogue(sync);

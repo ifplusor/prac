@@ -184,6 +184,13 @@ export interface PartHostFace {
    */
   focusFile: (placement: string, resource: string) => void;
   /**
+   * Make one view the focused view, so its title actions run in the view's own
+   * context rather than whichever view happened to be focused before.
+   *
+   * @param viewId - the workbench view id (`workbench.explorer.fileView`).
+   */
+  focusView: (viewId: string) => void;
+  /**
    * Forget one placement's surface, so the same placement can be mounted again
    * (elsewhere, or after its host went away). The editor **stays open** — the view may
    * come back — and the workbench's text model survives while anything else references

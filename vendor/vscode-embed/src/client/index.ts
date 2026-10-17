@@ -260,6 +260,20 @@ export interface VscodeEmbedHandle {
    */
   view(viewId: string): () => ReactElement;
   /**
+   * Make one view the focused view.
+   *
+   * @param viewId - the workbench view id.
+   */
+  focusView(viewId: string): void;
+  /**
+   * Execute a workbench command, for diagnostics and for callers that need the
+   * command itself rather than a DOM action.
+   *
+   * @param command - the command id.
+   * @param args - forwarded arguments.
+   */
+  runCommand(command: string, ...args: unknown[]): Promise<unknown>;
+  /**
    * The seat component for **one file placement**.
    *
    * The unit is the placement — a file in one editor group (decision 17, made precise
@@ -819,6 +833,11 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
     partHost,
     view,
     file,
+    focusView: (viewId: string): void => {
+      record.face?.focusView(viewId);
+    },
+    runCommand: (command: string, ...args: unknown[]): Promise<unknown> =>
+      record.commands?.executeCommand(command, ...args) ?? Promise.resolve(undefined),
     capabilities: { editors, diagnostics },
     placements: () => record.face?.listPlacements() ?? [],
     enableTimelineProbe: (): void => {
