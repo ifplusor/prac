@@ -2,7 +2,7 @@
  * The client half's **published type surface**.
  *
  * Types only: this module exists so the pack's dts pass emits a declaration
- * bundle for the view consumers (`prac-client-ui-vscode-editor`, `…-explorer`) to import —
+ * bundle for the view consumers (`prac-client-ui-vscode-editor`, `…-views`) to import —
  * the thing that lets them stop restating this mechanism's face by hand. It must
  * stay free of runtime code (the emitted `.mjs` is a stub); the executable client
  * half is `index.ts`, wrapped by `scripts/pack-client.ts` into the loader artifact.
