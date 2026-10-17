@@ -102,17 +102,32 @@ Server（node）
 
 ### 2.2 核心对象模型
 
-| 对象 | 作用 | 持有什么 | 谁调用 | 不知道 |
-| --- | --- | --- | --- | --- |
-| `PracVscodeFace` | consumers 看到的 adaptor 前台 | catalogue / `hostFor` / `focusView` / `runCommand` / file placement / capabilities | consumers、诊断/门 | frame 的 layout |
-| `VscodeEmbedHandle` | DSH 插件 boot / 挂载 workbench 的把手 | boot / `view` / `file` / `placements` / `views` / `floatHost` / group region channel | `vscode-host` | frame 的 `LayoutState` |
-| `WorkbenchFace`（目标名） | workbench 对 embedder 的内部面 | view / file mount、focus / release、placements、capabilities；**不承载 part mount** | `vscode-embed` | consumers / `PracVscodeFace` |
-| `EmbeddedWorkbench` | VS Code workbench 本体 | workbench 服务、`IWorkbenchLayoutService`、view / editor host、overlay | `WorkbenchFace` | frame / consumers |
-| `PracEditorHost` | editor group 的 owner | `IEditorGroupsService`、group / region、editor group model / panes | workbench、`vscode-host` 的 region channel | view container |
-| `ViewPane` / `ViewPaneContainer` | 上游 view 的 UI / container runtime | 一个 view 的 pane / 一个 container 的运行时 | `tryMountView` / container context | frame |
-| `VscodeCatalogueEntry` | catalogue 的一行数据 | `view` / `appId` / `title` / `source` / `location` / `containerId` / `containerTitle` / `region` | `ui-vscode-views` / `ui-vscode-editor` / arrangement | 怎么渲染 |
-| `PracLayoutFace` | frame 的布局服务 | 区域树、view 放置、区域创建 / 删除 | adaptor、arrangement、editor host | VS Code 的 part / container |
-| `prac.view` | frame 的 view 注册槽 | 每个 view 的一次注册（id / label / icon / 宿主组件） | consumers | view 的来源 |
+按边界分三组：
+
+#### 2.2.1 consumer 面
+
+| 对象 | 作用 | 谁调用 | 不知道 |
+| --- | --- | --- | --- |
+| `PracVscodeFace` | consumers 的 adaptor 前台：catalogue / `hostFor` / `focusView` / `runCommand` / file placement / capabilities | consumers、诊断/门 | frame 的 layout |
+| `VscodeCatalogueEntry` | catalogue 的一行数据：`view` / `appId` / `title` / `source` / `location` / `containerId` / `containerTitle` / `region` | `ui-vscode-views` / `ui-vscode-editor` / arrangement | 怎么渲染 |
+| `prac.view` | frame 的 view 注册槽：每个 view 的一次注册（id / label / icon / 宿主组件） | consumers | view 的来源 |
+
+#### 2.2.2 embed / workbench
+
+| 对象 | 作用 | 谁调用 | 不知道 |
+| --- | --- | --- | --- |
+| `VscodeEmbedHandle` | DSH 插件 boot / 挂载 workbench 的把手：boot / `view` / `file` / `placements` / `views` / `floatHost` / group region channel | `vscode-host` | frame 的 `LayoutState` |
+| `WorkbenchFace`（目标名） | workbench 对 embedder 的内部面：view / file mount、focus / release、placements、capabilities；**不承载 part mount** | `vscode-embed` | consumers / `PracVscodeFace` |
+| `EmbeddedWorkbench` | VS Code workbench 本体：workbench 服务、`IWorkbenchLayoutService`、view / editor host、overlay | `WorkbenchFace` | frame / consumers |
+| `PracEditorHost` | editor group 的 owner：`IEditorGroupsService`、group / region、editor group model / panes | workbench、`vscode-host` 的 region channel | view container |
+| `ViewPane` | 一个 view 的 UI（上游 `ViewPane`） | `tryMountView` | frame |
+| `ViewPaneContainer` | 一个 container 的运行时（上游） | container context | frame |
+
+#### 2.2.3 frame 契约
+
+| 对象 | 作用 | 谁调用 | 不知道 |
+| --- | --- | --- | --- |
+| `PracLayoutFace` | frame 的布局服务：区域树、view 放置、区域创建 / 删除 | adaptor、arrangement、editor host | VS Code 的 part / container |
 
 调用关系：
 
