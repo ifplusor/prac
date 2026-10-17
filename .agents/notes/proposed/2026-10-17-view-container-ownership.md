@@ -35,6 +35,27 @@ prac 的 frame 和 VS Code 的 adaptor 是两层，不要混：
 
 `docs/architecture.md` 的“view 是单位 / container 是具名子区域 / part 是可选高级形态”约束的是 **frame 的编排模型**；它不否定 adaptor 需要一个 container context 来承接 VS Code 的 container 功能。
 
+## 扩展 UI 能力对 container context 的要求
+
+VS Code 扩展的 UI 能力是一组封闭的 surface（见 [docs/vscode.md](../../../docs/vscode.md) §4）：`viewsContainers` / `views` / `viewsWelcome`、`view/title` / `view/item/context`、container title、status bar、notifications / quick pick / dialog、webview / custom editor、编辑器内容 UI、SCM / comments / timeline / tests / debug / task / terminal / notebook / chat、themes / settings / walkthroughs。
+
+本 note 只处理其中的 **view container / view surface**：
+
+- `viewsContainers` / `views` / `viewsWelcome`；
+- `view/title` / `view/item/context`；
+- container title / menu；
+- view 的 order / visibility / focus / size；
+- container 的 view 集合模型（`ViewContainerModel`）。
+
+其余 surface（status bar、overlay、webview、编辑器内容、SCM / comments / timeline / …）由各自 adaptor 承接，不在这个 note 的 container context 里。
+
+这组 surface 说明：container context 不能只是 `getViewWithId` 的补丁；它至少要能承接：
+
+- view 的创建 / 移除 / 可见性 / 顺序 / 尺寸；
+- container title/menu 与 view title/item menu 的 action owner；
+- focus / visibility 的语义；
+- `viewsWelcome` 与 view 的空状态。
+
 ## 当前结构
 
 VS Code 原生：
@@ -72,7 +93,7 @@ left
 
 ## 机制
 
-### A. per-container adaptor（推荐）
+### A. per-container adaptor（子集 / 过渡）
 
 每个 VS Code container（`workbench.view.explorer` 等）在 `vscode-host` 内部对应一个 **container adaptor**：
 
@@ -93,7 +114,7 @@ frame 侧：
 - 它只告诉 adaptor “这个 container 在屏上了”；
 - frame 不持有 `ViewPaneContainer`，也不参与 VS Code 的 owner 语义。
 
-### B. headless real `ViewPaneContainer`
+### B. headless real `ViewPaneContainer`（推荐）
 
 如果最小 adaptor 接不住某些 container 功能（例如 container 的 view 集合模型、拖放、visibility），可以让 adaptor 创建一个 **headless 的真实 `ViewPaneContainer`**：
 
@@ -101,7 +122,7 @@ frame 侧：
 - 只作为 container context 和 view owner；
 - frame 仍然给 view 盒子。
 
-这是 A 的“更完整实现”，成本更高；只在 A 的最小接口不够时采用。
+这是 A 的“更完整实现”，也是当前更接近 VS Code view container 语义的 target：`ViewPaneContainer` 本身已经承接了 view 集合、`ViewPane` 生命周期、title/menu、visibility/focus 的模型；headless 只是不挂 part/pane composite。A 只有在能实现同一组模型时才是它的子集。
 
 ### C. full part / pane composite
 
@@ -111,6 +132,13 @@ frame 侧：
 
 只把 container-scoped action 从 view 标题条过滤掉，或只走 view-scoped action。  
 能临时消除错误，但**不承接 VS Code 的 container 功能**；作为过渡可以，作为终态不行。
+
+## 推荐
+
+- **B（headless real `ViewPaneContainer`）** 作为 view container surface 的 target；
+- **A** 只有在能够承接同一组 view container 模型时才是 B 的子集，否则只是过渡；
+- **C** 不取；**D** 只作为临时收口；
+- 其他扩展 UI surface 不塞进这个 container context，分别由 status bar / overlay / webview / editor / SCM / comments / timeline / debug / task / terminal / notebook / chat 的 adaptor 承接。
 
 ## 责任边界
 
@@ -152,3 +180,5 @@ frame 侧：
 - [2026-10-05-vscode-dsh-layout-boundary.md](../in-progress/2026-10-05-vscode-dsh-layout-boundary.md)：容器 = 具名子区域；activity bar 不继承。
 - [2026-10-06-vscode-view-catalogue.md](../in-progress/2026-10-06-vscode-view-catalogue.md)：容器本身不进目录；`containerId` 只是元数据。
 - [2026-10-07-editor-host.md](../in-progress/2026-10-07-editor-host.md)：编辑器组是另一条 owner 链。
+- [docs/vscode.md](../../../docs/vscode.md) §3：frame / part / container / pane / view 的 UI 布局模型。
+- [docs/vscode.md](../../../docs/vscode.md) §4：扩展的 UI 能力范围（声明式贡献 + 运行时 API + 边界）。
