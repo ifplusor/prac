@@ -130,21 +130,16 @@ Server（node）
 
 ### 3.1 已有契约
 
-- **`PartHostFace` / `VscodeEmbedHandle`**：mechanism 面。
-  - 宿主元素（view host / file host / float host）；**不暴露 part host**；
-  - 命令面；
-  - focus / layout；
-  - 不涉及 prac 的布局。
-- **`PracVscodeFace`**：adaptor 面。
-  - `catalogue()` / `onDidChangeCatalogue()`；
-  - `hostFor(view)`；
-  - `focusView(view)`；
-  - `runCommand(command, ...args)`；
-  - 后续按 surface 增加，不把 frame 的内部暴露出去。
-- **`prac.view`**：view 注册缝。
-  - frame 只按注册表成员判定；
-  - `containerId` / `containerTitle` 只是元数据；
-  - 不代表 container 是 frame 的 owner。
+| 面 | 形状 |
+| --- | --- |
+| `VscodeEmbedHandle` | `boot(launch)` / `view(viewId)` / `file(placement, resource)` / `placements()` / `views()` / `floatHost()` / `setGroupRegionChannel(channel)` / `focusView` / `runCommand` |
+| `PartHostFace`（目标） | `mountViewInto` / `focusView` / `releaseView` / `mountFileInto` / `focusFile` / `releaseFile` / `listViews` / `listPlacements` / capabilities；**不暴露 part mount**（当前代码仍保留，见 §7 cleanup） |
+| `PracVscodeFace` | `catalogue()` / `onDidChangeCatalogue()` / `hostFor(view)` / `focusView(view)` / `runCommand(command, ...args)` / `filePlacement(view)` / `fileResource(view)` / `capabilities.editors` / `capabilities.diagnostics` |
+| `VscodeCatalogueEntry` | `view` / `appId` / `title` / `source: "file" \| "view"` / `location: "sidebar" \| "panel" \| "auxiliarybar" \| "stage"` / `containerId?` / `containerTitle?` / `region?` |
+| `PracLayoutFace` | `getState` / `subscribe` / `listViews` / `listRegions` / `place` / `placeQuietly` / `removeView` / `createRegionBeside` / `regionInDirection` / `removeRegion` |
+| `prac.view` | `{ name: "prac.view", id, label, icon }` |
+
+`PartHostFace` 现在只承担 view / file / capability face；part mount 是旧组合模型的残留，不在目标契约里。
 
 ### 3.2 未来契约
 
@@ -229,7 +224,7 @@ Server（node）
 | **专用视图** | SCM / comments / timeline / tests / debug / task / terminal / notebook / chat | adaptor；多数是 view + action，部分需要 controller | future specialized views |
 | **主题 / 设置 / walkthrough** | themes / icon themes / configuration / walkthroughs | adaptor + frame 的主题/设置面 | future themes/settings |
 
-这张表是 **ownership**，不是设计；每个 surface 的细节在自己的 step。
+这张表是 **ownership**，不是设计；每个 surface 的细节在自己的 step。owner 列里的 “adaptor” 指 core workbench / adaptor 侧；view / action 的入口对 core 与 extension 一视同仁。
 
 ### 5.1 第一个 surface：container / view
 
@@ -242,7 +237,7 @@ Server（node）
 
 architecture 只定形状，不定机制：
 
-- container context 应位于 **adaptor 内部**，在 `ViewPane` 与 `PracLayoutFace` 之间；
+- container context 应位于 **adaptor 内部**，围绕 `ViewPane` / `ViewPaneContainer`；它通过 `PracLayoutFace` 和 frame 的 view host 协作，不拥有 layout；
 - 它要承接：view 集合、可见性、顺序、size、focus、container title / menu、`viewsWelcome`；
 - container context 是 core-owned，但不是 core-only；它服务同一 container 里的 core view 与 extension view；
 - 它不能把 part/pane composite 的 layout 带回 frame；
@@ -274,7 +269,8 @@ architecture 只定形状，不定机制：
 - **webview / custom editor**；
 - **editor content UI**；
 - **专用视图**；
-- **themes / settings / walkthroughs**。
+- **themes / settings / walkthroughs**；
+- **mechanism cleanup**：删除 `partHost` 与 public `mountPartInto` / `movePartInto`，把 `PartHostFace` 改名为 `WorkbenchFace` / `EmbedHostFace`；workbench 内部 parts 保持私有。
 
 frame 侧（stack chrome / grid）不属于这张 note 的 steps，见各自的 note。
 
