@@ -3,8 +3,8 @@
 > 这篇记 VS Code 自己的结构：它内部怎么分成两半、平台服务是什么、扩展宿主协议跑在什么通道上、诊断是怎么走的、agent / MCP / 工具 / skill / prompt 分别做在哪一层，以及 UI 布局的 frame / part / container / pane / view 概念模型。
 > **行号与数字都指 pinned `1.137.0` checkout。**
 
-> **覆盖什么**：运行形态 / 平台服务 / UI 布局 / 扩展宿主协议 / 诊断 / 激活 / agent 层。
-> 目录：1 运行形态 · 2 平台服务 · 3 UI 布局 · 4 扩展宿主协议 · 5 诊断 · 6 激活 · 7 agent 层
+> **覆盖什么**：运行形态 / 平台服务 / UI 布局 / 扩展的 UI 能力范围 / 扩展宿主协议 / 诊断 / 激活 / agent 层。
+> 目录：1 运行形态 · 2 平台服务 · 3 UI 布局 · 4 扩展的 UI 能力范围 · 5 扩展宿主协议 · 6 诊断 · 7 激活 · 8 agent 层
 
 ## 1. 运行形态：渲染器 / 扩展宿主 / 主线程
 
@@ -137,7 +137,74 @@ Overlays（不是 Part）：
 - **全局 overlay**：Quick Input、Context View（菜单）、Hover、Notifications、Dialogs；不在 grid 里，住在 workbench 的 `mainContainer`，按视口坐标定位。
 - **view 内部的浮层**：补全列表、webview 自己的 overlay 等，归 view 自己的隔离盒子，不和全局 overlay 同层。
 
-## 4. 扩展宿主协议与物理通道
+## 4. 扩展的 UI 能力范围
+
+> 扩展不能直接操作 workbench DOM；它的 UI 能力是一组**声明式贡献面**加**运行时 API**。上游落点：`api/browser/viewsExtensionPoint.ts`、`platform/actions/common/actions.ts`、`api/common/extHost.api.impl.ts`、`workbench/api/browser/mainThread*.ts`。
+
+### 4.1 声明式贡献
+
+| UI 面                       | 贡献点                                                        | 能力                                                                                                                           |
+| --------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **View Container**          | `viewsContainers`                                             | 在 `activitybar` / `panel` / `secondarySidebar` 新增容器（id、title、icon）                                                    |
+| **View**                    | `views`                                                       | 在自己的或内置容器里加 view；`tree` 或 `webview`；`when` / `icon` / `contextualTitle` / `visibility` / `initialSize` / `group` |
+| **View Welcome**            | `viewsWelcome`                                                | tree view 的空状态内容（Markdown、按钮、命令链接）                                                                             |
+| **View 标题条 / 项菜单**    | `menus`                                                       | `view/title`、`view/item/context` 里的 action                                                                                  |
+| **命令 / 键位**             | `commands`、`keybindings`                                     | 命令、标题、icon、enablement；键位                                                                                             |
+| **其它菜单**                | `menus`                                                       | command palette、editor/title、editor/context、explorer/context、SCM、Timeline、Notebook、Comment、Debug 等                    |
+| **Webview / Custom Editor** | `views`(webview)、`customEditors`                             | webview view；webview panel；自定义编辑器                                                                                      |
+| **Notebook**                | `notebooks`、`notebookRenderer`                               | notebook 类型、renderer、cell UI                                                                                               |
+| **Terminal**                | `terminal`                                                    | terminal profile（终端选择器里的项）                                                                                           |
+| **Debug**                   | `debuggers`                                                   | debugger 类型、初始配置、配置片段                                                                                              |
+| **Task / Problems**         | `taskDefinitions`、`problemMatchers`                          | task 定义、problem matcher/pattern                                                                                             |
+| **Walkthrough**             | `walkthroughs`                                                | Get Started / Welcome 步骤                                                                                                     |
+| **主题 / 图标**             | `themes`、`iconThemes`、`productIconThemes`、`fileIconThemes` | 颜色主题、图标主题、产品图标、文件图标                                                                                         |
+| **设置**                    | `configuration`、`configurationDefaults`                      | 配置项、默认值、设置 UI                                                                                                        |
+| **Chat**                    | `chatParticipants`、`languageModelTools`、`chatSessions` 等   | chat participant、LM tool、chat session、prompt/skill、MCP 定义                                                                |
+
+### 4.2 运行时 API
+
+| UI 面                           | API                                                                                   | 边界                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **状态栏**                      | `window.createStatusBarItem`                                                          | 只能加 item；不能改状态栏布局                                                   |
+| **通知 / 进度**                 | `showInformationMessage` / `showWarningMessage` / `showErrorMessage` / `withProgress` | 系统通知样式，不能塞任意 DOM                                                    |
+| **Quick Pick / Input / Dialog** | `showQuickPick` / `showInputBox` / `showOpenDialog` / `showSaveDialog`                | 系统组件                                                                        |
+| **Webview Panel**               | `createWebviewPanel`                                                                  | 自己的 iframe 内任意 UI；不能画到 workbench chrome                              |
+| **Webview View**                | `registerWebviewViewProvider`                                                         | 在 view 盒子里                                                                  |
+| **Tree View**                   | `createTreeView` + `TreeDataProvider`                                                 | 行是数据（label/icon/description/command/checkbox/collapsible），不能塞任意 DOM |
+| **Custom Editor**               | `registerCustomEditorProvider`                                                        | 编辑器 tab 里的自定义 UI                                                        |
+| **编辑器内容**                  | decorations、hover、CodeLens、Inlay Hints、semantic tokens、folding、links、colors    | 只能作用于编辑器内容，不能改编辑器 chrome                                       |
+| **SCM**                         | `scm.createSourceControl`                                                             | SCM 视图内的数据与命令                                                          |
+| **Comments**                    | `comments.createCommentController`                                                    | 评论线程 UI                                                                     |
+| **Timeline**                    | `registerTimelineProvider`                                                            | Timeline 视图内容                                                               |
+| **Tests**                       | `tests.createTestController`                                                          | Testing 视图/装饰                                                               |
+| **Notebook**                    | `notebooks.createNotebookController`                                                  | notebook 单元 UI                                                                |
+| **Chat**                        | `chat.createChatParticipant`、`lm.registerTool`                                       | chat 面板内的参与者和工具                                                       |
+
+### 4.3 边界
+
+- 不能新增 workbench **part**（titlebar / activitybar / sidebar / editor / panel / auxiliarybar / statusbar 是固定的）。
+- 不能新增 **ViewContainerLocation**；只有 `activitybar` / `panel` / `secondarySidebar`。
+- 不能向 workbench chrome 注入任意 DOM/CSS；只能在声明的 view、webview、编辑器内容或系统组件里画。
+- 不能画到 view 盒子外面；不能覆盖其他视图或编辑器（webview 的 overlay 也只能在自己的 iframe 里）。
+- 不能修改 workbench 的布局、sash、tab 条、标题栏、状态栏布局。
+- 不能新增顶级菜单栏；只能往已有的 `menus` contribution point 里加项。
+- 不能直接改另一个扩展的 UI。
+- 不能把任意 HTML 塞进 tree view；tree 行是数据，不是 DOM。
+- 不能自定义通知 / Quick Pick / Dialog 的 chrome；只能提供内容、选项和 action。
+
+### 4.4 与 UI 布局模型的对应
+
+- `viewsContainers` / `views` → `ViewContainer` / `ViewPaneContainer` / `ViewPane`；`tree` 落到 `TreeViewPane`，`webview` 落到 `WebviewViewPane`。
+- `view/title` / `view/item/context` → `MenuId.ViewTitle` / `ViewItemContext` 的 action。
+- `commands` / `keybindings` → 命令与键位注册表；菜单项只是引用命令。
+- `statusBar` API → `StatusbarPart` 的状态栏 item。
+- 通知 / Quick Pick / Dialog → workbench `mainContainer` 的 overlay。
+- `createWebviewPanel` / `customEditors` → 编辑器 part 的 tab/group。
+- decorations / hover / CodeLens / Inlay Hints → 编辑器 pane 的内容 UI。
+- themes / icons → 主题/图标服务；settings → 配置服务。
+- `chat` / `notebook` / `SCM` / `Comments` / `Timeline` / `Tests` / `Debug` / `Task` / `Terminal` → 各自对应的 view/panel + action。
+
+## 5. 扩展宿主协议与物理通道
 
 **扩展宿主协议，以及它跑在什么上**：`api/common/extHost.protocol.ts`（**4218 行**）——代理标识 **168** 个 = `MainContext` **87** + `ExtHostContext` **81**；`MainThreadXxxShape` **86** 个接口 / **500** 个 `$` 方法；`ExtHostXxxShape` **81** 个接口 / **441** 个 `$` 方法（怎么数的：标识数两个 `…Context` 表里的条目，方法数 `interface XxxShape` 里以 `$` 开头的方法，都能用一条命令复算）。**主线程那 87 个实现全在渲染器里**：78 个 `@extHostNamedCustomer(MainContext.MainThreadXxx)` + 9 个手工注册（Documents / TextEditors / Webviews / WebviewPanels / WebviewViews / CustomEditors / NotebookDocuments / NotebookEditors / ChatOutputRenderer），全在 `src/vs/workbench/api/browser/**`——**协议之外没有 server 侧的实现可复用**。
 
@@ -148,7 +215,7 @@ Overlays（不是 Part）：
 
 **发起方永远是渲染器**：远程要渲染器发 `desiredConnectionType === ExtensionHost`（`remoteAgentConnection.ts:362`）服务端才 fork；桌面由渲染器 `createExtensionHost()`（`localProcessExtensionHost.ts:225`）让主进程起 utility 进程。⇒ **没有页面就没有扩展宿主**，也就没有任何扩展能力。
 
-## 5. 诊断
+## 6. 诊断
 
 **诊断是怎么走的**：全程靠 VS Code 扩展主动"推"，协议里没有"拉"的请求方法。
 
@@ -164,7 +231,7 @@ Overlays（不是 Part）：
 - **读诊断的那一侧**（以 Error Lens 3.28.0 为例，`~/.vscode/extensions/usernamehw.errorlens-3.28.0/dist/extension.js` 没混淆）：它 `createDiagnosticCollection` 出现 **0 次**，**只读不写**。读法就是拉：`languages.getDiagnostics()`（不带参数 = 全部，状态栏计数用它；按 uri 拉用来画装饰），订阅 `languages.onDidChangeDiagnostics`，自带 delay / debounce（`errorLens.delay` / `delayMode`；`onSave` 模式下打字时**先把装饰清掉**、保存后再画）。它的输出全在界面侧：按严重度的行尾 `after.contentText`、整行背景、problem range、gutter 图标（运行时生成 SVG data URI）、`hoverMessage`（Markdown + `command:` 按钮）、CodeLens、状态栏两个计数 + 一条消息。它的输出循环都从 `window.visibleTextEditors` / `activeTextEditor` 出发，**没有编辑器就什么都不画**（不是报错，是什么都不做）；装饰真正落到屏幕上靠 `MainThreadTextEditors.$trySetDecorations`（`api/browser/mainThreadEditors.ts:304-311`，渲染器里找不到那个 editor id 就直接 `reject(illegalArgument('TextEditor(<id>)'))`；注册装饰类型是 `$registerTextEditorDecorationType`，`extHost.protocol.ts:349`）。⇒ **扩展可以在 server 侧的扩展宿主里跑，装饰由主线程代理到渲染器**——它的 `extensionKind: ["ui","workspace"]`，`main` 与 `browser` 指向同一个入口，两边都能跑。
 - 还没核实：客户端**启用 pull**（`textDocument/diagnostic`）的具体路径。`vscode-languageclient` 不在 VS Code checkout 里，上面关于它和 cSpell 的结论来自**本地已安装的 cSpell 产物**，不是库的源码。
 
-## 6. 激活
+## 7. 激活
 
 **激活的时候要不要等主线程**：
 
@@ -173,7 +240,7 @@ Overlays（不是 Part）：
 - 启动之后，**远程形态的激活不等渲染器确认**：`$onWillActivateExtension` 在 `isRemote` 时发了就不等，只有本地（桌面）扩展宿主才 await（`extHostExtensionService.ts:445-455`）。⇒ 没有页面，VS Code 扩展也能激活、也能自己 `set()` 诊断。
 - 但 **UI 类型的 VS Code 扩展**，扩展宿主会把激活**交给主线程**（`extHostExtensionService.ts:193`）：判定是 `isHostExtension`——不在本宿主的 `myRegistry` 里、却在全局注册表里、有 main/browser 代码且 `api === 'none'`（`services/extensions/common/extensionDescriptionRegistry.ts:31-45`）。⇒ 没人答，激活就**永远挂着**。
 
-## 7. agent / MCP / 工具 / skill / prompt 分别做在哪一层
+## 8. agent / MCP / 工具 / skill / prompt 分别做在哪一层
 
 一共五层。前四层扩展都能参与，第五层是 core 自己的循环，VS Code 扩展替换不了。
 
