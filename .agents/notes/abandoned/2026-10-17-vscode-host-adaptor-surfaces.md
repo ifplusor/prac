@@ -4,7 +4,7 @@ status: abandoned:superseded
 
 # Agent Note: vscode-host adaptor surfaces —— 一张归属图
 
-> **Superseded**：本 note 的 surface inventory 已并入 [vscode-host architecture](2026-10-17-vscode-host-architecture.md) 的 “Surface ownership” 一节；这里只保留为历史。
+> **Superseded**：本 note 的 surface inventory 已并入 [vscode-host architecture](../proposed/2026-10-17-vscode-host-architecture.md) 的 “Surface ownership” 一节；这里只保留为历史。
 >
 > **这是哪件工作**：`vscode-host` 是 prac 与 VS Code 之间的 adaptor；这张 note 只做**归属图**，把每个 UI surface 的 owner、现有 step、缺口列清楚。umbrella 见 [2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)。
 > **状态**：已由 architecture 取代。这是一张 map，不是设计；具体设计留给各 surface 自己的 step。
