@@ -105,8 +105,8 @@ Server（node）
 | --- | --- | --- | --- |
 | `PracVscodeFace` | `packages/client/vscode-host/src/client/public.ts` | catalogue、`hostFor`、`focusView`、`runCommand`、file placement、capabilities | consumers、诊断/门 |
 | `VscodeEmbedHandle` | `vendor/vscode-embed/src/client/index.ts` | boot、`view`、`file`、`placements`、`views`、`floatHost`、group region channel | `vscode-host` |
-| `PartHostFace`（现名；只承载 workbench → embedder 的 view/file/capability face） | `vendor/vscode/overlay/embedBridge.ts` | view/file mount、focus/release、placements、capabilities；**不承载 part mount** | `vscode-embed` |
-| `EmbeddedWorkbench` | `vendor/vscode/overlay/embeddedWorkbench.ts` | workbench 服务、`IWorkbenchLayoutService`、view/editor host、overlay | `PartHostFace` |
+| `WorkbenchFace`（目标名；只承载 workbench → embedder 的 view/file/capability face） | `vendor/vscode/overlay/embedBridge.ts` | view/file mount、focus/release、placements、capabilities；**不承载 part mount** | `vscode-embed` |
+| `EmbeddedWorkbench` | `vendor/vscode/overlay/embeddedWorkbench.ts` | workbench 服务、`IWorkbenchLayoutService`、view/editor host、overlay | `WorkbenchFace` |
 | `PracEditorHost` | `vendor/vscode/overlay/pracEditorHost.ts` | `IEditorGroupsService`、group / region、editor group model/panes | workbench、`vscode-host` 的 region channel |
 | `ViewPane` / `ViewPaneContainer` | 上游 workbench | 一个 view 的 pane / 一个 container 的运行时 | `tryMountView` / container context |
 | `VscodeCatalogueEntry` | `vscode-host` 的 face | `view` / `appId` / `title` / `source` / `location` / `containerId` / `containerTitle` / `region` | `ui-vscode-views` / `ui-vscode-editor` / arrangement |
@@ -133,13 +133,13 @@ Server（node）
 | 面 | 形状 |
 | --- | --- |
 | `VscodeEmbedHandle` | `boot(launch)` / `view(viewId)` / `file(placement, resource)` / `placements()` / `views()` / `floatHost()` / `setGroupRegionChannel(channel)` / `focusView` / `runCommand` |
-| `PartHostFace`（目标） | `mountViewInto` / `focusView` / `releaseView` / `mountFileInto` / `focusFile` / `releaseFile` / `listViews` / `listPlacements` / capabilities；**不暴露 part mount**（当前代码仍保留，见 §7 cleanup） |
+| `WorkbenchFace`（目标） | `mountViewInto` / `focusView` / `releaseView` / `mountFileInto` / `focusFile` / `releaseFile` / `listViews` / `listPlacements` / capabilities；**不暴露 part mount**（当前代码仍保留，见 §7 cleanup） |
 | `PracVscodeFace` | `catalogue()` / `onDidChangeCatalogue()` / `hostFor(view)` / `focusView(view)` / `runCommand(command, ...args)` / `filePlacement(view)` / `fileResource(view)` / `capabilities.editors` / `capabilities.diagnostics` |
 | `VscodeCatalogueEntry` | `view` / `appId` / `title` / `source: "file" \| "view"` / `location: "sidebar" \| "panel" \| "auxiliarybar" \| "stage"` / `containerId?` / `containerTitle?` / `region?` |
 | `PracLayoutFace` | `getState` / `subscribe` / `listViews` / `listRegions` / `place` / `placeQuietly` / `removeView` / `createRegionBeside` / `regionInDirection` / `removeRegion` |
 | `prac.view` | `{ name: "prac.view", id, label, icon }` |
 
-`PartHostFace` 现在只承担 view / file / capability face；part mount 是旧组合模型的残留，不在目标契约里。
+`WorkbenchFace` 现在只承担 view / file / capability face；part mount 是旧组合模型的残留，不在目标契约里。
 
 ### 3.2 未来契约
 
@@ -161,7 +161,7 @@ Server（node）
 3. 等 `ctx.workspaces` + `ctx.uiSession` 给出当前 workspace；
 4. `embed.boot({ workspacePath, configurationDefaults })`；机制侧只 boot 一次；
 5. `EmbeddedWorkbench` 起 workbench 服务、`PracEditorHost`（`IEditorGroupsService`）、overlay/float host；
-6. `PartHostFace`（workbench → embedder 的 view/file/capability face）发布；`pracVscode` service 发布；
+6. `WorkbenchFace`（workbench → embedder 的 view/file/capability face）发布；`pracVscode` service 发布；
 7. consumers 注入 `pracVscode`；`ui-vscode-views` / `ui-vscode-editor` 读 catalogue 并注册 `prac.view`；
 8. arrangement 落位；frame 渲染区域/stack；`hostFor(view)` 给宿主元素。
 
@@ -270,7 +270,7 @@ architecture 只定形状，不定机制：
 - **editor content UI**；
 - **专用视图**；
 - **themes / settings / walkthroughs**；
-- **mechanism cleanup**：删除 `partHost` 与 public `mountPartInto` / `movePartInto`，把 `PartHostFace` 改名为 `WorkbenchFace` / `EmbedHostFace`；workbench 内部 parts 保持私有。
+- **mechanism cleanup**：删除 `partHost` 与 public `mountPartInto` / `movePartInto`，把当前 workbench face 统一命名为 `WorkbenchFace`；workbench 内部 parts 保持私有。
 
 frame 侧（stack chrome / grid）不属于这张 note 的 steps，见各自的 note。
 
