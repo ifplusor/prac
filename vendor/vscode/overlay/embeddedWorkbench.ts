@@ -31,6 +31,12 @@ import { ServiceCollection } from "../../platform/instantiation/common/serviceCo
 import { SyncDescriptor } from "../../platform/instantiation/common/descriptors.js";
 import { getSingletonServiceDescriptors } from "../../platform/instantiation/common/extensions.js";
 import { ILayoutOffsetInfo, ILayoutService } from "../../platform/layout/browser/layoutService.js";
+import { ContextViewService } from "../../platform/contextview/browser/contextViewService.js";
+import {
+  IContextViewDelegate,
+  IContextViewService,
+  IOpenContextView,
+} from "../../platform/contextview/browser/contextView.js";
 import { ILogService } from "../../platform/log/common/log.js";
 import { IStorageService } from "../../platform/storage/common/storage.js";
 import { IConfigurationService } from "../../platform/configuration/common/configuration.js";
@@ -135,6 +141,23 @@ function editorKey(resource: string, group: number): string {
 
 /** Hosts whose native context menu this workbench already suppresses (see `observeHost`). */
 const suppressedContextMenus = new WeakSet<HTMLElement>();
+
+/**
+ * The workbench's context views (menus, quick pick) belong to the embedder's
+ * overlay, not to the view that opened them.
+ *
+ * The default `ContextViewService` honours the container the caller passes; a
+ * view title action passes its own shadow host, which puts the menu inside the
+ * view's isolation root and clips it against the stack row. This override drops
+ * that container: the service falls back to the layout's main container (the
+ * float host mounted in the frame's overlay layer), which is where a popup
+ * belongs.
+ */
+class PracContextViewService extends ContextViewService {
+  override showContextView(delegate: IContextViewDelegate): IOpenContextView {
+    return super.showContextView(delegate);
+  }
+}
 
 export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutService {
   declare readonly _serviceBrand: undefined;
@@ -580,6 +603,11 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     for (const [id, descriptor] of getSingletonServiceDescriptors()) {
       serviceCollection.set(id, descriptor);
     }
+
+    // After the singleton list, so this is the context-view implementation the
+    // workbench and every view sees. Its popups land in the float host, not in a
+    // view's isolated shadow.
+    serviceCollection.set(IContextViewService, new SyncDescriptor(PracContextViewService));
 
     // prac's shell owns the editor: **prac is the editor host** (see
     // `pracEditorHost.ts`), so the workbench's own editor parts manager is replaced

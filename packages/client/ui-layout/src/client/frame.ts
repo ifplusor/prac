@@ -1742,9 +1742,11 @@ export function createFrame(
           "data-prac-overlay-layer": "",
           style: { position: "absolute", inset: 0, zIndex: 20, pointerEvents: "none" },
         },
-        // The float layer is a surface plane too: its entries live inside their own
-        // isolation root, while the box itself stays click-through.
-        createElement(IsolatedView, { clickThrough: true }, renderSlot("shell.overlay", {})),
+        // The float layer is the frame's overlay: its entries are surfaces
+        // themselves (the workbench float host, prac overlays) and must be direct
+        // children here. Wrapping them in an isolation root clipped the workbench's
+        // context views/quick input inside that shadow instead of the overlay.
+        renderSlot("shell.overlay", {}),
       ),
     );
   };
