@@ -856,16 +856,17 @@ const FRAME_STYLES = `
 :host([data-prac-view-chrome="frame"]) .pane-header .icon,
 :host([data-prac-view-chrome="frame"]) .pane-header .title { display: none; }
 :host([data-prac-view-chrome="frame"]) .pane-header { pointer-events: none; }
-/* The action slot is the row's own, not a hover affordance: keep the view's action
-   icons visible exactly as the view would show them on a focused pane. */
-:host([data-prac-view-chrome="frame"]) .pane-header .actions {
+/* VS Code reveals a view's title actions while the pointer is anywhere in the
+   view (title bar or body), not permanently. The row is the host's ancestor, so
+   :host-context is what carries that hover across the isolation boundary. */
+:host-context([data-prac-stack-entry]:hover) .pane-header .actions {
   display: flex !important;
   opacity: 1 !important;
   visibility: visible !important;
   align-items: center;
   height: 100%;
 }
-:host([data-prac-view-chrome="frame"]) .pane-header .actions .action-label {
+:host-context([data-prac-stack-entry]:hover) .pane-header .actions .action-label {
   opacity: 1 !important;
   visibility: visible !important;
 }
