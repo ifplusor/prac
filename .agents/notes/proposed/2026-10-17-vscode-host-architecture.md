@@ -2,10 +2,11 @@
 status: proposed
 ---
 
-# Agent Note: vscode-host 的架构 —— adaptor 的层、契约与 surface
+# Agent Note: vscode-host 的架构 —— adaptor 的层、对象、契约与 surface
 
-> **这是哪件工作**：prac 的 VS Code 面需要一个 adaptor；这张 note 是 adaptor 的 **sub-umbrella**，定义它的职责边界、层、契约、生命周期、non-goals 与 surface ownership。总 umbrella 见 [2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)。
+> **这是哪件工作**：prac 的 VS Code 面需要一个 adaptor；这张 note 是 adaptor 的 **sub-umbrella**，定义它的职责边界、层、对象、契约、生命周期、non-goals 与 surface ownership。总 umbrella 见 [2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)。
 > **状态**：提出，未裁。这里只定骨架；每个 surface 的具体设计留给 step。
+> **读法**：1–2 边界与结构；3–4 接口与生命周期；5–7 面、约束与计划；8 开放问题。
 
 ## Problem
 
@@ -54,7 +55,7 @@ adaptor 侧已经有几个 step，但缺一张骨架：
 - adaptor 在 **catalogue / `prac.view` / `hostFor` / action** 上不区别：core view 与 extension view 走同一套 view 契约。
 - **container context 是 core-owned，但不是 core-only**：它服务同一 container 里的 core view 与 extension view。
 
-## 2. 层与包
+## 2. 层、对象与状态
 
 ```text
 DSH shell / slots / services
@@ -290,6 +291,7 @@ architecture 只定形状，不定机制：
 
 ## 7. Steps
 
+- **mechanism cleanup**：删除 `partHost` 与 public `mountPartInto` / `movePartInto`，把当前 workbench face 统一命名为 `WorkbenchFace`；workbench 内部 parts 保持私有；
 - [view catalogue](../in-progress/2026-10-06-vscode-view-catalogue.md)（in-progress）；
 - [editor host](../in-progress/2026-10-07-editor-host.md)（in-progress）；
 - **container / view**：architecture 之后重新推导；不沿用被 superseded 的 container context note；
@@ -298,8 +300,7 @@ architecture 只定形状，不定机制：
 - **webview / custom editor**；
 - **editor content UI**；
 - **专用视图**；
-- **themes / settings / walkthroughs**；
-- **mechanism cleanup**：删除 `partHost` 与 public `mountPartInto` / `movePartInto`，把当前 workbench face 统一命名为 `WorkbenchFace`；workbench 内部 parts 保持私有。
+- **themes / settings / walkthroughs**。
 
 frame 侧（stack chrome / grid）不属于这张 note 的 steps，见各自的 note。
 
