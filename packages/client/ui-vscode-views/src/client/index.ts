@@ -25,7 +25,7 @@
  */
 
 import { createElement, useLayoutEffect, useRef } from "react";
-import type { PointerEvent as ReactPointerEvent, ReactElement } from "react";
+import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "prac-client-vscode-host/client";
@@ -152,20 +152,6 @@ export function apply(ctx: Context): void {
             {
               ref,
               style: { display: "contents" },
-              // The title actions run in the view's own context. The pane header
-              // cannot take focus here (its title/twisty are hidden), so focus the
-              // view before the action's click reaches the command.
-              //
-              // Only the header's actions: focusing on every pointer-down in the
-              // body steals the tree's own focus first, and `ViewPane.focus()`
-              // reveals the previously focused row — clicking another folder then
-              // jumps the tree before the click lands.
-              onPointerDownCapture: (event: ReactPointerEvent<HTMLElement>) => {
-                const target = event.target;
-                if (!(target instanceof Element)) return;
-                if (target.closest(".pane-header .actions") === null) return;
-                host.focusView(view);
-              },
             },
             createElement(View),
           );
