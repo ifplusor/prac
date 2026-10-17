@@ -78,19 +78,10 @@ B（保留 pane header）已被用户收回：它把 VS Code chrome 当成行头
 4. **拖拽**：在 pane header 标题区加框架拖拽落点，避开动作按钮；重排仍走 `moveEntry`。
 5. **门**：`verify:stack` 加“一行只有一个标题”“pane header 可见/动作可见”“折叠同步”“重排”；`verify:containers` / `outline` / `timeline` 回归；截图对比 Explorer。
 
-## 实现（B 原型，不作为终态）
-
-- **label**：`ui-vscode-views` 把 `VscodeCatalogueEntry.title` 作为 `prac.view` 的 `label` 注册；layout 的 `readDeclaredViewIds` 记录 `declaredViewLabel`，`viewLabel` 优先用它。Explorer 的栈行现在显示 `Outline` / `Timeline` / `Open Editors` / `prac-dev` / `Probe Webview`，不再出现 `WORKBENCH...` 原始 id。
-- **expanded `vscode:*` 行（原型）**：不画 `entryHeader`；VS Code pane header 保留；`entryOverlay` 只提供折叠按钮和标题拖拽。这是 B 原型；A 会隐藏 pane header，改为 prac 行头。
-- **pane header 的重复折叠（过渡，待收回）**：`IsolatedView` 在 frame-chrome 行上带 `data-prac-view-chrome="frame"`；隔离内的 CSS 隐藏 `.twisty-container`，并让 `.pane-header` 本身 `pointer-events: none`、只放行 `.actions`。这是 frame 接管折叠的过渡；按上位原则应恢复 pane header 的 twisty/点击，并把 pane collapse 同步到 `entry.collapsed`。
-- **folded `vscode:*` 行（过渡，待收回）**：当前用 frame 的 `entryHeader`；按上位原则应保留 collapsed 的 pane header，行高跟随 pane header。
-- **`dsh:*` 行**：不变，frame 行头。**单视图 bare**：没有 stack 行头，保留 pane header。
-- **证据**：Explorer live 截图（一行一标题、twisty 隐藏、pane header 动作仍在）；ui-layout **147** 单测；六门 live 全绿（`verify:stack` 17/17、`resize`、`split`、`containers`、`persistence`、`bottom`）。
-
 ## A 的目标形态
 
 - `prac.view` 增加 `headless`（视图不自带 chrome）与 `actions`（视图的动作模型/face）描述；`ui-vscode-views`/`vscode-host` 隐藏自己的 pane header 并提供动作。
-- prac 行头统一画：图标、标题、twisty、动作、hover、键盘；22px；`dsh:*` 与 `vscode:*` 一致。
+- prac 行头统一画：图标、标题、twisty、动作、hover、键盘；22px；`dsh:*` 与 `vscode:*` 一致。标题来自视图目录/title（不是 raw id）。
 - 折叠/重排/sash 全部在 prac 行头；点击/键盘折叠，拖动超过阈值重排。
 - 动作重新呈现：常用动作内联，其余 overflow；不复制 VS Code menu DOM。
 
