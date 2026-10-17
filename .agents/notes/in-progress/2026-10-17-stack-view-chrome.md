@@ -83,12 +83,13 @@ B（保留 pane header）已被用户收回：它把 VS Code chrome 当成行头
 - `prac.view` 增加 `headless`（视图不自带 chrome）与 `actions`（视图的动作模型/face）描述；`ui-vscode-views`/`vscode-host` 隐藏自己的 pane header 并提供动作。
 - prac 行头统一画：图标、标题、twisty、动作、hover、键盘；22px；`dsh:*` 与 `vscode:*` 一致。标题来自视图目录/title（不是 raw id）。
 - 折叠/重排/sash 全部在 prac 行头；点击/键盘折叠，拖动超过阈值重排。
-- 动作源 = `ViewPane.menuActions` / `MenuId.ViewTitle` 的**真实 Menu/IAction**；`view/title` 是扩展贡献面，不能只取 flat DTO。
-- 动作桥优先级（考虑插件生态）：
-  1. **短期**：frame 标题/twisty + pane 的 `.actions` 原地保留（pane 的 title/icon/twisty 隐藏）。扩展动作、子菜单、Toggle、ThemeIcon、`when` 全部原样，风险最低。
-  2. **目标**：把 VS Code `ActionBar` 托管到 frame 的 action slot（pane header 隐藏，一个 header）。动作模型仍是真实 `IAction`，只是呈现位置移到 prac 行头。
-  3. **prac 自绘 action bar** 只有在补齐 submenu/toggle/ThemeIcon/`when`/命令语义后才可用；否则会丢扩展贡献的动作。
-- 动作模型必须保留：id/命令、label、icon（ThemeIcon/codicon）、enabled、checked、group、submenu/children、tooltip；`run` 走原 `IAction`；`onDidChange` 跟随 menu/context。
+- 动作桥采用**双生态共同契约**，不是 VS Code 专用：
+  - `PracViewAction`：`id`（各生态自己的 command id）、`label`、`icon`（DSH `IconProps` 组件 / codicon / ThemeIcon）、`enabled`、`checked`、`group`（primary / secondary）、`submenu/children`、`tooltip`；`run` 与 `subscribe` 由适配器提供。
+  - **VS Code 适配器**：`ViewPane.menuActions` / `MenuId.ViewTitle` / `IAction` → `PracViewAction`；保留 `view/title` 扩展贡献的 `when`、submenu、Toggle、ThemeIcon。
+  - **DSH 适配器**：`ctx.shortcuts` 命令 / `ctx.commandUi` action + `prac.view` 的动作声明 → `PracViewAction`；DSH 插件可用 `prac.viewActions` slot 注册动作或自定义 action bar；`run` 走 DSH command。
+  - **呈现**：frame 行头的 action slot 默认渲染一个 prac action bar（primary inline、secondary overflow、submenu、toggle、icon、tooltip、keyboard、aria）；slot 可替换为自定义 renderer（VS Code `ActionBar` / DSH bar），但契约不变。
+  - 两个生态都通过同一个 DSH slot + contract 进入；frame 不认识 VS Code 或 DSH 的具体命令。
+  - 测试：VS Code test extension 的 `view/title` + DSH test plugin 的 view action，走同一契约、同一个 action bar。
 
 ## Open questions
 
@@ -98,7 +99,7 @@ B（保留 pane header）已被用户收回：它把 VS Code chrome 当成行头
 - pane header 实际高度（约 22px）与 `HEADER_HEIGHT`(20) 仍差 2px；按上位原则以 pane header 高度为准，`dsh:*` 行头向它对齐；混合栈里的行高/基线还需要对齐一次。
 - 顶部 container bar 与 VS Code activity bar + side bar 的差距：独立工作，不在 B 里做。
 - 动作桥的边界：`ViewPane` 是否已创建/所在 container 是否 active；折叠行的 `showActions`（WhenExpanded）；toggle/submenu 动作；动作条宽度与 overflow；`dsh:*` 视图的动作 slot 空值。
-- 插件生态：`view/title` 的 `when`/`enablement`、submenu、Toggle、ThemeIcon、扩展命令、动态菜单变更；需要一个测试扩展往 `view/title` 贡献动作，验证 live 出现并可执行。
+- 插件生态：VS Code 侧 `view/title` 的 `when`/`enablement`、submenu、Toggle、ThemeIcon、扩展命令、动态菜单变更；DSH 侧 `ctx.shortcuts` / `ctx.commandUi` 的命令与动作上下文。两侧各需要一条测试贡献（VS Code test extension + DSH test plugin），验证同一契约下 live 出现并可执行。
 - ~~拖拽落点跨影根时，标题区的命中如何避开右侧动作按钮？~~ 已落地：`entryOverlay` 在光 DOM 上，标题区到右侧 120px 为止；动作区由 `.actions` 接指针；行顶 `SASH_SIZE` 留给 sash。
 - 混合栈里 `dsh:*` 的 prac 行头与 VS Code 的 pane header 如何视觉对齐（高度、padding、折叠 chevron）？
 - 单视图 bare 与两视图 stack 之间的切换，pane header 的显隐是否会造成一次布局跳动？
