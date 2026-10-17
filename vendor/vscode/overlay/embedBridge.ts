@@ -28,7 +28,7 @@ export const EMBED_BRIDGE = "vscodeEmbed";
  *
  * Optional composition: a host carrying it is where that part is mounted; parts
  * without one stay in the workbench's own container. Written by the embedder's
- * shell and read by {@link PartHostFace}'s implementation, so it is spelled here
+ * shell and read by {@link WorkbenchFace}'s implementation, so it is spelled here
  * once and imported by both.
  */
 export const PART_HOST_ATTR = "data-vscode-embed-part-host";
@@ -50,7 +50,7 @@ export const PART_HOST_ATTR = "data-vscode-embed-part-host";
 export const FLOAT_HOST_ATTR = "data-vscode-embed-float-host";
 
 /**
- * One view the workbench currently offers, as {@link PartHostFace.listViews}
+ * One view the workbench currently offers, as {@link WorkbenchFace.listViews}
  * reports it.
  *
  * Plain data, deliberately: the embedder maps these onto its own view catalogue
@@ -81,22 +81,7 @@ export interface ViewCatalogueEntry {
  * unbound keeps working. Parts are single instances bound to their services, so
  * the embedder *moves* one between hosts and never recreates it.
  */
-export interface PartHostFace {
-  /**
-   * Create a registered part into an external host element.
-   *
-   * @param partId - the workbench part id (`workbench.parts.editor`).
-   * @param element - the host element the embedder rendered for it.
-   */
-  mountPartInto: (partId: string, element: HTMLElement) => void;
-  /**
-   * Move an already-mounted part into another host element (re-parenting, not
-   * recreating).
-   *
-   * @param partId - the workbench part id.
-   * @param element - the new host element.
-   */
-  movePartInto: (partId: string, element: HTMLElement) => void;
+export interface WorkbenchFace {
   /**
    * Create a registered view into an external host element.
    *
@@ -111,7 +96,7 @@ export interface PartHostFace {
    */
   mountViewInto: (viewId: string, element: HTMLElement) => void;
   /**
-   * Dispose a view created by {@link PartHostFace.mountViewInto}, so the same
+   * Dispose a view created by {@link WorkbenchFace.mountViewInto}, so the same
    * view can be created again (elsewhere, or after its host went away).
    *
    * @param viewId - the view id.
@@ -128,7 +113,7 @@ export interface PartHostFace {
    * screen — one authority, not two.
    *
    * Whether a view can actually be mounted with
-   * {@link PartHostFace.mountViewInto} right now is a separate question: a view
+   * {@link WorkbenchFace.mountViewInto} right now is a separate question: a view
    * is created lazily, so `mountViewInto` accepts an entry even before the
    * extension that provides it has activated.
    *
@@ -140,7 +125,7 @@ export interface PartHostFace {
    *
    * Fires when a view's `when` starts or stops holding, and when containers or
    * views are registered or unregistered — so a listener can re-read
-   * {@link PartHostFace.listViews} and reconcile.
+   * {@link WorkbenchFace.listViews} and reconcile.
    *
    * @param listener - called when the active view set changed.
    * @returns a function that unsubscribes.
@@ -164,14 +149,14 @@ export interface PartHostFace {
    * where the editor goes — the element's region does not, so a host rendered in
    * another region **moves** that placement's editor there rather than opening a
    * second one, and the token survives the move (see
-   * {@link PartHostFace.listPlacements}).
+   * {@link WorkbenchFace.listPlacements}).
    *
    * The resource is the workbench's own URI as a string
    * (`vscode-remote://<authority>/<path>`, or a bare path for a local file) —
-   * the same vocabulary {@link PartHostFace.openWorkspaceFolder} takes, because
+   * the same vocabulary {@link WorkbenchFace.openWorkspaceFolder} takes, because
    * the embedder cannot construct a `URI` instance.
    *
-   * @param placement - the placement token, from {@link PartHostFace.listPlacements}.
+   * @param placement - the placement token, from {@link WorkbenchFace.listPlacements}.
    * @param resource - the file's URI, as a string.
    * @param element - the host element the embedder rendered for it.
    */
@@ -202,13 +187,13 @@ export interface PartHostFace {
   releaseFile: (placement: string, resource: string) => void;
   /**
    * Open a file in the workbench, by the same string vocabulary as
-   * {@link PartHostFace.mountFileInto}.
+   * {@link WorkbenchFace.mountFileInto}.
    *
    * The public `vscode.open` command cannot be driven from the embedder (its
    * argument is validated against a `URI` instance the page cannot construct), so
    * a path is opened through this instead. It goes through the editor service
    * exactly like an explorer click does, so it also shows up in
-   * {@link PartHostFace.listOpenFiles} and becomes a view.
+   * {@link WorkbenchFace.listOpenFiles} and becomes a view.
    *
    * @param resource - the file's URI, as a string.
    */
@@ -216,7 +201,7 @@ export interface PartHostFace {
   /**
    * The file **placements** the workbench currently has open, in its own order.
    *
-   * The embedder owns *rendering* files (see {@link PartHostFace.mountFileInto}),
+   * The embedder owns *rendering* files (see {@link WorkbenchFace.mountFileInto}),
    * so it needs to know what the app considers open — opening one from the app's
    * own UI (an explorer click, a command, a jump) has to become a view, or the
    * app would be editing files nobody can see. The unit is the placement rather
@@ -248,7 +233,7 @@ export interface PartHostFace {
    *
    * Fires after the set actually changed (not on every editor activation, and not
    * when the same file becomes active or dirty), so a listener can re-read
-   * {@link PartHostFace.listPlacements} and reconcile.
+   * {@link WorkbenchFace.listPlacements} and reconcile.
    *
    * @param listener - called when the placement set changed.
    * @returns a function that unsubscribes.
@@ -258,7 +243,7 @@ export interface PartHostFace {
    * The resources the workbench currently has open, in its own order.
    *
    * The distinct files, for a consumer that only asks *what* is open — placement
-   * is what rendering needs (see {@link PartHostFace.listPlacements}).
+   * is what rendering needs (see {@link WorkbenchFace.listPlacements}).
    *
    * @returns one URI string per open file.
    */
@@ -309,7 +294,7 @@ export interface PartHostFace {
  * (the embedder moved the view's editor, or the workbench's own move command did) and
  * must keep its name, or every consumer holding that name would be left with a stale
  * one. The token is opaque to the embedder: it is handed out here, quoted back in
- * {@link PartHostFace.mountFileInto}, and never interpreted there.
+ * {@link WorkbenchFace.mountFileInto}, and never interpreted there.
  */
 export interface FilePlacement {
   /** The placement's identity. Stable for as long as the placement lives. */
@@ -517,7 +502,7 @@ export interface EmbedBridge {
    * Whether the embedder's shell mounts the parts itself.
    *
    * `true` (an embedder that renders its own part hosts): the workbench mounts
-   * nothing on its own and publishes {@link PartHostFace} through
+   * nothing on its own and publishes {@link WorkbenchFace} through
    * {@link EmbedBridge.publish}. `false`/absent (a page that wants the workbench
    * composed by its own containers, e.g. `vendor/vscode/scripts/page.html`): the
    * workbench mounts each part into the document host carrying
@@ -534,7 +519,7 @@ export interface EmbedBridge {
    *
    * @param face - the part-hosting face.
    */
-  publish(face: PartHostFace): void;
+  publish(face: WorkbenchFace): void;
 }
 
 /**
@@ -555,6 +540,6 @@ export function readEmbedBridge(options: unknown): EmbedBridge | undefined {
   if (typeof candidate.publish !== "function") return undefined;
   return {
     deferParts: candidate.deferParts === true,
-    publish: candidate.publish as (face: PartHostFace) => void,
+    publish: candidate.publish as (face: WorkbenchFace) => void,
   };
 }

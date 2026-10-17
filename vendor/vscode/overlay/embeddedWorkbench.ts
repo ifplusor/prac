@@ -520,10 +520,6 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
           // No detached editor part: prac *is* the host (registered above), and the
           // embedder mounts each region's group where the region is.
           bridge.publish({
-            mountPartInto: (partId: string, element: HTMLElement) =>
-              this.mountPartInto(partId, element),
-            movePartInto: (partId: string, element: HTMLElement) =>
-              this.movePartInto(partId, element),
             mountViewInto: (viewId: string, element: HTMLElement) =>
               this.mountViewInto(viewId, element),
             focusView: (viewId: string) => this.focusView(viewId),
@@ -876,7 +872,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     return entries;
   }
 
-  /** Subscribe to catalogue changes (see {@link PartHostFace.onDidChangeViews}). */
+  /** Subscribe to catalogue changes (see {@link WorkbenchFace.onDidChangeViews}). */
   onDidChangeViews(listener: () => void): () => void {
     this.viewCatalogueListeners.add(listener);
     this.observeViewCatalogue();
@@ -1742,7 +1738,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    * in its own layout region.
    */
 
-  mountPartInto(partId: string, element: HTMLElement): void {
+  private mountPartInto(partId: string, element: HTMLElement): void {
     if (this.mountedParts.has(partId)) {
       // Already created — possibly detached (see `createDetachedPart`). The
       // embedder asking for it means it wants it visible, so move it there.
@@ -1837,7 +1833,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    * instance bound to its services, and `create()` is a one-time act. Moving is
    * therefore `replaceChildren` on the new host plus a fresh layout pass.
    */
-  movePartInto(partId: string, element: HTMLElement): void {
+  private movePartInto(partId: string, element: HTMLElement): void {
     const grid = this.grids.get(partId);
     if (!grid) {
       this.mountPartInto(partId, element);

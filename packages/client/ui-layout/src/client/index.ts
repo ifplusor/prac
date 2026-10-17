@@ -25,10 +25,10 @@
  * 3. **Sashes and collapse are frame-owned.** Dragging a sash adjusts the two
  *    regions beside it; collapsing a region remembers its width so expanding
  *    restores it. This is the (b) option from the integration note: the frame
- *    stays React-owned (DSH-style), and VS Code parts remain *hosted* — a
- *    region renders a view, and the `vscode:view:<app view id>` view renders the part host the
- *    client mechanism publishes (`ctx.pracVscode.partHost`); the part is re-parented
- *    there, never recreated. The host
+ *    stays React-owned (DSH-style), and VS Code content remains *hosted* — a
+ *    region renders a view, and the `vscode:view:<app view id>` view renders the
+ *    host component the client mechanism publishes (`ctx.pracVscode.hostFor(view)`);
+ *    the view is re-parented there, never recreated. The host
  *    mechanism is never bypassed.
  * 4. **Roles, not positions, are what the borrowed face speaks.** DSH's
  *    plugins still call `ctx.layout`; that compat shim translates positional

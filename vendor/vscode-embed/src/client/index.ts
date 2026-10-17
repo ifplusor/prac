@@ -2,16 +2,16 @@
  * prac-vscode-embed — browser half.
  *
  * The mechanism for running the built Code - OSS app inside a page someone else
- * owns, and for handing its part-hosting face to that page:
+ * owns, and for handing its workbench face to that page:
  *
  * 1. **the singleton boot** — `create()` may be called at most once per page, so
  *    booting goes through a page-level record rather than through module state.
  *    That matters because a consumer's bundle *inlines* this module: two
  *    consumers would be two module instances, and only a page-level record lets
  *    them share one boot, one face and one set of hosts.
- * 2. **the part host element factory** — a React component per part id; its
- *    element is handed to the app's face (`movePartInto`), so the part lands
- *    wherever the consumer's own shell put it.
+ * 2. **the view / file host element factories** — a React component per view or
+ *    file placement; its element is handed to the app's face (`mountViewInto` /
+ *    `mountFileInto`), so the content lands wherever the consumer's shell put it.
  * 3. **the app's own handles** — its command namespace, its boot element and its
  *    failure, for whoever needs them next.
  *
@@ -25,7 +25,7 @@
 import { createElement, useEffect, useRef } from "react";
 import { deliverThemeToHost } from "./theme-root.js";
 import type { ReactElement } from "react";
-import { EMBED_BRIDGE, FLOAT_HOST_ATTR, PART_HOST_ATTR } from "prac-vscode";
+import { EMBED_BRIDGE, FLOAT_HOST_ATTR } from "prac-vscode";
 import type {
   DiagnosticEntry,
   DiagnosticsPage,
@@ -34,11 +34,11 @@ import type {
   EditorEntry,
   EmbedBridge,
   FilePlacement,
-  PartHostFace,
+  WorkbenchFace,
   ViewCatalogueEntry,
 } from "prac-vscode";
 
-export { EMBED_BRIDGE, FLOAT_HOST_ATTR, PART_HOST_ATTR };
+export { EMBED_BRIDGE, FLOAT_HOST_ATTR };
 export type {
   DiagnosticEntry,
   DiagnosticsPage,
@@ -46,7 +46,7 @@ export type {
   DiagnosticsSnapshot,
   EditorEntry,
   EmbedBridge,
-  PartHostFace,
+  WorkbenchFace,
   ViewCatalogueEntry,
 };
 
@@ -64,14 +64,14 @@ export interface CommandNamespace {
 export interface VscodeEmbedPage {
   /** The once-per-page guard: the app is started at most once. */
   started: boolean;
-  /** The element `create()` mounted the app into (parts are moved out of it). */
+  /** The element `create()` mounted the app into (views and file placements are moved out of it). */
   host?: HTMLElement;
   /** The app module's command namespace, once its module has loaded. */
   commands?: CommandNamespace;
   /** Why the boot rejected, when it did (diagnostics only). */
   error?: string;
-  /** The app's part-hosting face, once its service graph has restored. */
-  face?: PartHostFace;
+  /** The app's workbench face, once its service graph has restored. */
+  face?: WorkbenchFace;
   /** The app's region channel, kept until the workbench publishes a face to hand it to. */
   groupRegionChannel?: {
     createRegionBeside(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
@@ -79,8 +79,6 @@ export interface VscodeEmbedPage {
     regionInDirection(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
     removeRegion(region: string): void;
   };
-  /** The element hosting each part, by part id, across all consumers. */
-  readonly hosts: Map<string, HTMLElement>;
   /** The element hosting each view, by view id, across all consumers. */
   readonly viewHosts: Map<string, HTMLElement>;
   /**
@@ -132,7 +130,6 @@ function page(): VscodeEmbedPage {
   if (existing !== undefined) return existing;
   const record: VscodeEmbedPage = {
     started: false,
-    hosts: new Map(),
     viewHosts: new Map(),
     fileHosts: new Map(),
     placementListeners: new Map(),
@@ -143,12 +140,6 @@ function page(): VscodeEmbedPage {
   };
   globalThis.__vscodeEmbed = record;
   return record;
-}
-
-/** Enter one part into the record and, if the face is up, hand it over. */
-function mountPart(record: VscodeEmbedPage, partId: string, element: HTMLElement): void {
-  record.hosts.set(partId, element);
-  record.face?.movePartInto(partId, element);
 }
 
 /** Enter one view into the record and, if the face is up, have it created here. */
@@ -241,13 +232,6 @@ export interface VscodeEmbedHandle {
    * @returns whether the app is running or was already started.
    */
   boot(launch: VscodeEmbedLaunch): boolean;
-  /**
-   * The seat component for one part id.
-   *
-   * @param partId - the part id (`workbench.parts.editor`).
-   * @returns a component rendering the host element the part is mounted into.
-   */
-  partHost(partId: string): () => ReactElement;
   /**
    * The seat component for one view id.
    *
@@ -526,19 +510,18 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
                 : { extensionsGallery: options.extensionsGallery }),
             },
             // The embed bridge: the app mounts no parts on its own, and hands its
-            // part-hosting face back through `publish`. The field name and the
+            // workbench face back through `publish`. The field name and the
             // face's shape come from the one contract both sides compile
             // (`prac-vscode` → staged into the checkout as `embedBridge.ts`).
             [EMBED_BRIDGE]: {
               deferParts: true,
-              publish: (face: PartHostFace) => {
+              publish: (face: WorkbenchFace) => {
                 record.face = face;
                 // The app may install the region channel before the workbench publishes its
                 // face (it boots asynchronously); hand it over then.
                 if (record.groupRegionChannel !== undefined) {
                   face.setGroupRegionChannel(record.groupRegionChannel);
                 }
-                for (const [partId, element] of record.hosts) face.movePartInto(partId, element);
                 for (const [viewId, element] of record.viewHosts)
                   face.mountViewInto(viewId, element);
                 for (const { placement, resource, element } of record.fileHosts.values())
@@ -647,47 +630,6 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
         // into events by default): the layer must stay click-through, and the app's
         // float containers opt back in one by one (see the app overlay's stylesheet).
         style: { position: "absolute", inset: 0, pointerEvents: "none" },
-      });
-    };
-  };
-
-  const partHost = (partId: string): (() => ReactElement) => {
-    return function VscodePartHost(): ReactElement {
-      const ref = useRef<HTMLDivElement | null>(null);
-      useEffect(() => {
-        const element = ref.current;
-        if (!element) return undefined;
-        // The host lives inside the view's isolation root, where the app's theme
-        // variables have to be delivered (`:host`) instead of inherited.
-        const stopTheme = deliverThemeToHost(element);
-        mountPart(record, partId, element);
-        return () => {
-          stopTheme?.();
-          if (record.hosts.get(partId) === element) record.hosts.delete(partId);
-        };
-      }, []);
-      return createElement("div", {
-        ref,
-        // `monaco-workbench` is load-bearing, not decoration: most of the app's
-        // view CSS is scoped under it (`.monaco-workbench .outline-pane …`), and
-        // the frame deliberately does *not* put that class on the isolation host —
-        // so without it here the rules are mirrored into the root and match
-        // nothing. Measured: the Outline's message stayed visible and its tree
-        // sized to its content (7612px inside a 734px region) until this class was
-        // on an ancestor inside the root. `theme-root.ts` still delivers the
-        // variables through `:host`; this only restores the selectors' context.
-        className: "vscode-embed-part-host monaco-workbench",
-        [PART_HOST_ATTR]: partId,
-        // Inline sizing beats the class's absolute positioning so the host stays
-        // inside its region instead of escaping the frame.
-        style: {
-          position: "relative",
-          width: "100%",
-          height: "100%",
-          minWidth: 0,
-          minHeight: 0,
-          overflow: "hidden",
-        },
       });
     };
   };
@@ -830,7 +772,6 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
   return {
     boot,
     floatHost,
-    partHost,
     view,
     file,
     focusView: (viewId: string): void => {

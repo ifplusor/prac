@@ -178,7 +178,7 @@ editor:
 | 面 | 形状 |
 | --- | --- |
 | `VscodeEmbedHandle` | `boot(launch)` / `view(viewId)` / `file(placement, resource)` / `placements()` / `views()` / `floatHost()` / `setGroupRegionChannel(channel)` / `focusView` / `runCommand` |
-| `WorkbenchFace`（目标） | `mountViewInto` / `focusView` / `releaseView` / `mountFileInto` / `focusFile` / `releaseFile` / `listViews` / `listPlacements` / capabilities；**不暴露 part mount**（当前代码仍保留，见 §7 cleanup） |
+| `WorkbenchFace`（目标） | `mountViewInto` / `focusView` / `releaseView` / `mountFileInto` / `focusFile` / `releaseFile` / `listViews` / `listPlacements` / capabilities；**不暴露 part mount**（已移除） |
 | `PracVscodeFace` | `catalogue()` / `onDidChangeCatalogue()` / `hostFor(view)` / `focusView(view)` / `runCommand(command, ...args)` / `filePlacement(view)` / `fileResource(view)` / `capabilities.editors` / `capabilities.diagnostics` |
 | `VscodeCatalogueEntry` | `view` / `appId` / `title` / `source: "file" \| "view"` / `location: "sidebar" \| "panel" \| "auxiliarybar" \| "stage"` / `containerId?` / `containerTitle?` / `region?` |
 | `PracLayoutFace` | `getState` / `subscribe` / `listViews` / `listRegions` / `place` / `placeQuietly` / `removeView` / `createRegionBeside` / `regionInDirection` / `removeRegion` |
@@ -306,7 +306,6 @@ architecture 只定形状，不定机制：
 
 ## 7. Steps
 
-- **mechanism cleanup**：删除 `partHost` 与 public `mountPartInto` / `movePartInto`，把当前 workbench face 统一命名为 `WorkbenchFace`；workbench 内部 parts 保持私有；
 - [view catalogue](../in-progress/2026-10-06-vscode-view-catalogue.md)（in-progress）；
 - [editor host](../in-progress/2026-10-07-editor-host.md)（in-progress）；
 - **container / view**：architecture 之后重新推导；不沿用被 superseded 的 container context note；
