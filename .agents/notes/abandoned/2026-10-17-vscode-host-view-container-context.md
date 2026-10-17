@@ -4,7 +4,7 @@ status: abandoned:superseded
 
 # Agent Note: vscode-host 作为 adaptor —— view container context
 
-> **Superseded**：本 note 先于 [vscode-host architecture](../proposed/2026-10-17-vscode-host-architecture.md) 写成，把 collapse 的修法上升成 container context 并先选了 B。它的观察保留为证据；container/view 将作为 architecture 之后的 step 重新推导。
+> **Superseded**：本 note 先于 [vscode-host architecture](../in-progress/2026-10-17-vscode-host-architecture.md) 写成，把 collapse 的修法上升成 container context 并先选了 B。它的观察保留为证据；container/view 将作为 architecture 之后的 step 重新推导。
 >
 > **这是哪件工作**：prac 的 frame 按 view/region 组合；VS Code 的 view container/part 语义需要由 `vscode-host` 这个 adaptor 接住。umbrella 见 [2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)。
 > **状态**：已由 architecture 取代。

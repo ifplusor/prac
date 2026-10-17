@@ -1,11 +1,11 @@
 ---
-status: proposed
+status: in-progress
 ---
 
 # Agent Note: vscode-host 的架构 —— adaptor 的层、对象、契约与 surface
 
 > **这是哪件工作**：prac 的 VS Code 面需要一个 adaptor；这张 note 是 adaptor 的 **sub-umbrella**，定义它的职责边界、层、对象、契约、生命周期、non-goals 与 surface ownership。总 umbrella 见 [2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)。
-> **状态**：提出，未裁。这里只定骨架；每个 surface 的具体设计留给 step。
+> **状态**：已接受为方向（in-progress）。先按这张骨架走；每个 surface 的具体设计留给 step。
 > **读法**：1–2 边界与结构；3–4 接口与生命周期；5–7 面、约束与计划；8 开放问题。
 
 ## Problem
@@ -28,7 +28,7 @@ adaptor 侧已经有几个 step，但缺一张骨架：
 ## 范围
 
 - 这张 note 是 **adaptor 的 architecture**，不是整个 prac UI 的 architecture；
-- frame 侧（区域、stack、fold、sash、grid）另有一条线，见 [2026-10-05-vscode-dsh-layout-boundary.md](../in-progress/2026-10-05-vscode-dsh-layout-boundary.md)、[2026-10-15-ui-layout-stack.md](../resolved/2026-10-15-ui-layout-stack.md)、[2026-10-17-stack-view-chrome.md](../in-progress/2026-10-17-stack-view-chrome.md)、[2026-10-15-ui-layout-grid.md](2026-10-15-ui-layout-grid.md)；
+- frame 侧（区域、stack、fold、sash、grid）另有一条线，见 [2026-10-05-vscode-dsh-layout-boundary.md](../in-progress/2026-10-05-vscode-dsh-layout-boundary.md)、[2026-10-15-ui-layout-stack.md](../resolved/2026-10-15-ui-layout-stack.md)、[2026-10-17-stack-view-chrome.md](../in-progress/2026-10-17-stack-view-chrome.md)、[2026-10-15-ui-layout-grid.md](../proposed/2026-10-15-ui-layout-grid.md)；
 - 这里不设计每个 surface；只定骨架与 surface ownership；
 - 这里不替代总 umbrella；它是总 umbrella 下的一个 sub-umbrella。
 
@@ -343,4 +343,4 @@ frame 侧（stack chrome / grid）不属于这张 note 的 steps，见各自的 
 - [2026-10-06-vscode-view-catalogue.md](../in-progress/2026-10-06-vscode-view-catalogue.md)：view catalogue。
 - [2026-10-07-editor-host.md](../in-progress/2026-10-07-editor-host.md)：editor host。
 - [2026-10-17-stack-view-chrome.md](../in-progress/2026-10-17-stack-view-chrome.md)：frame 侧的 stack chrome。
-- [2026-10-15-ui-layout-grid.md](2026-10-15-ui-layout-grid.md)：frame 侧的 grid。
+- [2026-10-15-ui-layout-grid.md](../proposed/2026-10-15-ui-layout-grid.md)：frame 侧的 grid。

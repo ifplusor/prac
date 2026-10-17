@@ -1,6 +1,6 @@
 # Worklog: vscode-host architecture
 
-> 过程/证据。产物是 `.agents/notes/proposed/2026-10-17-vscode-host-architecture.md`；本文件不签字、不进当前方向。
+> 过程/证据。产物是 `.agents/notes/in-progress/2026-10-17-vscode-host-architecture.md`；本文件不签字、不进当前方向。
 
 ## 起点
 
