@@ -84,6 +84,9 @@ B（保留 pane header）已被用户收回：它把 VS Code chrome 当成行头
 - prac 行头统一画：图标、标题、twisty、动作、hover、键盘；22px；`dsh:*` 与 `vscode:*` 一致。标题来自视图目录/title（不是 raw id）。
 - 折叠/重排/sash 全部在 prac 行头；点击/键盘折叠，拖动超过阈值重排。
 - 动作重新呈现：常用动作内联，其余 overflow；不复制 VS Code menu DOM。
+- 动作桥（选定）：**动作模型 + `prac.viewActions` DSH slot + prac action bar**。宿主侧从 `IViewsService.getViewWithId` / `ViewPane.menuActions` 取 `primary` / `secondary`（`MenuId.ViewTitle` 的 `IAction`），经 `vscode-host` / `ui-vscode-views` 转成 plain `ViewAction` 并由 slot 组件渲染；`runViewAction` 执行原 `IAction`。不 portal `.actions` DOM。
+  - 极致的 VS Code 视觉可在 slot 内换 VS Code `ActionBar`（动作模型不变）。
+  - 动作模型延期时的过渡：frame 标题/twisty + pane 的 `.actions` 留在原处（只藏 pane 标题/图标/twisty），不作为终态。
 
 ## Open questions
 
@@ -92,6 +95,7 @@ B（保留 pane header）已被用户收回：它把 VS Code chrome 当成行头
 - ~~折叠权威取 pane 的 collapse 还是 stack 的 `entry.collapsed`？~~ 已落地：frame 的 `entry.collapsed` 是权威；pane header 的 twisty 隐藏、标题区不接指针，只放行动作。
 - pane header 实际高度（约 22px）与 `HEADER_HEIGHT`(20) 仍差 2px；按上位原则以 pane header 高度为准，`dsh:*` 行头向它对齐；混合栈里的行高/基线还需要对齐一次。
 - 顶部 container bar 与 VS Code activity bar + side bar 的差距：独立工作，不在 B 里做。
+- 动作桥的边界：`ViewPane` 是否已创建/所在 container 是否 active；折叠行的 `showActions`（WhenExpanded）；toggle/submenu 动作；动作条宽度与 overflow；`dsh:*` 视图的动作 slot 空值。
 - ~~拖拽落点跨影根时，标题区的命中如何避开右侧动作按钮？~~ 已落地：`entryOverlay` 在光 DOM 上，标题区到右侧 120px 为止；动作区由 `.actions` 接指针；行顶 `SASH_SIZE` 留给 sash。
 - 混合栈里 `dsh:*` 的 prac 行头与 VS Code 的 pane header 如何视觉对齐（高度、padding、折叠 chevron）？
 - 单视图 bare 与两视图 stack 之间的切换，pane header 的显隐是否会造成一次布局跳动？
