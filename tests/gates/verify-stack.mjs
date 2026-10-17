@@ -1,6 +1,7 @@
 /**
- * Verification of **stacked regions** — prac's own composition, so the views it
- * stacks are prac's own (`dsh:*`): this gate needs no VS Code side at all.
+ * Verification of **stacked regions** — prac's own composition. The first two views are prac's
+ * (`dsh:*`); the third uses the app's real outline view so the untouched-row and folded-middle
+ * scenarios have a third registered view.
  *
  * The point is that prac groups views itself (the workbench's view container is
  * a *higher form*, not the unit):
@@ -29,10 +30,11 @@ import { distinctColours, openPrac, report, requireUrl } from "./harness.mjs";
 const BASE_VIEW = "dsh:sidebar";
 const ADDED_VIEW = "dsh:main:conversation";
 /**
- * A third view for the folded-middle and untouched-row scenarios. The DSH right bar is a real view
- * in the catalogue; the compat shim keeps it hidden by default, so `place` is what shows it.
+ * A third view for the folded-middle and untouched-row scenarios. The DSH right bar is kept hidden
+ * by the compat shim, so use the app's real outline view instead (the stack accepts any registered
+ * view id; the row is what this gate drives).
  */
-const THIRD_VIEW = "dsh:rightbar";
+const THIRD_VIEW = "vscode:view:outline";
 /** The top-level region whose active child is the stack's home. */
 const OUTER_REGION = "left";
 
@@ -278,9 +280,11 @@ const checks = {
     openIn(afterAlt) === openIn(beforeAlt) &&
     afterAlt.entries.every((entry) => entry.collapsed === false),
   // 7. The region grew: the rows share it by their proportions (C8), not one row taking all.
+  // Compare with `afterAlt`: the Alt drag has already changed the two rows, so `beforeAlt` is not
+  // the state the growth starts from.
   bothRowsShareTheGrowth: (() => {
     const gains = grown.entries.map((entry) => {
-      const before = beforeAlt.entries.find((old) => old.view === entry.view)?.entry?.h ?? 0;
+      const before = afterAlt.entries.find((old) => old.view === entry.view)?.entry?.h ?? 0;
       return (entry.entry?.h ?? 0) - before;
     });
     const shared = gains.filter((gain) => gain > 20).length >= 2;
