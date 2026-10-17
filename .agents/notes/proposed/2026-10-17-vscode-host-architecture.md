@@ -67,9 +67,60 @@ DSH shell / slots / services
 - **consumers**：按 DSH 的形式消费 face / catalogue；不碰 adaptor 内部。
 - **frame**：只接收 `prac.view` 和 view 盒子；不认 part/container/pane。
 
+### 2.1 运行时拓扑
+
+```text
+Browser
+  DSH shell（prac-web-app + ui-layout frame）
+    ├─ vscode-host plugin（client）
+    │   ├─ PracVscodeFace → ctx.pracVscode
+    │   ├─ createVscodeEmbed → VscodeEmbedHandle
+    │   └─ vendor/vscode EmbeddedWorkbench
+    ├─ ui-vscode-views（source: "view"）
+    ├─ ui-vscode-editor（source: "file"）
+    └─ arrangement（web-app：place / placeQuietly）
+Server（node）
+  prac-host-vscode
+    └─ code server
+         └─ extension host（UI 宿主，和 agent 的 P1 宿主分开）
+```
+
+- `vscode-host` 的 `apply()` 先 `createVscodeEmbed({ route, productName, extensionsGallery })`；
+- 在 boot 之前用 `ctx.pracLayout` 装好 `setGroupRegionChannel`（`createRegionBeside` / `regionInDirection` / `removeRegion`），因为编辑器组的 `addGroup` 要同步建区域；
+- **workspace 是 window identity**：只有 `ctx.workspaces` + `ctx.uiSession` 能确定当前 workspace 时才 `embed.boot({ workspacePath, configurationDefaults: { "files.autoSave": "off" } })`；一个页面只 boot 一次；
+- `ctx.provide("pracVscode", face)`；`shell.overlay` 注册 `embed.floatHost()`（`order: -100`，prac 自己的 overlay 在上）；
+- consumers 通过 `inject: ["pracVscode"]` 等这个 service；frame 通过 `ctx.pracLayout` 提供区域/放置。
+
+### 2.2 核心对象模型
+
+| 对象 | 在哪 | 持有什么 | 谁调用 |
+| --- | --- | --- | --- |
+| `PracVscodeFace` | `packages/client/vscode-host/src/client/public.ts` | catalogue、`hostFor`、`focusView`、`runCommand`、file placement、capabilities | consumers、诊断/门 |
+| `VscodeEmbedHandle` | `vendor/vscode-embed/src/client/index.ts` | boot、`partHost`、`view`、`file`、`placements`、`views`、`floatHost`、group region channel | `vscode-host` |
+| `PartHostFace` | `vendor/vscode/overlay/embedBridge.ts` | workbench 侧的 mount/focus/release/list、file placements、capabilities | `vscode-embed` |
+| `EmbeddedWorkbench` | `vendor/vscode/overlay/embeddedWorkbench.ts` | workbench 服务、`IWorkbenchLayoutService`、view/editor host、overlay | `PartHostFace` |
+| `PracEditorHost` | `vendor/vscode/overlay/pracEditorHost.ts` | `IEditorGroupsService`、group / region、editor group model/panes | workbench、`vscode-host` 的 region channel |
+| `ViewPane` / `ViewPaneContainer` | 上游 workbench | 一个 view 的 pane / 一个 container 的运行时 | `tryMountView` / container context |
+| `VscodeCatalogueEntry` | `vscode-host` 的 face | `view` / `appId` / `title` / `source` / `location` / `containerId` / `containerTitle` / `region` | `ui-vscode-views` / `ui-vscode-editor` / arrangement |
+| `PracLayoutFace` | `packages/client/ui-layout/src/client/contract.ts` | 区域树、view 放置、区域创建/删除 | adaptor、arrangement、editor host |
+| `prac.view` | `ui-layout` 的 slot | 每个 view 的一次注册（id/label/icon/宿主组件） | consumers |
+
+### 2.3 状态归属
+
+| 状态 | 归谁 |
+| --- | --- |
+| workspace / session identity | DSH |
+| 区域树、放置、stack/tab/fold/sash、持久化 | frame（`ui-layout`） |
+| workbench、view pane、editor group、container context、overlay | adaptor（`vscode-host` / workbench） |
+| view catalogue（文件 + 视图） | adaptor（来自 `IEditorService` / `IViewDescriptorService`） |
+| `prac.view` 注册 | consumers |
+| capabilities（editors / diagnostics） | adaptor 计算；consumers 只读 |
+
+关键：**frame 不持有 workbench 状态；adaptor 不持有 layout 状态**。两边通过 `PracLayoutFace`、`prac.view`、host element 协作。
+
 ## 3. 契约
 
-### 已有
+### 3.1 已有契约
 
 - **`PartHostFace` / `VscodeEmbedHandle`**：mechanism 面。
   - 宿主元素（partHost / view host / float host）；
@@ -87,7 +138,7 @@ DSH shell / slots / services
   - `containerId` / `containerTitle` 只是元数据；
   - 不代表 container 是 frame 的 owner。
 
-### 未来
+### 3.2 未来契约
 
 - **view action / container action**：`ViewTitle` / `ViewContainerTitle` 的 owner 与 scope；
 - **container context**：view container / view surface 的 runtime；
@@ -98,48 +149,64 @@ DSH shell / slots / services
 
 这些契约未定；不要在 step 里先写成既成事实。
 
-## 4. 生命周期
+## 4. 生命周期与序列
 
-### boot / workbench
+### 4.1 boot / workbench
 
-- `pracVscode` service 启动；
-- 确定 workspace / code server / workbench 资源；
-- 创建 workbench face；
-- 注册 float host / part hosts / view hosts；
-- 发布 catalogue；
-- 订阅 catalogue 变化。
+1. DSH 加载 `prac-client-vscode-host`；`apply()` 创建 `VscodeEmbedHandle`；
+2. `setGroupRegionChannel` 绑定 `ctx.pracLayout`；
+3. 等 `ctx.workspaces` + `ctx.uiSession` 给出当前 workspace；
+4. `embed.boot({ workspacePath, configurationDefaults })`；机制侧只 boot 一次；
+5. `EmbeddedWorkbench` 起 workbench 服务、`PracEditorHost`（`IEditorGroupsService`）、overlay/float host；
+6. `PartHostFace` 发布；`pracVscode` service 发布；
+7. consumers 注入 `pracVscode`；`ui-vscode-views` / `ui-vscode-editor` 读 catalogue 并注册 `prac.view`；
+8. arrangement 落位；frame 渲染区域/stack；`hostFor(view)` 给宿主元素。
 
-### view
+### 4.2 view
 
-1. catalogue 增；
-2. consumer 注册 `prac.view`；
-3. frame 按 `location` / `containerId` 落成区域 / 具名子区域 / stack 行；
-4. `hostFor(view)` 给宿主元素；
-5. adaptor 创建 / 挂载 `ViewPane`；
-6. future：container context 承接 view 集合 / 可见性 / 顺序 / action / focus；
-7. catalogue 减或视图离场：释放宿主，剪掉持久化位置 / 顺序 / 选中；
-8. dispose。
+1. catalogue 增（`source: "view"` 或 `"file"`）；
+2. consumer 注册 `prac.view`（id = `vscode:view:<id>` / `vscode:file:<placement>:<resource>`）；
+3. frame 按 `location` / `containerId` 落成区域、具名子区域或 stack 行；
+4. `hostFor(view)` 返回 mount 组件；
+5. `vscode-embed` 的 view host → `mountViewInto(viewId, element)`；
+6. `tryMountView` 取 descriptor，直接 `createInstance(ViewPane)`，`render()`、`setVisible(true)`，放进 `.monaco-pane-view`；
+7. `focusView` / title action / container action 按 owner 分派；
+8. catalogue 减或视图离场：`releaseView`、`removeView`、剪持久化位置。
 
-### editor
+当前第 6 步**没有 `ViewPaneContainer`**：`ViewPane` 是直接创建的。这是 container/view surface 的缺口，不是 frame 的缺口。
 
-1. catalogue 的 `source: "file"` 条目；
+### 4.3 editor
+
+1. catalogue 的 `source: "file"` 条目带 placement；
 2. `ui-vscode-editor` 注册 `prac.view`；
-3. `PracEditorHost` 的 group / region；
-4. `EditorGroupModel` / `EditorPanes` / editor pane；
-5. 编辑器组是平行链，不混进 container context；
-6. dispose。
+3. `PracEditorHost` 的 group 绑到 frame 的区域；`addGroup` 走 `createRegionBeside` / `regionInDirection`；
+4. `mountFileInto(placement, resource, element)`；group 用 `EditorGroupModel` / `EditorPanes`；
+5. 同一个文件可以出现在多个 group / 区域，视图 id 用 placement 区分；
+6. dispose：`releaseFile` / `removeRegion` / `removeView`。
 
-### overlay
+### 4.4 overlay
 
-- 由 workbench 的应用服务创建的 overlay（context view / quick pick / notifications / hover / dialog）进 frame 的 `shell.overlay` / float host；
-- 由 view 部件自己画的 overlay（补全列表 / webview overlay）留在 view 自己的隔离盒子里；
-- 这是 ownership 分界，不是 CSS 细节。
+1. `EmbeddedWorkbench` 自己的 root 住在 `shell.overlay` / `floatHost`；
+2. 应用服务创建的 context view / quick pick / notifications / hover / dialog 进 float host；
+3. view 部件自己画的补全/webview overlay 留在 view 盒内；
+4. 次序由 `shell.overlay` 的 entry `order` 决定，不由 z-index 猜。
 
-### extension host / LSP
+### 4.5 extension host / LSP
 
 - P1 是另一条链：[2026-09-21-p1-ext-host-chain.md](../in-progress/2026-09-21-p1-ext-host-chain.md)；
-- 不经过 UI adaptor；
+- UI 的 `EmbeddedWorkbench` 有自己的扩展宿主；
+- agent 侧的扩展宿主与 UI 侧分开；
 - UI adaptor 只消费扩展贡献出来的 view / menu / command / webview / editor 面。
+
+### 4.6 失败与顺序
+
+- 没有 workspace：不 boot，等 registry；不猜测路径；
+- boot 之前 catalogue 为空：consumer 等待 `pracVscode`，不要在启动期缓存空目录；
+- `tryMountView` 找不到 descriptor：deferred，等 view 注册后再试；
+- workbench 未启动：`tryMountView` 返回 false，不要创建半成品 pane；
+- view 已注册但 frame 未落位：`hostFor` 不渲染，等 placement；
+- code server / workbench 失败：adaptor 报错，frame 不接管 VS Code 的启动；
+- 页面关闭：frame dispose → consumer dispose → `releaseView` / `releaseFile` → workbench dispose。
 
 ## 5. Surface ownership
 
@@ -155,6 +222,23 @@ DSH shell / slots / services
 | **主题 / 设置 / walkthrough** | themes / icon themes / configuration / walkthroughs | adaptor + frame 的主题/设置面 | future themes/settings |
 
 这张表是 **ownership**，不是设计；每个 surface 的细节在自己的 step。
+
+### 5.1 第一个 surface：container / view
+
+当前事实：
+
+- `tryMountView` 直接创建 `ViewPane`，没有 `ViewPaneContainer`；
+- `IViewsService.getViewWithId` 返回 null；
+- `Collapse Folders` 这类 container-scoped action 没有 owner；
+- `view/title`、`view/item/context` 的 action 仍能挂在 view 上。
+
+architecture 只定形状，不定机制：
+
+- container context 应位于 **adaptor 内部**，在 `ViewPane` 与 `PracLayoutFace` 之间；
+- 它要承接：view 集合、可见性、顺序、size、focus、container title / menu、`viewsWelcome`；
+- 它不能把 part/pane composite 的 layout 带回 frame；
+- 具体用 headless real `ViewPaneContainer` 还是更小的 context，是 architecture 之后的 step；
+- 不沿用已 abandoned 的 container context note 的 B 结论。
 
 ## 6. Non-goals
 
