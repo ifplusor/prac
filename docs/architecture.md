@@ -126,7 +126,8 @@
 
 ### 3.2 IDE 那一半怎么进来
 
-- **编辑器** = **一个文件一个视图**，不是 editor part / editor group；**tab 是区域级能力**（不是 `center` 专有），**分栏是区域的性质**——模式与区域的绑定见 §3.1。
+- **编辑器**：一个文件可以有一个或多个 **editor / 放置**；同一个文件可以同时出现在多个 editor group / 区域（对齐 VS Code 的 Split Editor）。**分栏是区域**，**tab 是组 / 区域的**；**身份是放置**，不是文件。
+- **editor group 是 prac 自己的对象**：`PracEditorHost` 在区域里承载组；组用上游的 `EditorGroupModel` / `EditorPanes`，不用上游的 `EditorPart` / `EditorGroupView`；一个载文件的区域 = 一个组，拆区域 = 新组；只放侧栏 / 面板的区域没有组。frame 只给区域 / 盒子，不认识组。
 - 扩展贡献的视图（tree view 等）也按视图进来；容器与 part 是可选的高级形态（整块标准 IDE 区域），不是组合的单位。
 - 现在的落点是「编辑器 / 侧栏」这类面，其余 IDE 面按同一套规矩逐步接。
 - 已知的坑：视图要进 VS Code 自己的可见性模型，否则 body 会是 "no data provider registered"。
