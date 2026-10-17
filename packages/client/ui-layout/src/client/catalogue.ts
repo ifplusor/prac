@@ -62,6 +62,8 @@ export function viewSource(viewId: string): string {
  * who it is.
  */
 let declaredViewIds: ReadonlySet<string> = new Set<string>();
+/** The display title each `prac.view` entry declares, keyed by view id. */
+let declaredViewLabels: ReadonlyMap<string, string> = new Map<string, string>();
 
 /**
  * Re-read the `prac.view` slot registry into {@link declaredViewIds}.
@@ -71,11 +73,30 @@ let declaredViewIds: ReadonlySet<string> = new Set<string>();
  */
 export function readDeclaredViewIds(slots: Context["slots"]): ReadonlySet<string> {
   const ids = new Set<string>();
+  const labels = new Map<string, string>();
   for (const entry of slots.entries(VIEW_SLOT)) {
-    if (entry.options.id !== undefined && entry.options.id !== "") ids.add(entry.options.id);
+    const id = entry.options.id;
+    if (id === undefined || id === "") continue;
+    ids.add(id);
+    const label = entry.options.label;
+    if (typeof label === "string" && label !== "") labels.set(id, label);
   }
   declaredViewIds = ids;
+  declaredViewLabels = labels;
   return ids;
+}
+
+/**
+ * The display title a `prac.view` entry declared, if any.
+ *
+ * The frame must not show the raw id when the source already has a title: the
+ * VS Code catalogue reports `title` and `ui-vscode-views` carries it here.
+ *
+ * @param viewId - the view identity.
+ * @returns the declared label, or undefined for DSH slots/unknown ids.
+ */
+export function declaredViewLabel(viewId: string): string | undefined {
+  return declaredViewLabels.get(viewId);
 }
 
 /**

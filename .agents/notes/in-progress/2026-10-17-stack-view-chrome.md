@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 ---
 
 # Agent Note: stack 视图的标题归属
@@ -48,9 +48,9 @@ Stack 的一行出现**两条标题**：
 - 优点：最快消除重复标题，动作不丢。
 - 代价：仍是两条横条/两个折叠 chevron；只是暂时不重复文字；不是终态。
 
-## Recommendation
+## Decision
 
-选 **B**。理由：
+选 **B**（已裁）。理由：
 
 1. 一视图一标题，且标题来自视图自己，不需要框架复制视图标题/动作；
 2. 动作原地保留，不额外造一套菜单；
@@ -67,11 +67,22 @@ A 作为“统一外观”的备选，但代价是把视图内部 chrome 框架�
 4. **拖拽**：在 pane header 标题区加框架拖拽落点，避开动作按钮；重排仍走 `moveEntry`。
 5. **门**：`verify:stack` 加“一行只有一个标题”“pane header 可见/动作可见”“折叠同步”“重排”；`verify:containers` / `outline` / `timeline` 回归；截图对比 Explorer。
 
+## 实现（B，已落地）
+
+- **label**：`ui-vscode-views` 把 `VscodeCatalogueEntry.title` 作为 `prac.view` 的 `label` 注册；layout 的 `readDeclaredViewIds` 记录 `declaredViewLabel`，`viewLabel` 优先用它。Explorer 的栈行现在显示 `Outline` / `Timeline` / `Open Editors` / `prac-dev` / `Probe Webview`，不再出现 `WORKBENCH...` 原始 id。
+- **expanded `vscode:*` 行**：不画 `entryHeader`；VS Code pane header 保留为唯一标题；`entryOverlay` 只提供折叠按钮和标题拖拽，位于 pane header 之上、从 `SASH_SIZE` 开始（行顶的 sash 不被盖住），右侧留 120px 给 pane header 动作。
+- **pane header 的重复折叠**：`IsolatedView` 在 frame-chrome 行上带 `data-prac-view-chrome="frame"`；隔离内的 CSS 隐藏 `.twisty-container`，并让 `.pane-header` 本身 `pointer-events: none`、只放行 `.actions`。折叠权威是 stack 的 `entry.collapsed`；pane header 自己的 collapse 不再抢事件。
+- **folded `vscode:*` 行**：没有 pane header，继续用 frame 的 `entryHeader`（title 来自 label，折叠/拖拽都在）；行高 20。
+- **`dsh:*` 行**：不变，frame 行头。**单视图 bare**：没有 stack 行头，保留 pane header。
+- **证据**：Explorer live 截图（一行一标题、twisty 隐藏、pane header 动作仍在）；ui-layout **147** 单测；六门 live 全绿（`verify:stack` 17/17、`resize`、`split`、`containers`、`persistence`、`bottom`）。
+
 ## Open questions
 
-- 折叠权威取 pane 的 collapse 还是 stack 的 `entry.collapsed`？双向同步会不会打架（`setEntryFolded` 与 VS Code 的 collapse 事件）？
-- pane header 高度与 `HEADER_HEIGHT`(20) 不一致时，是压 pane header 到 20，还是让 stack 行高跟随 pane header？
-- 拖拽落点跨影根时，标题区的命中如何避开右侧动作按钮（`composedPath` / 框架 overlay）？
+
+
+- ~~折叠权威取 pane 的 collapse 还是 stack 的 `entry.collapsed`？~~ 已落地：frame 的 `entry.collapsed` 是权威；pane header 的 twisty 隐藏、标题区不接指针，只放行动作。
+- pane header 实际高度（约 22px）与 `HEADER_HEIGHT`(20) 仍差 2px；折叠行 20、展开行由 pane header 撑起，混合栈里的行高/基线还需要对齐一次。
+- ~~拖拽落点跨影根时，标题区的命中如何避开右侧动作按钮？~~ 已落地：`entryOverlay` 在光 DOM 上，标题区到右侧 120px 为止；动作区由 `.actions` 接指针；行顶 `SASH_SIZE` 留给 sash。
 - 混合栈里 `dsh:*` 的 prac 行头与 VS Code 的 pane header 如何视觉对齐（高度、padding、折叠 chevron）？
 - 单视图 bare 与两视图 stack 之间的切换，pane header 的显隐是否会造成一次布局跳动？
 

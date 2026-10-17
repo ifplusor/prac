@@ -31,6 +31,7 @@ import {
   DSH_SIDEBAR_VIEW,
   DSH_VIEW_SOURCE,
   VIEW_SLOT,
+  declaredViewLabel,
   isDeclaredView,
   viewSource,
 } from "./catalogue.js";
@@ -194,10 +195,13 @@ function View({ viewId, renderSlot, box, viewportWidth }: ViewProps): ReactNode 
 function IsolatedView({
   children,
   clickThrough = false,
+  chrome,
 }: {
   children?: ReactNode;
   /** The box itself lets events pass; its entries opt back in (the float layer). */
   clickThrough?: boolean;
+  /** When the frame owns the row title, hide the view's own duplicate collapse affordance. */
+  chrome?: "frame";
 }): ReactElement {
   const host = useRef<HTMLDivElement | null>(null);
   const [content, setContent] = useState<HTMLElement | null>(null);
@@ -215,6 +219,7 @@ function IsolatedView({
     {
       ref: host,
       "data-prac-view-host": "",
+      ...(chrome === "frame" ? { "data-prac-view-chrome": "frame" } : {}),
       style: {
         display: "flex",
         flexDirection: "column",
@@ -228,9 +233,9 @@ function IsolatedView({
   );
 }
 
-/** A view's display label: the tail of its id (`dsh:sidebar` → `sidebar`). */
+/** A view's display label: its declared title, else the tail of its id. */
 function viewLabel(viewId: string): string {
-  return (viewId.split(":").pop() ?? viewId).replace(/[-_]/g, " ");
+  return declaredViewLabel(viewId) ?? (viewId.split(":").pop() ?? viewId).replace(/[-_]/g, " ");
 }
 
 /** The header a stacked view carries: its label plus a fold toggle. */
@@ -822,6 +827,10 @@ const FRAME_STYLES = `
 [data-prac-sash][data-prac-stack-sash-state="at-maximum"] { cursor: n-resize; }
 [data-prac-sash][data-prac-stack-sash-state="disabled"] { cursor: default; pointer-events: none; }
 [data-prac-sash]:hover, [data-prac-sash]:active { background: rgba(127, 127, 127, 0.35); }
+:host([data-prac-view-chrome="frame"]) .pane-header .twisty-container { display: none; }
+:host([data-prac-view-chrome="frame"]) .pane-header { pointer-events: none; }
+:host([data-prac-view-chrome="frame"]) .pane-header .actions,
+:host([data-prac-view-chrome="frame"]) .pane-header .actions * { pointer-events: auto; }
 `;
 
 /** Inject the frame's stylesheet once. */
@@ -1197,10 +1206,10 @@ export function createFrame(
      * @param viewId - the view to render.
      * @param box - the box of the region holding it.
      */
-    const viewBody = (viewId: string, box: Box): ReactElement =>
+    const viewBody = (viewId: string, box: Box, chrome?: "frame"): ReactElement =>
       createElement(
         IsolatedView,
-        { key: viewId },
+        { key: viewId, ...(chrome === undefined ? {} : { chrome }) },
         createElement(View, {
           viewId,
           renderSlot,
@@ -1357,6 +1366,75 @@ export function createFrame(
         ),
       );
 
+    /**
+     * The frame's controls over a view that already brings its own pane header.
+     *
+     * B owns the title: a `vscode:*` row keeps its VS Code pane header (title + actions) and the
+     * frame draws only the fold switch and the title drag area on top of it. The strip is
+     * transparent and stops before the pane's action buttons, so the one title stays the pane's.
+     *
+     * @param node - the stack row.
+     * @param viewId - the view on the row.
+     */
+    const entryOverlay = (node: RegionNode, viewId: string): ReactElement =>
+      createElement(
+        "div",
+        {
+          "data-prac-stack-overlay": node.id,
+          style: {
+            position: "absolute",
+            // Start below the sash: the boundary strip owns the row's first SASH_SIZE pixels, and
+            // an overlay on top of it would swallow the boundary drag.
+            top: SASH_SIZE,
+            left: 0,
+            right: "120px",
+            height: HEADER_HEIGHT,
+            zIndex: 6,
+            display: "flex",
+            alignItems: "center",
+            gap: "2px",
+          },
+        },
+        createElement(
+          "button",
+          {
+            type: "button",
+            "data-prac-stack-toggle": viewId,
+            "aria-expanded": node.collapsed === true ? "false" : "true",
+            title: node.collapsed === true ? "Expand" : "Collapse",
+            onClick: (event: ReactMouseEvent<HTMLElement>) => {
+              const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
+              const height = row?.getBoundingClientRect().height;
+              store.update((current) =>
+                setEntryFolded(current, node.id, node.collapsed !== true, height),
+              );
+            },
+            style: {
+              background: "none",
+              border: "none",
+              color: "inherit",
+              cursor: "pointer",
+              padding: "0 2px",
+              font: "inherit",
+            },
+          },
+          node.collapsed === true ? "\u25b8" : "\u25be",
+        ),
+        createElement("span", {
+          "data-prac-stack-title": node.id,
+          onPointerDownCapture: (event: PointerDragEvent) => {
+            if (event.button !== 0) return;
+            const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
+            beginReorder(event, node.id, row?.parentElement ?? null);
+          },
+          style: {
+            flex: "1 1 auto",
+            height: "100%",
+            cursor: "pointer",
+          },
+        }),
+      );
+
     const renderRegion = (node: RegionNode, dir: Dir, fill = false): ReactElement => {
       const box = sizes.get(node.id) ?? ZERO_BOX;
       const child = activeChild(state, node);
@@ -1467,42 +1545,64 @@ export function createFrame(
                 "data-prac-stack-collapsed": node.collapsed === true ? "true" : "false",
               }
             : {}),
-          style: regionStyle(
-            node,
-            dir,
-            fill,
-            // A row is drawn at its allocated extent (C6/C8): the gain a region made belongs to one
-            // row, and the allocation is what says which.
-            node.entry === true ? sizes.get(node.id)?.height : undefined,
-          ),
+          style: {
+            ...regionStyle(
+              node,
+              dir,
+              fill,
+              // A row is drawn at its allocated extent (C6/C8): the gain a region made belongs to one
+              // row, and the allocation is what says which.
+              node.entry === true ? sizes.get(node.id)?.height : undefined,
+            ),
+            // The B overlay is absolute inside its row; the row is the containing block.
+            ...(node.entry === true &&
+            views.length === 1 &&
+            node.collapsed !== true &&
+            viewSource(views[0] ?? "") === "vscode:"
+              ? { position: "relative" }
+              : {}),
+          },
         },
         showsTabStrip(state, node)
           ? [tabStrip(views, node.id), viewBody(frontView(state, node.id) ?? views[0] ?? "", box)]
           : node.entry === true && views.length === 1
-            ? [
-                entryHeader(node, views[0] ?? ""),
-                // A folded row is **only its header** (design B4/D1): no body at all.
-                node.collapsed === true
-                  ? null
-                  : createElement(
-                      "div",
-                      {
-                        "data-prac-stack-body": node.id,
-                        style: {
-                          display: "flex",
-                          flexDirection: "column",
-                          flex: "1 1 auto",
-                          minHeight: 0,
-                          position: "relative",
-                          overflow: "hidden",
+            ? (() => {
+                const viewId = views[0] ?? "";
+                const stackBody =
+                  node.collapsed === true
+                    ? null
+                    : createElement(
+                        "div",
+                        {
+                          "data-prac-stack-body": node.id,
+                          style: {
+                            display: "flex",
+                            flexDirection: "column",
+                            flex: "1 1 auto",
+                            minHeight: 0,
+                            position: "relative",
+                            overflow: "hidden",
+                          },
                         },
-                      },
-                      viewBody(views[0] ?? "", box),
-                    ),
-              ]
+                        viewBody(
+                          viewId,
+                          box,
+                          viewSource(viewId) === "vscode:" ? "frame" : undefined,
+                        ),
+                      );
+                // B: a view with its own pane header owns the row title. The expanded row is just
+                // the view plus the frame's fold/drag overlay; a folded row has no view, so the
+                // frame's own header (with the declared title) is what remains.
+                if (viewSource(viewId) === "vscode:") {
+                  return node.collapsed === true
+                    ? [entryHeader(node, viewId)]
+                    : [stackBody, entryOverlay(node, viewId)];
+                }
+                return [entryHeader(node, viewId), stackBody];
+              })()
             : // No strip: the region still shows its **front** view. It used to take the
-              // first by order, which is a different question — measured with a region a
-              // view had just been split into: the file that was copied in was front, the
+              // first by order, which is a different question — measured with a region a view
+              // had just been split into: the file that was copied in was front, the
               // region rendered its neighbour, and the new file's view got no surface.
               [viewBody(frontView(state, node.id) ?? views[0] ?? "", box)],
       );

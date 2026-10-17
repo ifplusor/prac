@@ -53,31 +53,35 @@ export function apply(ctx: Context): void {
   ctx.effect(
     () =>
       slots.inject(SLOT, () => {
-        /** The live registration per view, so a view that leaves can retract. */
-        const registered = new Map<string, () => void>();
+        /** The live registration per view, so a view that leaves or retitles can re-register. */
+        const registered = new Map<string, { label: string; dispose: () => void }>();
         const sync = (): void => {
           const entries = viewEntries();
-          const wanted = new Set(entries.map((entry) => entry.view));
-          for (const [view, dispose] of Array.from(registered)) {
-            if (wanted.has(view)) continue;
-            dispose();
+          const byView = new Map(entries.map((entry) => [entry.view, entry]));
+          for (const [view, record] of Array.from(registered)) {
+            const entry = byView.get(view);
+            if (entry !== undefined && entry.title === record.label) continue;
+            record.dispose();
             registered.delete(view);
           }
-          for (const { view } of entries) {
+          for (const { view, title } of entries) {
             if (registered.has(view)) continue;
             // The component renders an empty host until the app has created the
             // view, then fills it — the bridge's direction, one level up.
-            registered.set(
-              view,
-              slots.register({ name: SLOT, id: view }, () => host.hostFor(view)() ?? null),
-            );
+            registered.set(view, {
+              label: title,
+              dispose: slots.register(
+                { name: SLOT, id: view, label: title },
+                () => host.hostFor(view)() ?? null,
+              ),
+            });
           }
         };
         sync();
         const stop = host.onDidChangeCatalogue(sync);
         return () => {
           stop();
-          for (const dispose of registered.values()) dispose();
+          for (const { dispose } of registered.values()) dispose();
           registered.clear();
         };
       }),

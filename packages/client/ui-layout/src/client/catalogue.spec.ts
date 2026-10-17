@@ -5,6 +5,7 @@ import {
   VIEW_SLOT,
   catalogueViewIds,
   isDeclaredView,
+  declaredViewLabel,
   readDeclaredViewIds,
   viewSource,
 } from "./catalogue.js";
@@ -15,7 +16,9 @@ import {
  * view — are decisions, not rendering. The live gate keeps the half a browser
  * owns: that the surface renders exactly what this returns.
  */
-type SlotEntry = { readonly options: { readonly key?: string; readonly id?: string } };
+type SlotEntry = {
+  readonly options: { readonly key?: string; readonly id?: string; readonly label?: string };
+};
 
 /**
  * A registry stand-in with one list per slot name.
@@ -97,5 +100,16 @@ describe("readDeclaredViewIds / isDeclaredView", () => {
       registry({ [VIEW_SLOT]: [{ options: { id: "" } }, { options: { id: "prac:notes" } }] }),
     );
     expect([...ids]).toEqual(["prac:notes"]);
+  });
+
+  it("reads the declared title, and forgets it when the view leaves", () => {
+    readDeclaredViewIds(
+      registry({
+        [VIEW_SLOT]: [{ options: { id: "vscode:view:outline", label: "Outline" } }],
+      }),
+    );
+    expect(declaredViewLabel("vscode:view:outline")).toBe("Outline");
+    readDeclaredViewIds(registry({}));
+    expect(declaredViewLabel("vscode:view:outline")).toBeUndefined();
   });
 });
