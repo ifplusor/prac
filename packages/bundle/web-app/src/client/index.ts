@@ -46,6 +46,7 @@ import type { Side } from "prac-client-ui-layout/client";
 import type {} from "prac-client-vscode-host/client";
 import {
   CONVERSATION,
+  DSH_CONVERSATION_VIEW,
   VSCODE_SURFACE,
   arrange,
   focusView,
@@ -579,6 +580,41 @@ function RecallSurface({ layout, onFocus }: RecallSurfaceProps): ReactElement | 
 }
 
 /**
+ * One action for the conversation view, rendered by the frame's
+ * `prac.viewActions` slot.
+ *
+ * This is the arrangement's action, not a VS Code menu: the frame owns the row
+ * header, the view owner supplies the actions, and the two only meet through
+ * the slot.
+ *
+ * @param props - the action to run.
+ */
+function ConversationAction({ onFocus }: { onFocus: () => void }): ReactElement {
+  return createElement(
+    "button",
+    {
+      type: "button",
+      "data-prac-view-action": "conversation",
+      title: "Bring the conversation forward",
+      "aria-label": "Bring the conversation forward",
+      onClick: onFocus,
+      style: {
+        font: "inherit",
+        fontSize: "12px",
+        lineHeight: "1",
+        height: "100%",
+        padding: "0 6px",
+        border: 0,
+        background: "transparent",
+        color: "inherit",
+        cursor: "pointer",
+      },
+    },
+    "对话",
+  );
+}
+
+/**
  * Apply the arrangement: default placements, roles, the strip, the recall
  * surface and the keys.
  *
@@ -703,6 +739,13 @@ export function apply(ctx: Context): void {
           back: () => focus.back(),
         },
       }),
+    ),
+  );
+
+  // The conversation's action, in the frame's per-view header slot.
+  slots.inject("prac.viewActions", () =>
+    slots.register({ name: "prac.viewActions", key: DSH_CONVERSATION_VIEW }, () =>
+      createElement(ConversationAction, { onFocus: () => focus.focus(CONVERSATION) }),
     ),
   );
 

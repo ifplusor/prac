@@ -263,7 +263,7 @@ function attachCodeServerProxy(webCtx: Context, target: CodeServerTarget): void 
     // host connections upgrade on the same segment, and upgrades match by exact
     // pathname.
     webCtx.effect(
-      () => server.registerUpgrade({ path: segment, handler: proxy.upgrade }),
+      () => server.registerUpgrade({ path: segment, handler: proxy.upgrade.bind(proxy) }),
       `${name}: upgrade ${segment} → ${target.host}:${target.port}`,
     );
   } catch (error) {

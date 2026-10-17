@@ -86,7 +86,7 @@ export function apply(ctx: Context): void {
   // whoever declared the view (the face's `onDidRequestCloseView`).
   const closeListeners = new Set<(viewId: string) => void>();
   const store = createStore((viewId) => {
-    for (const listener of [...closeListeners]) listener(viewId);
+    for (const listener of Array.from(closeListeners)) listener(viewId);
   });
   const { layout, pracLayout, panelInfo } = createServices(ctx, store, closeListeners);
 

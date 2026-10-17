@@ -1243,6 +1243,15 @@ export function createFrame(
           ),
         ),
         createElement("span", { key: "filler", style: { flex: "1 1 auto" } }),
+        createElement(
+          "div",
+          {
+            key: "actions",
+            "data-prac-tab-actions": active,
+            style: { display: "flex", alignItems: "center", flex: "0 0 auto", height: "100%" },
+          },
+          renderSlot("prac.viewActions", {}, { entryKey: active }),
+        ),
       );
     };
 
