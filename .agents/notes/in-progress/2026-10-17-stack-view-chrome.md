@@ -81,11 +81,11 @@ B（保留 pane header）已被用户收回：它把 VS Code chrome 当成行头
 ## A 的目标形态
 
 - `prac.view` 增加 `headless`（视图不自带 chrome）与 `actions`（视图的动作模型/face）描述；`ui-vscode-views`/`vscode-host` 隐藏自己的 pane header 并提供动作。
-- prac 行头统一画：图标、标题、twisty、动作、hover、键盘；22px；`dsh:*` 与 `vscode:*` 一致。标题来自视图目录/title（不是 raw id）。
+- prac 行头统一画：图标（待接）、标题、twisty、动作、hover、键盘；22px；`dsh:*` 与 `vscode:*` 一致。标题来自视图目录/title（不是 raw id）。
 - 折叠/重排/sash 全部在 prac 行头；点击/键盘折叠，拖动超过阈值重排。
 - **A 第一版（已落地）**：展开的 VS Code 行由 frame 画 title/twisty/fold/drag；pane 的 `.title`/`.icon`/`.twisty` 隐藏，`.actions` 保留；`verify:stack` / `containers` / `persistence` / `resize` / `split` / `bottom` 六门 live 全绿。
 - **标题来源（已定）**：视图自己的 pane 标题优先；`ui-vscode-views` 挂载后观察 `.pane-header .title` 并重新注册 `prac.view` label，catalogue title 只作回退。fileView 因此显示 `prac-dev` 而不是 `Folders`。
-- **待接**：22px/2px、DSH 视图的 action slot。
+- **待接**：view icon、container bar、mixed stack 的最后 2px 对齐；DSH action slot 已声明并在 DSH 行头渲染（`prac.viewActions`）。
 - **视觉边界**：动作条可以完全用视图自己的（VS Code `.actions` / `ActionBar`、DSH 自己的 action bar），但 frame 的 title/twisty/icon 是 prac 实现，不承诺与 VS Code pane header 像素级一致。要完全一致只能整条保留 pane header（B）或逐项移植它的字体/间距/hover/背景/主题，后者不作为目标。
 - 动作槽采用**视图自持**（A 的第一版）：
   - frame 行头只保留 title/icon/twisty/fold/drag/sash + 右侧一个 action slot。
@@ -104,6 +104,8 @@ B（保留 pane header）已被用户收回：它把 VS Code chrome 当成行头
 - 动作桥的边界：`ViewPane` 是否已创建/所在 container 是否 active；折叠行的 `showActions`（WhenExpanded）；toggle/submenu 动作；动作条宽度与 overflow；`dsh:*` 视图的动作 slot 空值。
 - 插件生态：VS Code 侧 `view/title` 的 `when`/`enablement`、submenu、Toggle、ThemeIcon、扩展命令、动态菜单变更；DSH 侧 `ctx.shortcuts` / `ctx.commandUi` 的命令与动作上下文。两侧各需要一条测试贡献（VS Code test extension + DSH test plugin），验证同一 action slot 下 live 出现并可执行。
 - 动作槽的布局：slot 的最大宽度/overflow；pane `.actions` 与 frame 标题的 22px 对齐；折叠行的 `showActions`；DSH action bar 的视觉；是否需要在后续引入统一动作模型。
+- **view icon**：frame 的行头在 frame shadow 里，没有视图 shadow 的 codicon font-face；`className` 能传，glyph 画不出。需要 view-owned icon descriptor（自包含 SVG，或 view 提供的 icon style/font）；暂不做。
+- **DSH action slot**：`prac.viewActions` 已声明并在 DSH 行头渲染；DSH 视图动作的注册与测试仍待接。
 - ~~拖拽落点跨影根时，标题区的命中如何避开右侧动作按钮？~~ 已落地：`entryOverlay` 在光 DOM 上，标题区到右侧 120px 为止；动作区由 `.actions` 接指针；行顶 `SASH_SIZE` 留给 sash。
 - 混合栈里 `dsh:*` 的 prac 行头与 VS Code 的 pane header 如何视觉对齐（高度、padding、折叠 chevron）？
 - 单视图 bare 与两视图 stack 之间的切换，pane header 的显隐是否会造成一次布局跳动？
