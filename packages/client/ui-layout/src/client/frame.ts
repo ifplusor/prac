@@ -827,7 +827,9 @@ const FRAME_STYLES = `
 [data-prac-sash][data-prac-stack-sash-state="at-maximum"] { cursor: n-resize; }
 [data-prac-sash][data-prac-stack-sash-state="disabled"] { cursor: default; pointer-events: none; }
 [data-prac-sash]:hover, [data-prac-sash]:active { background: rgba(127, 127, 127, 0.35); }
-:host([data-prac-view-chrome="frame"]) .pane-header .twisty-container { display: none; }
+:host([data-prac-view-chrome="frame"]) .pane-header .twisty-container,
+:host([data-prac-view-chrome="frame"]) .pane-header .icon,
+:host([data-prac-view-chrome="frame"]) .pane-header .title { display: none; }
 :host([data-prac-view-chrome="frame"]) .pane-header { pointer-events: none; }
 :host([data-prac-view-chrome="frame"]) .pane-header .actions,
 :host([data-prac-view-chrome="frame"]) .pane-header .actions * { pointer-events: auto; }
@@ -1420,19 +1422,26 @@ export function createFrame(
           },
           node.collapsed === true ? "\u25b8" : "\u25be",
         ),
-        createElement("span", {
-          "data-prac-stack-title": node.id,
-          onPointerDownCapture: (event: PointerDragEvent) => {
-            if (event.button !== 0) return;
-            const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
-            beginReorder(event, node.id, row?.parentElement ?? null);
+        createElement(
+          "span",
+          {
+            "data-prac-stack-title": node.id,
+            onPointerDownCapture: (event: PointerDragEvent) => {
+              if (event.button !== 0) return;
+              const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
+              beginReorder(event, node.id, row?.parentElement ?? null);
+            },
+            style: {
+              flex: "1 1 auto",
+              height: "100%",
+              cursor: "pointer",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            },
           },
-          style: {
-            flex: "1 1 auto",
-            height: "100%",
-            cursor: "pointer",
-          },
-        }),
+          viewLabel(viewId),
+        ),
       );
 
     const renderRegion = (node: RegionNode, dir: Dir, fill = false): ReactElement => {
