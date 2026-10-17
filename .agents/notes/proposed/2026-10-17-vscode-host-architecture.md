@@ -46,6 +46,14 @@ adaptor 侧已经有几个 step，但缺一张骨架：
 
 > **frame 不认识 VS Code；adaptor 不持有 / 修改 frame 的内部布局状态，只通过 `PracLayoutFace`（`ctx.pracLayout`）、`prac.view`、host element 这些窄契约协作；vendor 不认识 prac 的政策。**
 
+### 1.1 core workbench 与 extension
+
+- **core workbench** 是 adaptor 内部的 **host / engine**：固定 part、container context、editor group、overlay、workbench 服务；它可以直接用 `IViewsService` / `IEditorGroupsService` / `IContextViewService`。
+- **built-in extension / external extension** 是 **contributor**：只用 `vscode.*` 与 `contributes`；没有 DOM、没有内部服务；不能新增 part。
+- adaptor 在 **ownership / capability** 上区别对待：core 拥有 host，extension 只能贡献。
+- adaptor 在 **catalogue / `prac.view` / `hostFor` / action** 上不区别：core view 与 extension view 走同一套 view 契约。
+- **container context 是 core-owned，但不是 core-only**：它服务同一 container 里的 core view 与 extension view。
+
 ## 2. 层与包
 
 ```text
@@ -236,6 +244,7 @@ architecture 只定形状，不定机制：
 
 - container context 应位于 **adaptor 内部**，在 `ViewPane` 与 `PracLayoutFace` 之间；
 - 它要承接：view 集合、可见性、顺序、size、focus、container title / menu、`viewsWelcome`；
+- container context 是 core-owned，但不是 core-only；它服务同一 container 里的 core view 与 extension view；
 - 它不能把 part/pane composite 的 layout 带回 frame；
 - 具体用 headless real `ViewPaneContainer` 还是更小的 context，是 architecture 之后的 step；
 - 不沿用已 abandoned 的 container context note 的 B 结论。
@@ -252,6 +261,8 @@ architecture 只定形状，不定机制：
 - 不把 container 的 owner 放回 frame。
 - 不暴露 part host，也不把整块 VS Code part 当兜底；prac 只组合 view、editor placement、overlay。
 - 如果将来要“part 作为高级形态”，另立设计；不保留一个现在就在的 fallback。
+- 不按 core / extension 分 view 渲染路径；core view 与 extension view 走同一套 `prac.view` / `hostFor` / action。
+- 不把 core workbench 当普通 extension 重建；core 是 host，extension 是 contributor。
 
 ## 7. Steps
 
