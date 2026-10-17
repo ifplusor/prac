@@ -24,6 +24,8 @@
  * @module prac-client-ui-vscode-views/client
  */
 
+import { createElement, useLayoutEffect, useRef } from "react";
+import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "prac-client-vscode-host/client";
@@ -70,13 +72,57 @@ export function apply(ctx: Context): void {
             // view, then fills it — the bridge's direction, one level up.
             registered.set(view, {
               label: title,
-              dispose: slots.register(
-                { name: SLOT, id: view, label: title },
-                () => host.hostFor(view)() ?? null,
+              dispose: slots.register({ name: SLOT, id: view, label: title }, () =>
+                createElement(ViewWithTitle, { view }),
               ),
             });
           }
         };
+        /**
+         * Re-register a view after its own pane header reports a title.
+         *
+         * The catalogue title is the view descriptor's name; the pane header can
+         * show something else (the Explorer view shows the workspace). The pane's
+         * title is the one the person sees, so it wins; the catalogue entry stays
+         * the fallback until the view has mounted.
+         *
+         * @param view - the prac view id.
+         * @param label - the pane header's current title.
+         */
+        const retitle = (view: string, label: string): void => {
+          const record = registered.get(view);
+          if (record === undefined || record.label === label) return;
+          record.dispose();
+          registered.delete(view);
+          sync();
+        };
+        /**
+         * The view plus a title observer.
+         *
+         * The pane header lives in the frame's isolated shadow, which is also this
+         * component's root; observe that root rather than the global document. It
+         * is deliberately a **pull from the rendered chrome**, not a second view
+         * model: the pane header is the authority for the view's own title.
+         *
+         * @param props - the view id.
+         */
+        function ViewWithTitle({ view }: { view: string }): ReactElement | null {
+          const ref = useRef<HTMLDivElement | null>(null);
+          useLayoutEffect(() => {
+            const root = ref.current?.getRootNode();
+            if (!(root instanceof ShadowRoot)) return undefined;
+            const read = (): void => {
+              const label = root.querySelector(".pane-header .title")?.textContent?.trim();
+              if (label !== undefined && label !== "") retitle(view, label);
+            };
+            read();
+            const observer = new MutationObserver(read);
+            observer.observe(root, { childList: true, subtree: true, characterData: true });
+            return () => observer.disconnect();
+          }, [view]);
+          const View = host.hostFor(view);
+          return createElement("div", { ref, style: { display: "contents" } }, createElement(View));
+        }
         sync();
         const stop = host.onDidChangeCatalogue(sync);
         return () => {

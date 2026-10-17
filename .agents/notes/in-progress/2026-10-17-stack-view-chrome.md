@@ -84,7 +84,8 @@ B（保留 pane header）已被用户收回：它把 VS Code chrome 当成行头
 - prac 行头统一画：图标、标题、twisty、动作、hover、键盘；22px；`dsh:*` 与 `vscode:*` 一致。标题来自视图目录/title（不是 raw id）。
 - 折叠/重排/sash 全部在 prac 行头；点击/键盘折叠，拖动超过阈值重排。
 - **A 第一版（已落地）**：展开的 VS Code 行由 frame 画 title/twisty/fold/drag；pane 的 `.title`/`.icon`/`.twisty` 隐藏，`.actions` 保留；`verify:stack` / `containers` / `persistence` / `resize` / `split` / `bottom` 六门 live 全绿。
-- **待定**：fileView 的 frame 标题是目录 title `Folders`，pane header 原本是 `prac-dev`；以哪个作为视图标题需要定。另有 22px/2px、DSH 视图的 action slot 待接。
+- **标题来源（已定）**：视图自己的 pane 标题优先；`ui-vscode-views` 挂载后观察 `.pane-header .title` 并重新注册 `prac.view` label，catalogue title 只作回退。fileView 因此显示 `prac-dev` 而不是 `Folders`。
+- **待接**：22px/2px、DSH 视图的 action slot。
 - **视觉边界**：动作条可以完全用视图自己的（VS Code `.actions` / `ActionBar`、DSH 自己的 action bar），但 frame 的 title/twisty/icon 是 prac 实现，不承诺与 VS Code pane header 像素级一致。要完全一致只能整条保留 pane header（B）或逐项移植它的字体/间距/hover/背景/主题，后者不作为目标。
 - 动作槽采用**视图自持**（A 的第一版）：
   - frame 行头只保留 title/icon/twisty/fold/drag/sash + 右侧一个 action slot。
