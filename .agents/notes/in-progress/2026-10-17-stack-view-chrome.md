@@ -83,6 +83,7 @@ B（保留 pane header）已被用户收回：它把 VS Code chrome 当成行头
 - `prac.view` 增加 `headless`（视图不自带 chrome）与 `actions`（视图的动作模型/face）描述；`ui-vscode-views`/`vscode-host` 隐藏自己的 pane header 并提供动作。
 - prac 行头统一画：图标、标题、twisty、动作、hover、键盘；22px；`dsh:*` 与 `vscode:*` 一致。标题来自视图目录/title（不是 raw id）。
 - 折叠/重排/sash 全部在 prac 行头；点击/键盘折叠，拖动超过阈值重排。
+- **视觉边界**：动作条可以完全用视图自己的（VS Code `.actions` / `ActionBar`、DSH 自己的 action bar），但 frame 的 title/twisty/icon 是 prac 实现，不承诺与 VS Code pane header 像素级一致。要完全一致只能整条保留 pane header（B）或逐项移植它的字体/间距/hover/背景/主题，后者不作为目标。
 - 动作槽采用**视图自持**（A 的第一版）：
   - frame 行头只保留 title/icon/twisty/fold/drag/sash + 右侧一个 action slot。
   - VS Code 视图：pane 的 title/icon/twisty 隐藏，`.actions`（VS Code ActionBar / `view/title` 扩展动作）保留在 action slot 的位置；扩展生态原样。
