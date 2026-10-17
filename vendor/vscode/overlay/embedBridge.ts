@@ -81,6 +81,18 @@ export interface ViewCatalogueEntry {
  * unbound keeps working. Parts are single instances bound to their services, so
  * the embedder *moves* one between hosts and never recreates it.
  */
+/** One action offered by a view or container, as the embedder can render it. */
+export interface PracVscodeAction {
+  /** The command id; the embedder runs it through the workbench command service. */
+  readonly id: string;
+  readonly label: string;
+  /** The action's icon class, when it has one (the adapter owns the class/font). */
+  readonly icon?: string;
+  readonly enabled: boolean;
+  readonly checked: boolean;
+  readonly tooltip?: string;
+}
+
 export interface WorkbenchFace {
   /**
    * Create a registered view into an external host element.
@@ -131,6 +143,17 @@ export interface WorkbenchFace {
    * @returns a function that unsubscribes.
    */
   onDidChangeViews: (listener: () => void) => () => void;
+  /**
+   * The actions in one container's title menu (`MenuId.ViewContainerTitle`).
+   *
+   * The container owns these actions; the embedder draws the container bar and
+   * runs an action through {@link runCommand}. Keyed by the container id from
+   * {@link ViewCatalogueEntry.containerId}.
+   *
+   * @param containerId - the view container id.
+   * @returns the container's primary and secondary actions.
+   */
+  containerActions: (containerId: string) => readonly PracVscodeAction[];
   /**
    * Mount **one placement's editing surface** into an external host element.
    *

@@ -21,6 +21,18 @@ import type { ReactElement } from "react";
 export type { IWorkspaces } from "@deepseek-ai/dsh-api-workspace-controller/client";
 export type { ISessions } from "@deepseek-ai/dsh-api-session-controller/client";
 
+/** One action offered by a view or container, as this face exposes it. */
+export interface PracVscodeAction {
+  /** The command id; the consumer runs it through the workbench command service. */
+  readonly id: string;
+  readonly label: string;
+  /** The action's icon class, when it has one (the adapter owns the class/font). */
+  readonly icon?: string;
+  readonly enabled: boolean;
+  readonly checked: boolean;
+  readonly tooltip?: string;
+}
+
 /** The shared VS Code client mechanism this package publishes on the registry. */
 export interface PracVscodeFace {
   /**
@@ -47,6 +59,13 @@ export interface PracVscodeFace {
    * @returns a function that unsubscribes.
    */
   onDidChangeCatalogue(listener: () => void): () => void;
+  /**
+   * The actions in one container's title menu.
+   *
+   * @param containerId - the container id from a catalogue entry.
+   * @returns primary and secondary actions the frame can render.
+   */
+  containerActions(containerId: string): readonly PracVscodeAction[];
   /**
    * The mount component for any catalogue entry, by its view id.
    *

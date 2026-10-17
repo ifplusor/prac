@@ -107,6 +107,8 @@ export function apply(ctx: Context): void {
           "prac.view": { kind: "list", scope: "root" },
           // The action surface a view may fill; keyed by its `prac.view` id.
           "prac.viewActions": { kind: "keyed", scope: "root" },
+          // The action surface a container may fill; keyed by its container id.
+          "prac.containerActions": { kind: "keyed", scope: "root" },
         },
       },
       // The current session is the frame's business (it titles the page): the source comes

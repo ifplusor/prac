@@ -34,6 +34,7 @@ import type {
   EditorEntry,
   EmbedBridge,
   FilePlacement,
+  PracVscodeAction,
   WorkbenchFace,
   ViewCatalogueEntry,
 } from "prac-vscode";
@@ -323,6 +324,13 @@ export interface VscodeEmbedHandle {
    * @returns a function that unsubscribes.
    */
   onDidChangeViews(listener: () => void): () => void;
+  /**
+   * The actions in one container's title menu.
+   *
+   * @param containerId - the view container id.
+   * @returns primary and secondary actions, ready for an embedder action bar.
+   */
+  containerActions(containerId: string): readonly PracVscodeAction[];
   /**
    * The **float layer** component: where the app's own root is mounted.
    *
@@ -780,6 +788,8 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
     runCommand: (command: string, ...args: unknown[]): Promise<unknown> =>
       record.commands?.executeCommand(command, ...args) ?? Promise.resolve(undefined),
     capabilities: { editors, diagnostics },
+    containerActions: (containerId: string): readonly PracVscodeAction[] =>
+      record.face?.containerActions(containerId) ?? [],
     placements: () => record.face?.listPlacements() ?? [],
     enableTimelineProbe: (): void => {
       record.face?.enableTimelineProbe();

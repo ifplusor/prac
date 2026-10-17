@@ -254,6 +254,7 @@ export function apply(ctx: Context): void {
         stopViews();
       };
     },
+    containerActions: (containerId: string) => embed.containerActions(containerId),
     hostFor: (view: string): (() => ReactElement | null) => {
       const placement = placementOfFileView(view);
       if (placement !== undefined) return embed.file(placement.placement, placement.resource);

@@ -45,6 +45,8 @@ import { IHostService } from "../services/host/browser/host.js";
 import { INotificationService } from "../../platform/notification/common/notification.js";
 import { ICommandService } from "../../platform/commands/common/commands.js";
 import { IViewsService } from "../../workbench/services/views/common/viewsService.js";
+import type { IAction } from "../../base/common/actions.js";
+import { ViewContainerMenuActions } from "../../workbench/browser/parts/views/viewMenuActions.js";
 import { ViewsService } from "../../workbench/services/views/browser/viewsService.js";
 import { IEditorService } from "../services/editor/common/editorService.js";
 import { IEditorResolverService } from "../services/editor/common/editorResolverService.js";
@@ -307,6 +309,9 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   private readonly parts = new Map<string, Part>();
 
   /** Views the embedder mounted, by view id — one pane each, created on demand. */
+  /** Container title-menu actions, one per container, created lazily. */
+  private readonly containerMenuActions = new Map<string, ViewContainerMenuActions>();
+
   private readonly mountedViews = new Map<
     string,
     { pane: ViewPane; host: HTMLElement; frame: HTMLElement }
@@ -554,6 +559,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
             releaseView: (viewId: string) => this.releaseView(viewId),
             listViews: () => this.listViews(),
             onDidChangeViews: (listener: () => void) => this.onDidChangeViews(listener),
+            containerActions: (containerId: string) => this.containerActions(containerId),
             mountFileInto: (placement: string, resource: string, element: HTMLElement) =>
               this.mountFileInto(placement, resource, element),
             focusFile: (placement: string, resource: string) => this.focusFile(placement, resource),
@@ -867,6 +873,44 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     });
     mounted.pane.setVisible(false);
     mounted.pane.dispose();
+  }
+
+  /**
+   * The actions in one container's title menu.
+   *
+   * The menu is scoped to the container (`MenuId.ViewContainerTitle`), so it is
+   * created once per container and cached; the embedder draws the container bar
+   * and runs an action by id through the command service.
+   *
+   * @param containerId - the view container id.
+   * @returns the container's primary and secondary actions.
+   */
+  containerActions(containerId: string): readonly PracVscodeAction[] {
+    const container = this.viewDescriptorService.getViewContainerById(containerId);
+    if (!container) return [];
+    let menu = this.containerMenuActions.get(containerId);
+    if (!menu) {
+      const instantiationService = this.instantiationService;
+      if (!instantiationService) return [];
+      menu = this._register(
+        instantiationService.createInstance(
+          ViewContainerMenuActions,
+          this.mainContainer,
+          container,
+          undefined,
+        ),
+      );
+      this.containerMenuActions.set(containerId, menu);
+    }
+    const toAction = (action: IAction): PracVscodeAction => ({
+      id: action.id,
+      label: action.label,
+      icon: typeof action.class === "string" ? action.class : undefined,
+      enabled: action.enabled,
+      checked: action.checked,
+      tooltip: action.tooltip,
+    });
+    return [...menu.getPrimaryActions(), ...menu.getSecondaryActions()].map(toAction);
   }
 
   //#region View catalogue

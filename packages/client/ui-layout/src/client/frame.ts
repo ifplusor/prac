@@ -118,7 +118,13 @@ interface PointerDragEvent {
  * keys, so a dispatch to a key the frame did not declare is a type error.
  */
 type RenderSlot = import("@deepseek-ai/dsh-client-ui-slots").PropsRenderSlots<
-  "sidebar" | "main" | "rightbar" | "shell.overlay" | "prac.view" | "prac.viewActions"
+  | "sidebar"
+  | "main"
+  | "rightbar"
+  | "shell.overlay"
+  | "prac.view"
+  | "prac.viewActions"
+  | "prac.containerActions"
 >["renderSlot"];
 
 // ── the frame ─────────────────────────────────────────────────────────
@@ -1317,8 +1323,14 @@ export function createFrame(
         ),
       );
 
-    const containerBar = (node: RegionNode, activeId: string): ReactElement =>
-      createElement(
+    const containerBar = (node: RegionNode, activeId: string): ReactElement => {
+      // `activeId` is the selected path (`regionId/childId`); the action slot is
+      // keyed by the child's container id, not the path or the `container:` prefix.
+      const selectedId = activeId.slice(activeId.lastIndexOf("/") + 1);
+      const actionKey = selectedId.startsWith("container:")
+        ? selectedId.slice("container:".length)
+        : selectedId;
+      return createElement(
         "div",
         { key: "containers", "data-prac-container-bar": node.id, style: TAB_STRIP_STYLE },
         (node.children ?? []).map((child) =>
@@ -1349,7 +1361,22 @@ export function createFrame(
             child.label ?? viewLabel(child.id),
           ),
         ),
+        createElement(
+          "div",
+          {
+            key: "actions",
+            "data-prac-container-actions": actionKey,
+            style: {
+              display: "flex",
+              alignItems: "center",
+              flex: "0 0 auto",
+              height: "100%",
+            },
+          },
+          renderSlot("prac.containerActions", {}, { entryKey: actionKey }),
+        ),
       );
+    };
 
     /**
      * A region renders the child it selects, or — when it holds views — its
