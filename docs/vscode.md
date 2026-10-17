@@ -1,6 +1,6 @@
 # VS Code 的内部结构（参考）
 
-> 这篇记 VS Code 自己的结构：它内部怎么分成两半、平台服务是什么、扩展宿主协议跑在什么通道上、诊断是怎么走的、agent / MCP / 工具 / skill / prompt 分别做在哪一层。
+> 这篇记 VS Code 自己的结构：它内部怎么分成两半、平台服务是什么、扩展宿主协议跑在什么通道上、诊断是怎么走的、agent / MCP / 工具 / skill / prompt 分别做在哪一层，以及 UI 布局的 frame / part / container / pane / view 概念模型。
 > **prac 怎么用它**（用哪种运行形态、语言服务怎么接）在 [in-progress/2026-09-19-architecture.md](../.agents/notes/in-progress/2026-09-19-architecture.md) 与 [architecture.md](architecture.md)（§2.2 / §4.2）。broker 那份设计已降级为那篇里的 P1（[abandoned/2026-09-16-vscode-integration-transport.md](../.agents/notes/abandoned/2026-09-16-vscode-integration-transport.md)）。**行号与数字都指 pinned `1.137.0` checkout。**
 
 **内部怎么分成两半**：**渲染器**（renderer）跑 workbench 的界面；**扩展宿主**（extension host）是另一个进程，跑扩展代码，只能用 `vscode.*` API，**没有 DOM、没有界面**。扩展宿主协议的另一端叫"**主线程**"（main thread）——**它不是线程，是那套 RPC 里的角色名**（`MainContext.MainThreadXxx` ↔ `ExtHostContext.ExtHostXxx`），实现在 workbench 里，替扩展宿主做界面、编辑器、存储、诊断这些事。**两种运行形态下主线程都在渲染器里**，远程形态搬走的只有扩展宿主。
@@ -99,3 +99,94 @@ flowchart LR
 **⑤ agent host**（`platform/agentHost/**`）：把**外部 agent** 当被托管的进程跑起来——`node/copilot`、`node/claude`、`node/codex`、`node/localCommands`，并给它们一整套宿主设施：changeset（`agentHostChangesetService.ts`）、checkpoint（`agentHostCheckpointService.ts`）、plan review（`agentHostPlanReview.ts`）、git 和独立 worktree（`agentHostGitService.ts`；协议方法比如 `vscode/createAgentHostDetachedWorktree`，见 `agentHostExtensionProtocol.ts`）、文件系统 provider、customization、BYOK 模型（`agentHostByokLm.ts`）、managed rules / settings、OTel。
 
 **和扩展生态的关系**：上面每一项**都有对应的扩展声明点或 API**——用得最多的就是 Copilot 扩展（它同时声明了 `chatParticipants` / `languageModelTools` / `languageModelToolSets` / `languageModelChatProviders` / `mcpServerDefinitionProviders` / `chatSessions` / `chatAgents` / `chatPromptFiles` / `chatSkills`）。⇒ **在 VS Code 里，"支持 agent"本身就是一块扩展面**：core 出循环和注册表，VS Code 扩展出 agent、工具、模型、会话、定制。MCP 还多一条：VS Code 会从**别的工具**那里导入服务器定义（`ExternalDiscoverySource`：Claude Desktop / Copilot / Windsurf / Cursor 的全局与工作区配置，`mcpConfiguration.ts:54-55`），也会 discovery 工作区里的 mcp 配置（`discovery/workspaceDotMcpDiscovery.ts`）。
+
+## UI 布局概念模型：frame / part / container / pane / view
+
+> 这一节是 VS Code 自己的布局概念，不是 prac 的 region/view 模型。**词相同不代表概念相同**：prac 的 `container` 是具名子区域，VS Code 的 `ViewContainer` 是 part 内部的视图分组；prac 的 `view` 是唯一组合单位，VS Code 的 `ViewPane` 是 container 里的一个 pane。
+> 上游落点（pinned 1.137.0）：`src/vs/workbench/browser/layout.ts`、`src/vs/base/browser/ui/grid/grid.ts`、`src/vs/workbench/browser/part.ts`、`src/vs/workbench/browser/parts/**`、`src/vs/workbench/browser/parts/views/**`、`src/vs/base/browser/ui/splitview/**`、`src/vs/workbench/services/views/**`、`src/vs/workbench/browser/parts/editor/**`、`src/vs/platform/contextview/**`。
+
+### 1. 总图
+
+```text
+Workbench（frame）
+└─ Layout / Grid（顶层网格 + sash）
+   ├─ TitlebarPart
+   ├─ BannerPart
+   ├─ ActivitybarPart            ← 图标条：选择 container
+   ├─ SidebarPart                ← PaneCompositePart
+   │   └─ ViewPaneContainer      ← container 运行时（PaneComposite）
+   │       └─ PaneView（SplitView）
+   │           ├─ ViewPane       ← view：Open Editors
+   │           ├─ ViewPane       ← view：Folders
+   │           └─ ViewPane       ← view：Outline / Timeline
+   ├─ EditorPart                 ← 编辑器 part（平行链）
+   │   └─ EditorGroupView        ← editor group（不是 ViewPane）
+   │       ├─ EditorGroupModel
+   │       ├─ EditorTabsControl
+   │       └─ EditorPanes
+   ├─ PanelPart                  ← PaneCompositePart
+   │   └─ ViewPaneContainer      ← Problems / Output / Terminal / Debug Console
+   ├─ AuxiliaryBarPart           ← PaneCompositePart（secondary sidebar）
+   │   └─ ViewPaneContainer
+   └─ StatusbarPart
+
+Overlays（不是 Part）：
+  QuickInput / ContextView（菜单）/ Hover / Notifications / Dialogs
+```
+
+### 2. 五层
+
+| 层                                    | 是什么                                             | 谁拥有                                           | 例子                                                                           |
+| ------------------------------------- | -------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| **Workbench / Layout / Grid**         | 整个 frame：顶层网格、part 位置、sash、序列化      | `Layout` / `SerializableGrid`                    | 工作台窗口                                                                     |
+| **Part**                              | 顶层网格区域，有位置、最小/最大尺寸、自己的 chrome | `Part` 子类                                      | titlebar、activitybar、sidebar、editor、panel、auxiliarybar、statusbar、banner |
+| **PaneCompositePart**                 | 承载一个 container 的 part                         | `SidebarPart` / `PanelPart` / `AuxiliaryBarPart` | 侧栏、底栏、次级侧栏                                                           |
+| **ViewContainer / ViewPaneContainer** | 具名视图分组及其运行时                             | `ViewDescriptorService` + `ViewPaneContainer`    | Explorer、Search、SCM、Run、Problems、Output                                   |
+| **Pane / ViewPane**                   | container 里的可折叠项；view 是 `ViewPane`         | `PaneView` / `ViewPaneContainer`                 | Open Editors、Folders、Outline、Timeline                                       |
+
+- **`Part`**：顶层网格里的区域，不是 container。`TitlebarPart` / `BannerPart` / `ActivitybarPart` / `SidebarPart` / `PanelPart` / `AuxiliaryBarPart` / `EditorPart` / `StatusbarPart`。sash 在 `Layout`/`Grid` 层；part 自己只负责内容。
+- **`ViewContainer`**：描述（id、title、icon、order、location）；`ViewContainerModel`：模型（all / active / visible view descriptors、顺序、大小、可见性）；`ViewPaneContainer`：运行时（`PaneComposite` 子类，持有 `ViewPane`s）。
+- **`ViewContainerLocation`**：只有 `Sidebar` / `Panel` / `AuxiliaryBar`；**editor 不是 ViewContainerLocation**。
+- **`Pane`**：基础可折叠项（header + twisty + body）；`PaneView` 是 `SplitView<Pane>`；`ViewPane` 继承 `Pane`，是一个 view 的运行时；`ViewPaneContainer` 是 `PaneComposite`，内部用一个 `PaneView` 装 `ViewPane`s。
+- **`PaneComposite`**：container 的外壳：title bar + action bar + pane view；`ViewPaneContainer` 是它的子类。
+- **`ViewPane`**：header 有 view title、twisty、title actions；body 是 tree / webview / welcome。
+- **`EditorPart`**：独立 part，内部是 `EditorGroupView` 的 grid/splitview；`EditorGroupView` 不是 `ViewPane`，`EditorGroupModel` 管打开的编辑器、顺序、活动、preview/pinned，`EditorTabsControl` 是 group 内的 tab 条，`EditorPanes` 管编辑器面板。
+- **`ActivitybarPart`**：part，不是 container。每个 `ActivitybarItem` 对应一个 `ViewContainer`；点击后把该 container 打开到 sidebar/panel/auxiliarybar；container 的切换载体是 part 里的容器条 / `PaneCompositeBar`，不是 activity bar 自己装视图。
+
+### 3. 容易混淆的边界
+
+| 容易混淆                       | 实际                                                                  |
+| ------------------------------ | --------------------------------------------------------------------- |
+| part = container               | **不是**；part 是顶层区域，container 是 part 内部的视图分组           |
+| sidebar 就是 Explorer          | **不是**；sidebar 是 part，Explorer 是它当前承载的 container          |
+| activity bar 装视图            | **不是**；activity bar 只选择 container                               |
+| `ViewPaneContainer` 是 part    | **不是**；它是 `PaneComposite`，住在 `PaneCompositePart` 里           |
+| `ViewPane` 是 container        | **不是**；它是 container 里的一个 view                                |
+| editor group 是 view container | **不是**；editor 是另一条 part/group 链                               |
+| 菜单都是 part                  | **不是**；菜单是 ContextView overlay                                  |
+| 所有 pane 都是 view            | **不是**；`Pane` 是基类，`ViewPane` 才是 view；editor group 不是 pane |
+
+### 4. 菜单 / action 的 scope
+
+- `MenuId.ViewTitle`：**view** 的标题条 action（`ViewPane.menuActions`；`MenuId.ViewTitleContext` 是它的 `...` 上下文菜单）。
+- `MenuId.ViewContainerTitle`：**container** 的标题/菜单（`ViewPaneContainer` 这一层）。
+- `MenuId.ActivityBar` / `ActivityBarContext`：**activity bar** 的项与上下文菜单。
+- `ViewContainerModel` / `IViewsService`：container 的 view 集合、可见性、focus；`IViewDescriptorService` 是注册表。
+- 所以“Collapse Folders in Explorer”挂在 `ViewTitle` 菜单里，**owner 是 container**；`IViewsService.getViewWithId` 依赖 `ViewPaneContainer`，container 不存在时返回 `null`。
+
+### 5. Overlay
+
+- **全局 overlay**：Quick Input、Context View（菜单）、Hover、Notifications、Dialogs；不在 grid 里，住在 workbench 的 `mainContainer`（prac 里是 float host / `shell.overlay`），按视口坐标定位。
+- **view 内部的浮层**：补全列表、webview 自己的 overlay 等，归 view 自己的隔离盒子，不和全局 overlay 同层。
+
+### 6. 对 prac / adaptor 的含义
+
+- **part** → prac 的顶层区域/part（sidebar/panel/aux/editor）；
+- **container** → prac 的具名子区域（视觉分组）+ **`vscode-host` adaptor 内部的 container context**；
+- **view** → `prac.view`（唯一的组合单位）；
+- **pane** → view 的 header/body（实际的 `ViewPane`，挂在 frame 的隔离盒子里）；
+- **editor group** → `PracEditorHost` 那条平行链，不混进 view container。
+
+关键句：**part 是网格区域；container 是 part 里的视图分组；pane 是 container 里的可折叠项；view 是 pane 的一种；editor group 是另一条链；overlay 不在网格里。**
+
+prac 的 frame 不认 part/container；这些语义由 `vscode-host` 这个 adaptor 承接（设计见 [2026-10-17-view-container-ownership.md](../.agents/notes/proposed/2026-10-17-view-container-ownership.md)）。
