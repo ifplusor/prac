@@ -17,6 +17,7 @@ import {
   dragSnapTarget,
   HEADER_HEIGHT,
   ensureStackShape,
+  entryBoundary,
   regionNode,
   defaultTree,
   findNode,
@@ -39,6 +40,49 @@ import {
 const stateOf = (
   views: Record<string, { size?: number; collapsed?: boolean; max?: number; cachedSize?: number }>,
 ): LayoutState => ({ views }) as unknown as LayoutState;
+
+describe("entryBoundary (B2/B4/B7: which row boundaries can move)", () => {
+  const shaped = (folded: readonly string[] = []) =>
+    ensureStackShape({
+      tree: setRegionChildren(defaultTree(), "left", [
+        regionNode("left.explorer", 0, { label: "Explorer", stack: true }),
+      ]),
+      views: Object.fromEntries(
+        ["a", "b", "c"].map((id, order) => [
+          id,
+          { region: "left.explorer", order, hidden: false, collapsed: folded.includes(id) },
+        ]),
+      ),
+    } as unknown as LayoutState);
+  const row = (state: LayoutState, view: string): string => `left.explorer/stack/${view}`;
+
+  it("says yes for a boundary with open rows on both sides", () => {
+    const state = shaped();
+    const node = findNode(state.tree, "left.explorer");
+    expect(node?.type).toBe("split");
+    expect(node === null ? 0 : stackEntries(node).length).toBe(3);
+    // What the rows are actually called: the id is `<region>/stack/<view>`.
+    expect(stackEntries(node!).map((entry) => entry.id)).toEqual([
+      "left.explorer/stack/a",
+      "left.explorer/stack/b",
+      "left.explorer/stack/c",
+    ]);
+    expect(entryBoundary(state, row(state, "a"))).toBe(true);
+    expect(entryBoundary(state, row(state, "b"))).toBe(true);
+  });
+
+  it("says no for the last row: it has no boundary at all", () => {
+    const state = shaped();
+    expect(entryBoundary(state, row(state, "c"))).toBe(false);
+  });
+
+  it("says no when a whole side is folded", () => {
+    const state = shaped(["c"]);
+    // b's boundary looks down past the folded c — nothing there can take room.
+    expect(entryBoundary(state, row(state, "b"))).toBe(false);
+    expect(entryBoundary(state, row(state, "a"))).toBe(true);
+  });
+});
 
 describe("a stack keeps the name of the region it stands in for", () => {
   it("carries the label onto the split it becomes", () => {

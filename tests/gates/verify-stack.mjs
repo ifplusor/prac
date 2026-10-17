@@ -188,6 +188,12 @@ const checks = {
     bodyHeight(stacked, BASE_VIEW) > 40 &&
     bodyHeight(stacked, ADDED_VIEW) > 40,
   stackedPainted: stacked.distinctColours > 4,
+  // The row boundary is **usable** while there are open rows on both sides, and the last row has
+  // none at all (B2/B4/B7) — this is what gives the boundary its resize cursor.
+  boundariesFollowTheRows:
+    stacked.entries.length === 2 &&
+    stacked.entries[0]?.handle === "true" &&
+    stacked.entries[1]?.handle === "false",
   // 3. Folding keeps the header, drops the body, and gives the space away.
   foldKeepsHeaderDropsBody:
     entryOf(folded, ADDED_VIEW)?.collapsed === true &&

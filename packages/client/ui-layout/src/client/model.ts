@@ -1911,9 +1911,11 @@ export function structuralRegion(tree: LayoutNode, regionId: string): string {
 }
 
 export function findParentSplit(node: LayoutNode, id: string): SplitNode | null {
-  if (node.type !== "split") return null;
-  if (node.children.some((child) => child.id === id)) return node;
-  for (const child of node.children) {
+  const children = node.children ?? [];
+  if (node.type === "split" && children.some((child) => child.id === id)) return node;
+  // Regions have children too (the container layer), and a split may live anywhere under one — so the
+  // search goes through **both** kinds of node, not just splits.
+  for (const child of children) {
     const hit = findParentSplit(child, id);
     if (hit !== null) return hit;
   }
