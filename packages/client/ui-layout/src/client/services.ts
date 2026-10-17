@@ -313,8 +313,16 @@ export function createServices(
     },
     setViewCollapsed(viewId: string, collapsed: boolean): void {
       // Through the model: a view that lives in a stack **row** folds through its region, so writing
-      // the record here would leave the picture unchanged.
-      store.update((state) => setViewCollapsed(state, viewId, collapsed));
+      // the record here would leave the picture unchanged. E1 wants the height it is drawn at, and
+      // this face has the DOM the model deliberately does not: read the row before folding, so an
+      // unfold comes back to the drawn height instead of the floor.
+      const height =
+        typeof document === "undefined"
+          ? undefined
+          : document
+              .querySelector(`[data-prac-stack-entry="${CSS.escape(viewId)}"]`)
+              ?.getBoundingClientRect().height;
+      store.update((state) => setViewCollapsed(state, viewId, collapsed, height));
     },
     /** Collapse a region to nothing (remembering its size) or restore it. */
     setCollapsed(regionId: string, collapsed: boolean): void {

@@ -46,7 +46,8 @@ import {
 } from "./contract.js";
 import { mountIsolated, releaseIsolated } from "./isolation.js";
 import {
-  entryBoundary,
+  entrySashState,
+  type EntrySashState,
   activeChild,
   chosenChild,
   edgeRegion,
@@ -62,10 +63,10 @@ import {
   visibleViews,
   MIN_ENTRY,
   HEADER_HEIGHT,
+  altDragTarget,
   redistributeOnDrag,
+  stackDragAnchor,
   setViewCollapsed,
-  dragSnapTarget,
-  dragChainTarget,
   moveViewInRegion,
   resetStackBoundary,
   setEntryFolded,
@@ -257,6 +258,8 @@ const STACK_HEADER_STYLE: StyleObject = {
 const TAB_STRIP_STYLE: StyleObject = {
   display: "flex",
   alignItems: "stretch",
+  height: HEADER_HEIGHT,
+  boxSizing: "border-box",
   flex: "0 0 auto",
   overflow: "hidden",
   background: "rgba(127,127,127,0.10)",
@@ -267,7 +270,9 @@ const TAB_STYLE: StyleObject = {
   font: "inherit",
   fontSize: "11px",
   lineHeight: "1",
-  padding: "5px 10px",
+  height: HEADER_HEIGHT,
+  boxSizing: "border-box",
+  padding: "4px 10px",
   border: "none",
   borderRight: "1px solid rgba(127,127,127,0.22)",
   background: "transparent",
@@ -342,12 +347,6 @@ const TAB_ACTIVE_STYLE: StyleObject = {
   boxShadow: "inset 0 -1px 0 rgba(127,127,127,0.9)",
 };
 
-/** Whether two measurement maps say the same thing. */
-function sameSizes(a: ReadonlyMap<string, number>, b: ReadonlyMap<string, number>): boolean {
-  if (a.size !== b.size) return false;
-  for (const [key, value] of a) if (b.get(key) !== value) return false;
-  return true;
-}
 /**
  * The one stack-entry drag in flight, if any.
  *
@@ -397,17 +396,16 @@ function readStackRows(
 /**
  * One in-flight drag of a boundary between two **stack rows** (entry leaves).
  *
- * The rows come from the DOM (`readStackRows`), the arithmetic is the stack's own
- * (`dragSnapTarget` / `dragChainTarget` / `redistributeOnDrag`), and the writes go into the tree —
- * a row's height is its region's `size`, so the drawn height and the stored height are one number.
+ * The rows come from the DOM (`readStackRows`), the arithmetic is `redistributeOnDrag`, and the
+ * writes go into the tree — a row's height is its region's `size`, so the drawn height and the
+ * stored height are one number. A stack row does **not** snap: dragging changes heights only; the
+ * fold toggle is the one way a row folds (D3–D5).
  */
 interface EntryDragState {
   pointerId: number;
   draggedId: string;
   container: StackContainer;
   rows: { viewId: string; height: number; folded: boolean }[];
-  peers: { viewId: string; height: number; folded: boolean }[];
-  startRows: { viewId: string; height: number }[];
   start: number;
   origin: number;
   limit: number;
@@ -421,37 +419,51 @@ function startEntryDrag(
   rowId: string,
   pointerId: number,
   origin: number,
-  element: { setPointerCapture?(pointerId: number): void } | null,
+  element: {
+    setPointerCapture?(pointerId: number): void;
+    releasePointerCapture?(pointerId: number): void;
+  } | null,
 ): void {
   const rows = readStackRows(container);
-  const index = rows.findIndex((row) => row.viewId === rowId);
+  // The boundary under a folded row still resizes the stack: the nearest **open** row above it is
+  // the one that changes height, and the folded header moves with the boundary. Anchoring on the
+  // folded row itself made every move a no-op (`stackDragAnchor`).
+  const anchor = stackDragAnchor(rows, rowId);
+  if (anchor === undefined) return;
+  const index = rows.findIndex((row) => row.viewId === anchor.viewId);
   if (index < 0) return;
   const below = rows.slice(index + 1);
+  // The drag is computed from the rows **as drawn**: seed every open row with that number before
+  // the first move. Otherwise the untouched rows keep older claims, and `allocateStack`'s
+  // proportional pass re-fits them on every pointermove — the elastic bounce reported during a drag
+  // (only the rows the drag wrote matched what was on screen).
+  store.update((state) => {
+    let next = state;
+    for (const row of rows) {
+      if (!row.folded && row.height > 0) next = setEntryHeight(next, row.viewId, row.height);
+    }
+    return next;
+  });
   const drag: EntryDragState = {
     pointerId,
-    draggedId: rowId,
+    draggedId: anchor.viewId,
     container,
     rows,
-    peers: rows.filter((row) => !row.folded),
-    startRows: rows.map((row) => ({ viewId: row.viewId, height: row.height })),
-    start: rows[index]?.height ?? MIN_ENTRY,
+    start: anchor.height,
     origin,
     limit:
-      (rows[index]?.height ?? MIN_ENTRY) +
-      below.reduce((total, row) => total + Math.max(0, row.height - MIN_ENTRY), 0),
+      anchor.height + below.reduce((total, row) => total + Math.max(0, row.height - MIN_ENTRY), 0),
   };
   rowDrag = drag;
   const move = (moveEvent: PointerEvent): void => {
     if (rowDrag !== drag || moveEvent.pointerId !== drag.pointerId) return;
     moveEvent.preventDefault();
     const pointerDelta = moveEvent.clientY - drag.origin;
-    // Holding Alt drags the boundary as a plain resize: no folding, the way VS Code drops its snap
-    // state while the modifier is down (`splitview.ts:929`, design B6).
+    // B6: Alt narrows the drag to the adjacent view's half (`SplitView.onSashStart`'s alt branch);
+    // it changes heights only, never a fold.
     if (moveEvent.altKey === true) {
-      const target = Math.max(
-        MIN_ENTRY,
-        Math.min(drag.limit, Math.round(drag.start + pointerDelta)),
-      );
+      const wanted = altDragTarget(drag.rows, drag.draggedId, drag.start + pointerDelta);
+      const target = Math.max(MIN_ENTRY, Math.min(drag.limit, Math.round(wanted)));
       const sizes = redistributeOnDrag(drag.rows, drag.draggedId, target);
       store.update((state) => {
         let next = state;
@@ -460,43 +472,8 @@ function startEntryDrag(
       });
       return;
     }
-    const snap =
-      dragSnapTarget(drag.rows, drag.draggedId, pointerDelta) ??
-      ((): { viewId: string; collapsed: boolean } | undefined => {
-        const chain = dragChainTarget(
-          drag.rows,
-          drag.draggedId,
-          Math.round(drag.start + pointerDelta),
-        );
-        return chain === undefined ? undefined : { viewId: chain, collapsed: true };
-      })();
-    if (snap !== undefined) {
-      const atStart = drag.startRows.find((row) => row.viewId === snap.viewId)?.height;
-      store.update((state) =>
-        setEntryFolded(state, snap.viewId, snap.collapsed, atStart ?? MIN_ENTRY),
-      );
-      const rows = readStackRows(drag.container).filter(
-        (row) => !row.folded && !(snap.collapsed && row.viewId === snap.viewId),
-      );
-      drag.rows = rows;
-      drag.peers = rows;
-      requestAnimationFrame(() => {
-        if (rowDrag !== drag) return;
-        const settled = readStackRows(drag.container);
-        drag.rows = settled;
-        drag.peers = settled.filter((row) => !row.folded);
-      });
-      drag.start = rows.find((row) => row.viewId === drag.draggedId)?.height ?? drag.start;
-      drag.origin = moveEvent.clientY;
-      const below = drag.peers.slice(
-        drag.peers.findIndex((peer) => peer.viewId === drag.draggedId) + 1,
-      );
-      drag.limit = Math.max(
-        MIN_ENTRY,
-        drag.start + below.reduce((total, peer) => total + Math.max(0, peer.height - MIN_ENTRY), 0),
-      );
-      return;
-    }
+    // D3–D5: a stack row does not snap — the drag changes heights only, and the fold toggle is the
+    // one way a row folds.
     const wanted = Math.round(drag.start + pointerDelta);
     const target = Math.max(MIN_ENTRY, Math.min(drag.limit, wanted));
     const sizes = redistributeOnDrag(drag.rows, drag.draggedId, target);
@@ -506,8 +483,9 @@ function startEntryDrag(
       return next;
     });
   };
-  const stop = (upEvent: PointerEvent): void => {
-    if (rowDrag !== drag || upEvent.pointerId !== drag.pointerId) return;
+  /** End the drag from any source: pointerup, pointercancel, or the window losing focus. */
+  const finish = (): void => {
+    if (rowDrag !== drag) return;
     rowDrag = null;
     // "What is on screen is what the state says" (D2): the drag wrote the two rows it moved, and the
     // rows it did not touch may still claim a height the allocation has since re-fitted — write what
@@ -516,17 +494,30 @@ function startEntryDrag(
     store.update((state) => {
       let next = state;
       for (const row of settled) {
-        if (row.height > 0) next = setEntryHeight(next, row.viewId, row.height);
+        // A folded row is a header, not a height (J3): writing its 20px back would clamp it to the
+        // floor and leave a misleading `size` behind.
+        if (row.height > 0 && !row.folded) next = setEntryHeight(next, row.viewId, row.height);
       }
       return next;
     });
+    element?.releasePointerCapture?.(pointerId);
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", stop);
-    window.removeEventListener("pointercancel", stop);
+    window.removeEventListener("pointercancel", cancel);
+    window.removeEventListener("blur", cancel);
   };
-  window.addEventListener("pointermove", move);
+  const stop = (upEvent: PointerEvent): void => {
+    if (rowDrag !== drag || upEvent.pointerId !== drag.pointerId) return;
+    finish();
+  };
+  const cancel = (): void => {
+    if (rowDrag !== drag) return;
+    finish();
+  };
+  window.addEventListener("pointermove", move, { passive: false });
   window.addEventListener("pointerup", stop);
-  window.addEventListener("pointercancel", stop);
+  window.addEventListener("pointercancel", cancel);
+  window.addEventListener("blur", cancel);
   element?.setPointerCapture?.(pointerId);
 }
 
@@ -545,107 +536,77 @@ interface DragState {
   snap: { before?: SnapTarget; after?: SnapTarget };
 }
 
-/** Props of one draggable boundary. */
-interface SashProps {
-  store: LayoutStore;
+/** A generic (non-stack) split boundary drag: one at a time, driven from the window. */
+interface SashDragState extends DragState {
   splitId: string;
   dir: Dir;
-  index: number;
-  leftId: string;
-  rightId: string;
+}
+
+let sashDrag: SashDragState | null = null;
+let sashCleanup: (() => void) | null = null;
+
+/** What the split's present children are drawn at right now. */
+function readSplitDrawn(store: LayoutStore, splitId: string, dir: Dir): Map<string, number> {
+  const state = store.get();
+  const node = findNode(state.tree, splitId);
+  const drawn = new Map<string, number>();
+  if (node === null || node.type !== "split") return drawn;
+  for (const child of node.children.filter((entry) => isPresent(state, entry))) {
+    const element =
+      document.querySelector(`[data-prac-region="${CSS.escape(child.id)}"]`) ??
+      document.querySelector(`[data-prac-split="${CSS.escape(child.id)}"]`);
+    const rect = element?.getBoundingClientRect();
+    if (rect !== undefined) drawn.set(child.id, dir === "row" ? rect.width : rect.height);
+  }
+  return drawn;
 }
 
 /**
- * A draggable boundary between two adjacent regions.
+ * Start a split-boundary drag.
  *
- * Plain pointer events with capture: `pointerdown` records the two
- * neighbours and the split's measured extent, `pointermove` translates the
- * pointer delta into a size change, `pointerup` ends it. The rule set is the
- * one the spec fixes: fixed|fixed grows one and shrinks the other;
- * fixed|flex changes the fixed one; flex|flex does nothing. The flex side
- * keeps its own minimum, so a fixed neighbour can never squeeze it away.
- *
- * @param props - the boundary's identity and the two regions it separates.
+ * The move/up listeners live on the **window**, not on the sash element. A fast drag would otherwise
+ * depend on the pointer staying over a four-pixel element (or on pointer capture surviving a
+ * re-render that moves the sash under the pointer) — the reported "too fast and it stops" failure.
+ * The element only supplies the starting pixels; the window keeps delivering events until pointerup,
+ * pointercancel, or a window blur.
  */
-function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): ReactElement {
-  const drag = useRef<DragState | null>(null);
-
-  const onPointerDown = (event: PointerDragEvent): void => {
-    if (event.button !== 0) return;
-    const state = store.get();
-    const split = findSplit(state.tree, splitId);
-    const a = findRegion(state.tree, leftId);
-    const b = findRegion(state.tree, rightId);
-    // A collapsed block is deliberately draggable: that is how a drag brings it back (VS Code keeps
-    // the sash usable for exactly this, `splitview.ts:1417-1420`).
-    if (!split || !a || !b) return;
-    const element = event.currentTarget;
-    const container = element.parentElement;
-    if (a.entry === true && b.entry === true && container !== null) {
-      // Between two stack rows the boundary is the stack's own: floors, snap and the folding chain
-      // are the stack's semantics (B/C/D), not the generic two-region resize.
-      const rows = readStackRows(container as unknown as StackContainer);
-      const index = rows.findIndex((row) => row.viewId === a.id);
-      if (index < 0) return;
-      startEntryDrag(
-        store,
-        container as unknown as StackContainer,
-        a.id,
-        event.pointerId,
-        event.clientY,
-        element,
-      );
-      element.setPointerCapture(event.pointerId);
-      event.preventDefault();
-      return;
-    }
-    // A drag starts from the pixels: a flexible child claims nothing in the tree, so its drawn
-    // extent is the only honest starting point.
-    const drawn = readDrawn();
-    drag.current = {
-      pointerId: event.pointerId,
-      origin: dir === "row" ? event.clientX : event.clientY,
-      index,
-      drawn,
-      snap: snapTargets(state, splitId, index, drawn),
-    };
-    element.setPointerCapture(event.pointerId);
-    event.preventDefault();
+function startSashDrag(
+  store: LayoutStore,
+  splitId: string,
+  dir: Dir,
+  index: number,
+  pointerId: number,
+  origin: number,
+  element: {
+    setPointerCapture?(pointerId: number): void;
+    releasePointerCapture?(pointerId: number): void;
+  } | null,
+): void {
+  // A second pointerdown while a boundary drag is still live replaces it cleanly (no stale window
+  // listeners left behind by the first).
+  sashCleanup?.();
+  const drawn = readSplitDrawn(store, splitId, dir);
+  const drag: SashDragState = {
+    pointerId,
+    splitId,
+    dir,
+    index,
+    origin,
+    drawn,
+    snap: snapTargets(store.get(), splitId, index, drawn),
   };
-
-  /** What the split's present children are drawn at right now. */
-  const readDrawn = (): Map<string, number> => {
-    const state = store.get();
-    const node = findNode(state.tree, splitId);
-    const drawn = new Map<string, number>();
-    if (node === null || node.type !== "split") return drawn;
-    for (const child of node.children.filter((entry) => isPresent(state, entry))) {
-      const element =
-        document.querySelector(`[data-prac-region="${CSS.escape(child.id)}"]`) ??
-        document.querySelector(`[data-prac-split="${CSS.escape(child.id)}"]`);
-      const rect = element?.getBoundingClientRect();
-      if (rect !== undefined) drawn.set(child.id, dir === "row" ? rect.width : rect.height);
-    }
-    return drawn;
-  };
-
-  const onPointerMove = (event: PointerDragEvent): void => {
-    const current = drag.current;
-    if (!current || current.pointerId !== event.pointerId) return;
+  sashDrag = drag;
+  const move = (event: PointerEvent): void => {
+    if (sashDrag !== drag || event.pointerId !== drag.pointerId) return;
     event.preventDefault();
-    // While the frame re-renders after a block went in or out, the pixels under the pointer are not
-    // ours to read: the next move picks the drag up again from the new base.
-    if (current.settling === true) return;
+    if (drag.settling === true) return;
     const point = dir === "row" ? event.clientX : event.clientY;
-    const delta = point - current.origin;
+    const delta = point - drag.origin;
     // VS Code's sash snap, unless Alt is held (`splitview.ts:929`): past the limit the block goes
-    // away with its size remembered, and back across the limit it returns. The band between the two
-    // limits is the block's own minimum, which is what keeps the flip from chattering.
+    // away with its size remembered, and back across the limit it returns.
     if (!event.altKey) {
-      const before = current.snap.before;
-      const after = current.snap.after;
-      // What the drag would leave the block with: it grows with a positive delta on the near side and
-      // shrinks with one on the far side. Under half its own minimum it goes away; over it, it returns.
+      const before = drag.snap.before;
+      const after = drag.snap.after;
       const wantedBeforeHidden = before !== undefined && before.size + delta < before.half;
       const wantedAfterHidden = after !== undefined && after.size - delta < after.half;
       const flipBefore = before !== undefined && before.hidden !== wantedBeforeHidden;
@@ -661,16 +622,14 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
           }
           return next;
         });
-        // The boundary moved on its own: the rest of the drag starts from here, with the pixels and
-        // the limits re-read once the frame has re-rendered.
-        current.settling = true;
+        drag.settling = true;
         const from = point;
         requestAnimationFrame(() => {
-          if (drag.current !== current) return;
-          current.settling = false;
-          current.origin = from;
-          current.drawn = readDrawn();
-          current.snap = snapTargets(store.get(), splitId, current.index, current.drawn);
+          if (sashDrag !== drag) return;
+          drag.settling = false;
+          drag.origin = from;
+          drag.drawn = readSplitDrawn(store, splitId, dir);
+          drag.snap = snapTargets(store.get(), splitId, drag.index, drag.drawn);
         });
         return;
       }
@@ -680,17 +639,127 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
     // proportion (the default), `expand` pushes the neighbour only. `drawn` stays the base the drag
     // started from: `delta` is measured from the same pointer, so both have to be one coordinate.
     store.update((state) =>
-      resizeBoundary(state, splitId, current.index, delta, "distribute", current.drawn),
+      resizeBoundary(state, splitId, drag.index, delta, "distribute", drag.drawn),
     );
   };
+  const cleanup = (): void => {
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", finish);
+    window.removeEventListener("pointercancel", finish);
+    window.removeEventListener("blur", cancel);
+    if (sashDrag === drag) sashDrag = null;
+    if (sashCleanup === cleanup) sashCleanup = null;
+    element?.releasePointerCapture?.(drag.pointerId);
+  };
+  const finish = (event?: PointerEvent): void => {
+    if (sashDrag !== drag) return;
+    if (event !== undefined && event.pointerId !== drag.pointerId) return;
+    cleanup();
+  };
+  const cancel = (): void => finish();
+  sashCleanup = cleanup;
+  window.addEventListener("pointermove", move, { passive: false });
+  window.addEventListener("pointerup", finish);
+  window.addEventListener("pointercancel", finish);
+  window.addEventListener("blur", cancel);
+  element?.setPointerCapture?.(pointerId);
+}
 
-  const onPointerUp = (event: PointerDragEvent): void => {
-    const current = drag.current;
-    if (!current) return;
-    drag.current = null;
-    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+/** Props of one draggable boundary. */
+interface SashProps {
+  store: LayoutStore;
+  splitId: string;
+  dir: Dir;
+  index: number;
+  leftId: string;
+  rightId: string;
+  /** A stack row boundary's `SashState`; the generic region boundaries leave it undefined. */
+  stackState?: EntrySashState;
+  /** Where the boundary sits along the split's axis, in px (the preceding children's extent). */
+  offset: number;
+}
+
+/**
+ * A draggable boundary between two adjacent regions.
+ *
+ * The sash is an **absolute overlay**: it takes no flex space, stays transparent until hovered or
+ * dragged, and sits on the shared edge. Its drag is driven from the window (`startSashDrag`), so a
+ * fast pointer cannot outrun a four-pixel element. The rule set is the one the spec fixes:
+ * fixed|fixed grows one and shrinks the other; fixed|flex changes the fixed one; flex|flex does
+ * nothing. The flex side keeps its own minimum, so a fixed neighbour can never squeeze it away.
+ *
+ * @param props - the boundary's identity and the two regions it separates.
+ */
+function Sash({
+  store,
+  splitId,
+  dir,
+  index,
+  leftId,
+  rightId,
+  stackState,
+  offset,
+}: SashProps): ReactElement {
+  const sashRef = useRef<HTMLDivElement | null>(null);
+  const half = SASH_SIZE / 2;
+  // The model's offset is the initial guess; the DOM is the authority for the exact pixel. The
+  // previous sibling is the region to the left/above the boundary (the sash is rendered after it).
+  useLayoutEffect(() => {
+    const element = sashRef.current;
+    const previous = element?.previousElementSibling;
+    const parent = element?.parentElement;
+    if (!element || !previous || !parent) return;
+    const parentBox = parent.getBoundingClientRect();
+    const previousBox = previous.getBoundingClientRect();
+    if (dir === "row") element.style.left = `${previousBox.right - parentBox.left - half}px`;
+    else element.style.top = `${previousBox.bottom - parentBox.top - half}px`;
+  });
+  const onPointerDown = (event: PointerDragEvent): void => {
+    if (event.button !== 0) return;
+    const state = store.get();
+    const split = findSplit(state.tree, splitId);
+    const a = findRegion(state.tree, leftId);
+    const b = findRegion(state.tree, rightId);
+    // A collapsed block is deliberately draggable: that is how a drag brings it back (VS Code keeps
+    // the sash usable for exactly this, `splitview.ts:1417-1420`).
+    if (!split || !a || !b) return;
+    const element = event.currentTarget;
+    const container = element.parentElement;
+    if (a.entry === true && b.entry === true && container !== null) {
+      // Between two stack rows the boundary is the stack's own: floors and the four `SashState`
+      // values are the stack's semantics (B/C/D), not the generic two-region resize.
+      const rows = readStackRows(container as unknown as StackContainer);
+      const at = rows.findIndex((row) => row.viewId === a.id);
+      if (at < 0) return;
+      const state = entrySashState(
+        store.get(),
+        a.id,
+        new Map(rows.map((row) => [row.viewId, row.height])),
+      );
+      if (state === "disabled") return;
+      startEntryDrag(
+        store,
+        container as unknown as StackContainer,
+        a.id,
+        event.pointerId,
+        event.clientY,
+        element,
+      );
+      event.preventDefault();
+      return;
     }
+    // The move/up listeners live on the window (`startSashDrag`): a fast drag cannot outrun a
+    // four-pixel element or a re-render that moves it.
+    startSashDrag(
+      store,
+      splitId,
+      dir,
+      index,
+      event.pointerId,
+      dir === "row" ? event.clientX : event.clientY,
+      element,
+    );
+    event.preventDefault();
   };
 
   const onDoubleClick = (): void => {
@@ -700,7 +769,7 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
     if (a?.entry !== true || b?.entry !== true) {
       // A region boundary: a reset never lands on a **hidden** neighbour (VS Code returns early
       // there, `splitview.ts:1193-1199`); otherwise the split's blocks share what there is evenly.
-      const drawn = readDrawn();
+      const drawn = readSplitDrawn(store, splitId, dir);
       const { before, after } = snapTargets(state, splitId, index, drawn);
       if (before?.hidden === true || after?.hidden === true) return;
       store.update((next) => distributeSplitEvenly(next, splitId, drawn));
@@ -719,17 +788,24 @@ function Sash({ store, splitId, dir, index, leftId, rightId }: SashProps): React
     });
   };
 
+  // The sash **overlays** the boundary instead of being a flex child: the regions fill the split,
+  // and the four-pixel strip is centered on the shared edge. It is transparent until hovered (or
+  // dragged), like VS Code's `monaco-sash`.
+  const style: StyleObject =
+    dir === "row"
+      ? { left: offset - half, top: 0, bottom: 0, width: SASH_SIZE }
+      : { top: offset - half, left: 0, right: 0, height: SASH_SIZE };
   return createElement("div", {
     "data-prac-sash": `${splitId}:${index}`,
+    ref: sashRef,
     onDoubleClick,
     "data-prac-sash-dir": dir,
     "data-prac-sash-left": leftId,
     "data-prac-sash-right": rightId,
+    ...(stackState === undefined ? {} : { "data-prac-stack-sash-state": stackState }),
     "aria-hidden": "true",
+    style,
     onPointerDown,
-    onPointerMove,
-    onPointerUp,
-    onPointerCancel: onPointerUp,
   });
 }
 
@@ -739,13 +815,13 @@ const FRAME_STYLES = `
 [data-prac-overlay-layer] > * { pointer-events: auto; }
 [data-prac-region] { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
 [data-prac-region] > * { flex: 1 1 auto; min-height: 0; }
-[data-prac-sash] { flex: 0 0 ${SASH_SIZE}px; position: relative; z-index: 5; touch-action: none; user-select: none; background: transparent; }
+[data-prac-sash] { position: absolute; z-index: 5; touch-action: none; user-select: none; background: transparent; }
 [data-prac-sash][data-prac-sash-dir="row"] { cursor: col-resize; }
 [data-prac-sash][data-prac-sash-dir="column"] { cursor: row-resize; }
-[data-prac-sash]:hover { background: rgba(127, 127, 127, 0.35); }
-[data-prac-stack-entry]::after { content: ""; cursor: default; position: absolute; left: 0; right: 0; bottom: 0; height: ${SASH_SIZE}px; z-index: 5; cursor: row-resize; }
-[data-prac-stack-entry][data-prac-stack-handle="true"]::after { cursor: row-resize; }
-[data-prac-stack-entry][data-prac-stack-handle="true"]:hover::after { background: rgba(127, 127, 127, 0.35); }
+[data-prac-sash][data-prac-stack-sash-state="at-minimum"] { cursor: s-resize; }
+[data-prac-sash][data-prac-stack-sash-state="at-maximum"] { cursor: n-resize; }
+[data-prac-sash][data-prac-stack-sash-state="disabled"] { cursor: default; pointer-events: none; }
+[data-prac-sash]:hover, [data-prac-sash]:active { background: rgba(127, 127, 127, 0.35); }
 `;
 
 /** Inject the frame's stylesheet once. */
@@ -860,39 +936,6 @@ export function createFrame(
     const state = useLayout(store);
     const frameRef = useRef<HTMLDivElement | null>(null);
 
-    // Track the frame's own box (not the window).
-    /** What each stack entry measured on the previous frame (see `allocateStack`). */
-    const measuredEntries = useRef<Map<string, number>>(new Map());
-    /**
-     * What each region measured.
-     *
-     * `allocateStack` needs the height the stack **really** has: the frame's own size table comes
-     * from the previous frame and a stack that overflowed once keeps reporting the too-large
-     * number (measured: 756 against a region that is 734 tall).
-     */
-    const measuredRegions = useRef<Map<string, number>>(new Map());
-    /** Bumped when the measurements changed, so the allocation runs again with the real numbers. */
-    const [measureVersion, setMeasureVersion] = useState(0);
-    void measureVersion;
-    useLayoutEffect(() => {
-      const entries = new Map<string, number>();
-      for (const node of document.querySelectorAll<HTMLElement>("[data-prac-stack-entry]")) {
-        const viewId = node.getAttribute("data-prac-stack-entry");
-        if (viewId !== null) entries.set(viewId, Math.round(node.getBoundingClientRect().height));
-      }
-      const regions = new Map<string, number>();
-      for (const node of document.querySelectorAll<HTMLElement>("[data-prac-region]")) {
-        const regionId = node.getAttribute("data-prac-region");
-        if (regionId !== null)
-          regions.set(regionId, Math.round(node.getBoundingClientRect().height));
-      }
-      const changed =
-        !sameSizes(entries, measuredEntries.current) ||
-        !sameSizes(regions, measuredRegions.current);
-      measuredEntries.current = entries;
-      measuredRegions.current = regions;
-      if (changed) setMeasureVersion((version) => version + 1);
-    });
     useLayoutEffect(() => {
       const element = frameRef.current;
       if (!element) return undefined;
@@ -921,6 +964,9 @@ export function createFrame(
     }, []);
 
     const sizes = resolveSizes(state, state.viewportWidth, state.viewportHeight);
+    // The `SashState` tests are about what the rows are **drawn** at: a flexible row claims 0 in the
+    // tree, so the claim alone cannot answer B2. `sizes` is this render's allocation.
+    const rowHeights = new Map<string, number>([...sizes].map(([id, box]) => [id, box.height]));
 
     /**
      * A region renders the front-most visible view from the views table.
@@ -1348,6 +1394,8 @@ export function createFrame(
         );
       }
       const views = visibleViews(state, node.id);
+      const sashState: EntrySashState =
+        node.entry === true ? entrySashState(state, node.id, rowHeights) : "disabled";
       return createElement(
         "div",
         {
@@ -1366,9 +1414,18 @@ export function createFrame(
                   if (event.clientY < rect.bottom - SASH_SIZE) return;
                   const container = element.parentElement;
                   if (container === null) return;
-                  // The **last** row has no boundary (design B7): its bottom edge is the stack's.
+                  // The **last** row has no boundary (B7), and a `Disabled` one must not start a
+                  // drag at all — no resize, no fallback. Only `Enabled`/`AtMinimum`/`AtMaximum`
+                  // reach the starter.
                   const rows = readStackRows(container as unknown as StackContainer);
-                  if (rows.findIndex((row) => row.viewId === node.id) >= rows.length - 1) return;
+                  const at = rows.findIndex((row) => row.viewId === node.id);
+                  if (at < 0 || at >= rows.length - 1) return;
+                  const state = entrySashState(
+                    store.get(),
+                    node.id,
+                    new Map(rows.map((row) => [row.viewId, row.height])),
+                  );
+                  if (state === "disabled") return;
                   startEntryDrag(
                     store,
                     container as unknown as StackContainer,
@@ -1402,11 +1459,11 @@ export function createFrame(
                 // way); the frame's own helpers key on the region, in `data-prac-stack-row`.
                 "data-prac-stack-entry": views[0] ?? "",
                 "data-prac-stack-row": node.id,
-                // The boundary under this row: it exists unless this is the **last** row (B7), and it
-                // is **usable** only when a row above can still give and a row below can still take
-                // (B2/B4) — so a run of folded rows has no usable boundary at its edge, and a stack
-                // that is folded shut has none at all. Readers ask with this marker.
-                "data-prac-stack-handle": entryBoundary(state, node.id) ? "true" : "false",
+                // The boundary under this row follows `SashState` (B2/B4): `Disabled` has no handle
+                // or resize cursor; `AtMinimum`/`AtMaximum` keep the handle and a **directional**
+                // cursor; `Enabled` is the ordinary resize. Readers ask with these markers.
+                "data-prac-stack-handle": sashState === "disabled" ? "false" : "true",
+                "data-prac-stack-sash-state": sashState,
                 "data-prac-stack-collapsed": node.collapsed === true ? "true" : "false",
               }
             : {}),
@@ -1452,7 +1509,7 @@ export function createFrame(
     };
 
     /**
-     * Recursive: a split interleaves its present children with sashes.
+     * Recursive: a split overlays its present children's boundaries with sashes.
      *
      * @param node - the subtree to render.
      * @param dir - the parent split's axis.
@@ -1461,6 +1518,9 @@ export function createFrame(
       if (node.type === "region") return renderRegion(node, dir);
       const present = node.children.filter((child) => isPresent(state, child));
       const parts: ReactElement[] = [];
+      // The sashes are absolutely positioned, so the children flow edge to edge and the boundary
+      // offset is the sum of the extents before it (the allocation, not the DOM).
+      let offset = 0;
       present.forEach((child, index) => {
         if (index > 0) {
           const before = edgeRegion(state, present[index - 1], "right");
@@ -1475,11 +1535,17 @@ export function createFrame(
                 index,
                 leftId: before.id,
                 rightId: after.id,
+                offset,
+                ...(before.entry === true && after.entry === true
+                  ? { stackState: entrySashState(state, before.id, rowHeights) }
+                  : {}),
               }),
             );
           }
         }
         parts.push(renderNode(child, node.dir));
+        const box = sizes.get(child.id);
+        offset += node.dir === "row" ? (box?.width ?? 0) : (box?.height ?? 0);
       });
       return createElement(
         "div",

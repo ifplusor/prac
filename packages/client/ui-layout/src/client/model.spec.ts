@@ -4,7 +4,6 @@ import {
   CENTER_REGION,
   BOTTOM_REGION,
   DEFAULT_MIN,
-  SASH_SIZE,
   type LayoutNode,
   type LayoutState,
   type RegionNode,
@@ -19,7 +18,6 @@ import {
   freshNodeId,
   frontView,
   isPresent,
-  isStacked,
   nodeBasis,
   place,
   pruneEmbedderRegions,
@@ -182,11 +180,6 @@ describe("placement", () => {
     expect(rows(two.tree)).toBeGreaterThan(0);
   });
 
-  it("never calls a non-stack region stacked, even with two views", () => {
-    const two = place(place(state(), "a", CENTER_REGION), "b", CENTER_REGION);
-    expect(isStacked(two, findRegion(two.tree, CENTER_REGION)!)).toBe(false);
-  });
-
   it("forgets a view's record entirely, and the child it had of its own", () => {
     // A file view whose file the app no longer has open has nothing to come back to; the
     // record is what the frame persists, and a fresh placement of that file is named
@@ -322,13 +315,18 @@ describe("resolveSizes", () => {
   it("gives fixed tracks their size and shares the rest with the flexible one", () => {
     const current = place(place(state(), "dsh:sidebar", "left"), "vscode:view:b", "right");
     const boxes = resolveSizes(current, 1000, 800);
-    // Three present children, two sashes; the centre absorbs what is left.
+    // Sashes are overlays; the centre absorbs only what the tracks leave.
     expect(boxes.get("left")).toEqual({ width: 280, height: 800 });
     expect(boxes.get("right")).toEqual({ width: 420, height: 800 });
-    expect(boxes.get(CENTER_REGION)?.width).toBe(1000 - 280 - 420 - 2 * SASH_SIZE);
+    expect(boxes.get(CENTER_REGION)?.width).toBe(1000 - 280 - 420);
   });
 
-  it("leaves an empty fixed track out of the box map, and its sash with it", () => {
+  it("records a split's own box for its boundary overlays", () => {
+    const boxes = resolveSizes(state(), 1000, 800);
+    expect(boxes.get("root")).toEqual({ width: 1000, height: 800 });
+  });
+
+  it("leaves an empty fixed track out of the box map", () => {
     const boxes = resolveSizes(state(), 1000, 800);
     expect(boxes.has("left")).toBe(false);
     expect(boxes.has("right")).toBe(false);
@@ -340,10 +338,10 @@ describe("resolveSizes", () => {
     const current = place(place(state(), "dsh:sidebar", "left"), "terminal", BOTTOM_REGION);
     const boxes = resolveSizes(current, 1000, 800);
     expect(boxes.get(BOTTOM_REGION)).toEqual({ width: 1000, height: 240 });
-    expect(boxes.get("left")?.height).toBe(800 - 240 - SASH_SIZE);
+    expect(boxes.get("left")?.height).toBe(800 - 240);
   });
 
-  it("gives a collapsed region no extent, sash still counted", () => {
+  it("gives a collapsed region no extent", () => {
     const current = setCollapsed(state(), "right", true);
     const boxes = resolveSizes(current, 1000, 800);
     expect(boxes.get("right")?.width).toBe(0);

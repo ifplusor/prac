@@ -104,8 +104,8 @@ describe("resolveSizes", () => {
       tree: split([box("a", 0, { min: 40 }), box("b", 0, { min: 40 })]),
       views: {},
     } as unknown as LayoutState;
-    // 900 less the one sash between them.
-    expect(widths(state, ["a", "b"])).toEqual([447.5, 447.5]);
+    // Sashes overlay the boundary; the regions share all 900.
+    expect(widths(state, ["a", "b"])).toEqual([450, 450]);
   });
 });
 
@@ -118,9 +118,9 @@ describe("resizeBoundary", () => {
 
   it("distributes a drag over the whole side, in proportion", () => {
     const next = resizeBoundary(three(), "root", 1, 90);
-    // The drag writes those sizes; what is drawn is them re-fitted to the frame less its sashes
-    // (`resolveSizes` is the only thing that decides pixels).
-    expect(widths(next, ["a", "b", "c"])).toEqual([390, 255, 245]);
+    // The drag writes those sizes; what is drawn is them re-fitted to the frame (`resolveSizes`
+    // is the only thing that decides pixels). Sashes overlay, so they consume no extent.
+    expect(widths(next, ["a", "b", "c"])).toEqual([390, 255, 255]);
   });
 
   it("clamps the drag to what the two sides can do", () => {
@@ -130,7 +130,32 @@ describe("resizeBoundary", () => {
     } as unknown as LayoutState;
     const next = resizeBoundary(state, "root", 1, 90);
     // `a` cannot take more than 50, and nothing may end up under its floor either.
-    expect(widths(next, ["a", "b", "c"])).toEqual([350, 275, 265]);
+    expect(widths(next, ["a", "b", "c"])).toEqual([350, 275, 275]);
+  });
+
+  it("does not move when the side that should shrink is already at its floor", () => {
+    const state = {
+      tree: split([box("a", 300), box("b", 40), box("c", 40)]),
+      views: {},
+    } as unknown as LayoutState;
+    // Growing a needs b/c to shrink, and they cannot: the drag is a no-op, not a partial move.
+    expect(resizeBoundary(state, "root", 1, 90)).toBe(state);
+  });
+
+  it("does not move when the side that should grow is already at its ceiling", () => {
+    const state = {
+      tree: split([box("a", 300, { max: 300 }), box("b", 300), box("c", 300)]),
+      views: {},
+    } as unknown as LayoutState;
+    expect(resizeBoundary(state, "root", 1, 90)).toBe(state);
+  });
+
+  it("does not move up when the up side is already at its floor", () => {
+    const state = {
+      tree: split([box("a", 40), box("b", 300), box("c", 300)]),
+      views: {},
+    } as unknown as LayoutState;
+    expect(resizeBoundary(state, "root", 1, -90)).toBe(state);
   });
 
   it("pushes only the neighbour in `expand`, and by priority when it must choose", () => {
@@ -144,7 +169,7 @@ describe("resizeBoundary", () => {
     } as unknown as LayoutState;
     // The high-priority neighbour is considered first, so it is the one that gives way.
     expect(widths(resizeBoundary(state, "root", 1, 90, "expand"), ["a", "b", "c"])).toEqual([
-      390, 300, 200,
+      390, 300, 210,
     ]);
   });
 

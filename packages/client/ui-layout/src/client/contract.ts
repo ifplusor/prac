@@ -84,7 +84,12 @@ export interface RegionNode {
   size: number;
   /** Whether the region absorbs the split's free space rather than a fixed size. */
   flex: boolean;
-  /** Whether the region renders at 0px while staying present. */
+  /**
+   * Whether the region renders at 0px while staying present.
+   *
+   * A **stack row** (`entry`) is the exception: it is a header, drawn at `HEADER_HEIGHT`, and its
+   * `size` is 0 rather than a height (the design's E1/J3). An ordinary region collapses to 0.
+   */
   collapsed: boolean;
   /** The size to restore when expanding. */
   cachedSize: number;
@@ -237,9 +242,10 @@ export type LayoutNode = RegionNode | SplitNode;
 /** Where one view sits, and in what order inside its region. */
 export interface ViewRecord {
   /**
-   * The height this view's entry takes in a **stack**, once a person has dragged its bottom edge.
-   * Absent means "share the height with the other entries". While the entry is **folded** this is
-   * not a height at all: a folded row is a header, and what it remembers lives in `cachedSize`
+   * The height this view **declares** for its row, or the height a lone (melted) view keeps while
+   * it has no row. A row's authoritative height is the leaf's `size`; this field only seeds it and
+   * waits while the view is not a row. Absent means "no claim" (share the remaining height); while
+   * the view is **folded** this is 0/not a height, and what it remembers lives in `cachedSize`
    * (VS Code keeps `size` and `_cachedVisibleSize` apart, `splitview.ts:221-246`).
    */
   size?: number;
@@ -261,17 +267,28 @@ export interface ViewRecord {
    */
   max?: number;
   region: string;
+  /**
+   * The region's open order.
+   *
+   * A stack stores the same order in its split's children and renumbers this field on a reorder
+   * (F7), so the tab strip and the stack cannot drift when a region changes mode.
+   */
   order: number;
   hidden: boolean;
-  /** Whether the view's body is folded away inside a stack (its header stays). */
+  /**
+   * Whether the view's body is folded away inside a stack (its header stays).
+   *
+   * A view without a row (the one-view interlude after a melt) keeps the fold here until a second
+   * view turns the region back into a stack.
+   */
   collapsed?: boolean;
   /** Chrome the view's declarer set on it (tab dot, preview italic). */
   flags?: ViewFlags;
   /**
    * Whether this view is the one its region renders.
    *
-   * **Separate from `order` on purpose**: `order` is the tab strip's position (open
-   * order, changed by dragging a tab) and this is what "active" means (changed by
+   * **Separate from `order` on purpose**: `order` is the region's open order (the tab strip's
+   * position, kept in sync with a stack's rows) and this is what "active" means (changed by
    * clicking a tab or by placing a view). VS Code keeps the two apart — its tabs do not
    * move when the active editor changes — and merging them made the strip MRU.
    */
@@ -335,8 +352,8 @@ export type StyleObject = Record<string, string | number>;
 /** A box standing in for a region the resolver has not measured yet. */
 export const ZERO_BOX: Box = { width: 0, height: 0 };
 
-/** Width/height of a sash in px. Kept in step with FRAME_STYLES. */
-export const SASH_SIZE = 5;
+/** Width/height of a sash's hit area in px (VS Code: `--vscode-sash-size` 4). Kept in step with FRAME_STYLES. */
+export const SASH_SIZE = 4;
 /** A region's minimum size in px unless it declares its own. */
 export const DEFAULT_MIN = 120;
 /** The centre work area stays wider than a side track can usefully be. */

@@ -14,7 +14,6 @@ import {
   CENTER_MIN,
   CENTER_REGION,
   DEFAULT_MIN,
-  SASH_SIZE,
   type LayoutPriority,
   type Sizing,
   type Box,
@@ -162,9 +161,11 @@ export function findRegion(node: LayoutNode, id: string): RegionNode | null {
  * @returns the split node, or null.
  */
 export function findSplit(node: LayoutNode, id: string): SplitNode | null {
-  if (node.type !== "split") return null;
-  if (node.id === id) return node;
-  for (const child of node.children) {
+  if (node.type === "split" && node.id === id) return node;
+  // A split may live **under a region** (the container layer): a stack takes a container child's
+  // place, and a selectable region's children are where that split is. The search has to go through
+  // both kinds of node, the same way `findParentSplit` does.
+  for (const child of childNodes(node)) {
     const found = findSplit(child, id);
     if (found) return found;
   }
@@ -191,7 +192,12 @@ export function firstRegionId(node: LayoutNode): string {
  * @returns one entry per region, in tree order.
  */
 export function regionInfos(node: LayoutNode): RegionInfo[] {
-  if (node.type === "split") return node.children.flatMap((child) => regionInfos(child));
+  if (node.type === "split") {
+    // A stack is **one** position (its split id), not a list of internal leaves: a row is not a
+    // place a view can be moved to. The split's id is what `place`/`select` address.
+    if (isStackSplit(node, node.children)) return [{ id: node.id, collapsed: false }];
+    return node.children.flatMap((child) => regionInfos(child));
+  }
   return [
     { id: node.id, collapsed: node.collapsed },
     ...(node.children ?? []).flatMap((child) => regionInfos(child)),
@@ -323,7 +329,13 @@ export function resizeBoundary(
       const head = sign > 0 ? basis.max - sizes.get(child.id)! : sizes.get(child.id)! - basis.min;
       return total + Math.max(0, head);
     }, 0);
-  const moved = Math.max(-headroom(down, -1), Math.min(headroom(up, 1), delta));
+  // Both sides must be able to absorb the movement in **each** direction: a positive delta grows
+  // the up side and shrinks the down side, a negative one does the reverse. Clamping with only the
+  // receiver's headroom let a drag squeeze a side past its floor (or past its ceiling); the two
+  // headrooms have to bound the movement together.
+  const lower = -Math.min(headroom(up, -1), headroom(down, 1));
+  const upper = Math.min(headroom(up, 1), headroom(down, -1));
+  const moved = Math.max(lower, Math.min(upper, delta));
 
   if (moved !== 0) {
     if (sizing === "expand") {
@@ -459,6 +471,9 @@ export function revealRegion(tree: LayoutNode, id: string): LayoutNode {
     const target = next.find((child) => findNode(child, id) !== null);
     const changed = next.some((child, index) => child !== children[index]);
     if (target === undefined) return changed ? { ...node, children: next } : node;
+    // Already selected: returning a fresh object here made `place`'s "nothing to do" check fail
+    // forever, so every activation re-placed the view and bumped its order (measured).
+    if (!changed && node.active === target.id) return node;
     return { ...node, children: next, active: target.id };
   };
   return walk(tree);
@@ -520,6 +535,10 @@ export function isStackSplit(node: SplitNode, children: readonly LayoutNode[]): 
 /**
  * Share a **stack's** extent out the way VS Code's `SplitView` does (design C6/C8).
  *
+ * When every open row has a claim (a drag writes them all; a declared size counts too), the extent
+ * is shared by those **proportions** first — `SplitView.layout`'s `proportionalLayout`, default true
+ * (C8) — and each share is clamped to its bounds. The remainder then follows C6 below.
+ *
  * A row that nobody has sized takes an even share to begin with; after that, room that appears goes
  * to **one** row — the first that can still grow, looking from the last one back — up to what it
  * declares, and room that is taken comes back the same way, never under a floor. A folded row (one
@@ -540,17 +559,36 @@ export function allocateStack(
   // A folded row holds its **header**, and that height is part of the stack's extent like any other
   // (its claim reads 0 because a folded row is drawn from its header, not from a `size` of its own).
   const sized = basis.map((entry, index) => (folded[index] === true ? HEADER_HEIGHT : entry.size));
-  const settled = sized.reduce((total, size) => total + size, 0);
-  // A row nobody has sized takes an equal share of what the sized ones leave (C1) — the fold's own
-  // header is not part of what is shared out (C4).
-  const unsized = basis
-    .map((_, index) => index)
-    .filter((index) => folded[index] !== true && basis[index]!.size === 0);
-  if (unsized.length > 0) {
-    const share = Math.max(0, content - settled) / unsized.length;
-    for (const index of unsized) {
+  const open = basis.map((_, index) => index).filter((index) => folded[index] !== true);
+  // C8: when every open row has a claim it has a **proportion** (after a drag, the drag writes every
+  // open row; a view that declares a size is the same), so a region resize shares the extent by
+  // those proportions — `SplitView.layout`'s `proportionalLayout` (default true). A stack whose open
+  // rows include one nobody has sized has no complete set of proportions; it falls back to C1 (an
+  // equal share for the unsized rows), which is the prac default for a fresh stack.
+  const hasProportions = open.length > 0 && open.every((index) => basis[index]!.size > 0);
+  if (hasProportions) {
+    const total = open.reduce((sum, index) => sum + basis[index]!.size, 0);
+    const contentForOpen = Math.max(0, content - (basis.length - open.length) * HEADER_HEIGHT);
+    for (const index of open) {
       const entry = basis[index]!;
-      sized[index] = Math.max(entry.min, Math.min(entry.max, share));
+      sized[index] = Math.max(
+        entry.min,
+        Math.min(entry.max, (entry.size / total) * contentForOpen),
+      );
+    }
+  } else {
+    const settled = sized.reduce((total, size) => total + size, 0);
+    // A row nobody has sized takes an equal share of what the sized ones leave (C1) — the fold's own
+    // header is not part of what is shared out (C4).
+    const unsized = basis
+      .map((_, index) => index)
+      .filter((index) => folded[index] !== true && basis[index]!.size === 0);
+    if (unsized.length > 0) {
+      const share = Math.max(0, content - settled) / unsized.length;
+      for (const index of unsized) {
+        const entry = basis[index]!;
+        sized[index] = Math.max(entry.min, Math.min(entry.max, share));
+      }
     }
   }
   const claimed = sized.reduce((total, size) => total + size, 0);
@@ -820,14 +858,17 @@ function dropOwnChild(tree: LayoutNode, viewId: string): LayoutNode {
  */
 export function placeQuietly(state: LayoutState, viewId: string, regionId: string): LayoutState {
   const view = ensureView(state, viewId);
-  // Open order: a view that is new to this region goes to the **end** of its strip
-  // (VS Code appends tabs), and a view that already lives here keeps its place — a
-  // placement brings it to the front without moving it.
-  const arriving = state.views[viewId] === undefined || state.views[viewId]?.region !== regionId;
   // A region that selects among children shows none of its own views, so a
   // direct placement into it lands in a child of its own — "a container with
   // one view", the shape the design gives a view that stands alone.
   const landing = landingRegion(state.tree, regionId, viewId);
+  // Open order: a view that is new to this region goes to the **end** of its strip
+  // (VS Code appends tabs), and a view that already lives here keeps its place — a
+  // placement brings it to the front without moving it. "New" is judged against the
+  // **landing** region: a view already in one of a stack's rows is not arriving just
+  // because the caller named the split.
+  const arriving =
+    state.views[viewId] === undefined || state.views[viewId]?.region !== landing.region;
   // A view arriving in the region goes after the ones already there; one that is
   // already there keeps its order (so activating never moves a tab).
   const order = arriving ? maxOrder(state, landing.region) + 1 : view.order;
@@ -852,8 +893,12 @@ export function placeQuietly(state: LayoutState, viewId: string, regionId: strin
  * @returns the order a newly arriving view takes.
  */
 function maxOrder(state: LayoutState, regionId: string): number {
+  // A stack's views live in its rows, not directly in the region: ask the split for them too, or a
+  // placement into a stack would always get order 0.
+  const split = findSplit(state.tree, regionId);
+  const rowIds = new Set(split === null ? [] : stackEntries(split).map((row) => row.id));
   const orders = Object.entries(state.views)
-    .filter(([, view]) => view.region === regionId)
+    .filter(([, view]) => view.region === regionId || rowIds.has(view.region))
     .map(([, view]) => view.order);
   return orders.length === 0 ? -1 : Math.max(...orders);
 }
@@ -987,27 +1032,25 @@ export function ensureStackShape(state: LayoutState): LayoutState {
   let changed = false;
   const views = { ...state.views };
 
-  /** One view's leaf: the id is derived, the height is the view's own, the fold moves over. */
+  /** One view's leaf: the id is derived, the height/fold moves from the record. */
   const leafFor = (regionId: string, viewId: string): RegionNode => {
     const view = state.views[viewId];
     // A row nobody sized stays **flexible** so the rows keep sharing the height equally, the way a
-    // stack does before anyone touches it; a row that was sized keeps that height, and a folded one
-    // is its header.
+    // stack does before anyone touches it; a row that was sized keeps that height. A folded row has
+    // no height of its own (`size = 0`, E1) — its header is drawn from `collapsed` + `HEADER_HEIGHT`
+    // — and its memory is `cachedSize`.
     const sized = view?.size;
-    const leaf = regionNode(
-      `${regionId}/stack/${viewId}`,
-      view?.collapsed === true ? HEADER_HEIGHT : (sized ?? 0),
-      {
-        min: MIN_ENTRY,
-        entry: true,
-        flex: view?.collapsed === true ? false : sized === undefined,
-        ...(sized !== undefined && view?.collapsed !== true ? { size: sized } : {}),
-        ...(view?.collapsed === true ? { collapsed: true } : {}),
-        ...(view?.cachedSize !== undefined ? { cachedSize: view.cachedSize } : {}),
-        // The ceiling is the view's to declare; the layout only reads it.
-        ...(view?.max === undefined ? {} : { max: view.max }),
-      },
-    );
+    const folded = view?.collapsed === true;
+    const leaf = regionNode(`${regionId}/stack/${viewId}`, folded ? 0 : (sized ?? 0), {
+      min: MIN_ENTRY,
+      entry: true,
+      flex: folded ? false : sized === undefined,
+      ...(sized !== undefined && !folded ? { size: sized } : {}),
+      ...(folded ? { collapsed: true } : {}),
+      ...(view?.cachedSize !== undefined ? { cachedSize: view.cachedSize } : {}),
+      // The ceiling is the view's to declare; the layout only reads it.
+      ...(view?.max === undefined ? {} : { max: view.max }),
+    });
     const record = views[viewId];
     if (record !== undefined && record.region !== leaf.id) {
       // The height lives in the tree now; the record no longer carries one (G1: `tabs` has none).
@@ -1026,8 +1069,38 @@ export function ensureStackShape(state: LayoutState): LayoutState {
       .sort((a, b) => a[1].order - b[1].order)
       .map(([id]) => id);
 
+  /**
+   * Move a row's height and fold back onto the view record when the row stops being a row.
+   *
+   * This is the one-view interlude (A4/melt): a lone view has no header, so its fold has nowhere to
+   * be drawn; the record is where it waits until a second view makes the region a stack again.
+   */
+  const writeBack = (viewId: string, row: RegionNode, regionId: string): void => {
+    const record = views[viewId];
+    if (record === undefined) return;
+    const base = { ...record, region: regionId };
+    if (row.collapsed === true) {
+      views[viewId] = {
+        ...base,
+        collapsed: true,
+        size: 0,
+        cachedSize: row.cachedSize ?? row.size,
+      };
+    } else if (row.flex === true && row.size === 0) {
+      views[viewId] = { ...base, collapsed: undefined, size: undefined, cachedSize: undefined };
+    } else {
+      views[viewId] = { ...base, collapsed: undefined, size: row.size, cachedSize: row.size };
+    }
+    changed = true;
+  };
+
   /** A one-row stack is a bare region again: the design shows a lone view without a header. */
-  const melt = (node: SplitNode, rows: RegionNode[], size: number, flex: boolean): LayoutNode => {
+  const melt = (
+    node: SplitNode,
+    rows: readonly RegionNode[],
+    size: number,
+    flex: boolean,
+  ): LayoutNode => {
     const kept = rows.find((row) => visibleIn(row.id).length > 0);
     // Nothing left to show: the leftover must not hold space. A **flexible** region counts as present
     // while empty (`isPresent`), which would leave an empty bottom bar on screen.
@@ -1039,62 +1112,92 @@ export function ensureStackShape(state: LayoutState): LayoutState {
         ...(node.label === undefined ? {} : { label: node.label }),
       });
     }
-    const view = visibleIn(kept.id)[0];
-    if (view !== undefined) {
-      const record = views[view];
-      if (record !== undefined) {
-        views[view] = { ...record, region: node.id, collapsed: undefined, size: undefined };
-        changed = true;
-      }
-    }
+    const viewId = visibleIn(kept.id)[0];
+    if (viewId !== undefined) writeBack(viewId, kept, node.id);
+    // The region's `collapsed` is a **track** collapse, not the row's fold: the view's fold moved
+    // back to its record above, and a second view turns the region into a stack again.
     return regionNode(node.id, size, {
       flex,
       min: MIN_ENTRY,
       stack: true,
       ...(node.label === undefined ? {} : { label: node.label }),
-      ...(kept.collapsed === true ? { collapsed: true } : {}),
-      ...(kept.cachedSize !== undefined ? { cachedSize: kept.cachedSize } : {}),
     });
+  };
+
+  /** The order a child row's view holds (F7: one order for the region). */
+  const orderOf = (child: LayoutNode): number => {
+    if (child.type !== "region" || child.entry !== true) return Number.POSITIVE_INFINITY;
+    const viewId = visibleIn(child.id)[0];
+    return viewId === undefined ? Number.POSITIVE_INFINITY : (views[viewId]?.order ?? 0);
   };
 
   const walk = (node: LayoutNode): LayoutNode => {
     if (node.type === "split") {
       const children = node.children.map(walk);
-      let shaped = children;
+      const isStack = stackEntries({ ...node, children }).length === children.length;
+      if (!isStack) {
+        if (children.every((child, index) => child === node.children[index])) return node;
+        changed = true;
+        return { ...node, children };
+      }
       let dirty = !children.every((child, index) => child === node.children[index]);
-      // A stack split may have picked up a view directly (a container that had already become one is
-      // still addressed by its own id): such a view gets a row of its own. And a stack that falls
-      // back to fewer than two visible rows melts into a plain region.
-      if (stackEntries({ ...node, children: shaped }).length === shaped.length) {
-        const strays = visibleIn(node.id);
-        if (strays.length > 0) {
-          shaped = [
-            ...shaped,
-            ...strays.map((viewId) => leafFor(node.id, viewId) as unknown as LayoutNode),
-          ];
+      // Reconcile the rows with the views. A row with no visible view is not a row (A4); a row with
+      // more than one visible view is split, one leaf each; a visible view pointing at the split is a
+      // stray and becomes a row (this is how a hidden view comes back).
+      const next: LayoutNode[] = [];
+      for (const child of children) {
+        if (child.type !== "region" || child.entry !== true) {
+          next.push(child);
+          continue;
+        }
+        const rowViews = visibleIn(child.id);
+        if (rowViews.length === 0) {
+          for (const [viewId, record] of Object.entries(views)) {
+            if (record.region === child.id) writeBack(viewId, child, node.id);
+          }
+          dirty = true;
+          continue;
+        }
+        next.push(child);
+        for (const viewId of rowViews.slice(1)) {
+          next.push(leafFor(node.id, viewId));
           dirty = true;
         }
-        const rows = shaped.filter(
-          (child): child is RegionNode => child.type === "region" && child.entry === true,
-        );
-        const shown = rows.filter((row) => visibleIn(row.id).length > 0);
-        if (shown.length < 2) {
-          changed = true;
-          return melt(node, shown.length > 0 ? shown : rows, node.size ?? 0, node.flex ?? true);
-        }
+      }
+      for (const viewId of visibleIn(node.id)) {
+        next.push(leafFor(node.id, viewId));
+        dirty = true;
+      }
+      next.sort((a, b) => orderOf(a) - orderOf(b));
+      if (
+        next.length !== children.length ||
+        next.some((child, index) => child !== children[index])
+      ) {
+        dirty = true;
+      }
+      if (dirty) changed = true;
+      const rows = next.filter(
+        (child): child is RegionNode => child.type === "region" && child.entry === true,
+      );
+      const shown = rows.filter((row) => visibleIn(row.id).length > 0);
+      if (shown.length < 2) {
+        changed = true;
+        return melt(node, shown.length > 0 ? shown : rows, node.size ?? 0, node.flex ?? true);
       }
       if (!dirty) return node;
-      changed = true;
-      return { ...node, children: shaped };
+      return { ...node, children: next };
     }
     // A region can hold child regions (the container layer); shape those first.
     let region = node;
     if (region.children !== undefined && region.children.length > 0) {
-      const children = region.children.map(walk) as RegionNode[];
+      const children = region.children.map(walk);
       if (!children.every((child, index) => child === region.children?.[index])) {
         region = { ...region, children };
         changed = true;
       }
+      // A region with children **selects** among them; its own views are not a stack of rows. Leave
+      // the shape alone: converting it here would drop the children (measured on the container layer).
+      return region;
     }
     if (region.stack !== true) return region;
     const visible = visibleIn(region.id);
@@ -1142,7 +1245,7 @@ export function ensureStackShape(state: LayoutState): LayoutState {
             ...entry,
             collapsed: true,
             flex: false,
-            size: HEADER_HEIGHT,
+            size: 0,
             cachedSize: from ?? entry.cachedSize ?? entry.size,
           }
         : from === undefined
@@ -1214,29 +1317,15 @@ export function visibleViews(state: LayoutState, regionId: string): string[] {
  */
 export function isPresent(state: LayoutState, node: LayoutNode): boolean {
   if (node.type === "split") return node.children.some((child) => isPresent(state, child));
+  // A stack row is present only while it has a visible view. Its `flex`/`collapsed` fields describe
+  // the header/row, not an empty holding cell; a hidden or removed view must not leave a blank row.
+  if (node.entry === true) return visibleViews(state, node.id).length > 0;
   if (node.collapsed) return true;
   const children = node.children;
   if (children !== undefined && children.length > 0) {
     return node.flex || children.some((child) => isPresent(state, child));
   }
   return node.flex || visibleViews(state, node.id).length > 0;
-}
-
-/**
- * Whether a region renders its views as a stack of headers rather than bare.
- *
- * A stack region of one renders bare on purpose: a single-view region must look
- * and measure exactly as it did before stacking existed, so the header is a cost
- * paid only when a second visible view arrives.
- *
- * This is the render *decision*, kept here (not in the frame) so it can be
- * tested without a DOM: the frame only carries out what this returns.
- *
- * @param state - current state.
- * @param node - the region to test.
- */
-export function isStacked(state: LayoutState, node: LayoutNode): boolean {
-  return node.type === "region" && node.stack === true && visibleViews(state, node.id).length > 1;
 }
 
 /**
@@ -1351,6 +1440,10 @@ export function edgeRegion(
  * arithmetic so owner props (`sidebar.width`, `rightbar.width`) can be told
  * what their occupant has, without a DOM read.
  *
+ * Sashes are **overlays** (`position: absolute`, like VS Code's `monaco-sash`), not flex children:
+ * they take no extent away from the regions. The map records a split's own box as well, because the
+ * frame needs it to place the boundary overlay.
+ *
  * @param state - current state.
  * @param width - frame width in px.
  * @param height - frame height in px.
@@ -1370,10 +1463,10 @@ export function resolveSizes(state: LayoutState, width: number, height: number):
       }
       return;
     }
+    out.set(node.id, { width: w, height: h });
     const present = node.children.filter((child) => isPresent(state, child));
-    const extent = node.dir === "row" ? w : h;
-    const sashes = Math.max(0, present.length - 1) * SASH_SIZE;
-    const content = Math.max(0, extent - sashes);
+    // Sashes overlay the boundary (no flex item), so the regions share the whole extent.
+    const content = Math.max(0, node.dir === "row" ? w : h);
     const basis = present.map(nodeBasis);
     const sizes = isStackSplit(node, present)
       ? allocateStack(
@@ -1835,19 +1928,39 @@ export function redistributeOnDrag(
 }
 
 /**
- * The next entry a drag folds so that it can keep going.
+ * The height an **Alt-drag** takes a row to (design B6, `SplitView.onSashStart`'s alt branch).
  *
- * Growing an entry only takes room from the entries below it, and once they all sit on their floor
- * there is none left — upstream stops the drag there (`maxDelta`, `splitview.ts:1281`). But a
- * person dragging past that point means "get this out of the way", and what they expect is the
- * order they described: fileView → open editors → timeline, i.e. the next entry folds and the drag
- * continues into the room its body frees. The entries **above** the dragged one are never touched.
+ * Alt narrows the drag to the view on the far side of the boundary, at **half** its own headroom:
+ * the last boundary uses the upper (dragged) view, `(min − size)/2` on the way in; every other
+ * boundary uses the next view, `(size − min)/2` on the way out. With no declared ceiling the other
+ * direction is unbounded, exactly as upstream's `maximumSize` is (the stack's rows declare none).
+ * The result is the **dragged row's height**; the frame clamps it to the stack and hands it to
+ * `redistributeOnDrag`.
  *
- * @param entries - every entry of the stack, top-down, with its height and fold state.
- * @param viewId - the entry whose bottom edge is being dragged.
- * @param target - the height it is being dragged to.
- * @returns the entry below that should fold, if the drag has run out of room.
+ * @param entries - the stack's rows, top-down, with the heights they are drawn at.
+ * @param viewId - the row whose bottom edge is being dragged.
+ * @param target - the unconstrained height the pointer asks for.
+ * @returns the Alt-constrained height for that row.
  */
+export function altDragTarget(
+  entries: readonly { viewId: string; height: number; folded: boolean }[],
+  viewId: string,
+  target: number,
+): number {
+  const at = entries.findIndex((entry) => entry.viewId === viewId);
+  const dragged = entries[at];
+  if (dragged === undefined || dragged.folded || at >= entries.length - 1) return target;
+  const last = at === entries.length - 2;
+  // A folded row between the anchor and the next open row is a header: skip it, like the drag's
+  // own `redistributeOnDrag` does.
+  const focus = last ? dragged : entries.slice(at + 1).find((entry) => !entry.folded);
+  if (focus === undefined) return target;
+  const minDelta = last ? (MIN_ENTRY - dragged.height) / 2 : Number.NEGATIVE_INFINITY;
+  const maxDelta = last ? Number.POSITIVE_INFINITY : (focus.height - MIN_ENTRY) / 2;
+  const delta = Math.max(minDelta, Math.min(maxDelta, target - dragged.height));
+  return dragged.height + delta;
+}
+
 /**
  * What a **double-click on a boundary** does: even out the two rows it separates.
  *
@@ -1922,24 +2035,90 @@ export function findParentSplit(node: LayoutNode, id: string): SplitNode | null 
   return null;
 }
 
+/** The four states VS Code gives a sash (`SashState`), in its own words. */
+export type EntrySashState = "enabled" | "at-minimum" | "at-maximum" | "disabled";
+
 /**
- * Whether the boundary **under** a stack row can move at all (design B2/B4).
+ * The `SashState` of the boundary **under** a stack row (design B2/B4).
  *
- * A boundary trades room between its two sides, so each side needs a row that is still open: folded
- * rows hold only their header and can neither give nor take (B3), and the **last** row of a stack has
- * no boundary to begin with (B7).
+ * A drag is possible in a direction only when the two **sides** can trade room:
+ * down/right needs the rows above to grow and the rows below to shrink; up/left needs the opposite.
+ * The tests are cumulative and skip folded rows (B3). At least one direction ⇒ the sash is
+ * `enabled` or one of the one-way states; neither ⇒ `disabled`. The **last** row has no boundary
+ * (B7), and a side that is entirely folded has no movable row at all.
+ *
+ * `drawn` is what the rows are actually painted at, when the caller knows it (a flexible row's
+ * tree `size` is 0, so the claim alone cannot answer B2); without it the tree's own sizes are used.
  *
  * @param state - the layout state.
  * @param rowId - the row whose bottom edge is in question.
- * @returns true when the boundary under that row can move.
+ * @param drawn - row id → painted height, when known.
+ * @returns the sash state under that row.
  */
-export function entryBoundary(state: LayoutState, rowId: string): boolean {
+export function entrySashState(
+  state: LayoutState,
+  rowId: string,
+  drawn?: ReadonlyMap<string, number>,
+): EntrySashState {
   const parent = findParentSplit(state.tree, rowId);
   const siblings = parent === null ? [] : stackEntries(parent);
   const at = siblings.findIndex((row) => row.id === rowId);
-  if (at < 0 || at >= siblings.length - 1) return false;
-  const open = (row: RegionNode): boolean => row.collapsed !== true;
-  return siblings.slice(0, at + 1).some(open) && siblings.slice(at + 1).some(open);
+  if (at < 0 || at >= siblings.length - 1) return "disabled";
+  const sizeOf = (row: RegionNode): number => drawn?.get(row.id) ?? nodeBasis(row).size;
+  const canShrink = (rows: readonly RegionNode[]): boolean =>
+    rows.some((row) => row.collapsed !== true && sizeOf(row) - nodeBasis(row).min > 0);
+  const canGrow = (rows: readonly RegionNode[]): boolean =>
+    rows.some((row) => row.collapsed !== true && nodeBasis(row).max - sizeOf(row) > 0);
+  const up = siblings.slice(0, at + 1);
+  const down = siblings.slice(at + 1);
+  // Does the sash have room to move down/right (up grows, down shrinks) or up/left?
+  const downOk = canGrow(up) && canShrink(down);
+  const upOk = canShrink(up) && canGrow(down);
+  if (!upOk && !downOk) return "disabled";
+  if (upOk && downOk) return "enabled";
+  // AtMinimum can still move down/right; AtMaximum can still move up/left (upstream `SashState`).
+  return downOk ? "at-minimum" : "at-maximum";
+}
+
+/**
+ * Whether the boundary under a stack row can move in any direction.
+ *
+ * @param state - the layout state.
+ * @param rowId - the row whose bottom edge is in question.
+ * @param drawn - row id → painted height, when known.
+ * @returns true when the sash is not `disabled`.
+ */
+export function entryBoundary(
+  state: LayoutState,
+  rowId: string,
+  drawn?: ReadonlyMap<string, number>,
+): boolean {
+  return entrySashState(state, rowId, drawn) !== "disabled";
+}
+
+/**
+ * The row a boundary drag actually resizes.
+ *
+ * A folded row is a header: it owns no room, so dragging the boundary under it cannot resize *it*.
+ * The rows above the boundary are still open, though — the nearest one is the row whose height
+ * changes, and the folded header (plus whatever sits below it) moves with it. Without this, a sash
+ * next to a folded view looked enabled but every move was a no-op (the `redistributeOnDrag` anchor
+ * was the folded row).
+ *
+ * @param rows - the stack's rows, top-down.
+ * @param viewId - the row whose bottom edge was pressed.
+ * @returns the nearest open row at or above the pressed row; undefined when there is none.
+ */
+export function stackDragAnchor<T extends { readonly viewId: string; readonly folded: boolean }>(
+  rows: readonly T[],
+  viewId: string,
+): T | undefined {
+  const at = rows.findIndex((row) => row.viewId === viewId);
+  if (at < 0) return undefined;
+  for (let index = at; index >= 0; index -= 1) {
+    if (rows[index]!.folded !== true) return rows[index];
+  }
+  return undefined;
 }
 
 export function stackEntries(node: LayoutNode): RegionNode[] {
@@ -1959,9 +2138,14 @@ export function stackEntries(node: LayoutNode): RegionNode[] {
  * @returns the new state, or the same one when nothing changes.
  */
 export function setEntryHeight(state: LayoutState, entryId: string, height: number): LayoutState {
-  const size = Math.max(MIN_ENTRY, Math.round(height));
   const node = findRegion(state.tree, entryId);
-  if (node === null || (node.size === size && node.flex !== true)) return state;
+  // A folded row is a header, not a height (J3); the fold toggle/expansion owns its `size`.
+  if (node === null || node.collapsed === true) return state;
+  const size = Math.max(
+    MIN_ENTRY,
+    Math.min(node.max ?? Number.POSITIVE_INFINITY, Math.round(height)),
+  );
+  if (node.size === size && node.flex !== true) return state;
   // A height a person dragged is a **fixed** height: a flexible row's element is `flex: 1 1 0` and
   // ignores `size`, so writing the number alone would leave the picture unchanged.
   return {
@@ -1991,11 +2175,16 @@ export function setEntryFolded(
   const before = node.size;
   const remembered = measuredHeight ?? node.size ?? node.cachedSize;
   const cachedSize = remembered === undefined ? undefined : Math.round(remembered);
+  // A folded row has **no height**: its 20px header is drawing (`HEADER_HEIGHT` is applied by the
+  // frame/allocation to `collapsed` rows), and the height it remembers lives in `cachedSize` (E1).
   const size = collapsed
-    ? HEADER_HEIGHT
+    ? 0
     : node.cachedSize === undefined
       ? MIN_ENTRY
-      : Math.max(MIN_ENTRY, Math.round(node.cachedSize));
+      : Math.max(
+          MIN_ENTRY,
+          Math.min(node.max ?? Number.POSITIVE_INFINITY, Math.round(node.cachedSize)),
+        );
 
   // The row's own new height…
   let tree = updateRegion(state.tree, entryId, (entry) => ({
@@ -2011,7 +2200,13 @@ export function setEntryFolded(
   // goes to the rows **below it**, from the last one back, whole (no caps, not in proportion); what
   // it needs comes from the same rows, and none of them may be squeezed under the floor. When there
   // is nothing below, the room goes the same way **above** — the extent still has to be filled.
-  const delta = before - size;
+  // The folded row **occupies its header**, not its `size` (C4): the open rows only share out the
+  // body the fold frees (or the body the unfold needs), not the 20px the header keeps.
+  // An open flexible row's `size` is 0; its drawn height (the caller's measurement) is what it
+  // actually gives up. A fixed row falls back to its own size when no measurement is available.
+  const beforeOccupied = node.collapsed === true ? HEADER_HEIGHT : (measuredHeight ?? before);
+  const afterOccupied = collapsed ? HEADER_HEIGHT : size;
+  const delta = beforeOccupied - afterOccupied;
   if (delta !== 0) {
     const parent = findParentSplit(tree, entryId);
     const rows = parent === null ? [] : stackEntries(parent);
@@ -2021,14 +2216,19 @@ export function setEntryFolded(
     const take = (order: readonly RegionNode[], from: number): number => {
       for (const row of order) {
         if (from === 0) break;
+        // B3: a folded row is a header — it neither gives nor takes.
+        if (row.collapsed === true) continue;
         if (from > 0) {
-          const give = from;
+          // C5/C6: fill the nearest capable row up to its own ceiling, then move on.
+          const capacity = Math.max(0, (row.max ?? Number.POSITIVE_INFINITY) - row.size);
+          const give = Math.min(capacity, from);
+          if (give === 0) continue;
           tree = updateRegion(tree, row.id, (entry) => ({
             ...entry,
             size: entry.size + give,
             flex: false,
           }));
-          from = 0;
+          from -= give;
         } else {
           const room = Math.max(0, row.size - MIN_ENTRY);
           const given = Math.min(room, -from);
@@ -2066,68 +2266,39 @@ export function moveEntry(
   direction: "up" | "down",
 ): LayoutState {
   if (entryId === referenceId) return state;
-  const walk = (node: LayoutNode): { node: LayoutNode; moved: boolean } => {
-    if (node.type !== "split") return { node, moved: false };
-    const index = node.children.findIndex((child) => child.id === entryId);
-    const at = node.children.findIndex((child) => child.id === referenceId);
-    if (index >= 0 && at >= 0) {
-      const others = node.children.filter((child) => child.id !== entryId);
-      const to = others.findIndex((child) => child.id === referenceId);
-      const target = direction === "up" ? to : to + 1;
-      const moving = node.children[index] as LayoutNode;
-      const next = [...others.slice(0, target), moving, ...others.slice(target)];
-      return {
-        node: { ...node, children: next },
-        moved: next.some((child, position) => child !== node.children[position]),
-      };
-    }
-    for (let position = 0; position < node.children.length; position += 1) {
-      const child = node.children[position];
-      if (child === undefined || child.type === "region") continue;
-      const inner = walk(child);
-      if (inner.moved) {
-        const children = [...node.children];
-        children[position] = inner.node;
-        return { node: { ...node, children }, moved: true };
-      }
-    }
-    return { node, moved: false };
-  };
-  const result = walk(state.tree);
-  return result.moved ? { ...state, tree: result.node } : state;
+  // The rows may sit under a **region** (the container layer), so ask for the parent split rather
+  // than walking only split children — that is the rule the note gives every id-based lookup.
+  const parent = findParentSplit(state.tree, entryId);
+  if (parent === null || findParentSplit(state.tree, referenceId)?.id !== parent.id) return state;
+  const index = parent.children.findIndex((child) => child.id === entryId);
+  if (index < 0 || !parent.children.some((child) => child.id === referenceId)) return state;
+  const others = parent.children.filter((child) => child.id !== entryId);
+  const at = others.findIndex((child) => child.id === referenceId);
+  if (at < 0) return state;
+  const target = direction === "up" ? at : at + 1;
+  const moving = parent.children[index];
+  if (moving === undefined) return state;
+  const children = [...others.slice(0, target), moving, ...others.slice(target)];
+  if (children.every((child, position) => child === parent.children[position])) return state;
+  const tree = replaceNode(state.tree, parent.id, () => ({ ...parent, children }));
+  // F7: the region has **one** order. A stack stores it in the split's children; the tab strip
+  // stores it in `ViewRecord.order`. Renumber the rows' views so the two forms cannot drift when a
+  // region changes mode.
+  const views = { ...state.views };
+  children.forEach((child, position) => {
+    if (child.type !== "region" || child.entry !== true) return;
+    const inRow = Object.entries(views)
+      .filter(([, view]) => view.region === child.id)
+      .sort((a, b) => a[1].order - b[1].order);
+    inRow.forEach(([viewId], offset) => {
+      const view = views[viewId];
+      if (view !== undefined && view.order !== position + offset)
+        views[viewId] = { ...view, order: position + offset };
+    });
+  });
+  return { ...state, tree, views };
 }
 
-export function dragChainTarget(
-  entries: readonly { viewId: string; height: number; folded: boolean }[],
-  viewId: string,
-  target: number,
-): string | undefined {
-  const at = entries.findIndex((entry) => entry.viewId === viewId);
-  const dragged = entries[at];
-  if (dragged === undefined || dragged.folded) return undefined;
-  const wanted = Math.max(MIN_ENTRY, target) - dragged.height;
-  const room = entries
-    .slice(at + 1)
-    .filter((entry) => !entry.folded)
-    .reduce((total, entry) => total + Math.max(0, entry.height - MIN_ENTRY), 0);
-  if (wanted <= room) return undefined;
-  return entries.slice(at + 1).find((entry) => !entry.folded)?.viewId;
-}
-
-/**
- * Fold or unfold a stack entry, remembering the height it had.
- *
- * `SplitView` hides a view with `setVisible(false)`, which **caches the view's size**
- * (`splitview.ts:228`) and hands it back on the way in (`:233`, `getViewCachedVisibleSize`), so a
- * folded viewlet unfolds at the height it had. A size somebody dragged is already remembered; this
- * covers the entry nobody has sized, whose height only exists on screen.
- *
- * @param state - the layout state.
- * @param viewId - the view to fold or unfold.
- * @param collapsed - the state to move to.
- * @param measuredHeight - what the entry is drawn at right now, if the caller can see it.
- * @returns the state with the view folded, and with the size it should come back at.
- */
 /**
  * Declare the height a view wants when it is a row of a stack.
  *
@@ -2143,14 +2314,40 @@ export function dragChainTarget(
 export function setViewSize(state: LayoutState, viewId: string, size: number): LayoutState {
   const view = state.views[viewId];
   if (view === undefined) return state;
-  const wanted = Math.max(0, Math.round(size));
+  const rounded = Math.max(0, Math.round(size));
+  // 0 is "no claim" (C1); any real height is a row's, so the floor and the view's own `max` apply
+  // (C3/C6). This is a declaration: the layout only reads it.
+  const wanted =
+    rounded === 0
+      ? 0
+      : Math.max(MIN_ENTRY, Math.min(view.max ?? Number.POSITIVE_INFINITY, rounded));
   const home = view.region === undefined ? null : findRegion(state.tree, view.region);
   if (home?.entry === true) {
+    const next =
+      rounded === 0
+        ? 0
+        : Math.max(MIN_ENTRY, Math.min(home.max ?? Number.POSITIVE_INFINITY, rounded));
+    // A folded row has no height to write (J3): the declaration updates the memory it will unfold
+    // at, while `size` stays 0.
+    if (home.collapsed === true) {
+      if (home.cachedSize === next) return state;
+      return {
+        ...state,
+        tree: updateRegion(state.tree, home.id, (row) => ({
+          ...row,
+          size: 0,
+          flex: false,
+          cachedSize: next,
+        })),
+      };
+    }
+    if (home.size === next && home.flex === (next === 0)) return state;
     return {
       ...state,
-      tree: updateRegion(state.tree, home.id, (row) => ({ ...row, size: wanted, flex: false })),
+      tree: updateRegion(state.tree, home.id, (row) => ({ ...row, size: next, flex: next === 0 })),
     };
   }
+  if (view.size === wanted) return state;
   return { ...state, views: { ...state.views, [viewId]: { ...view, size: wanted } } };
 }
 
@@ -2184,45 +2381,14 @@ export function setViewCollapsed(
   // row with no memory shares the height again instead of opening at whatever it currently measures,
   // which while folded is the header.
   const size =
-    view.cachedSize === undefined ? undefined : Math.max(MIN_ENTRY, Math.round(view.cachedSize));
+    view.cachedSize === undefined
+      ? undefined
+      : Math.max(
+          MIN_ENTRY,
+          Math.min(view.max ?? Number.POSITIVE_INFINITY, Math.round(view.cachedSize)),
+        );
   return {
     ...state,
     views: { ...state.views, [viewId]: { ...view, collapsed, size, cachedSize: undefined } },
   };
-}
-
-/** How close to gone an entry must be before a drag folds it: half its floor, as upstream snaps at
- * half the view's minimum size (`splitview.ts:942/966`). */
-export const SNAP_DISTANCE = Math.floor(MIN_ENTRY / 2);
-
-/**
- * Whether a drag has reached the point where an entry folds.
- *
- * Upstream's sash snaps a view away once the drag passes half of its minimum size
- * (`splitview.ts:942/1301`, `limitDelta = minDelta − halfSize` for the visible case). The other
- * direction is deliberately **not** implemented: upstream has the machinery for it but nothing in
- * the workbench opts in (`IView.snap`, `@defaultValue false`, `:78-84`), so a collapsed view stays
- * collapsed until a person asks for it — which here is the fold toggle on its header.
- *
- * @param entries - every entry of the stack, top-down, with its current height and fold state.
- * @param viewId - the entry whose bottom edge is being dragged.
- * @param pointerDelta - how far the pointer has moved since the drag began (or since it was
- *   re-anchored, which the caller does after every snap).
- * @returns the view to fold, if the drag has crossed the threshold.
- */
-export function dragSnapTarget(
-  entries: readonly { viewId: string; height: number; folded: boolean }[],
-  viewId: string,
-  pointerDelta: number,
-): { viewId: string; collapsed: boolean } | undefined {
-  const at = entries.findIndex((entry) => entry.viewId === viewId);
-  const dragged = entries[at];
-  if (dragged === undefined || dragged.folded) return undefined;
-  // The entry's own boundary cannot go under half a floor: that folds the entry being dragged.
-  if (dragged.height + pointerDelta < SNAP_DISTANCE) return { viewId, collapsed: true };
-  const below = entries[at + 1];
-  if (below === undefined || below.folded) return undefined;
-  return below.height - pointerDelta < SNAP_DISTANCE
-    ? { viewId: below.viewId, collapsed: true }
-    : undefined;
 }

@@ -69,9 +69,11 @@ async function sample() {
       entries: [...(host?.querySelectorAll("[data-prac-stack-entry]") ?? [])].map((entry) => ({
         view: entry.getAttribute("data-prac-stack-entry"),
         collapsed: entry.getAttribute("data-prac-stack-collapsed") === "true",
-        // "false" means the boundary under this row cannot move (B4): the last row has none, and a
-        // run of folded rows has nothing left to trade.
+        // `handle="false"` only for `Disabled` (B4): the last row has no boundary, and a wholly
+        // folded side has nothing to trade. `AtMinimum`/`AtMaximum` keep the handle and a directional
+        // cursor; the state attribute is what tells them apart.
         handle: entry.getAttribute("data-prac-stack-handle"),
+        sash: entry.getAttribute("data-prac-stack-sash-state"),
         entry: box(entry),
         header: box(entry.querySelector("[data-prac-stack-toggle]")),
         body: box(entry.querySelector("[data-prac-stack-body]")),
@@ -168,6 +170,7 @@ const bodyHeight = (facts, view) => entryOf(facts, view)?.body?.h ?? 0;
 const heightOf = (facts, view) => facts.entries.find((entry) => entry.view === view)?.entry?.h ?? 0;
 const sumOf = (facts) => facts.entries.reduce((total, entry) => total + (entry.entry?.h ?? 0), 0);
 const openIn = (facts) => facts.entries.filter((entry) => entry.collapsed !== true).length;
+const near = (a, b, tolerance = 6) => Math.abs(a - b) <= tolerance;
 
 const checks = {
   // 1. The default layout is untouched: one visible view, no headers.
@@ -188,12 +191,14 @@ const checks = {
     bodyHeight(stacked, BASE_VIEW) > 40 &&
     bodyHeight(stacked, ADDED_VIEW) > 40,
   stackedPainted: stacked.distinctColours > 4,
-  // The row boundary is **usable** while there are open rows on both sides, and the last row has
-  // none at all (B2/B4/B7) — this is what gives the boundary its resize cursor.
+  // The first row's boundary is draggable (`Enabled`/one-way), and the last row's is `Disabled`
+  // (B2/B4/B7). `handle` alone cannot tell the one-way states from `Enabled`; the state attribute can.
   boundariesFollowTheRows:
     stacked.entries.length === 2 &&
     stacked.entries[0]?.handle === "true" &&
-    stacked.entries[1]?.handle === "false",
+    stacked.entries[0]?.sash !== "disabled" &&
+    stacked.entries[1]?.handle === "false" &&
+    stacked.entries[1]?.sash === "disabled",
   // 3. Folding keeps the header, drops the body, and gives the space away.
   foldKeepsHeaderDropsBody:
     entryOf(folded, ADDED_VIEW)?.collapsed === true &&
@@ -203,24 +208,30 @@ const checks = {
   // 4. The header itself toggles (the UI path, not just the face).
   // 5. Folded shut: every boundary is dead, and the stack does not pretend to fill itself.
   aShutStackHasNoUsableBoundary:
-    shut.entries.length > 0 && shut.entries.every((entry) => entry.handle === "false"),
+    shut.entries.length > 0 &&
+    shut.entries.every((entry) => entry.handle === "false" && entry.sash === "disabled"),
   aShutStackLeavesItsRoomBlank: sumOf(shut) + 40 < (shut.region?.h ?? 0),
   // 6. Alt is a plain resize: the drag moves the boundary and folds nothing.
   altDragFoldsNothing:
     afterAlt.entries.length === beforeAlt.entries.length &&
     openIn(afterAlt) === openIn(beforeAlt) &&
     afterAlt.entries.every((entry) => entry.collapsed === false),
-  // 7. The region grew: one row took the room, the other rows are where they were.
-  oneRowTakesTheGrowth: (() => {
+  // 7. The region grew: the rows share it by their proportions (C8), not one row taking all.
+  bothRowsShareTheGrowth: (() => {
     const gains = grown.entries.map((entry) => {
       const before = beforeAlt.entries.find((old) => old.view === entry.view)?.entry?.h ?? 0;
       return (entry.entry?.h ?? 0) - before;
     });
-    const took = gains.filter((gain) => gain > 60);
-    return took.length === 1 && gains.every((gain) => gain >= -2);
+    const shared = gains.filter((gain) => gain > 20).length >= 2;
+    return shared && gains.every((gain) => gain >= -2);
   })(),
   clickToggles:
     entryOf(clicked, BASE_VIEW)?.collapsed === true && bodyHeight(clicked, BASE_VIEW) <= 2,
+  // 8. Fold then unfold restores the drawn height, through both paths the note names: the header
+  // click (BASE_VIEW) and the face (ADDED_VIEW, folded above). E1/E2.
+  unfoldRestoresTheHeight:
+    near(heightOf(opened, BASE_VIEW), heightOf(stacked, BASE_VIEW)) &&
+    near(heightOf(opened, ADDED_VIEW), heightOf(stacked, ADDED_VIEW)),
   // Only this feature's own failures; the page's known noise is not ours.
   noErrors: own("__pracLayout").length === 0 && own("prac-client-ui-layout").length === 0,
 };
