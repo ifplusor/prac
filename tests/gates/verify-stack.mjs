@@ -28,6 +28,11 @@ import { distinctColours, openPrac, report, requireUrl } from "./harness.mjs";
 /** The two views the stack gets (both prac's). */
 const BASE_VIEW = "dsh:sidebar";
 const ADDED_VIEW = "dsh:main:conversation";
+/**
+ * A third view for the folded-middle and untouched-row scenarios. The DSH right bar is a real view
+ * in the catalogue; the compat shim keeps it hidden by default, so `place` is what shows it.
+ */
+const THIRD_VIEW = "dsh:rightbar";
 /** The top-level region whose active child is the stack's home. */
 const OUTER_REGION = "left";
 
@@ -68,6 +73,7 @@ async function sample() {
       region: box(host),
       entries: [...(host?.querySelectorAll("[data-prac-stack-entry]") ?? [])].map((entry) => ({
         view: entry.getAttribute("data-prac-stack-entry"),
+        row: entry.getAttribute("data-prac-stack-row"),
         collapsed: entry.getAttribute("data-prac-stack-collapsed") === "true",
         // `handle="false"` only for `Disabled` (B4): the last row has no boundary, and a wholly
         // folded side has nothing to trade. `AtMinimum`/`AtMaximum` keep the handle and a directional
@@ -78,6 +84,14 @@ async function sample() {
         header: box(entry.querySelector("[data-prac-stack-toggle]")),
         body: box(entry.querySelector("[data-prac-stack-body]")),
       })),
+      sashes: [...(host?.querySelectorAll("[data-prac-sash]") ?? [])].map((sash) => ({
+        left: sash.getAttribute("data-prac-sash-left"),
+        right: sash.getAttribute("data-prac-sash-right"),
+        dir: sash.getAttribute("data-prac-sash-dir"),
+        state: sash.getAttribute("data-prac-stack-sash-state"),
+        background: getComputedStyle(sash).backgroundColor,
+        box: box(sash),
+      })),
       containers: [...(bar?.querySelectorAll("[data-prac-container]") ?? [])].map((item) => ({
         id: item.getAttribute("data-prac-container"),
         active: item.getAttribute("data-prac-container-active") === "true",
@@ -87,6 +101,18 @@ async function sample() {
   }, REGION);
   facts.distinctColours = await distinctColours(page, facts.region);
   return facts;
+}
+
+/** A one-move drag: the fast path that used to lose the pointer/up pair. */
+async function dragQuick(box, dy) {
+  if (!box) throw new Error("no sash box for the quick drag");
+  const x = Math.round(box.x + box.w / 2);
+  const y = Math.round(box.y + box.h / 2);
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x, y + dy);
+  await page.mouse.up();
+  await page.waitForTimeout(700);
 }
 
 const initial = await sample();
@@ -104,6 +130,17 @@ await page.waitForSelector(
 );
 await page.waitForTimeout(2000);
 const stacked = await sample();
+
+// Hover is the only time the sash paints: the overlay is transparent by default.
+const firstSash = stacked.sashes[0];
+if (firstSash?.box) {
+  await page.mouse.move(
+    Math.round(firstSash.box.x + firstSash.box.w / 2),
+    Math.round(firstSash.box.y + firstSash.box.h / 2),
+  );
+  await page.waitForTimeout(250);
+}
+const hovered = await sample();
 
 // Fold through the face; then unfold through a real click on the header.
 await page.evaluate((view) => globalThis.__pracLayout.setViewCollapsed(view, true), ADDED_VIEW);
@@ -157,6 +194,30 @@ const afterAlt = await sample();
 await page.setViewportSize({ width: 1600, height: 1200 });
 await page.waitForTimeout(1000);
 const grown = await sample();
+
+// ── 8. third open row: one-step drag, untouched row stays put ───────────────
+await page.evaluate(({ region, view }) => globalThis.__pracLayout.place(view, region), {
+  region: REGION,
+  view: THIRD_VIEW,
+});
+await page.waitForSelector(
+  `[data-prac-region="${REGION}"] [data-prac-stack-entry="${THIRD_VIEW}"], [data-prac-split="${REGION}"] [data-prac-stack-entry="${THIRD_VIEW}"]`,
+  { timeout: 60_000 },
+);
+await page.waitForTimeout(1200);
+const third = await sample();
+const quickSash = third.sashes[0];
+if (quickSash?.box) await dragQuick(quickSash.box, -60);
+const afterQuick = await sample();
+
+// ── 9. fold the middle row, then drag the sash below it ─────────────────────
+await page.evaluate((view) => globalThis.__pracLayout.setViewCollapsed(view, true), ADDED_VIEW);
+await page.waitForTimeout(600);
+const foldedMiddle = await sample();
+const addedRow = foldedMiddle.entries.find((entry) => entry.view === ADDED_VIEW)?.row;
+const middleSash = foldedMiddle.sashes.find((sash) => sash.left === addedRow);
+if (middleSash?.box) await dragQuick(middleSash.box, -60);
+const adjacent = await sample();
 
 await close();
 
@@ -232,6 +293,38 @@ const checks = {
   unfoldRestoresTheHeight:
     near(heightOf(opened, BASE_VIEW), heightOf(stacked, BASE_VIEW)) &&
     near(heightOf(opened, ADDED_VIEW), heightOf(stacked, ADDED_VIEW)),
+  // 9. The sash is a 4px overlay, not a flex gap: the rows touch, the strip is 4px, and it is
+  // transparent until hovered.
+  sashIsAnOverlayWithoutAGap:
+    stacked.sashes.length > 0 &&
+    near(
+      (stacked.entries[0]?.entry?.y ?? 0) + (stacked.entries[0]?.entry?.h ?? 0),
+      stacked.entries[1]?.entry?.y ?? 0,
+      1,
+    ) &&
+    near(stacked.sashes[0]?.box?.h ?? 0, 4, 1) &&
+    stacked.sashes[0]?.background === "rgba(0, 0, 0, 0)",
+  sashAppearsOnHover:
+    hovered.sashes[0]?.background !== "rgba(0, 0, 0, 0)" &&
+    hovered.sashes[0]?.background !== stacked.sashes[0]?.background,
+  // 10. A one-move drag still works, and the third row is not dragged along by proportional
+  // re-fitting (the seed keeps its claim equal to what is drawn).
+  quickDragMoves:
+    openIn(afterQuick) === 3 &&
+    Math.abs(heightOf(afterQuick, BASE_VIEW) - heightOf(third, BASE_VIEW)) > 10,
+  untouchedThirdRowDoesNotBounce: near(
+    heightOf(afterQuick, THIRD_VIEW),
+    heightOf(third, THIRD_VIEW),
+    2,
+  ),
+  // 11. The middle row is folded; the sash below it still resizes the open rows on both sides and
+  // leaves the folded header at its 20px.
+  foldedMiddleStillDrags:
+    entryOf(adjacent, ADDED_VIEW)?.collapsed === true &&
+    near(heightOf(adjacent, ADDED_VIEW), 20, 2) &&
+    Math.abs(heightOf(adjacent, BASE_VIEW) - heightOf(foldedMiddle, BASE_VIEW)) > 10 &&
+    Math.abs(heightOf(adjacent, THIRD_VIEW) - heightOf(foldedMiddle, THIRD_VIEW)) > 10 &&
+    openIn(adjacent) === 2,
   // Only this feature's own failures; the page's known noise is not ours.
   noErrors: own("__pracLayout").length === 0 && own("prac-client-ui-layout").length === 0,
 };
@@ -249,8 +342,13 @@ report({
     beforeAlt,
     afterAlt,
     grown,
+    hovered,
+    third,
+    afterQuick,
+    foldedMiddle,
+    adjacent,
     consoleErrors,
   },
   checks,
-  ok: "OK: one view renders bare, two stack with headers, folding keeps the header and hands the space over, and the header toggles on click.",
+  ok: "OK: one view renders bare, two stack with headers, the sash is a 4px hover-only overlay, folding keeps the header, one-step drags work, the folded middle stays draggable, and an untouched third row does not bounce.",
 });
