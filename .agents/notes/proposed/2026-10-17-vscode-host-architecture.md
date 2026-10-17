@@ -44,7 +44,7 @@ adaptor 侧已经有几个 step，但缺一张骨架：
 
 关键句：
 
-> **frame 不认识 VS Code；adaptor 不认识 frame 的内部；vendor 不认识 prac 的政策。**
+> **frame 不认识 VS Code；adaptor 不持有 / 修改 frame 的内部布局状态，只通过 `PracLayoutFace`（`ctx.pracLayout`）、`prac.view`、host element 这些窄契约协作；vendor 不认识 prac 的政策。**
 
 ## 2. 层与包
 
