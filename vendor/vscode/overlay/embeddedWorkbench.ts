@@ -45,6 +45,7 @@ import { IHostService } from "../services/host/browser/host.js";
 import { INotificationService } from "../../platform/notification/common/notification.js";
 import { ICommandService } from "../../platform/commands/common/commands.js";
 import { IViewsService } from "../../workbench/services/views/common/viewsService.js";
+import { ViewsService } from "../../workbench/services/views/browser/viewsService.js";
 import { IEditorService } from "../services/editor/common/editorService.js";
 import { IEditorResolverService } from "../services/editor/common/editorResolverService.js";
 import { IUntitledTextEditorService } from "../services/untitled/common/untitledTextEditorService.js";
@@ -52,7 +53,7 @@ import { URI } from "../../base/common/uri.js";
 import { IEditorGroupsService } from "../services/editor/common/editorGroupsService.js";
 import type { EditorInput } from "../common/editor/editorInput.js";
 import { IPaneCompositePartService } from "../services/panecomposite/browser/panecomposite.js";
-import { IViewDescriptorService, ViewContainerLocationToString } from "../common/views.js";
+import { IViewDescriptorService, IView, ViewContainerLocationToString } from "../common/views.js";
 import { ITitleService } from "../services/title/browser/titleService.js";
 import { IStatusbarService } from "../services/statusbar/browser/statusbar.js";
 import { IBannerService } from "../services/banner/browser/bannerService.js";
@@ -157,6 +158,33 @@ const suppressedContextMenus = new WeakSet<HTMLElement>();
 class PracContextViewService extends ContextViewService {
   override showContextView(delegate: IContextViewDelegate): IOpenContextView {
     return super.showContextView(delegate);
+  }
+}
+
+/**
+ * The default view service with one addition: views prac mounts outside a
+ * `ViewPaneContainer` are still resolvable by id.
+ *
+ * `getViewWithId` is what container-scoped commands use (Explorer's Collapse
+ * Folders is the first one); the stock implementation only looks in its private
+ * container map, which prac deliberately does not populate because the frame,
+ * not a VS Code part, owns the layout.
+ */
+class PracViewsService extends ViewsService {
+  private readonly mountedViews = new Map<string, IView>();
+
+  /** Make a mounted pane visible to `getViewWithId`. */
+  registerMountedView(view: IView): void {
+    this.mountedViews.set(view.id, view);
+  }
+
+  /** Forget a pane that was released or replaced. */
+  unregisterMountedView(id: string): void {
+    this.mountedViews.delete(id);
+  }
+
+  override getViewWithId<T extends IView>(id: string): T | null {
+    return (this.mountedViews.get(id) as T | undefined) ?? super.getViewWithId<T>(id);
   }
 }
 
@@ -606,6 +634,9 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     // workbench and every view sees. Its popups land in the float host, not in a
     // view's isolated shadow.
     serviceCollection.set(IContextViewService, new SyncDescriptor(PracContextViewService));
+    // Views mounted by the embedder have no ViewPaneContainer, so make them
+    // resolvable by id through the view service the container commands use.
+    serviceCollection.set(IViewsService, new SyncDescriptor(PracViewsService));
 
     // prac's shell owns the editor: **prac is the editor host** (see
     // `pracEditorHost.ts`), so the workbench's own editor parts manager is replaced
@@ -778,6 +809,9 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       frame.className = "monaco-pane-view";
       frame.appendChild(pane.element);
       this.mountedViews.set(viewId, { pane, host: element, frame });
+      this.instantiationService.invokeFunction((accessor) => {
+        (accessor.get(IViewsService) as PracViewsService).registerMountedView(pane);
+      });
       this._register(pane);
       element.replaceChildren(frame);
       // Size it like a container would (see `layout()`): a pane mounted outside
@@ -828,6 +862,9 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     const mounted = this.mountedViews.get(viewId);
     if (!mounted) return;
     this.mountedViews.delete(viewId);
+    this.instantiationService.invokeFunction((accessor) => {
+      (accessor.get(IViewsService) as PracViewsService).unregisterMountedView(viewId);
+    });
     mounted.pane.setVisible(false);
     mounted.pane.dispose();
   }

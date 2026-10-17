@@ -120,6 +120,7 @@ Server（node）
 | `WorkbenchFace`（目标名） | workbench 对 embedder 的内部面：view / file mount、focus / release、placements、capabilities；**不承载 part mount** | `vscode-embed` | consumers / `PracVscodeFace` |
 | `EmbeddedWorkbench` | VS Code workbench 本体：workbench 服务、`IWorkbenchLayoutService`、view / editor host、overlay | `WorkbenchFace` | frame / consumers |
 | `PracEditorHost` | editor group 的 owner：`IEditorGroupsService`、group / region、editor group model / panes | workbench、`vscode-host` 的 region channel | view container |
+| `PracViewsService` | 让 mounted `ViewPane` 能按 id 被找到：container-scoped command / focus 用 | workbench、mounted view | frame / container |
 | `ViewPane` | 一个 view 的 UI（上游 `ViewPane`） | `tryMountView` | frame |
 | `ViewPaneContainer` | 一个 container 的运行时（上游） | container context | frame |
 
@@ -217,11 +218,15 @@ editor:
 3. frame 按 `location` / `containerId` 落成区域、具名子区域或 stack 行；
 4. `hostFor(view)` 返回 mount 组件；
 5. `vscode-embed` 的 view host → `mountViewInto(viewId, element)`；
-6. `tryMountView` 取 descriptor，直接 `createInstance(ViewPane)`，`render()`、`setVisible(true)`，放进 `.monaco-pane-view`；
-7. `focusView` / title action / container action 按 owner 分派；
+6. `tryMountView` 取 descriptor，直接 `createInstance(ViewPane)`，`render()`、`setVisible(true)`，放进 `.monaco-pane-view`，并注册到 `PracViewsService`；
+7. `focusView` / title action / container action 按 owner 分派；container action 通过 `PracViewsService.getViewWithId` 找到 mounted pane；
 8. catalogue 减或视图离场：`releaseView`、`removeView`、剪持久化位置。
 
-当前第 6 步**没有 `ViewPaneContainer`**：`ViewPane` 是直接创建的。这是 container/view surface 的缺口，不是 frame 的缺口。
+当前第 6 步**没有 `ViewPaneContainer`**：`ViewPane` 是直接创建的。container context 目前是最小实现：
+
+- `PracViewsService` 只让 `getViewWithId` / focus 找到 mounted pane；
+- view 集合 / 可见性 / 顺序 / size / container title / menu / `viewsWelcome` 仍缺；
+- 所以 `Collapse Folders` 已经能跑，但还不是完整 container。
 
 ### 4.3 editor
 
@@ -276,8 +281,8 @@ editor:
 当前事实：
 
 - `tryMountView` 直接创建 `ViewPane`，没有 `ViewPaneContainer`；
-- `IViewsService.getViewWithId` 返回 null；
-- `Collapse Folders` 这类 container-scoped action 没有 owner；
+- `PracViewsService` 让 mounted pane 可按 id 解析；`Collapse Folders` 已验证可用；
+- 但 view 集合 / 可见性 / 顺序 / size / container title / menu / `viewsWelcome` 仍缺；
 - `view/title`、`view/item/context` 的 action 仍能挂在 view 上。
 
 architecture 只定形状，不定机制：
@@ -308,7 +313,7 @@ architecture 只定形状，不定机制：
 
 - [view catalogue](../in-progress/2026-10-06-vscode-view-catalogue.md)（in-progress）；
 - [editor host](../in-progress/2026-10-07-editor-host.md)（in-progress）；
-- **container / view**：architecture 之后重新推导；不沿用被 superseded 的 container context note；
+- **container / view**：first pass（`PracViewsService` + collapse）已验证；剩余是 view 集合 / 可见性 / 顺序 / container title / menu；不沿用被 superseded 的 container context note；
 - **action / menu**；
 - **status bar / overlay**；
 - **webview / custom editor**；
