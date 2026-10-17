@@ -558,7 +558,9 @@ export function allocateStack(
 ): number[] {
   // A folded row holds its **header**, and that height is part of the stack's extent like any other
   // (its claim reads 0 because a folded row is drawn from its header, not from a `size` of its own).
-  const sized = basis.map((entry, index) => (folded[index] === true ? HEADER_HEIGHT : entry.size));
+  const sized = basis.map((entry, index) =>
+    folded[index] === true ? STACK_HEADER_HEIGHT : entry.size,
+  );
   const open = basis.map((_, index) => index).filter((index) => folded[index] !== true);
   // C8: when every open row has a claim it has a **proportion** (after a drag, the drag writes every
   // open row; a view that declares a size is the same), so a region resize shares the extent by
@@ -568,7 +570,10 @@ export function allocateStack(
   const hasProportions = open.length > 0 && open.every((index) => basis[index]!.size > 0);
   if (hasProportions) {
     const total = open.reduce((sum, index) => sum + basis[index]!.size, 0);
-    const contentForOpen = Math.max(0, content - (basis.length - open.length) * HEADER_HEIGHT);
+    const contentForOpen = Math.max(
+      0,
+      content - (basis.length - open.length) * STACK_HEADER_HEIGHT,
+    );
     for (const index of open) {
       const entry = basis[index]!;
       sized[index] = Math.max(
@@ -1860,6 +1865,15 @@ export function pruneEmbedderRegions(state: LayoutState): LayoutState {
 export const HEADER_HEIGHT = 20;
 
 /**
+ * The height of a stack row's header.
+ *
+ * A stack row mirrors the view's own pane header (VS Code's is 22), while the
+ * selector bar and tab strip keep {@link HEADER_HEIGHT}. The two are separate so
+ * a stack row can align with what the view draws without moving the other chrome.
+ */
+export const STACK_HEADER_HEIGHT = 22;
+
+/**
  * Smallest height a stack entry may be dragged to.
  *
  * An entry is hidden by **folding** it, not by dragging it away, so the floor only has to keep
@@ -2175,7 +2189,7 @@ export function setEntryFolded(
   const before = node.size;
   const remembered = measuredHeight ?? node.size ?? node.cachedSize;
   const cachedSize = remembered === undefined ? undefined : Math.round(remembered);
-  // A folded row has **no height**: its 20px header is drawing (`HEADER_HEIGHT` is applied by the
+  // A folded row has **no height**: its 22px header is drawing (`STACK_HEADER_HEIGHT` is applied by the
   // frame/allocation to `collapsed` rows), and the height it remembers lives in `cachedSize` (E1).
   const size = collapsed
     ? 0
@@ -2204,8 +2218,8 @@ export function setEntryFolded(
   // body the fold frees (or the body the unfold needs), not the 20px the header keeps.
   // An open flexible row's `size` is 0; its drawn height (the caller's measurement) is what it
   // actually gives up. A fixed row falls back to its own size when no measurement is available.
-  const beforeOccupied = node.collapsed === true ? HEADER_HEIGHT : (measuredHeight ?? before);
-  const afterOccupied = collapsed ? HEADER_HEIGHT : size;
+  const beforeOccupied = node.collapsed === true ? STACK_HEADER_HEIGHT : (measuredHeight ?? before);
+  const afterOccupied = collapsed ? STACK_HEADER_HEIGHT : size;
   const delta = beforeOccupied - afterOccupied;
   if (delta !== 0) {
     const parent = findParentSplit(tree, entryId);

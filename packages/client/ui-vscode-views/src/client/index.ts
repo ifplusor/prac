@@ -56,15 +56,21 @@ export function apply(ctx: Context): void {
     () =>
       slots.inject(SLOT, () => {
         /** The live registration per view, so a view that leaves or retitles can re-register. */
-        const registered = new Map<string, { label: string; dispose: () => void }>();
+        const registered = new Map<string, { label: string; icon: string; dispose: () => void }>();
         /** The pane header's title per view; survives a catalogue re-read. */
         const paneTitles = new Map<string, string>();
+        /** The pane header's icon class per view. */
+        const paneIcons = new Map<string, string>();
         const sync = (): void => {
           const entries = viewEntries();
           const byView = new Map(entries.map((entry) => [entry.view, entry]));
           for (const [view, record] of Array.from(registered)) {
             const entry = byView.get(view);
-            if (entry !== undefined && (paneTitles.get(view) ?? entry.title) === record.label) {
+            if (
+              entry !== undefined &&
+              (paneTitles.get(view) ?? entry.title) === record.label &&
+              (paneIcons.get(view) ?? "") === record.icon
+            ) {
               continue;
             }
             record.dispose();
@@ -73,15 +79,19 @@ export function apply(ctx: Context): void {
           for (const { view, title } of entries) {
             if (registered.has(view)) continue;
             const label = paneTitles.get(view) ?? title;
+            const icon = paneIcons.get(view) ?? "";
             // Resolve the mount component once per registration: hostFor can return
             // a fresh component, and a new identity on every render would remount
             // the whole view (and its pane header) forever.
             const View = host.hostFor(view);
+            // `icon` is this adapter's extra slot option; the registry's base
+            // options type does not know it, so keep it out of the literal's
+            // excess-property check.
+            const options = { name: SLOT, id: view, label, icon };
             registered.set(view, {
               label,
-              dispose: slots.register({ name: SLOT, id: view, label }, () =>
-                createElement(ViewWithTitle, { view, View }),
-              ),
+              icon,
+              dispose: slots.register(options, () => createElement(ViewWithTitle, { view, View })),
             });
           }
         };
@@ -96,9 +106,10 @@ export function apply(ctx: Context): void {
          * @param view - the prac view id.
          * @param label - the pane header's current title.
          */
-        const retitle = (view: string, label: string): void => {
-          if (paneTitles.get(view) === label) return;
+        const retitle = (view: string, label: string, icon: string): void => {
+          if (paneTitles.get(view) === label && paneIcons.get(view) === icon) return;
           paneTitles.set(view, label);
+          paneIcons.set(view, icon);
           const record = registered.get(view);
           if (record === undefined) return;
           record.dispose();
@@ -128,7 +139,8 @@ export function apply(ctx: Context): void {
             if (!(root instanceof ShadowRoot)) return undefined;
             const read = (): void => {
               const label = root.querySelector(".pane-header .title")?.textContent?.trim();
-              if (label !== undefined && label !== "") retitle(view, label);
+              const icon = root.querySelector(".pane-header .icon")?.className ?? "";
+              if (label !== undefined && label !== "") retitle(view, label, icon);
             };
             read();
             const observer = new MutationObserver(read);
@@ -144,6 +156,7 @@ export function apply(ctx: Context): void {
           for (const { dispose } of registered.values()) dispose();
           registered.clear();
           paneTitles.clear();
+          paneIcons.clear();
         };
       }),
     "prac-client-ui-vscode-views: one view per app view",

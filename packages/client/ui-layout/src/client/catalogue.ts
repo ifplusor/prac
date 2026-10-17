@@ -64,6 +64,8 @@ export function viewSource(viewId: string): string {
 let declaredViewIds: ReadonlySet<string> = new Set<string>();
 /** The display title each `prac.view` entry declares, keyed by view id. */
 let declaredViewLabels: ReadonlyMap<string, string> = new Map<string, string>();
+/** The icon class each `prac.view` entry declares, keyed by view id. */
+let declaredViewIcons: ReadonlyMap<string, string> = new Map<string, string>();
 
 /**
  * Re-read the `prac.view` slot registry into {@link declaredViewIds}.
@@ -74,15 +76,19 @@ let declaredViewLabels: ReadonlyMap<string, string> = new Map<string, string>();
 export function readDeclaredViewIds(slots: Context["slots"]): ReadonlySet<string> {
   const ids = new Set<string>();
   const labels = new Map<string, string>();
+  const icons = new Map<string, string>();
   for (const entry of slots.entries(VIEW_SLOT)) {
     const id = entry.options.id;
     if (id === undefined || id === "") continue;
     ids.add(id);
     const label = entry.options.label;
     if (typeof label === "string" && label !== "") labels.set(id, label);
+    const icon = (entry.options as { icon?: unknown }).icon;
+    if (typeof icon === "string" && icon !== "") icons.set(id, icon);
   }
   declaredViewIds = ids;
   declaredViewLabels = labels;
+  declaredViewIcons = icons;
   return ids;
 }
 
@@ -97,6 +103,20 @@ export function readDeclaredViewIds(slots: Context["slots"]): ReadonlySet<string
  */
 export function declaredViewLabel(viewId: string): string | undefined {
   return declaredViewLabels.get(viewId);
+}
+
+/**
+ * The icon class a `prac.view` entry declared, if any.
+ *
+ * The value is an opaque class name the declaring adapter owns (VS Code passes
+ * its codicon class; another adapter may pass its own). The frame only renders
+ * it, never interprets it.
+ *
+ * @param viewId - the view identity.
+ * @returns the declared icon class, or undefined.
+ */
+export function declaredViewIcon(viewId: string): string | undefined {
+  return declaredViewIcons.get(viewId);
 }
 
 /**

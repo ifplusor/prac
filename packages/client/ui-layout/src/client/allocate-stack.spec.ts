@@ -130,7 +130,7 @@ describe("entrySashState (B2/B4/B7: SashState of a row boundary)", () => {
     const heights = drawn({
       "left.explorer/stack/a": 200,
       "left.explorer/stack/b": 200,
-      "left.explorer/stack/c": 20,
+      "left.explorer/stack/c": 22,
     });
     // b looks down at a folded c: nothing there can take room.
     expect(entrySashState(state, row("b"), heights)).toBe("disabled");
@@ -142,7 +142,7 @@ describe("entrySashState (B2/B4/B7: SashState of a row boundary)", () => {
     const state = shaped(["b"]);
     const heights = drawn({
       "left.explorer/stack/a": 200,
-      "left.explorer/stack/b": 20,
+      "left.explorer/stack/b": 22,
       "left.explorer/stack/c": 200,
     });
     // The boundary under the folded b still has the open a above and c below.
@@ -258,18 +258,18 @@ describe("allocateStack (C1/C5/C6/C8: the stack shares, one row at a time)", () 
       false,
       true,
     ]);
-    // 680/600 of the two open rows, plus the folded header.
-    expect(sizes[0]).toBeCloseTo((680 * 200) / 600);
-    expect(sizes[1]).toBeCloseTo((680 * 400) / 600);
-    expect(sizes[2]).toBe(20);
+    // 678/600 of the two open rows, plus the 22px folded header.
+    expect(sizes[0]).toBeCloseTo((678 * 200) / 600);
+    expect(sizes[1]).toBeCloseTo((678 * 400) / 600);
+    expect(sizes[2]).toBe(22);
   });
 
   it("keeps the open sizes when they already fill the content around a folded header", () => {
     // The drag seeds the rows with their drawn heights; in that state the proportional pass is the
     // identity and must not move anything (the elastic bounce came from re-fitting stale claims).
     expect(
-      allocateStack(rows([{ size: 120 }, { size: 298 }, { size: 300 }]), 438, [false, false, true]),
-    ).toEqual([120, 298, 20]);
+      allocateStack(rows([{ size: 120 }, { size: 298 }, { size: 300 }]), 440, [false, false, true]),
+    ).toEqual([120, 298, 22]);
   });
 });
 
@@ -780,18 +780,18 @@ describe("setEntryFolded routes the difference (design C5/C6)", () => {
   it("gives a folded row's room to the rows below, whole, from the last one back", () => {
     const folded = setEntryFolded(stack({ a: 200, b: 200, c: 200 }), "left/stack/a", true, 200);
     // `a` is a header; the last row took the 180 the fold freed — not a share of it.
-    expect(heights(folded)).toEqual({ a: 0, b: 200, c: 380 });
+    expect(heights(folded)).toEqual({ a: 0, b: 200, c: 378 });
   });
 
   it("uses an unsized row's drawn height as the room its fold frees", () => {
     const folded = setEntryFolded(stack({ a: 0, b: 200, c: 200 }), "left/stack/a", true, 200);
-    expect(heights(folded)).toEqual({ a: 0, b: 200, c: 380 });
+    expect(heights(folded)).toEqual({ a: 0, b: 200, c: 378 });
   });
 
   it("takes what an unfolded row needs from below, never under the floor", () => {
     const state = stack({ a: 200, b: 60, c: 340 });
     const folded = setEntryFolded(state, "left/stack/a", true, 200);
-    expect(heights(folded).c).toBe(520);
+    expect(heights(folded).c).toBe(518);
     const opened = setEntryFolded(folded, "left/stack/a", false);
     // `a` remembers 200: the last row gives it back.
     expect(heights(opened)).toEqual({ a: 200, b: 60, c: 340 });
@@ -799,7 +799,7 @@ describe("setEntryFolded routes the difference (design C5/C6)", () => {
 
   it("falls back to the rows above when there is nothing below, nearest first", () => {
     const folded = setEntryFolded(stack({ a: 200, b: 200, c: 200 }), "left/stack/c", true, 200);
-    expect(heights(folded)).toEqual({ a: 200, b: 380, c: 0 });
+    expect(heights(folded)).toEqual({ a: 200, b: 378, c: 0 });
   });
 
   it("clamps an unfolded row to the view's ceiling", () => {

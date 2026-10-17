@@ -17,7 +17,12 @@ import {
  * owns: that the surface renders exactly what this returns.
  */
 type SlotEntry = {
-  readonly options: { readonly key?: string; readonly id?: string; readonly label?: string };
+  readonly options: {
+    readonly key?: string;
+    readonly id?: string;
+    readonly label?: string;
+    readonly icon?: string;
+  };
 };
 
 /**

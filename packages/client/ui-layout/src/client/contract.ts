@@ -87,7 +87,7 @@ export interface RegionNode {
   /**
    * Whether the region renders at 0px while staying present.
    *
-   * A **stack row** (`entry`) is the exception: it is a header, drawn at `HEADER_HEIGHT`, and its
+   * A **stack row** (`entry`) is the exception: it is a header, drawn at `STACK_HEADER_HEIGHT`, and its
    * `size` is 0 rather than a height (the design's E1/J3). An ordinary region collapses to 0.
    */
   collapsed: boolean;

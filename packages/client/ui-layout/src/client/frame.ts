@@ -31,6 +31,7 @@ import {
   DSH_SIDEBAR_VIEW,
   DSH_VIEW_SOURCE,
   VIEW_SLOT,
+  declaredViewIcon,
   declaredViewLabel,
   isDeclaredView,
   viewSource,
@@ -64,6 +65,7 @@ import {
   visibleViews,
   MIN_ENTRY,
   HEADER_HEIGHT,
+  STACK_HEADER_HEIGHT,
   altDragTarget,
   redistributeOnDrag,
   stackDragAnchor,
@@ -238,11 +240,34 @@ function viewLabel(viewId: string): string {
   return declaredViewLabel(viewId) ?? (viewId.split(":").pop() ?? viewId).replace(/[-_]/g, " ");
 }
 
+/** The icon a stacked view declared, as an opaque class (the adapter owns its meaning). */
+const viewIcon = (viewId: string): string | undefined => declaredViewIcon(viewId);
+
+/** The icon element, or null when the view declared none. */
+const viewIconNode = (viewId: string): ReactElement | null => {
+  const icon = viewIcon(viewId);
+  return icon === undefined
+    ? null
+    : createElement("span", {
+        "aria-hidden": "true",
+        className: icon,
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flex: "0 0 auto",
+          width: "16px",
+          height: "100%",
+          fontSize: "14px",
+        },
+      });
+};
+
 /** The header a stacked view carries: its label plus a fold toggle. */
 
 const STACK_HEADER_STYLE: StyleObject = {
   display: "block",
-  height: HEADER_HEIGHT,
+  height: STACK_HEADER_HEIGHT,
   boxSizing: "border-box",
   width: "100%",
   textAlign: "left",
@@ -855,7 +880,12 @@ function regionStyle(node: RegionNode, dir: Dir, fill = false, allocated?: numbe
     // A folded stack row is **only its header** — a row that vanished entirely would lose the fold
     // switch that opens it again (design B4/D1).
     if (node.entry === true)
-      return { flex: `0 0 ${HEADER_HEIGHT}px`, minWidth: 0, minHeight: 0, overflow: "hidden" };
+      return {
+        flex: `0 0 ${STACK_HEADER_HEIGHT}px`,
+        minWidth: 0,
+        minHeight: 0,
+        overflow: "hidden",
+      };
     return { flex: "0 0 0px", minWidth: 0, minHeight: 0, overflow: "hidden" };
   }
   // The minimum is expressed on the split's own axis: a flex region with
@@ -1347,6 +1377,7 @@ export function createFrame(
           },
           node.collapsed === true ? "\u25b8" : "\u25be",
         ),
+        viewIconNode(viewId),
         createElement(
           "span",
           {
@@ -1390,7 +1421,7 @@ export function createFrame(
             top: SASH_SIZE,
             left: 0,
             right: "120px",
-            height: HEADER_HEIGHT,
+            height: STACK_HEADER_HEIGHT,
             zIndex: 6,
             display: "flex",
             alignItems: "center",

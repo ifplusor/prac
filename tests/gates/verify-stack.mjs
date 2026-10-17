@@ -325,7 +325,7 @@ const checks = {
   // leaves the folded header at its 20px.
   foldedMiddleStillDrags:
     entryOf(adjacent, ADDED_VIEW)?.collapsed === true &&
-    near(heightOf(adjacent, ADDED_VIEW), 20, 2) &&
+    near(heightOf(adjacent, ADDED_VIEW), 22, 2) &&
     Math.abs(heightOf(adjacent, BASE_VIEW) - heightOf(foldedMiddle, BASE_VIEW)) > 10 &&
     Math.abs(heightOf(adjacent, THIRD_VIEW) - heightOf(foldedMiddle, THIRD_VIEW)) > 10 &&
     openIn(adjacent) === 2,
