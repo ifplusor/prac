@@ -1,7 +1,7 @@
 # VS Code 的内部结构（参考）
 
 > 这篇记 VS Code 自己的结构：它内部怎么分成两半、平台服务是什么、扩展宿主协议跑在什么通道上、诊断是怎么走的、agent / MCP / 工具 / skill / prompt 分别做在哪一层，以及 UI 布局的 frame / part / container / pane / view 概念模型。
-> **prac 怎么用它**（用哪种运行形态、语言服务怎么接）在 [in-progress/2026-09-19-architecture.md](../.agents/notes/in-progress/2026-09-19-architecture.md) 与 [architecture.md](architecture.md)（§2.2 / §4.2）。broker 那份设计已降级为那篇里的 P1（[abandoned/2026-09-16-vscode-integration-transport.md](../.agents/notes/abandoned/2026-09-16-vscode-integration-transport.md)）。**行号与数字都指 pinned `1.137.0` checkout。**
+> **行号与数字都指 pinned `1.137.0` checkout。**
 
 > **覆盖什么**：运行形态 / 平台服务 / UI 布局 / 扩展宿主协议 / 诊断 / 激活 / agent 层。
 > 目录：1 运行形态 · 2 平台服务 · 3 UI 布局 · 4 扩展宿主协议 · 5 诊断 · 6 激活 · 7 agent 层
@@ -61,7 +61,6 @@ flowchart LR
 
 ## 3. UI 布局概念模型：frame / part / container / pane / view
 
-> 这一节是 VS Code 自己的布局概念，不是 prac 的 region/view 模型。**词相同不代表概念相同**：prac 的 `container` 是具名子区域，VS Code 的 `ViewContainer` 是 part 内部的视图分组；prac 的 `view` 是唯一组合单位，VS Code 的 `ViewPane` 是 container 里的一个 pane。
 > 上游落点（pinned 1.137.0）：`src/vs/workbench/browser/layout.ts`、`src/vs/base/browser/ui/grid/grid.ts`、`src/vs/workbench/browser/part.ts`、`src/vs/workbench/browser/parts/**`、`src/vs/workbench/browser/parts/views/**`、`src/vs/base/browser/ui/splitview/**`、`src/vs/workbench/services/views/**`、`src/vs/workbench/browser/parts/editor/**`、`src/vs/platform/contextview/**`。
 
 ### 1. 总图
@@ -138,18 +137,6 @@ Overlays（不是 Part）：
 - **全局 overlay**：Quick Input、Context View（菜单）、Hover、Notifications、Dialogs；不在 grid 里，住在 workbench 的 `mainContainer`（prac 里是 float host / `shell.overlay`），按视口坐标定位。
 - **view 内部的浮层**：补全列表、webview 自己的 overlay 等，归 view 自己的隔离盒子，不和全局 overlay 同层。
 
-### 6. 对 prac / adaptor 的含义
-
-- **part** → prac 的顶层区域/part（sidebar/panel/aux/editor）；
-- **container** → prac 的具名子区域（视觉分组）+ **`vscode-host` adaptor 内部的 container context**；
-- **view** → `prac.view`（唯一的组合单位）；
-- **pane** → view 的 header/body（实际的 `ViewPane`，挂在 frame 的隔离盒子里）；
-- **editor group** → `PracEditorHost` 那条平行链，不混进 view container。
-
-关键句：**part 是网格区域；container 是 part 里的视图分组；pane 是 container 里的可折叠项；view 是 pane 的一种；editor group 是另一条链；overlay 不在网格里。**
-
-prac 的 frame 不认 part/container；这些语义由 `vscode-host` 这个 adaptor 承接（设计见 [2026-10-17-view-container-ownership.md](../.agents/notes/proposed/2026-10-17-view-container-ownership.md)）。
-
 ## 4. 扩展宿主协议与物理通道
 
 **扩展宿主协议，以及它跑在什么上**：`api/common/extHost.protocol.ts`（**4218 行**）——代理标识 **168** 个 = `MainContext` **87** + `ExtHostContext` **81**；`MainThreadXxxShape` **86** 个接口 / **500** 个 `$` 方法；`ExtHostXxxShape` **81** 个接口 / **441** 个 `$` 方法（怎么数的：标识数两个 `…Context` 表里的条目，方法数 `interface XxxShape` 里以 `$` 开头的方法，都能用一条命令复算）。**主线程那 87 个实现全在渲染器里**：78 个 `@extHostNamedCustomer(MainContext.MainThreadXxx)` + 9 个手工注册（Documents / TextEditors / Webviews / WebviewPanels / WebviewViews / CustomEditors / NotebookDocuments / NotebookEditors / ChatOutputRenderer），全在 `src/vs/workbench/api/browser/**`——**协议之外没有 server 侧的实现可复用**。
@@ -157,7 +144,7 @@ prac 的 frame 不认 part/container；这些语义由 `vscode-host` 这个 adap
 协议本身是 `IRPCProtocol`（`proxyIdentifier.ts:8`），实现是 `RPCProtocol`（`rpcProtocol.ts:115`），两端各一个实例。消息是一帧一条的二进制：帧头 `uint8 type` + `uint32 req`（`:518-522`），12 种 type（`:940-953`：请求 1–4 / `Acknowledged` 5 / `Cancel` 6 / 回复 7–12）。`$` 方法用 JS `Proxy` 现造函数发出去（`:252`/`:461`），对端按 `rpcId` + `method` 在 `_doInvokeHandler` 里落到本地对象（`:449`）。物理通道被 `IMessagePassingProtocol`（`ipc.ts:99-106`）挡住了，两端都不知道自己跑在什么上：
 
 - **桌面**：Electron **utility 进程**（不是 `child_process.fork`）+ **MessagePort**（`localProcessExtensionHost.ts:416`，环境变量 `VSCODE_WILL_SEND_MESSAGE_PORT`；扩展宿主侧 `api/node/extensionHostProcess.ts:183-203`）；
-- **远程 / web（prac 的形态）**：浏览器 `new WebSocket`（`browserSocketFactory.ts:80`）→ code server 的 `upgradeToISocket`（`remoteExtensionHostAgentServer.ts:237`）→ `cp.fork` 出扩展宿主（`extensionHostConnection.ts:290`）→ 把这条 WS 与扩展宿主的管道 / socket 对拷（`:180-183` / `:190-200`；控制消息 `VSCODE_EXTHOST_IPC_SOCKET` / `…_READY`，连接方式由 `VSCODE_EXTHOST_WILL_SEND_SOCKET` / `VSCODE_EXTHOST_IPC_HOOK` 二选一）。
+- **远程 / web**：浏览器 `new WebSocket`（`browserSocketFactory.ts:80`）→ code server 的 `upgradeToISocket`（`remoteExtensionHostAgentServer.ts:237`）→ `cp.fork` 出扩展宿主（`extensionHostConnection.ts:290`）→ 把这条 WS 与扩展宿主的管道 / socket 对拷（`:180-183` / `:190-200`；控制消息 `VSCODE_EXTHOST_IPC_SOCKET` / `…_READY`，连接方式由 `VSCODE_EXTHOST_WILL_SEND_SOCKET` / `VSCODE_EXTHOST_IPC_HOOK` 二选一）。
 
 **发起方永远是渲染器**：远程要渲染器发 `desiredConnectionType === ExtensionHost`（`remoteAgentConnection.ts:362`）服务端才 fork；桌面由渲染器 `createExtensionHost()`（`localProcessExtensionHost.ts:225`）让主进程起 utility 进程。⇒ **没有页面就没有扩展宿主**，也就没有任何扩展能力。
 
@@ -203,9 +190,3 @@ prac 的 frame 不认 part/container；这些语义由 `vscode-host` 这个 adap
 **⑤ agent host**（`platform/agentHost/**`）：把**外部 agent** 当被托管的进程跑起来——`node/copilot`、`node/claude`、`node/codex`、`node/localCommands`，并给它们一整套宿主设施：changeset（`agentHostChangesetService.ts`）、checkpoint（`agentHostCheckpointService.ts`）、plan review（`agentHostPlanReview.ts`）、git 和独立 worktree（`agentHostGitService.ts`；协议方法比如 `vscode/createAgentHostDetachedWorktree`，见 `agentHostExtensionProtocol.ts`）、文件系统 provider、customization、BYOK 模型（`agentHostByokLm.ts`）、managed rules / settings、OTel。
 
 **和扩展生态的关系**：上面每一项**都有对应的扩展声明点或 API**——用得最多的就是 Copilot 扩展（它同时声明了 `chatParticipants` / `languageModelTools` / `languageModelToolSets` / `languageModelChatProviders` / `mcpServerDefinitionProviders` / `chatSessions` / `chatAgents` / `chatPromptFiles` / `chatSkills`）。⇒ **在 VS Code 里，"支持 agent"本身就是一块扩展面**：core 出循环和注册表，VS Code 扩展出 agent、工具、模型、会话、定制。MCP 还多一条：VS Code 会从**别的工具**那里导入服务器定义（`ExternalDiscoverySource`：Claude Desktop / Copilot / Windsurf / Cursor 的全局与工作区配置，`mcpConfiguration.ts:54-55`），也会 discovery 工作区里的 mcp 配置（`discovery/workspaceDotMcpDiscovery.ts`）。
-
-## 相关
-
-- [architecture.md](architecture.md)：prac 的目标架构与 `vscode-host` 的 adaptor 边界。
-- [concepts.md](concepts.md)：prac 的视图/区域词表。
-- [2026-10-17-view-container-ownership.md](../.agents/notes/proposed/2026-10-17-view-container-ownership.md)：adaptor 的 view container context 设计。
