@@ -57,23 +57,30 @@ export function apply(ctx: Context): void {
       slots.inject(SLOT, () => {
         /** The live registration per view, so a view that leaves or retitles can re-register. */
         const registered = new Map<string, { label: string; dispose: () => void }>();
+        /** The pane header's title per view; survives a catalogue re-read. */
+        const paneTitles = new Map<string, string>();
         const sync = (): void => {
           const entries = viewEntries();
           const byView = new Map(entries.map((entry) => [entry.view, entry]));
           for (const [view, record] of Array.from(registered)) {
             const entry = byView.get(view);
-            if (entry !== undefined && entry.title === record.label) continue;
+            if (entry !== undefined && (paneTitles.get(view) ?? entry.title) === record.label) {
+              continue;
+            }
             record.dispose();
             registered.delete(view);
           }
           for (const { view, title } of entries) {
             if (registered.has(view)) continue;
-            // The component renders an empty host until the app has created the
-            // view, then fills it — the bridge's direction, one level up.
+            const label = paneTitles.get(view) ?? title;
+            // Resolve the mount component once per registration: hostFor can return
+            // a fresh component, and a new identity on every render would remount
+            // the whole view (and its pane header) forever.
+            const View = host.hostFor(view);
             registered.set(view, {
-              label: title,
-              dispose: slots.register({ name: SLOT, id: view, label: title }, () =>
-                createElement(ViewWithTitle, { view }),
+              label,
+              dispose: slots.register({ name: SLOT, id: view, label }, () =>
+                createElement(ViewWithTitle, { view, View }),
               ),
             });
           }
@@ -90,8 +97,10 @@ export function apply(ctx: Context): void {
          * @param label - the pane header's current title.
          */
         const retitle = (view: string, label: string): void => {
+          if (paneTitles.get(view) === label) return;
+          paneTitles.set(view, label);
           const record = registered.get(view);
-          if (record === undefined || record.label === label) return;
+          if (record === undefined) return;
           record.dispose();
           registered.delete(view);
           sync();
@@ -106,7 +115,13 @@ export function apply(ctx: Context): void {
          *
          * @param props - the view id.
          */
-        function ViewWithTitle({ view }: { view: string }): ReactElement | null {
+        function ViewWithTitle({
+          view,
+          View,
+        }: {
+          view: string;
+          View: () => ReactElement | null;
+        }): ReactElement | null {
           const ref = useRef<HTMLDivElement | null>(null);
           useLayoutEffect(() => {
             const root = ref.current?.getRootNode();
@@ -120,7 +135,6 @@ export function apply(ctx: Context): void {
             observer.observe(root, { childList: true, subtree: true, characterData: true });
             return () => observer.disconnect();
           }, [view]);
-          const View = host.hostFor(view);
           return createElement("div", { ref, style: { display: "contents" } }, createElement(View));
         }
         sync();
@@ -129,6 +143,7 @@ export function apply(ctx: Context): void {
           stop();
           for (const { dispose } of registered.values()) dispose();
           registered.clear();
+          paneTitles.clear();
         };
       }),
     "prac-client-ui-vscode-views: one view per app view",
