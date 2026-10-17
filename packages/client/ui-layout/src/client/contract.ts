@@ -24,6 +24,8 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface SlotMap {
     /** prac's slot: a `root`-scoped list slot every prac surface declares one view into. */
     "prac.view": { kind: "list"; scope: "root" };
+    /** The per-view action surface a `prac.view` owner may fill; keyed by view id. */
+    "prac.viewActions": { kind: "keyed"; scope: "root" };
     // The child slots of the `root` slot prac registers — declared by their **owner**, which
     // is the frame (see the `ui-slots` contract: a slot table is merged by the plugin that
     // owns the slot, and reading entries stays string-keyed and dynamic). prac owns the frame

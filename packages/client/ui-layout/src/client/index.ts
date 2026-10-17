@@ -105,6 +105,8 @@ export function apply(ctx: Context): void {
           // The slot prac's own views (`prac:*`) and VS part hosts (`vscode:*`)
           // register into; the entry's declared id is its view id.
           "prac.view": { kind: "list", scope: "root" },
+          // The action surface a view may fill; keyed by its `prac.view` id.
+          "prac.viewActions": { kind: "keyed", scope: "root" },
         },
       },
       // The current session is the frame's business (it titles the page): the source comes

@@ -118,7 +118,7 @@ interface PointerDragEvent {
  * keys, so a dispatch to a key the frame did not declare is a type error.
  */
 type RenderSlot = import("@deepseek-ai/dsh-client-ui-slots").PropsRenderSlots<
-  "sidebar" | "main" | "rightbar" | "shell.overlay" | "prac.view"
+  "sidebar" | "main" | "rightbar" | "shell.overlay" | "prac.view" | "prac.viewActions"
 >["renderSlot"];
 
 // ── the frame ─────────────────────────────────────────────────────────
@@ -1410,6 +1410,19 @@ export function createFrame(
             },
           },
           viewLabel(viewId),
+        ),
+        createElement(
+          "div",
+          {
+            "data-prac-stack-actions": node.id,
+            style: {
+              display: "flex",
+              alignItems: "center",
+              flex: "0 0 auto",
+              height: "100%",
+            },
+          },
+          renderSlot("prac.viewActions", {}, { entryKey: viewId }),
         ),
       );
 
