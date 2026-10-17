@@ -856,6 +856,19 @@ const FRAME_STYLES = `
 :host([data-prac-view-chrome="frame"]) .pane-header .icon,
 :host([data-prac-view-chrome="frame"]) .pane-header .title { display: none; }
 :host([data-prac-view-chrome="frame"]) .pane-header { pointer-events: none; }
+/* The action slot is the row's own, not a hover affordance: keep the view's action
+   icons visible exactly as the view would show them on a focused pane. */
+:host([data-prac-view-chrome="frame"]) .pane-header .actions {
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  align-items: center;
+  height: 100%;
+}
+:host([data-prac-view-chrome="frame"]) .pane-header .actions .action-label {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
 :host([data-prac-view-chrome="frame"]) .pane-header .actions,
 :host([data-prac-view-chrome="frame"]) .pane-header .actions * { pointer-events: auto; }
 `;
