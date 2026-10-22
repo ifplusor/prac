@@ -13,7 +13,8 @@
     "verify:containers": "node tests/gates/verify-containers.mjs",
     "verify:persistence": "node tests/gates/verify-persistence.mjs",
     "verify:split": "node tests/gates/verify-split.mjs",
-    "verify:resize": "node tests/gates/verify-resize.mjs"
+    "verify:resize": "node tests/gates/verify-resize.mjs",
+    "verify:dynamic": "node tests/gates/verify-dynamic.mjs"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

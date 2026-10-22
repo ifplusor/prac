@@ -1,0 +1,19 @@
+{
+  "name": "gate-dynamic",
+  "publisher": "prac",
+  "version": "1.0.0",
+  "engines": { "vscode": "^1.0.0" },
+  "main": "./extension.js",
+  "activationEvents": ["*"],
+  "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "pracGateView",
+          "name": "Dynamic Gate",
+          "when": "pracGateVisible"
+        }
+      ]
+    }
+  }
+}
