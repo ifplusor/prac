@@ -77,11 +77,11 @@ VS Code 的 UI 模型是 part / container / pane / view / editor group；prac �
 | **group** | `VscodeViewGroupDefinition` | `VscodeViewGroup` | `ViewGroupState` → `ViewGroup` |
 | **view** | `VscodeViewDefinition` | `VscodeView` | `View` + `VscodeViewHost` |
 
-prac core 的 CRD-lite 机制见 [UI resource model](../proposed/2026-10-22-ui-crd.md)：`ResourceDefinition` / `ResourceDeclaration` / registry / materializer。`vscode-host` 只注册 concrete definition 并产生 concrete CR：`VscodeViewGroupDefinition` / `VscodeViewGroup`、`VscodeViewDefinition` / `VscodeView`。
+prac core 的 CRD-lite 机制见 [UI resource model](../proposed/2026-10-22-ui-crd.md)：`ViewGroupDefinition` / `ViewDefinition`、`ViewGroupResource` / `ViewResource`、两个 registry / materializer。`vscode-host` 只注册 concrete definition 并产生 concrete CR：`VscodeViewGroupDefinition` / `VscodeViewGroup`、`VscodeViewDefinition` / `VscodeView`。
 
 - `VscodeViewGroupDefinition` / `VscodeViewDefinition` 由 `vscode-host` 注册；
 - `VscodeViewGroup` / `VscodeView` 由 `vscode-host` 产生；
-- frame / arrangement 只认 core 的 `ResourceDefinition` / `ResourceDeclaration`，不认 `vscode`；
+- frame / arrangement 只认 core 的 `ViewGroupDefinition` / `ViewDefinition`、`ViewGroupResource` / `ViewResource`，不认 `vscode`；
 - 只有 view / view group 是 CR；action / overlay / part / host 不 CRD 化。
 
 ### 2.2 group
@@ -146,7 +146,8 @@ View（prac runtime）
 | --- | --- |
 | `PracVscodeFace` | catalogue / `hostFor` / `focusView` / `runCommand` / file placement / capabilities |
 | `VscodeCatalogueEntry` | catalogue 一行：`view` / `appId` / `title` / `source` / `role` / `containerId` / `containerTitle`（`role` 和 `containerId` 只是默认提示） |
-| `ResourceDefinition` | core 的 CRD 机制 |
+| `ViewGroupDefinition` / `ViewDefinition` | core 的类别 CRD 接口 |
+| `ViewGroupResource` / `ViewResource` | core 的类别 CR 信封 |
 | `VscodeViewGroupDefinition` / `VscodeViewDefinition` | `vscode-host` 注册的 CRD |
 | `VscodeViewGroup` / `VscodeView` | `vscode-host` 产生的 CR |
 | `prac.view` | `View` CR（vscode 具体为 `VscodeView`） |
@@ -177,17 +178,17 @@ View（prac runtime）
 ### 3.1 声明契约
 
 ```ts
-interface VscodeViewGroupDefinition extends ResourceDefinition<VscodeViewGroupSpec, ViewGroup> {
+interface VscodeViewGroupDefinition implements ViewGroupDefinition {
   bindingFactory(spec: VscodeViewGroupSpec): ContainerBinding | EditorGroupBinding;
 }
 
-interface VscodeViewGroup extends ResourceDeclaration<VscodeViewGroupSpec> {}
+interface VscodeViewGroup extends ViewGroupResource {}
 
-interface VscodeViewDefinition extends ResourceDefinition<VscodeViewSpec, View> {
+interface VscodeViewDefinition implements ViewDefinition {
   hostFactory(decl: VscodeView): VscodeViewHost;
 }
 
-interface VscodeView extends ResourceDeclaration<VscodeViewSpec> {}
+interface VscodeView extends ViewResource {}
 ```
 
 - `Definition = 类型 / CRD`；
