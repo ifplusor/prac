@@ -227,6 +227,33 @@ const explorerSections = await page.evaluate(() => {
   };
 });
 
+// Container title actions: the bar must render the group binding's actions and a
+// click must dispatch without tearing the bar down. Which action is product
+// behaviour; this gate only asserts the wiring.
+const actionBars = await page.evaluate(() =>
+  [...document.querySelectorAll("[data-prac-container-action-bar]")].map((bar) => ({
+    container: bar.getAttribute("data-prac-container-action-bar"),
+    buttons: [...bar.querySelectorAll("button[data-prac-group-action], button[data-prac-container-action]")]
+      .map((button) => ({
+        id:
+          button.getAttribute("data-prac-group-action") ??
+          button.getAttribute("data-prac-container-action"),
+        label: (button.textContent ?? "").trim(),
+        disabled: button.disabled,
+      }))
+      .filter((button) => button.id !== null),
+  })),
+);
+const actionClicked = await page.evaluate(() => {
+  const button = document.querySelector(
+    "[data-prac-container-action-bar] button[data-prac-group-action], [data-prac-container-action-bar] button[data-prac-container-action]",
+  );
+  if (!button) return false;
+  button.click();
+  return true;
+});
+await page.waitForTimeout(500);
+
 // Empty the container the way a session ends up when its views have been hidden.
 await page.evaluate((id) => {
   for (const view of globalThis.__pracLayout.listViews()) {
@@ -256,6 +283,8 @@ await close();
 const facts = {
   explorerSections,
   emptyState,
+  actionBars,
+  actionClicked,
   bars,
   visits,
   screens: { borrowed: placed.length, containers: bars.flatMap((bar) => borrowed(bar.bar)).length },
@@ -294,6 +323,9 @@ report({
     "one container at a time, and it is the one clicked":
       visits.length >= 8 &&
       visits.every((visit) => visit.shown.length === 1 && visit.shown[0] === visit.container),
+    "the container action bar renders actionable buttons":
+      actionBars.some((bar) => bar.buttons.length > 0 && bar.buttons.some((button) => !button.disabled)),
+    "a container action click is dispatched without losing the bar": actionClicked === true,
     "a container holds no bar of its own (its children are views, not containers)": visits.every(
       (visit) => visit.innerBar === null,
     ),
