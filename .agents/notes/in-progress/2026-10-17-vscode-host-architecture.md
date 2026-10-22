@@ -313,7 +313,7 @@ architecture 只定形状，不定机制：
 
 - [view catalogue](../in-progress/2026-10-06-vscode-view-catalogue.md)（in-progress）；
 - [editor host](../in-progress/2026-10-07-editor-host.md)（in-progress）；
-- **container / view**：first pass（`PracViewsService` + collapse）已验证；剩余是 view 集合 / 可见性 / 顺序 / container title / menu；不沿用被 superseded 的 container context note；
+- **container / view**：first pass（`PracViewsService` + collapse）已验证；剩余是 view 集合 / 可见性 / 顺序 / container title / menu；[container context](../proposed/2026-10-22-vscode-container-context.md) 已开 step note；
 - **action / menu**；
 - **status bar / overlay**；
 - **webview / custom editor**；
@@ -326,7 +326,7 @@ frame 侧（stack chrome / grid）不属于这张 note 的 steps，见各自的 
 ## 8. Open questions
 
 - **part context** 的最小契约：frame 的 `left` / `bottom` / `center` 与 VS Code 的 sidebar / panel / editor 如何对应，谁决定 part 的显示 / 尺寸 / 标题？
-- **view container / view** 的机制：headless `ViewPaneContainer`，还是更小的 context？`IViewsService` 怎么注册？
+- **view container / view** 的机制：见 [container context step](../proposed/2026-10-22-vscode-container-context.md)；headless `ViewPaneContainer`，还是更小的 context？`IViewsService` 怎么注册？
 - **action / menu** 的 owner：view-scoped / container-scoped / global 的边界由谁判定？
 - **overlay**：adaptor 只给内容、frame 给层，是否足够？
 - **webview / custom editor**：webview view、webview panel、custom editor 是否共用同一个 host 契约？
@@ -347,4 +347,5 @@ frame 侧（stack chrome / grid）不属于这张 note 的 steps，见各自的 
 - [2026-10-06-vscode-view-catalogue.md](../in-progress/2026-10-06-vscode-view-catalogue.md)：view catalogue。
 - [2026-10-07-editor-host.md](../in-progress/2026-10-07-editor-host.md)：editor host。
 - [2026-10-17-stack-view-chrome.md](../in-progress/2026-10-17-stack-view-chrome.md)：frame 侧的 stack chrome。
+- [2026-10-22-vscode-container-context.md](../proposed/2026-10-22-vscode-container-context.md)：container context step。
 - [2026-10-15-ui-layout-grid.md](../proposed/2026-10-15-ui-layout-grid.md)：frame 侧的 grid。
