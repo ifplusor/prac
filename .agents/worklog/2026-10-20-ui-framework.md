@@ -322,3 +322,8 @@
 
 - 默认 stage 扩为 1×3 grid（1 row，最多 3 cells）。
 - live 全绿：resize / containers / views / file / split。
+
+### 2026-10-22 — frame reorder → group order（slice 42）
+
+- `ViewGroupHost` 订阅 layout store；frame 端 reorder 后，若 group 成员都可见，写回 `group.reorder`。
+- 新增 reorder 回写单测；live file/containers 全绿。

@@ -27,6 +27,7 @@ export interface FrameViewGroup extends ViewGroupRuntime {
   readonly binding?: GroupBinding;
   readonly placements: readonly ViewGroupPlacement[];
   onDidChange(listener: () => void): () => void;
+  reorder(order: readonly string[]): void;
   setBinding?(binding: GroupBinding | undefined): void;
 }
 
@@ -51,8 +52,11 @@ export interface FrameGroup {
 export class ViewGroupHost {
   readonly #groups = new Map<string, FrameGroup>();
   readonly #regions = new Map<string, string>();
+  readonly #stop: () => void;
 
-  constructor(private readonly store: LayoutStore) {}
+  constructor(private readonly store: LayoutStore) {
+    this.#stop = store.subscribe(() => this.#syncOrderFromStore());
+  }
 
   /** Register a group in an existing region. */
   register(group: FrameViewGroup, regionId: string): FrameGroup {
@@ -91,6 +95,27 @@ export class ViewGroupHost {
       });
   }
 
+  /** Write a frame reorder back into the group, if every member is visible. */
+  #syncOrderFromStore(): void {
+    const state = this.store.get();
+    for (const entry of this.#groups.values()) {
+      const order = entry.group.state.order;
+      const records = order.map((viewId) => state.views[viewId]);
+      if (records.some((record) => record === undefined || record.hidden === true)) continue;
+      const visible = order
+        .map((viewId) => [viewId, state.views[viewId]] as const)
+        .filter(
+          (entry): entry is readonly [string, NonNullable<(typeof entry)[1]>] =>
+            entry[1] !== undefined,
+        )
+        .sort((a, b) => a[1].order - b[1].order)
+        .map(([viewId]) => viewId);
+      if (visible.some((viewId, index) => viewId !== order[index])) {
+        entry.group.reorder(visible);
+      }
+    }
+  }
+
   /** Look up a registered group. */
   get(groupId: string): FrameGroup | undefined {
     return this.#groups.get(groupId);
@@ -108,5 +133,6 @@ export class ViewGroupHost {
   /** Remove every frame projection; groups themselves are not disposed. */
   dispose(): void {
     for (const groupId of this.#groups.keys()) this.unregister(groupId);
+    this.#stop();
   }
 }

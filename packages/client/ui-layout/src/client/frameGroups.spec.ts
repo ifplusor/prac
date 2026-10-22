@@ -16,11 +16,16 @@ function memoryStore(): LayoutStore {
     catalogueVersion: 0,
     activePanelId: null,
   };
+  const listeners = new Set<() => void>();
   return {
     get: () => state,
-    subscribe: () => () => {},
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
     update: (updater) => {
       state = updater(state);
+      for (const listener of listeners) listener();
     },
     requestCloseView: () => {},
   };
@@ -78,6 +83,26 @@ describe("ViewGroupHost", () => {
     expect(item?.actions).toHaveLength(1);
     item?.runAction?.("collapse");
     expect(runAction).toHaveBeenCalledWith("collapse");
+  });
+
+  it("writes a frame reorder back into the group", () => {
+    const store = memoryStore();
+    const host = new ViewGroupHost(store);
+    const group = new ViewGroup("g1", "stack");
+    group.add(new View("v1"));
+    group.add(new View("v2"));
+    host.register(group, "left");
+
+    store.update((state) => ({
+      ...state,
+      views: {
+        ...state.views,
+        v1: { ...state.views["v1"]!, order: 1 },
+        v2: { ...state.views["v2"]!, order: 0 },
+      },
+    }));
+
+    expect(group.state.order).toEqual(["v2", "v1"]);
   });
 
   it("can register a fresh group after the old one leaves", () => {
