@@ -250,3 +250,9 @@
 - frame：grid 作为 CSS grid 渲染，cell 可继续是 region/split。
 - 新增 `grid.spec.ts`；ui-layout 182 passed，check/build 通过。
 - 默认 stage 仍是 split tree，尚未接线。
+
+### 2026-10-22 — stage grid wiring（slice 29）
+
+- 默认 stage：`stage` 是 1×1 `GridNode`，内容仍是 `center` region；top split 的左右 sash 与 center tab strip 保持。
+- `regionAncestry` 支持 grid parent；`removeRegion` 允许 grid 失去最后一个 cell。
+- live：`verify:containers` 13/13、`verify:file`、`verify:split` 全绿。

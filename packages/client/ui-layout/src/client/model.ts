@@ -53,11 +53,12 @@ export function gridNode(
   rows: number,
   columns: number,
   children: readonly LayoutNode[],
+  extra: Partial<GridNode> = {},
 ): GridNode {
   if (children.length > rows * columns) {
     throw new Error(`grid ${id} has more cells than its ${rows}x${columns} shape`);
   }
-  return { type: "grid", id, rows, columns, children };
+  return { type: "grid", id, rows, columns, children, ...extra };
 }
 
 /**
@@ -132,13 +133,21 @@ export function defaultTree(): SplitNode {
           // The centre is the editor group of this layout: it gets the tab strip
           // (VS Code's default `showTabs: "multiple"`), and it stays flexible so an
           // empty work area is still present.
-          regionNode(CENTER_REGION, 0, {
-            flex: true,
-            min: CENTER_MIN,
-            tabs: "multiple",
-            priority: "high",
-            snap: true,
-          }),
+          gridNode(
+            "stage",
+            1,
+            1,
+            [
+              regionNode(CENTER_REGION, 0, {
+                flex: true,
+                min: CENTER_MIN,
+                tabs: "multiple",
+                priority: "high",
+                snap: true,
+              }),
+            ],
+            { flex: true, min: CENTER_MIN, priority: "high" },
+          ),
           regionNode("right", 420, { stack: true, priority: "low", snap: true }),
         ],
       },
@@ -1719,7 +1728,7 @@ export function sideGeometry(side: Side): SideGeometry {
  */
 /** One step on the way from the root to a region. */
 interface RegionAncestryStep {
-  readonly split: SplitNode;
+  readonly parent: SplitNode | GridNode;
   readonly index: number;
 }
 
@@ -1731,11 +1740,10 @@ interface RegionAncestryStep {
  * @returns the steps, or undefined when the region is not in this subtree.
  */
 function regionAncestry(tree: LayoutNode, regionId: string): RegionAncestryStep[] | undefined {
-  if (tree.type === "grid") return undefined;
   if (tree.type === "region") return tree.id === regionId ? [] : undefined;
   for (let index = 0; index < tree.children.length; index += 1) {
     const below = regionAncestry(tree.children[index], regionId);
-    if (below !== undefined) return [{ split: tree, index }, ...below];
+    if (below !== undefined) return [{ parent: tree, index }, ...below];
   }
   return undefined;
 }
@@ -1776,9 +1784,9 @@ export function regionInDirection(
   if (path === undefined) return undefined;
   const { dir, before } = sideGeometry(side);
   for (let step = path.length - 1; step >= 0; step -= 1) {
-    const { split, index } = path[step];
-    if (split.dir !== dir) continue;
-    const neighbour = split.children[index + (before ? -1 : 1)];
+    const { parent, index } = path[step];
+    if (parent.type !== "split" || parent.dir !== dir) continue;
+    const neighbour = parent.children[index + (before ? -1 : 1)];
     if (neighbour === undefined) continue;
     return edgeRegionId(neighbour, before ? "last" : "first");
   }
@@ -1847,17 +1855,27 @@ export function removeRegion(state: LayoutState, regionId: string): LayoutState 
   if (path === undefined || path.length === 0) return state;
   const step = path[path.length - 1];
   if (step === undefined) return state;
-  const remaining = step.split.children.filter((_, position) => position !== step.index);
-  // Defensive: a split with no children left is not a shape this tree allows.
-  if (remaining.length === 0) return state;
+  const remaining = step.parent.children.filter((_, position) => position !== step.index);
+  // A grid can lose its last cell (the stage is allowed to be empty); a split cannot.
+  if (remaining.length === 0) {
+    if (step.parent.type === "grid") {
+      return {
+        ...state,
+        tree: replaceNode(state.tree, step.parent.id, () => ({ ...step.parent, children: [] })),
+      };
+    }
+    return state;
+  }
   const survivor = remaining[0];
   const replacement: LayoutNode =
-    remaining.length === 1
-      ? survivor.type === "region"
-        ? { ...survivor, flex: true }
-        : survivor
-      : { ...step.split, children: remaining };
-  return { ...state, tree: replaceNode(state.tree, step.split.id, () => replacement) };
+    step.parent.type === "grid"
+      ? { ...step.parent, children: remaining }
+      : remaining.length === 1
+        ? survivor.type === "region"
+          ? { ...survivor, flex: true }
+          : survivor
+        : { ...step.parent, children: remaining };
+  return { ...state, tree: replaceNode(state.tree, step.parent.id, () => replacement) };
 }
 
 /**

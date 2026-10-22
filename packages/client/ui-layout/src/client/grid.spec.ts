@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
-import { findRegion, gridNode, isPresent, regionInfos, regionNode, resolveSizes } from "./model.js";
+import {
+  findRegion,
+  gridNode,
+  isPresent,
+  regionInfos,
+  regionNode,
+  removeRegion,
+  resolveSizes,
+  splitRegionWith,
+} from "./model.js";
 import type { LayoutState } from "./contract.js";
 
 function state(): LayoutState {
@@ -35,6 +44,17 @@ describe("grid node", () => {
     const sizes = resolveSizes(layout, 1000, 800);
     expect(sizes.get("a")).toEqual({ width: 500, height: 400 });
     expect(sizes.get("d")).toEqual({ width: 500, height: 400 });
+  });
+
+  it("splits and removes a cell without losing the grid", () => {
+    const layout = state();
+    const split = splitRegionWith(layout, "a", "right", "split-a", "new-a");
+    expect(findRegion(split.tree, "new-a")).not.toBeNull();
+    expect(split.tree.type).toBe("grid");
+
+    const removed = removeRegion(split, "new-a");
+    expect(findRegion(removed.tree, "new-a")).toBeNull();
+    expect(removed.tree.type).toBe("grid");
   });
 
   it("rejects more cells than the declared shape", () => {
