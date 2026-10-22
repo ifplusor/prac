@@ -232,3 +232,8 @@
 - `VscodeGroupRuntime.reorder`；`VscodeGroupHost.reorder` 按 app editor 顺序投影到 group。
 - assembly 在 editors 订阅中按 region 分组重排 file views。
 - `verify:file` 全绿（含 split editor 两 group / 两 surface）。
+
+### 2026-10-22 — dynamic view re-add（slice 26）
+
+- 新增 `VscodeGroupHost.sync` 回归：view 从 catalogue 消失后再次出现，可以重新 materialize / add。
+- 验证：vscode-host 24 passed；check/build 通过。

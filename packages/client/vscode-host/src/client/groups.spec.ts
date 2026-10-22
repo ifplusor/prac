@@ -115,6 +115,30 @@ describe("VscodeGroupHost", () => {
     expect(host.viewIds()).toEqual([]);
   });
 
+  it("can re-add a view after it disappears from the catalogue", () => {
+    const host = new VscodeGroupHost({
+      layout: { registerViewGroup: () => {}, unregisterViewGroup: () => {} },
+      definition: definition(),
+      viewDefinition: viewDefinition(),
+    });
+    const entry = {
+      view: "vscode:view:workbench.view.explorer",
+      appId: "workbench.view.explorer",
+      title: "Explorer",
+      source: "view" as const,
+      location: "sidebar" as const,
+      containerId: "workbench.view.explorer",
+    };
+    const regions = ["left/container:workbench.view.explorer"];
+
+    host.sync([entry], regions);
+    host.sync([{ ...entry, containerId: "other" }], regions);
+    expect(host.hasView(entry.view)).toBe(false);
+    host.sync([entry], regions);
+
+    expect(host.hasView(entry.view)).toBe(true);
+  });
+
   it("disposes all groups and views", () => {
     const unregisterViewGroup = vi.fn();
     const host = new VscodeGroupHost({
