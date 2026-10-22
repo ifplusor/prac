@@ -15,8 +15,8 @@ status: in-progress
 它做三件事：
 
 1. **翻译** VS Code 的 container / view 为 prac 的 CR 风格声明：
-   - `VscodeViewGroupDefinition` / `VscodeViewGroupDeclaration`
-   - `VscodeViewDefinition` / `VscodeViewDeclaration`
+   - `VscodeViewGroupDefinition` / `VscodeViewGroup`
+   - `VscodeViewDefinition` / `VscodeView`
 2. **提供 VS Code runtime**：
    - `VscodeGroupBinding` 只挂到 `vscode.prac/v1` 的 `Container` / `Editor` 声明；
    - `VscodeViewHost` 为每个 VS Code view 提供 `ViewPane` / `EditorPane` host。
@@ -59,7 +59,7 @@ VS Code 的 UI 模型是 part / container / pane / view / editor group；prac �
 关键句：
 
 > **frame 不认识 VS Code；adaptor 不拥有 group runtime，也不拥有 group 成员。**
-> adaptor 声明 `VscodeViewGroupDeclaration` / `VscodeViewDeclaration`；frame 决定 group / placement；binding 和 view host 只承接 VS Code runtime。
+> adaptor 声明 `VscodeViewGroup` / `VscodeView`；frame 决定 group / placement；binding 和 view host 只承接 VS Code runtime。
 
 ### 1.1 core workbench 与 extension
 
@@ -74,8 +74,8 @@ VS Code 的 UI 模型是 part / container / pane / view / editor group；prac �
 
 | 资源 | CRD（source-specific） | CR（source-specific） | materialize |
 | --- | --- | --- | --- |
-| **group** | `VscodeViewGroupDefinition` | `VscodeViewGroupDeclaration` | `ViewGroupState` → `ViewGroup` |
-| **view** | `VscodeViewDefinition` | `VscodeViewDeclaration` | `View` + `VscodeViewHost` |
+| **group** | `VscodeViewGroupDefinition` | `VscodeViewGroup` | `ViewGroupState` → `ViewGroup` |
+| **view** | `VscodeViewDefinition` | `VscodeView` | `View` + `VscodeViewHost` |
 
 prac core 只提供 **CRD 机制**，不提供 `vscode` 的 definition：
 
@@ -136,7 +136,7 @@ interface ResourceDeclaration<TSpec> {
 VscodeViewGroupDefinition（CRD）
   apiVersion / kind / schema / validation / bindingFactory
         ↓
-VscodeViewGroupDeclaration（CR）
+VscodeViewGroup（CR）
   apiVersion / kind / metadata / spec
         ↓
 ViewGroupState（prac 数据）
@@ -147,7 +147,7 @@ ViewGroup（frame 运行时）
 ```
 
 - `VscodeViewGroupDefinition` 由 `vscode-host` 注册；
-- `VscodeViewGroupDeclaration` 由 `vscode-host` 产生；
+- `VscodeViewGroup` 由 `vscode-host` 产生；
 - `ViewGroupState` 由 arrangement / frame materialize；
 - `ContainerRecord` 由 arrangement 的 view group registry 写入，随 `ViewGroupState` 进 frame 的 layout store；source 不写 record；
 - source 卸载时 record 可 tombstone，不自动删除。
@@ -170,7 +170,7 @@ ViewGroup（frame 运行时）
 VscodeViewDefinition（CRD）
   apiVersion / kind / schema / validation / hostKind / hostFactory
         ↓
-VscodeViewDeclaration（CR）
+VscodeView（CR）
   apiVersion / kind / metadata / spec
         ↓
 View（prac runtime）
@@ -180,7 +180,7 @@ View（prac runtime）
 - `kind` 是 view 类型；
 - `hostKind` 是执行能力；
 - 两者不混；
-- `prac.view` 承载的是 `ViewDeclaration`；`vscode-host` 的具体实现是 `VscodeViewDeclaration`；
+- `prac.view` 承载的是 view CR；`vscode-host` 的具体实现是 `VscodeView`；
 - `containerId` 只是默认落位 hint，不是成员关系；
 - view 是否存在由 source catalogue 决定，placement 由 frame 决定。
 
@@ -194,8 +194,8 @@ View（prac runtime）
 | `VscodeCatalogueEntry` | catalogue 一行：`view` / `appId` / `title` / `source` / `role` / `containerId` / `containerTitle`（`role` 和 `containerId` 只是默认提示） |
 | `ResourceDefinition` | core 的 CRD 机制 |
 | `VscodeViewGroupDefinition` / `VscodeViewDefinition` | `vscode-host` 注册的 CRD |
-| `VscodeViewGroupDeclaration` / `VscodeViewDeclaration` | `vscode-host` 产生的 CR |
-| `prac.view` | `ViewDeclaration`（vscode 具体为 `VscodeViewDeclaration`） |
+| `VscodeViewGroup` / `VscodeView` | `vscode-host` 产生的 CR |
+| `prac.view` | `View` CR（vscode 具体为 `VscodeView`） |
 
 #### adaptor / workbench
 
@@ -227,19 +227,19 @@ interface VscodeViewGroupDefinition extends ResourceDefinition<VscodeViewGroupSp
   bindingFactory(spec: VscodeViewGroupSpec): ContainerBinding | EditorGroupBinding;
 }
 
-interface VscodeViewGroupDeclaration extends ResourceDeclaration<VscodeViewGroupSpec> {}
+interface VscodeViewGroup extends ResourceDeclaration<VscodeViewGroupSpec> {}
 
 interface VscodeViewDefinition extends ResourceDefinition<VscodeViewSpec, View> {
-  hostFactory(decl: VscodeViewDeclaration): VscodeViewHost;
+  hostFactory(decl: VscodeView): VscodeViewHost;
 }
 
-interface VscodeViewDeclaration extends ResourceDeclaration<VscodeViewSpec> {}
+interface VscodeView extends ResourceDeclaration<VscodeViewSpec> {}
 ```
 
 - `Definition = 类型 / CRD`；
 - `Declaration = 实例 / CR`；
-- `VscodeViewGroupDeclaration.spec.groupKind` 决定 `bindingFactory`；
-- `VscodeViewDeclaration.spec.hostKind` 决定 `hostFactory`；
+- `VscodeViewGroup.spec.groupKind` 决定 `bindingFactory`；
+- `VscodeView.spec.hostKind` 决定 `hostFactory`；
 - 没有 `source` 作为独立字段；`apiVersion` 已经表达来源；
 - kind 改变 = 新 CR / 迁移，不是改字段。
 
@@ -294,7 +294,7 @@ interface VscodeViewHost {
 | layout topology / view group / placement / active / order | frame | 是 |
 | `ContainerRecord` / metadata | arrangement registry | 是（layout store） |
 | `VscodeViewGroupDefinition` / `VscodeViewDefinition` | adaptor | 否（source 重建） |
-| `VscodeViewGroupDeclaration` / `VscodeViewDeclaration` | adaptor / consumers | 否（source 重建） |
+| `VscodeViewGroup` / `VscodeView` | adaptor / consumers | 否（source 重建） |
 | `VscodeGroupBinding` / `VscodeViewHost` | adaptor | 否 |
 | `IViewsService` external registry | adaptor | 否（runtime） |
 | view existence / availability | source catalogue | 否 |
@@ -306,7 +306,7 @@ interface VscodeViewHost {
 
 1. frame 恢复 layout / group state；
 2. `vscode-host` 注册 `VscodeViewGroupDefinition` / `VscodeViewDefinition`；
-3. `vscode-host` 产生 `VscodeViewGroupDeclaration` / `VscodeViewDeclaration`；
+3. `vscode-host` 产生 `VscodeViewGroup` / `VscodeView`；
 4. arrangement materialize `ViewGroupState` / `ViewGroup`；
 5. 对 `vscode.prac/v1 ViewGroup` 的 `spec.groupKind = container / editor` 创建 `VscodeGroupBinding`；
 6. frame 挂载 view 时，`VscodeViewHost` mount / 注册 external registry。
@@ -414,7 +414,7 @@ frame 侧（stack chrome / grid）不属于这张 note 的 steps，见各自的 
 
 ## 9. Validation
 
-- **声明翻译**：VS Code container / view → `VscodeViewGroupDeclaration` / `VscodeViewDeclaration`；`kind` / `spec.groupKind` 在声明时确定；
+- **声明翻译**：VS Code container / view → `VscodeViewGroup` / `VscodeView`；`kind` / `spec.groupKind` 在声明时确定；
 - **binding 不跟 view**：Folders 移出 Explorer 后，Explorer group 的 ContainerBinding 仍在；目标 plain group 没有 binding；
 - **view host**：移动后的 Folders 仍由 `VscodeViewHost` 挂载，`IViewsService.getViewWithId` 可找到；
 - **G**：原 container actions / context keys 不跟随；view actions / welcome 跟随；
