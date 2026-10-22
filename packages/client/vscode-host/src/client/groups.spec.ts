@@ -139,6 +139,31 @@ describe("VscodeGroupHost", () => {
     expect(host.hasView(entry.view)).toBe(true);
   });
 
+  it("can re-add a container group after it disappears", () => {
+    const host = new VscodeGroupHost({
+      layout: { registerViewGroup: () => {}, unregisterViewGroup: () => {} },
+      definition: definition(),
+      viewDefinition: viewDefinition(),
+    });
+    const entry = {
+      view: "vscode:view:workbench.view.explorer",
+      appId: "workbench.view.explorer",
+      title: "Explorer",
+      source: "view" as const,
+      location: "sidebar" as const,
+      containerId: "workbench.view.explorer",
+    };
+    const regions = ["left/container:workbench.view.explorer"];
+
+    host.sync([entry], regions);
+    host.sync([], regions);
+    expect(host.has("vscode:group:workbench.view.explorer")).toBe(false);
+    host.sync([entry], regions);
+
+    expect(host.has("vscode:group:workbench.view.explorer")).toBe(true);
+    expect(host.hasView(entry.view)).toBe(true);
+  });
+
   it("disposes all groups and views", () => {
     const unregisterViewGroup = vi.fn();
     const host = new VscodeGroupHost({

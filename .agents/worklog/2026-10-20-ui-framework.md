@@ -280,3 +280,9 @@
 - `GridPlacement`（row/column/rowSpan/columnSpan）进入 `GridNode.placements`；`gridNode` 校验越界。
 - frame 按 placement 写 `gridRow/gridColumn`；`resolveSizes` 按 span 分配；单 cell/未放置保持透明。
 - 新增 span、JSON 持久化、越界测试；live views/containers 全绿。
+
+### 2026-10-22 — uncommitted review + dynamic group return（slice 35）
+
+- 收口剩余 6 个未提交改动：paneHeader 声明、container action submenu、`runAction`、docs 边界；已提交 `399d0c8`。
+- 新增 `VscodeGroupHost` 回归：container group 消失后重新出现，group + view 都能重建。
+- vscode-host 25 passed；check/build 通过。
