@@ -34,6 +34,10 @@ UI umbrella 已经定了方向和 G：container 是 prac 的组合单元，conta
 - **G**：view 移出原 container 后，container 的 title actions / context keys 归当前 container；view 自己的 title actions / `viewsWelcome` 跟随；原 container 的 actions / context keys 不跟随。
 - **frame 不认识 VS Code container**：container context 在 adaptor 内部，frame 只看到 view group / host。
 - **container context 不能成为第二成员权威**：它承接 VS Code 语义，但 view 是否在 container 里仍由 prac placement 决定。
+- **container bar / group bar 由 frame 画**：adaptor 提供 action / context，不自己画第二套 bar。
+- **`paneHeader` 是 view 自报的呈现事实**：frame 用它决定是否保留 native pane header，不按来源前缀猜。
+- **`PracLayoutFace` 以 view group / grid cell 为落点**：region 只是几何槽位；editor group 的 `addGroup` 走 group / cell channel，不是只建 region。
+- **role 名是 `stage` / `primary sidebar` / `secondary sidebar` / `panel`**：left / center / right / bottom 只是默认物理位置。
 
 ## 设计空间
 
@@ -76,7 +80,8 @@ container context 拥有一个 stack，成员是 host，不要求成员是 `View
 1. Explorer container 同时显示 Open Editors / Folders / Outline，确认它是 stack，不是 select；
 2. 往 Explorer container 里放一个 DSH React view；
 3. 把 Folders 移到一个 DSH group；
-4. 记录：
+4. 额外验证 stage grid cell ↔ view group ↔ editor group 的映射：`addGroup` / `setGroupRegionChannel` 能否创建 grid cell / select view group，而不是只建 region；
+5. 记录：
    - container bar 是否仍切 container；
    - Folders 的 title / icon / `viewLocation` / `ViewTitle` actions 是否错位；
    - Explorer 的 `ViewContainerTitle` actions 是否还作用于已移出的 view；
@@ -103,6 +108,8 @@ container context 拥有一个 stack，成员是 host，不要求成员是 `View
 - DSH view 能进入 VS Code container，且不出现第二成员权威；
 - Folders 移出后，G 的 title actions / context keys 行为符合决策；
 - collapse / visibility / focus 有一致行为；
+- stage 的 grid cell / select view group / editor group binding 能建立，不出现第二成员权威；
+- container bar / group bar 由 frame 画，adaptor 只供 action / context；
 - spike 记录能支持或推翻所选机制。
 
 ## Related
