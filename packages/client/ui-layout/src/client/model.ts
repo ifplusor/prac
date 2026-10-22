@@ -133,13 +133,21 @@ export function defaultTree(): SplitNode {
           // The centre is the editor group of this layout: it gets the tab strip
           // (VS Code's default `showTabs: "multiple"`), and it stays flexible so an
           // empty work area is still present.
-          regionNode(CENTER_REGION, 0, {
-            flex: true,
-            min: CENTER_MIN,
-            tabs: "multiple",
-            priority: "high",
-            snap: true,
-          }),
+          gridNode(
+            "stage",
+            1,
+            1,
+            [
+              regionNode(CENTER_REGION, 0, {
+                flex: true,
+                min: CENTER_MIN,
+                tabs: "multiple",
+                priority: "high",
+                snap: true,
+              }),
+            ],
+            { flex: true, min: CENTER_MIN, priority: "high" },
+          ),
           regionNode("right", 420, { stack: true, priority: "low", snap: true }),
         ],
       },

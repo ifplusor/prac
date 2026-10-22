@@ -262,3 +262,9 @@
 - 尝试默认 stage 用 1×1 grid wrapper；containers/file/split 仍绿，但 `verify:views` 截图裁剪失败（paintAt 越界）。
 - 回退默认 stage 到原 split tree，保留 `GridNode` 数据层与 model/grid 测试。
 - 复验：`verify:views` 全绿；ui-layout 183 passed。
+
+### 2026-10-22 — stage grid live green（slice 31）
+
+- 默认 stage 改为 1×1 `GridNode`；1×1 grid 渲染为 `display: contents`，不引入第二层盒模型。
+- `regionAncestry` / `removeRegion` 支持 grid parent；grid 失去最后 cell 也保留空 grid。
+- live 全绿：`verify:containers` 13/13、`verify:file`、`verify:views`、`verify:split`。
