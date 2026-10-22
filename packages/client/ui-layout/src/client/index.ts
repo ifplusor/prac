@@ -76,6 +76,7 @@ export * from "./resource.js";
 export * from "./view.js";
 export * from "./viewGroup.js";
 export * from "./move.js";
+export * from "./frameBridge.js";
 
 /**
  * Install the mechanism: declare the frame's slots, publish the faces, keep the

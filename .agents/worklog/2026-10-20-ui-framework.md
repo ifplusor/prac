@@ -119,3 +119,9 @@
 - `ViewGroup.placements`：order + active + visible 的 frame 投影。
 - `ViewGroup.onDidChange`：成员 / active / order / binding / dispose 变化通知。
 - 验证：ui-layout 170 passed；check/build 通过。
+
+### 2026-10-22 — frame placement bridge（slice 9）
+
+- 新增 `frameBridge.ts`：`ViewGroupLayoutBridge` 把 `ViewGroup.placements` 投影到现有 layout store。
+- 成员/顺序/active 跟随 group；离开 group 或 dispose 时移除。
+- 验证：ui-layout 172 passed；check/build 通过（build 有既存 zustand unresolved 警告，不影响产物）。
