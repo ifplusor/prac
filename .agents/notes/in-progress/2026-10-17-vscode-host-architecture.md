@@ -15,8 +15,8 @@ status: in-progress
 它做三件事：
 
 1. **翻译** VS Code 的 container / view 为 prac 的 CR 风格声明：
-   - `ViewGroupDefinition` / `ViewGroupDeclaration`
-   - `ViewDefinition` / `ViewDeclaration`
+   - `VscodeViewGroupDefinition` / `VscodeViewGroupDeclaration`
+   - `VscodeViewDefinition` / `VscodeViewDeclaration`
 2. **提供 VS Code runtime**：
    - `VscodeGroupBinding` 只挂到 `vscode.prac/v1` 的 `Container` / `Editor` 声明；
    - `VscodeViewHost` 为每个 VS Code view 提供 `ViewPane` / `EditorPane` host。
@@ -59,7 +59,7 @@ VS Code 的 UI 模型是 part / container / pane / view / editor group；prac �
 关键句：
 
 > **frame 不认识 VS Code；adaptor 不拥有 group runtime，也不拥有 group 成员。**
-> adaptor 声明 `ViewGroupDeclaration` / `ViewDeclaration`；frame 决定 group / placement；binding 和 view host 只承接 VS Code runtime。
+> adaptor 声明 `VscodeViewGroupDeclaration` / `VscodeViewDeclaration`；frame 决定 group / placement；binding 和 view host 只承接 VS Code runtime。
 
 ### 1.1 core workbench 与 extension
 
@@ -72,15 +72,23 @@ VS Code 的 UI 模型是 part / container / pane / view / editor group；prac �
 
 ### 2.1 两类资源
 
-| 资源 | CRD | CR | materialize |
+| 资源 | CRD（source-specific） | CR（source-specific） | materialize |
 | --- | --- | --- | --- |
-| **group** | `ViewGroupDefinition` | `ViewGroupDeclaration` | `ViewGroupState` → `ViewGroup` |
-| **view** | `ViewDefinition` | `ViewDeclaration` | `View` + `ViewHost` |
+| **group** | `VscodeViewGroupDefinition` | `VscodeViewGroupDeclaration` | `ViewGroupState` → `ViewGroup` |
+| **view** | `VscodeViewDefinition` | `VscodeViewDeclaration` | `View` + `VscodeViewHost` |
 
-两者共用 CR 信封：
+prac core 只提供 **CRD 机制**，不提供 `vscode` 的 definition：
 
 ```ts
-interface Resource<TSpec> {
+interface ResourceDefinition<TSpec, TMaterialized> {
+  apiVersion: string;
+  kind: string;
+  validate(spec: unknown): TSpec;
+  default(spec: unknown): TSpec;
+  materialize(decl: ResourceDeclaration<TSpec>, ctx: MaterializeContext): TMaterialized;
+}
+
+interface ResourceDeclaration<TSpec> {
   apiVersion: string;
   kind: string;
   metadata: { id: string; labels?; annotations? };
@@ -88,10 +96,17 @@ interface Resource<TSpec> {
 }
 ```
 
+- `ResourceRegistry`：`(apiVersion, kind) → ResourceDefinition`；
+- `ResourceMaterializer`：调用 definition 的 `validate` / `default` / `materialize`；
+- `VscodeViewGroupDefinition` / `VscodeViewDefinition` 由 `vscode-host` 注册；
+- frame / arrangement 只认 `ResourceDefinition` / `ResourceDeclaration`，不认 `vscode`。
+
+所有 declaration 共用 `ResourceDeclaration` 信封：
+
 - `apiVersion + kind` 是类型，声明时确定、不可变；
 - `metadata` 是身份；
 - `spec` 是可变配置；
-- frame 把类型当 opaque，只通过 `ViewGroupDefinition` / `ViewDefinition` 查 schema / validation / factory。
+- frame 把类型当 opaque，只通过 registry 查 `ResourceDefinition` / schema / factory。
 
 ### 2.1.1 CRD-lite：复杂度预算
 
@@ -99,7 +114,7 @@ interface Resource<TSpec> {
 
 | 保留 | 不做 |
 | --- | --- |
-| 2 类资源：`ViewGroup` / `View` | 通用 resource framework |
+| 2 条 CRD：`VscodeViewGroup` / `VscodeView`（必要时再拆） | 通用 resource framework |
 | 1 个 CR 信封：`apiVersion / kind / metadata / spec` | 任意 UI 概念都做 CRD |
 | 1 个 definition registry（`Map`） | API server / etcd / watch / informer |
 | 1 个 materializer：declaration → state → runtime | controller / operator / reconcile loop 框架 |
@@ -107,7 +122,8 @@ interface Resource<TSpec> {
 | 一个 declared group 最多一个 group binding | 多 binding / attachment 层 |
 | 一个 view 一个 view host | `status` / conditions / finalizers / ownerReferences |
 
-- **只有 view 和 view group 是 CR**；action / overlay / part / host 仍走各自的 contribution 模型，不 CRD 化。
+- **只有 view 和 view group 是 CR**；`VscodeViewGroup` / `VscodeView` 两条 CRD 起步，action / overlay / part / host 仍走各自的 contribution 模型，不 CRD 化。
+- **不按 view 类型细拆 CRD**：tree / webview / React 用 `VscodeView` 的 spec 表达，除非 validation / factory 真的分叉。
 - **Definition 是 TypeScript 接口 + 函数**，不是独立的 schema 服务。
 - **kind 不可变**；第一版不做多版本转换，只保留 `apiVersion` 字段。
 - **一个 group 只有一个 declaration 来源**；不做多 source 合并 group kind。
@@ -117,10 +133,10 @@ interface Resource<TSpec> {
 ### 2.2 group
 
 ```text
-ViewGroupDefinition（CRD）
+VscodeViewGroupDefinition（CRD）
   apiVersion / kind / schema / validation / bindingFactory
         ↓
-ViewGroupDeclaration（CR）
+VscodeViewGroupDeclaration（CR）
   apiVersion / kind / metadata / spec
         ↓
 ViewGroupState（prac 数据）
@@ -130,8 +146,8 @@ ViewGroup（frame 运行时）
   slots / hosts / binding?
 ```
 
-- `ViewGroupDefinition` 由 source adapter 注册；
-- `ViewGroupDeclaration` 由 source adapter 产生；
+- `VscodeViewGroupDefinition` 由 `vscode-host` 注册；
+- `VscodeViewGroupDeclaration` 由 `vscode-host` 产生；
 - `ViewGroupState` 由 arrangement / frame materialize；
 - `ContainerRecord` 由 arrangement 的 view group registry 写入，随 `ViewGroupState` 进 frame 的 layout store；source 不写 record；
 - source 卸载时 record 可 tombstone，不自动删除。
@@ -140,8 +156,8 @@ ViewGroup（frame 运行时）
 
 | kind | group mode | binding |
 | --- | --- | --- |
-| `vscode.prac/v1 Container` | `stack` | `ContainerBinding` |
-| `vscode.prac/v1 Editor` | `select` | `EditorGroupBinding` |
+| `vscode.prac/v1 ViewGroup` + `spec.groupKind = container` | `stack` | `ContainerBinding` |
+| `vscode.prac/v1 ViewGroup` + `spec.groupKind = editor` | `select` | `EditorGroupBinding` |
 | plain group | `stack` / `select` | none |
 
 - binding 不跟 view 走，跟 declaration 走；
@@ -151,10 +167,10 @@ ViewGroup（frame 运行时）
 ### 2.3 view
 
 ```text
-ViewDefinition（CRD）
+VscodeViewDefinition（CRD）
   apiVersion / kind / schema / validation / hostKind / hostFactory
         ↓
-ViewDeclaration（CR）
+VscodeViewDeclaration（CR）
   apiVersion / kind / metadata / spec
         ↓
 View（prac runtime）
@@ -164,7 +180,7 @@ View（prac runtime）
 - `kind` 是 view 类型；
 - `hostKind` 是执行能力；
 - 两者不混；
-- `prac.view` 承载的是 `ViewDeclaration`；
+- `prac.view` 承载的是 `ViewDeclaration`；`vscode-host` 的具体实现是 `VscodeViewDeclaration`；
 - `containerId` 只是默认落位 hint，不是成员关系；
 - view 是否存在由 source catalogue 决定，placement 由 frame 决定。
 
@@ -176,9 +192,10 @@ View（prac runtime）
 | --- | --- |
 | `PracVscodeFace` | catalogue / `hostFor` / `focusView` / `runCommand` / file placement / capabilities |
 | `VscodeCatalogueEntry` | catalogue 一行：`view` / `appId` / `title` / `source` / `role` / `containerId` / `containerTitle`（`role` 和 `containerId` 只是默认提示） |
-| `ViewGroupDefinition` / `ViewDefinition` | 由 source adapter 注册的 CRD |
-| `ViewGroupDeclaration` / `ViewDeclaration` | source 产生的 CR |
-| `prac.view` | `ViewDeclaration` |
+| `ResourceDefinition` | core 的 CRD 机制 |
+| `VscodeViewGroupDefinition` / `VscodeViewDefinition` | `vscode-host` 注册的 CRD |
+| `VscodeViewGroupDeclaration` / `VscodeViewDeclaration` | `vscode-host` 产生的 CR |
+| `prac.view` | `ViewDeclaration`（vscode 具体为 `VscodeViewDeclaration`） |
 
 #### adaptor / workbench
 
@@ -188,7 +205,7 @@ View（prac runtime）
 | `WorkbenchFace` | workbench 对 embedder 的内部面：mount / focus / release / capabilities；不承载 part mount | consumers |
 | `EmbeddedWorkbench` | workbench 本体：服务、view / editor runtime、overlay | frame |
 | `PracEditorHost` | adaptor 侧 editor runtime 服务：`IEditorGroupsService`、`EditorGroupModel`、editor panes | prac editor group 类型 |
-| `VscodeGroupBinding` | `ViewGroup.binding?`：只匹配 `vscode.prac/v1 Container / Editor`；提供 group-level context / actions；不拥有 view host | group state / placement |
+| `VscodeGroupBinding` | `ViewGroup.binding?`：匹配 `vscode.prac/v1 ViewGroup` 的 `spec.groupKind = container / editor`；提供 group-level context / actions；不拥有 view host | group state / placement |
 | `VscodeViewHost` | 每个 VS Code view 的 runtime host：mount / release `ViewPane` / `EditorPane`；注册 / 注销 `IViewsService`；有 group binding 时用其 context，否则 unbound | group state / placement |
 | `PracViewsService` | `IViewsService` 的 subclass / patch：external view registry；其余方法 delegate | group state / placement |
 | `ViewPane` / `ViewPaneContainer` | 上游 view / container runtime；`ViewPaneContainer` 只是 `ContainerBinding` 内部实现 | frame / prac 成员 |
@@ -206,43 +223,34 @@ View（prac runtime）
 ### 3.1 声明契约
 
 ```ts
-interface ViewGroupDefinition {
-  apiVersion: string;
-  kind: string;
-  validate(spec: unknown): void;
-  default(spec: unknown): unknown;
-  bindingFactory?(spec: unknown): GroupBinding | undefined;
+interface VscodeViewGroupDefinition extends ResourceDefinition<VscodeViewGroupSpec, ViewGroup> {
+  bindingFactory(spec: VscodeViewGroupSpec): ContainerBinding | EditorGroupBinding;
 }
 
-interface ViewGroupDeclaration extends Resource<Record<string, unknown>> {}
+interface VscodeViewGroupDeclaration extends ResourceDeclaration<VscodeViewGroupSpec> {}
 
-interface ViewDefinition {
-  apiVersion: string;
-  kind: string;
-  validate(spec: unknown): void;
-  default(spec: unknown): unknown;
-  hostKind: HostKind;
-  hostFactory(decl: ViewDeclaration): ViewHost;
+interface VscodeViewDefinition extends ResourceDefinition<VscodeViewSpec, View> {
+  hostFactory(decl: VscodeViewDeclaration): VscodeViewHost;
 }
 
-interface ViewDeclaration extends Resource<ViewSpec> {}
+interface VscodeViewDeclaration extends ResourceDeclaration<VscodeViewSpec> {}
 ```
 
 - `Definition = 类型 / CRD`；
 - `Declaration = 实例 / CR`；
-- `ViewGroupDeclaration.kind` 决定 `bindingFactory`；
-- `ViewDeclaration.kind` 决定 `hostFactory` / `hostKind`；
+- `VscodeViewGroupDeclaration.spec.groupKind` 决定 `bindingFactory`；
+- `VscodeViewDeclaration.spec.hostKind` 决定 `hostFactory`；
 - 没有 `source` 作为独立字段；`apiVersion` 已经表达来源；
 - kind 改变 = 新 CR / 迁移，不是改字段。
 
 ### 3.2 group binding
 
-`ViewGroup.binding?` 只由 declaration 的 `apiVersion + kind` 决定：
+`ViewGroup.binding?` 只由 declaration 的 `apiVersion + kind + spec.groupKind` 决定：
 
 | declaration | binding |
 | --- | --- |
-| `vscode.prac/v1 Container` | `ContainerBinding` |
-| `vscode.prac/v1 Editor` | `EditorGroupBinding` |
+| `vscode.prac/v1 ViewGroup` + `spec.groupKind = container` | `ContainerBinding` |
+| `vscode.prac/v1 ViewGroup` + `spec.groupKind = editor` | `EditorGroupBinding` |
 | 其它 / plain | none |
 
 不根据 group 里的 view 推断。
@@ -285,8 +293,8 @@ interface VscodeViewHost {
 | workspace / session | DSH | — |
 | layout topology / view group / placement / active / order | frame | 是 |
 | `ContainerRecord` / metadata | arrangement registry | 是（layout store） |
-| `ViewGroupDefinition` / `ViewDefinition` | adaptor | 否（source 重建） |
-| `ViewGroupDeclaration` / `ViewDeclaration` | adaptor / consumers | 否（source 重建） |
+| `VscodeViewGroupDefinition` / `VscodeViewDefinition` | adaptor | 否（source 重建） |
+| `VscodeViewGroupDeclaration` / `VscodeViewDeclaration` | adaptor / consumers | 否（source 重建） |
 | `VscodeGroupBinding` / `VscodeViewHost` | adaptor | 否 |
 | `IViewsService` external registry | adaptor | 否（runtime） |
 | view existence / availability | source catalogue | 否 |
@@ -297,10 +305,10 @@ interface VscodeViewHost {
 **正常启动**
 
 1. frame 恢复 layout / group state；
-2. adaptor 注册 `ViewGroupDefinition` / `ViewDefinition`；
-3. adaptor 产生 `ViewGroupDeclaration` / `ViewDeclaration`；
+2. `vscode-host` 注册 `VscodeViewGroupDefinition` / `VscodeViewDefinition`；
+3. `vscode-host` 产生 `VscodeViewGroupDeclaration` / `VscodeViewDeclaration`；
 4. arrangement materialize `ViewGroupState` / `ViewGroup`；
-5. 对 `vscode.prac/v1 Container / Editor` group 创建 `VscodeGroupBinding`；
+5. 对 `vscode.prac/v1 ViewGroup` 的 `spec.groupKind = container / editor` 创建 `VscodeGroupBinding`；
 6. frame 挂载 view 时，`VscodeViewHost` mount / 注册 external registry。
 
 **recovery / reload**
@@ -351,7 +359,7 @@ interface VscodeViewHost {
 目标：
 
 - group 由 frame 拥有；
-- `vscode.prac/v1 Container` / `Editor` 声明才有 binding；
+- `vscode.prac/v1 ViewGroup` 且 `spec.groupKind = container / editor` 才有 binding；
 - `VscodeViewHost` 负责每个 VS Code view 的 mount / release；
 - `IViewsService` 的 external registry 由 view host 注册；
 - G：view 移出原 container 后，原 container actions / context keys 不跟随；view actions / welcome 跟随；
@@ -406,7 +414,7 @@ frame 侧（stack chrome / grid）不属于这张 note 的 steps，见各自的 
 
 ## 9. Validation
 
-- **声明翻译**：VS Code container / view → `ViewGroupDeclaration` / `ViewDeclaration`；kind 在声明时确定；
+- **声明翻译**：VS Code container / view → `VscodeViewGroupDeclaration` / `VscodeViewDeclaration`；`kind` / `spec.groupKind` 在声明时确定；
 - **binding 不跟 view**：Folders 移出 Explorer 后，Explorer group 的 ContainerBinding 仍在；目标 plain group 没有 binding；
 - **view host**：移动后的 Folders 仍由 `VscodeViewHost` 挂载，`IViewsService.getViewWithId` 可找到；
 - **G**：原 container actions / context keys 不跟随；view actions / welcome 跟随；
