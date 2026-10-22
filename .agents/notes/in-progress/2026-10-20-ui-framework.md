@@ -126,9 +126,10 @@ view group 的成员
 - **container = 具名 view group，默认 `stack`**；Explorer 的 Open Editors / Folders / Outline 就是同一个 container 里的 stack。
 - **container bar** 在父层 select 上切 container；**group bar** 只属于 select view group；stack container 没有 group bar。
 - **`ViewGroupState`**：每个 group 都有 id / mode / active / order / tombstone；`active` 只属于 select；无名 group 也有 state，但没有 `ContainerRecord`。
+- **`ViewGroupDeclaration`**：来源对 group 的声明：id / title / icon / role / order / hideIfEmpty / **kind**；kind 在声明时确定（container / editor / plain），不随放置变化。group 由 arrangement / frame 落成 `ViewGroupState`，declaration 不是 record。
 - **`ViewGroup`**：运行时对象，1:1 对应 `ViewGroupState`；持有 slots / hosts / `binding?`。source binding 是 runtime-only，不进 state。
-- **`ContainerRecord`**：具名 group 的 title / icon / location / order / hideIfEmpty / available / tombstone；成员不存，按 placement 派生。来源只声明 `ContainerDeclaration`，不拥有 record。
-- **身份**：placement 的目标是 `viewGroupId`；`ContainerRecord` 以同一个 `viewGroupId` 为 key；region id 只是布局节点 id；来源 container id 通过 `ContainerDeclaration` 映射，不是第二套成员键。
+- **`ContainerRecord`**：具名 group 的 title / icon / location / order / hideIfEmpty / available / kind / tombstone；成员不存，按 placement 派生。来源只声明 `ViewGroupDeclaration`，不拥有 record。
+- **身份**：placement 的目标是 `viewGroupId`；`ContainerRecord` 以同一个 `viewGroupId` 为 key；region id 只是布局节点 id；来源 container id 通过 `ViewGroupDeclaration` 映射，不是第二套成员键。
 - **对象还是角色**：container 是 prac 的具体对象（view group + `ContainerRecord`）；editor group 是“select view group + adapter binding”的角色，具体的 `PracEditorGroup` / `EditorGroupModel` 在 adapter 里。
 
 **placement**：`{ viewGroupId, order, front, hidden, folded?, size? }`。
@@ -263,7 +264,7 @@ adapter 大在：observe → normalize → bind → project → context → host
 
 **已定**：
 
-- **A**：container 的记录由 prac 的 `ContainerRecord` 持有；来源只声明元数据（id / title / icon / location / order / hideIfEmpty / available）；成员由 placement 派生。不引入 `prac.container` slot 作为第二权威。
+- **A**：container 的记录由 prac 的 `ContainerRecord` 持有；来源只声明 `ViewGroupDeclaration`（id / title / icon / role / order / hideIfEmpty / kind）；成员由 placement 派生。不引入 `prac.container` slot 作为第二权威。
 - **B**：stable host 只承诺 **DOM-only / React view**；editor 走 model + viewState（open target / close source），`view-pane` 跨 container 允许重建，webview / iframe 明确 reload（或用稳定层 + 几何，不 reparent）。
 - **D**：**editor 是 view**；**view group 有 `stack` / `select` 两种 mode**；container 是具名 view group（默认 stack）；editor group 是 select view group + editor binding，不是 prac 类型，只是 VS Code adapter 内部的 mapping（`EditorGroupModel` ↔ view group）。view group 可以放任何 view；editor view 的 host 是 `editor-pane`；非 editor view 若进 editor part，由 adapter 决定是否包成内部 `EditorPane`。
 - **I**：**select view group 的 total order 是可见 tab 的顺序权威**；adapter 双向同步 editor 子集，source 端移动 editor 时投影回 group 顺序，并尽量保留非 editor view 的位置。
