@@ -58,6 +58,22 @@ describe("ViewGroupLayoutBridge", () => {
     expect(store.get().views["v1"]?.region).toMatch(/^left/);
   });
 
+  it("does not unhide a view when the group changes", () => {
+    const store = memoryStore();
+    const group = new ViewGroup("g1");
+    group.add(new View("v1"));
+    const bridge = new ViewGroupLayoutBridge(group, store, "left");
+    store.update((state) => ({
+      ...state,
+      views: { ...state.views, v1: { ...state.views["v1"]!, hidden: true } },
+    }));
+
+    group.add(new View("v2"));
+    bridge.sync();
+
+    expect(store.get().views["v1"]?.hidden).toBe(true);
+  });
+
   it("removes views that leave the group and on dispose", () => {
     const store = memoryStore();
     const group = new ViewGroup("g1");

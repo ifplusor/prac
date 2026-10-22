@@ -334,7 +334,9 @@ export function apply(ctx: Context): void {
   ctx.effect(() => {
     syncGroups();
     const off = face.onDidChangeCatalogue(syncGroups);
+    const stopLayout = ctx.pracLayout.subscribe(syncGroups);
     return () => {
+      stopLayout();
       off();
       groupHost.dispose();
     };

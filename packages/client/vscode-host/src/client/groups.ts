@@ -74,7 +74,14 @@ export class VscodeGroupHost {
       if (this.has(groupId) && this.regionOf(groupId) !== item.regionId) {
         this.remove(groupId);
       }
-      if (!this.has(groupId)) this.add(item.resource, item.regionId);
+      if (!this.has(groupId)) {
+        try {
+          this.add(item.resource, item.regionId);
+        } catch {
+          // The frame may rebuild a container child between listRegions and
+          // registerViewGroup; the next sync will retry on the new tree.
+        }
+      }
     }
 
     const wantedViews = new Set(
@@ -242,14 +249,23 @@ export function planViewGroups(
   const planned: PlannedVscodeGroup[] = [];
   for (const resource of viewGroupsFromCatalogue(entries)) {
     const entry = entries.find((candidate) => candidate.containerId === resource.spec.containerId);
-    const desired =
-      resource.spec.groupKind === "editor"
-        ? "center"
-        : entry === undefined
-          ? undefined
-          : regionForLocation(entry.location);
-    const regionId = desired !== undefined && regionIds.includes(desired) ? desired : regionIds[0];
+    if (resource.spec.groupKind === "editor") {
+      const regionId = regionIds.includes("center") ? "center" : regionIds[0];
+      if (regionId !== undefined) planned.push({ resource, regionId });
+      continue;
+    }
+    const containerId = resource.spec.containerId;
+    const regionId =
+      containerId === undefined
+        ? undefined
+        : regionIds.find(
+            (id) => id === `container:${containerId}` || id.endsWith(`/container:${containerId}`),
+          );
     if (regionId !== undefined) planned.push({ resource, regionId });
+    else if (entry !== undefined) {
+      // The old arrangement has not created this container's child region yet;
+      // wait for the layout subscription to call sync again.
+    }
   }
   return planned;
 }

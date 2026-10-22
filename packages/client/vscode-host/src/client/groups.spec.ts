@@ -104,38 +104,13 @@ describe("VscodeGroupHost", () => {
       containerId: "workbench.view.explorer",
     };
 
-    host.sync([entry], ["left"]);
+    host.sync([entry], ["left/container:workbench.view.explorer"]);
     expect(host.has("vscode:group:workbench.view.explorer")).toBe(true);
     expect(host.hasView(entry.view)).toBe(true);
 
-    host.sync([], ["left"]);
+    host.sync([], ["left/container:workbench.view.explorer"]);
     expect(host.ids()).toEqual([]);
     expect(host.viewIds()).toEqual([]);
-  });
-
-  it("re-registers a group when its region changes", () => {
-    const registerViewGroup = vi.fn();
-    const unregisterViewGroup = vi.fn();
-    const host = new VscodeGroupHost({
-      layout: { registerViewGroup, unregisterViewGroup },
-      definition: definition(),
-      viewDefinition: viewDefinition(),
-    });
-    const entry = {
-      view: "vscode:view:workbench.view.explorer",
-      appId: "workbench.view.explorer",
-      title: "Explorer",
-      source: "view" as const,
-      location: "sidebar" as const,
-      containerId: "workbench.view.explorer",
-    };
-
-    host.sync([entry], ["left", "right"]);
-    host.sync([{ ...entry, location: "auxiliarybar" }], ["left", "right"]);
-
-    expect(unregisterViewGroup).toHaveBeenCalledWith("vscode:group:workbench.view.explorer");
-    expect(registerViewGroup).toHaveBeenCalledTimes(2);
-    expect(host.regionOf("vscode:group:workbench.view.explorer")).toBe("right");
   });
 
   it("disposes all groups and views", () => {
@@ -232,11 +207,15 @@ describe("viewGroupsFromCatalogue", () => {
           source: "view",
         },
       ],
-      ["left", "bottom"],
+      ["left/container:a", "bottom/container:b"],
     );
 
-    expect(planned.find((item) => item.resource.spec.containerId === "a")?.regionId).toBe("left");
-    expect(planned.find((item) => item.resource.spec.containerId === "b")?.regionId).toBe("bottom");
+    expect(planned.find((item) => item.resource.spec.containerId === "a")?.regionId).toBe(
+      "left/container:a",
+    );
+    expect(planned.find((item) => item.resource.spec.containerId === "b")?.regionId).toBe(
+      "bottom/container:b",
+    );
   });
 
   it("creates an editor group for file entries", () => {

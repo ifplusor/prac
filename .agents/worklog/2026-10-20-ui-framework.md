@@ -198,3 +198,11 @@
 - `pnpm check`：0 errors；仅 3 个既存 warning。
 - 修复新增 `PracLayoutFace` 方法导致的 arrangement test double 与 vscode-editor declaration-copy 类型问题。
 - docs 格式化通过。
+
+### 2026-10-22 — live container gate / region matching（slice 21）
+
+- 起 3084 rig（新 token）后跑 live gate。
+- 发现 `VscodeGroupHost` 把多个 container group 都注册到 `left`，触发 `region already hosts a view group`。
+- 修正：container group 匹配已有的 `.../container:<containerId>` 子区域；未出现时等待 layout 变化再 sync；注册 transient 失败不破坏其它 group。
+- 修正：`ViewGroupLayoutBridge` 不把用户已 hidden 的 view 重新显示。
+- live gates 全绿：`verify:containers` 13/13、`verify:stack`、`verify:split`、`verify:persistence`、`verify:bottom` 均 exit 0。

@@ -38,6 +38,9 @@ export class ViewGroupLayoutBridge {
         if (!current.has(viewId)) next = removeView(next, viewId);
       }
       for (const placement of placements) {
+        // A person may have hidden this view through the frame's chrome. Group
+        // membership is not a reason to bring it back; only an explicit show is.
+        if (next.views[placement.viewId]?.hidden === true) continue;
         next = placeQuietly(next, placement.viewId, this.regionId);
       }
       const frontId =
