@@ -69,14 +69,16 @@ export class VscodeGroupHost {
     }
 
     const wantedViews = new Set(
-      entries.filter((entry) => entry.containerId !== undefined).map((entry) => entry.view),
+      entries
+        .map((entry) => (viewGroupIdFor(entry) === undefined ? undefined : entry.view))
+        .filter((view): view is string => view !== undefined),
     );
     for (const viewId of this.viewIds()) {
       if (!wantedViews.has(viewId)) this.removeView(viewId);
     }
     for (const entry of entries) {
-      if (entry.containerId === undefined) continue;
-      const groupId = `vscode:group:${entry.containerId}`;
+      const groupId = viewGroupIdFor(entry);
+      if (groupId === undefined) continue;
       if (this.has(groupId) && !this.hasView(entry.view)) {
         this.addView(groupId, viewFromCatalogue(entry));
       }
@@ -144,14 +146,20 @@ export class VscodeGroupHost {
 
 /** One group resource per catalogue container, stable by container id. */
 export function viewGroupsFromCatalogue(
-  entries: readonly { readonly containerId?: string; readonly containerTitle?: string }[],
+  entries: readonly {
+    readonly containerId?: string;
+    readonly containerTitle?: string;
+    readonly source?: "file" | "view";
+  }[],
 ): VscodeViewGroup[] {
   const byContainer = new Map<string, { title?: string }>();
+  let hasFiles = false;
   for (const entry of entries) {
+    if (entry.source === "file") hasFiles = true;
     if (entry.containerId === undefined) continue;
     byContainer.set(entry.containerId, { title: entry.containerTitle });
   }
-  return [...byContainer].map(([containerId, { title }]) => ({
+  const groups: VscodeViewGroup[] = [...byContainer].map(([containerId, { title }]) => ({
     apiVersion: VSCODE_API_VERSION,
     kind: "ViewGroup",
     metadata: { id: `vscode:group:${containerId}` },
@@ -161,6 +169,24 @@ export function viewGroupsFromCatalogue(
       ...(title === undefined ? {} : { title }),
     },
   }));
+  if (hasFiles) {
+    groups.push({
+      apiVersion: VSCODE_API_VERSION,
+      kind: "ViewGroup",
+      metadata: { id: EDITOR_GROUP_ID },
+      spec: { groupKind: "editor", title: "Editor" },
+    });
+  }
+  return groups;
+}
+
+/** The one editor group the initial slice hosts. */
+export const EDITOR_GROUP_ID = "vscode:group:editor";
+
+/** The group a catalogue entry belongs to, or undefined when it has no home yet. */
+export function viewGroupIdFor(entry: VscodeCatalogueEntry): string | undefined {
+  if (entry.containerId !== undefined) return `vscode:group:${entry.containerId}`;
+  return entry.source === "file" ? EDITOR_GROUP_ID : undefined;
 }
 
 /** The frame region a catalogue location defaults to. */
@@ -199,7 +225,12 @@ export function planViewGroups(
   const planned: PlannedVscodeGroup[] = [];
   for (const resource of viewGroupsFromCatalogue(entries)) {
     const entry = entries.find((candidate) => candidate.containerId === resource.spec.containerId);
-    const desired = entry === undefined ? undefined : regionForLocation(entry.location);
+    const desired =
+      resource.spec.groupKind === "editor"
+        ? "center"
+        : entry === undefined
+          ? undefined
+          : regionForLocation(entry.location);
     const regionId = desired !== undefined && regionIds.includes(desired) ? desired : regionIds[0];
     if (regionId !== undefined) planned.push({ resource, regionId });
   }

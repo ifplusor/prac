@@ -191,6 +191,36 @@ describe("viewGroupsFromCatalogue", () => {
     expect(planned.find((item) => item.resource.spec.containerId === "b")?.regionId).toBe("bottom");
   });
 
+  it("creates an editor group for file entries", () => {
+    const groups = viewGroupsFromCatalogue([
+      { source: "file", containerId: undefined },
+      { source: "view", containerId: "a" },
+    ]);
+
+    expect(groups.map((group) => group.metadata.id)).toEqual([
+      "vscode:group:a",
+      "vscode:group:editor",
+    ]);
+  });
+
+  it("plans the editor group in the center", () => {
+    const planned = planViewGroups(
+      [
+        {
+          view: "vscode:file:p1:file:///a.ts",
+          appId: "file:///a.ts",
+          title: "a.ts",
+          source: "file",
+          location: "stage",
+        },
+      ],
+      ["left", "center"],
+    );
+
+    expect(planned[0]?.resource.metadata.id).toBe("vscode:group:editor");
+    expect(planned[0]?.regionId).toBe("center");
+  });
+
   it("maps locations to default frame regions", () => {
     expect(regionForLocation("stage")).toBe("center");
     expect(regionForLocation("panel")).toBe("bottom");
