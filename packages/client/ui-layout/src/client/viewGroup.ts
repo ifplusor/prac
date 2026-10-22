@@ -53,6 +53,16 @@ export class ViewGroup implements ViewGroupRuntime {
     return this.#binding;
   }
 
+  /** Whether this group currently holds the view. */
+  has(viewId: string): boolean {
+    return this.#views.has(viewId);
+  }
+
+  /** Look up a member view without changing its host. */
+  get(viewId: string): View | undefined {
+    return this.#views.get(viewId);
+  }
+
   /** Add a view to the end of the group order. */
   add(view: View): void {
     this.#assertLive();

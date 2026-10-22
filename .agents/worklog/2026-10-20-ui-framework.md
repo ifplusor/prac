@@ -79,3 +79,10 @@
 - 新增 `viewGroup.spec.ts`；resource 类型通过 `public.ts` 导出。
 - 验证：`pnpm --filter prac-client-ui-layout test` 165 passed；`check` / `build` 通过。
 - 尚未接入 placement / frame，也尚未实现跨 group 的 target-first move。
+
+### 2026-10-22 — target-first move / materializer integration（slice 3）
+
+- 新增 `move.ts`：目标先建、源后释放；失败保留源。
+- `ViewGroup.get/has`；`View` / `ViewGroup` 作为 materializer 的实际 runtime。
+- 新增 `runtimeResource.spec.ts`；公开 `MoveViewRequest` 类型。
+- 验证：168 passed；`check` / `build` 通过。
