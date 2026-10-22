@@ -96,7 +96,7 @@ export function apply(ctx: Context): void {
   const store = createStore((viewId) => {
     for (const listener of Array.from(closeListeners)) listener(viewId);
   });
-  const { layout, pracLayout, panelInfo } = createServices(ctx, store, closeListeners);
+  const { layout, pracLayout, panelInfo, viewGroups } = createServices(ctx, store, closeListeners);
 
   ctx.effect(() => {
     // A view may already have registered (activation order is not ours to
@@ -167,6 +167,7 @@ export function apply(ctx: Context): void {
       disposePracLayout();
       disposeLayout();
       disposePanelInfo();
+      viewGroups.dispose();
       disposeRoot();
     };
   }, "prac-client-ui-layout: frame + services");

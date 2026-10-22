@@ -131,3 +131,9 @@
 - 新增 `frameGroups.ts`：`ViewGroupHost` 管理 group id ↔ region 的一对一绑定与 bridge 生命周期。
 - 重复 group / region、未知 region 拒绝；unregister 不 dispose group runtime。
 - 验证：ui-layout 175 passed；check/build 通过。
+
+### 2026-10-22 — assembly group host（slice 11）
+
+- `createServices` 创建 `ViewGroupHost`；`PracLayoutFace` 新增 `registerViewGroup` / `unregisterViewGroup`。
+- `index.ts` 在 frame effect 清理时 `viewGroups.dispose()`。
+- 验证：ui-layout 175 passed；check/build 通过。

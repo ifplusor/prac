@@ -10,6 +10,8 @@
  */
 
 import type { RegionInfo, ViewInfo } from "./catalogue.js";
+import type { FrameGroup } from "./frameGroups.js";
+import type { ViewGroup } from "./viewGroup.js";
 
 // DSH's declaration merges reach this program through the **type-only** imports
 // the other modules already make (`PropsRenderSlots` from ui-slots,
@@ -551,6 +553,23 @@ export interface PracLayoutFace {
    * @param viewId - the view identity.
    */
   hide(viewId: string): void;
+  /**
+   * Register a materialized view group in a frame region.
+   *
+   * The caller owns the group runtime (the resource materializer); the frame
+   * owns the projection into the layout store.
+   *
+   * @param group - the materialized group.
+   * @param regionId - the existing frame region.
+   * @returns the registered group/region pair.
+   */
+  registerViewGroup(group: ViewGroup, regionId: string): FrameGroup;
+  /**
+   * Remove a view group's frame projection.
+   *
+   * @param groupId - the view-group id.
+   */
+  unregisterViewGroup(groupId: string): void;
   /**
    * Fold a view's body away inside a stack, keeping its header.
    *

@@ -63,6 +63,8 @@ import {
   structuralRegion,
 } from "./model.js";
 import type { LayoutStore } from "./store.js";
+import { ViewGroupHost, type FrameGroup } from "./frameGroups.js";
+import type { ViewGroup } from "./viewGroup.js";
 
 /** Whether a view's region sits inside the subtree a region id names. */
 function inRegionSubtree(region: string, target: string): boolean {
@@ -77,6 +79,8 @@ export interface LayoutServices {
   readonly pracLayout: PracLayoutFace;
   /** The `panelInfo` root hook's observable. */
   readonly panelInfo: HostObservable<PanelInfo>;
+  /** The frame's view-group owner. */
+  readonly viewGroups: ViewGroupHost;
 }
 
 /**
@@ -98,6 +102,7 @@ export function createServices(
   // one-view rows. Hiding the last visible view, placing one, folding one — they all change the shape
   // (a stack that falls back to one row melts, an empty leftover holds no space), so the normaliser
   // runs on the way out of each change rather than only on placements.
+  const viewGroups = new ViewGroupHost(store);
   const write = store.update.bind(store);
   store.update = (change: Parameters<typeof store.update>[0]) =>
     write((state: LayoutState) => ensureStackShape(change(state)));
@@ -311,6 +316,12 @@ export function createServices(
         return { ...state, views: { ...state.views, [viewId]: { ...view, hidden: true } } };
       });
     },
+    registerViewGroup(group: ViewGroup, regionId: string): FrameGroup {
+      return viewGroups.register(group, regionId);
+    },
+    unregisterViewGroup(groupId: string): void {
+      viewGroups.unregister(groupId);
+    },
     setViewCollapsed(viewId: string, collapsed: boolean): void {
       // Through the model: a view that lives in a stack **row** folds through its region, so writing
       // the record here would leave the picture unchanged. E1 wants the height it is drawn at, and
@@ -446,5 +457,5 @@ export function createServices(
     },
   };
 
-  return { layout, pracLayout, panelInfo };
+  return { layout, pracLayout, panelInfo, viewGroups };
 }
