@@ -215,6 +215,8 @@ describe("resource materializer", () => {
     const groups = new ViewGroupDefinitionRegistry();
     groups.register(definition);
 
-    expect(groups.lookup("test/v1", "ViewGroup")?.bindingFactory?.({})).toBe(binding);
+    expect(groups.lookup("test/v1", "ViewGroup")?.bindingFactory?.(groupResource("g1"))).toBe(
+      binding,
+    );
   });
 });

@@ -31,6 +31,8 @@ export interface PracVscodeAction {
   readonly enabled: boolean;
   readonly checked: boolean;
   readonly tooltip?: string;
+  /** Children of a submenu action; absent for a leaf action. */
+  readonly submenu?: readonly PracVscodeAction[];
 }
 
 /** The shared VS Code client mechanism this package publishes on the registry. */
@@ -66,6 +68,16 @@ export interface PracVscodeFace {
    * @returns primary and secondary actions the frame can render.
    */
   containerActions(containerId: string): readonly PracVscodeAction[];
+  /**
+   * Run one container-title action by id.
+   *
+   * Runs the original action (not `runCommand(id)`), so args and custom `run`
+   * behavior are preserved.
+   *
+   * @param containerId - the container id.
+   * @param actionId - the action id from {@link PracVscodeFace.containerActions}.
+   */
+  runAction(containerId: string, actionId: string): void;
   /**
    * The mount component for any catalogue entry, by its view id.
    *
@@ -323,3 +335,21 @@ declare module "@deepseek-ai/cordis" {
     pracVscode: PracVscodeFace;
   }
 }
+
+// The VS Code concrete resource surface. Runtime constructors live in
+// `client/index.ts`; these are the types consumers name.
+export type {
+  VscodeBindingFactory,
+  VscodeGroupFactory,
+  VscodeGroupKind,
+  VscodeGroupBinding,
+  VscodeHostFactory,
+  VscodeView,
+  VscodeViewDefinitionOptions,
+  VscodeViewFactory,
+  VscodeViewGroup,
+  VscodeViewGroupDefinitionOptions,
+  VscodeViewGroupSpec,
+  VscodeViewHost,
+  VscodeViewSpec,
+} from "./resources.js";

@@ -137,7 +137,7 @@ export interface ViewGroupDefinition extends MaterializerDefinition<
   ViewGroupSpec,
   ViewGroupRuntime
 > {
-  bindingFactory?(spec: ViewGroupSpec): GroupBinding | undefined;
+  bindingFactory?(decl: ViewGroupResource): GroupBinding | undefined;
 }
 
 /** Definition for a view kind. */

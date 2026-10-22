@@ -42,6 +42,7 @@ import type { ILayout } from "@deepseek-ai/dsh-client-ui-layout/client";
 import { createVscodeEmbed } from "prac-vscode-embed/client";
 import { EXTENSIONS_GALLERY } from "prac-vscode";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "./public.js";
+export * from "./resources.js";
 
 /** Same-origin prefix the host half serves the app bundle under. */
 const VSCODE_ROUTE = "/prac-vscode";
@@ -255,6 +256,7 @@ export function apply(ctx: Context): void {
       };
     },
     containerActions: (containerId: string) => embed.containerActions(containerId),
+    runAction: (containerId: string, actionId: string) => embed.runAction(containerId, actionId),
     hostFor: (view: string): (() => ReactElement | null) => {
       const placement = placementOfFileView(view);
       if (placement !== undefined) return embed.file(placement.placement, placement.resource);

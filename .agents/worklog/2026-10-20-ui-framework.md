@@ -86,3 +86,11 @@
 - `ViewGroup.get/has`；`View` / `ViewGroup` 作为 materializer 的实际 runtime。
 - 新增 `runtimeResource.spec.ts`；公开 `MoveViewRequest` 类型。
 - 验证：168 passed；`check` / `build` 通过。
+
+### 2026-10-22 — VS Code concrete resources（slice 4）
+
+- 新增 `vscode-host/src/client/resources.ts`：`VscodeViewGroupDefinition`、`VscodeViewDefinition`、`VscodeViewHost`、`VscodeGroupBinding`。
+- container → stack，editor → select；`hostFactory` 保留 source-owned `hostKind` / `MoveIntent`。
+- `bindingFactory` 改为接收完整 `ViewGroupResource`，以拿到 `metadata.id`。
+- 新增 `resources.spec.ts`；`vscode-host` 增加 `test` script。
+- 验证：ui-layout 168 passed；vscode-host 7 passed；两边 check/build 通过。
