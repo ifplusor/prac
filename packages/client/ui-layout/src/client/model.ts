@@ -136,7 +136,7 @@ export function defaultTree(): SplitNode {
           gridNode(
             "stage",
             1,
-            1,
+            3,
             [
               regionNode(CENTER_REGION, 0, {
                 flex: true,

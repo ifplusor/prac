@@ -317,3 +317,8 @@
 - 恢复默认 stage 为 1×1 GridNode。
 - `readSplitDrawn` 对无 DOM box 的 grid child 使用 `resolveSizes` fallback；横向 sash 现在能 resize grid 边界。
 - live 全绿：resize / containers / views / file。
+
+### 2026-10-22 — multi-cell stage default（slice 41）
+
+- 默认 stage 扩为 1×3 grid（1 row，最多 3 cells）。
+- live 全绿：resize / containers / views / file / split。
