@@ -58,7 +58,7 @@ view group 的成员
   view ← placement（viewGroupId + order / hidden / folded / size）
 ```
 
-三句话：
+模型要点：
 
 - **布局节点只有 split / grid / region**；region 是叶子盒子，负责几何。
 - **view group 不是第四个布局节点**，它是 region 的内容根；负责成员、mode、「选中 / 顺序」。
@@ -125,7 +125,8 @@ view group 的成员
 
 - **container = 具名 view group，默认 `stack`**；Explorer 的 Open Editors / Folders / Outline 就是同一个 container 里的 stack。
 - **container bar** 在父层 select 上切 container；**group bar** 只属于 select view group；stack container 没有 group bar。
-- **view group state**：每个 group 都有 id / mode / active / order / tombstone；`active` 只属于 select；无名 group 也有 state，但没有 `ContainerRecord`。
+- **`ViewGroupState`**：每个 group 都有 id / mode / active / order / tombstone；`active` 只属于 select；无名 group 也有 state，但没有 `ContainerRecord`。
+- **`ViewGroup`**：运行时对象，1:1 对应 `ViewGroupState`；持有 slots / hosts / `binding?`。source binding 是 runtime-only，不进 state。
 - **`ContainerRecord`**：具名 group 的 title / icon / location / order / hideIfEmpty / available / tombstone；成员不存，按 placement 派生。来源只声明 `ContainerDeclaration`，不拥有 record。
 - **身份**：placement 的目标是 `viewGroupId`；`ContainerRecord` 以同一个 `viewGroupId` 为 key；region id 只是布局节点 id；来源 container id 通过 `ContainerDeclaration` 映射，不是第二套成员键。
 - **对象还是角色**：container 是 prac 的具体对象（view group + `ContainerRecord`）；editor group 是“select view group + adapter binding”的角色，具体的 `PracEditorGroup` / `EditorGroupModel` 在 adapter 里。
