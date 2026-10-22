@@ -13,7 +13,7 @@ prac 的 container 是**具名 view group，默认 stack**；成员由 placement
 
 这个 step 要定的是：adaptor 用哪种 **container context** 承接 VS Code 的 container 行为——view 集合、可见性、顺序、collapse、title / menu、focus、drag / drop——并让 DSH view 和 VS Code view 能同时出现在一个 container 里。
 
-container context 属于 **`ContainerBinding`**；`ContainerBinding` 只挂到 `ViewGroupDeclaration.kind = container` 的 group。binding 的 kind 在声明时确定，不从 group 内容推断。group 的数据面是 `ViewGroupState`，运行时是 frame 的 `ViewGroup`。
+container context 属于 **`ContainerBinding`**；`ContainerBinding` 只挂到 `source = vscode` 且 `kind = container` 的 `ViewGroupDeclaration`。binding kind 在声明时确定，不从 group 内容推断。group 的数据面是 `ViewGroupState`，运行时是 frame 的 `ViewGroup`。
 
 ## Motivation
 
@@ -37,7 +37,7 @@ UI umbrella 已经定了方向和 G：container 是 prac 的组合单元，conta
 - **frame 不认识 VS Code container**：container context 在 adaptor 内部，frame 只看到 view group / host。
 - **container context 不能成为第二成员权威**：它承接 VS Code 语义，但 view 是否在 container 里仍由 prac placement 决定。
 - **group 是 frame 的**：`ViewGroup`（运行时）/ `ViewGroupState`（数据）/ active / order 都在 frame；`VscodeGroupBinding` 是 adaptor 侧的 `ViewGroup.binding?`。
-- **binding kind 只有两种**：`container` / `editor`；kind 由 `ViewGroupDeclaration` 在声明时确定，不由 group 内容推断。
+- **binding kind 只有两种**：`vscode/container` / `vscode/editor`；kind 由 `ViewGroupDeclaration` 的 `source + kind` 在声明时确定，不由 group 内容推断。
 - **没有 `view-host` binding**：VS Code view 被移到 plain group 时，没有 group binding；`VscodeViewHost` 用 unbound context 挂载。
 - **group mode 与 binding kind 不是同一个轴**：group mode 是 `stack` / `select`；binding kind 是 `container` / `editor` / none。前者决定内容怎么显示，后者由 group declaration 决定。
 - **`IViewsService` 用 external view registry**：`VscodeViewHost` 注册 / 注销 `ViewPane`；`getViewWithId` / `getActiveViewWithId` / `isViewVisible` 优先查 registry；没有 container binding 时，container 级方法返回 `null` / 不可用。
