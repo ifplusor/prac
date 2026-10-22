@@ -47,7 +47,7 @@ adaptor 侧已经有几个 step，但缺一张骨架：
 
 > **frame 不认识 VS Code；adaptor 不持有 / 修改 frame 的内部布局状态，只通过 `PracLayoutFace`（`ctx.pracLayout`）、`prac.view`、host element 这些窄契约协作；container 的成员由 prac placement 决定，adaptor 只承接 VS Code container 语义；vendor 不认识 prac 的政策。**
 >
-> **group 是 frame 的；adaptor 不拥有 group runtime。** 数据面是 `ViewGroupState`，运行时对象是 `ViewGroup`。adaptor 声明 `ViewGroupDeclaration`（kind 在声明时确定）；只有 `kind = container / editor` 的声明才挂 `VscodeGroupBinding`。VS Code view 的 `ViewPane` / `EditorPane` 由 `VscodeViewHost` 挂载并注册 `IViewsService`，binding 不拥有 view host。
+> **group 是 frame 的；adaptor 不拥有 group runtime。** 数据面是 `ViewGroupState`，运行时对象是 `ViewGroup`。adaptor 声明 `ViewGroupDeclaration`（`apiVersion + kind` 在声明时确定）；只有 `vscode.prac/v1` 的 `Container` / `Editor` 才挂 `VscodeGroupBinding`。VS Code view 的 `ViewPane` / `EditorPane` 由 `VscodeViewHost` 挂载并注册 `IViewsService`，binding 不拥有 view host。
 
 ### 1.1 core workbench 与 extension
 
@@ -112,7 +112,8 @@ Server（node）
 | --- | --- | --- | --- |
 | `PracVscodeFace` | consumers 的 adaptor 前台：catalogue / `hostFor` / `focusView` / `runCommand` / file placement / capabilities | consumers、诊断/门 | frame 的 layout |
 | `VscodeCatalogueEntry` | catalogue 的一行数据：`view` / `appId` / `title` / `source` / `role` / `containerId` / `containerTitle` / `viewGroupId?`（`location?` 只作来源提示） | `ui-vscode-views` / `ui-vscode-editor` / arrangement | 怎么渲染 |
-| `ViewGroupDeclaration` | 来源对 group 的声明：`source` + `kind`（source-defined，如 vscode/container、vscode/editor）+ id / title / icon / role / order / hideIfEmpty；kind 在声明时确定、不可变；frame 视为 opaque tag；arrangement 落成 `ViewGroupState` | adaptor / consumers | group 成员 / placement |
+| `ViewGroupDeclaration` | CR 风格的 group 声明：`apiVersion` + `kind` + `metadata` + `spec`；`apiVersion + kind` 在声明时确定、不可变；frame 视为 opaque 类型；arrangement 落成 `ViewGroupState` | adaptor / consumers | group 成员 / placement |
+| `ViewGroupKindDefinition` | kind registry 的一项：`apiVersion` / `kind` / schema / validation / binding factory；由 source adapter 注册 | adaptor / frame registry | 具体 group 实例 |
 | `prac.view` | frame 的 view 注册槽：每个 view 的一次注册（id / label / icon / `paneHeader` / 宿主组件） | consumers | view 的来源 |
 
 #### 2.2.2 embed / workbench
@@ -123,7 +124,7 @@ Server（node）
 | `WorkbenchFace`（目标名） | workbench 对 embedder 的内部面：view / file mount、focus / release、placements、capabilities；**不承载 part mount** | `vscode-embed` | consumers / `PracVscodeFace` |
 | `EmbeddedWorkbench` | VS Code workbench 本体：workbench 服务、`IWorkbenchLayoutService`、view / editor host、overlay | `WorkbenchFace` | frame / consumers |
 | `PracEditorHost` | adaptor 侧 editor runtime 的 owner：`IEditorGroupsService`、select view group / grid cell、editor group model / panes | workbench、`vscode-host` 的 group channel | prac 的 editor group 类型 / container |
-| `VscodeGroupBinding` | `ViewGroup.binding?` 的实现：只匹配 `source = vscode` 且 kind = container \| editor 的 `ViewGroupDeclaration`；kind 在声明时确定，不从 group 内容推断；拥有 container / editor context、actions；不拥有 view host | workbench、frame 的 `ViewGroup` | group state / placement / view host |
+| `VscodeGroupBinding` | `ViewGroup.binding?` 的实现：只匹配 `apiVersion = vscode.prac/v1` 且 kind = Container \| Editor 的 `ViewGroupDeclaration`；kind 在声明时确定，不从 group 内容推断；拥有 container / editor context、actions；不拥有 view host | workbench、frame 的 `ViewGroup` | group state / placement / view host |
 | `VscodeViewHost` | 每个 VS Code view 的运行时 host：mount / release `ViewPane` / `EditorPane`；注册 / 注销 `IViewsService`；有 group binding 时用它的 context，没有时用 unbound context | frame 的 `ViewGroup`、`VscodeGroupBinding` | group state / placement |
 | `PracViewsService` | `IViewsService` 的 subclass / patch：维护 external view registry；`VscodeViewHost` 注册 / 注销 ViewPane；其余方法 delegate | workbench、`VscodeViewHost` | group state / placement |
 | `ViewPane` | 一个 view 的 UI（上游 `ViewPane`） | `tryMountView` | frame |
@@ -135,7 +136,7 @@ Server（node）
 | --- | --- | --- | --- |
 | `PracLayoutFace` | frame 的布局服务：布局拓扑、view group、placement、grid cell、尺寸 | adaptor、arrangement、editor host | VS Code 的 part / container |
 
-**`ViewGroup` 是 frame 的运行时对象，`ViewGroupState` 是它的数据面；没有额外的 `GroupHost`。** binding 跟着 `ViewGroupDeclaration.kind` 走，不根据 group 内容推断：`container` / `editor` 声明才有 `VscodeGroupBinding`；plain group 没有 binding，但仍可放 VS Code view，由 `VscodeViewHost` 用 unbound context 挂载。
+**`ViewGroup` 是 frame 的运行时对象，`ViewGroupState` 是它的数据面；没有额外的 `GroupHost`。** binding 跟着 `ViewGroupDeclaration` 的 `apiVersion + kind` 走，不根据 group 内容推断：`vscode.prac/v1` 的 `Container` / `Editor` 才有 `VscodeGroupBinding`；plain group 没有 binding，但仍可放 VS Code view，由 `VscodeViewHost` 用 unbound context 挂载。
 
 调用关系：
 
@@ -188,7 +189,7 @@ editor:
 | --- | --- |
 | `VscodeEmbedHandle` | `boot(launch)` / `view(viewId)` / `file(placement, resource)` / `placements()` / `views()` / `floatHost()` / `setViewGroupChannel(channel)`（现名 `setGroupRegionChannel`） / `focusView` / `runCommand` |
 | `WorkbenchFace`（目标） | `mountViewInto` / `focusView` / `releaseView` / `mountFileInto` / `focusFile` / `releaseFile` / `listViews` / `listPlacements` / capabilities；**不暴露 part mount**（已移除） |
-| `VscodeGroupBinding` | `kind: container \| editor`；只能挂到同 kind 的 `ViewGroupDeclaration`；提供 group-level container / editor actions / context；不 mount view host |
+| `VscodeGroupBinding` | 只匹配 `apiVersion = vscode.prac/v1`、kind = `Container` / `Editor` 的 `ViewGroupDeclaration`；提供 group-level container / editor actions / context；不 mount view host |
 | `VscodeViewHost` | `mount(element)` / `release()` / `focus()`；`ViewPane` / `EditorPane` 的实例 owner；调用 `PracViewsService.registerExternalView` |
 | `PracVscodeFace` | `catalogue()` / `onDidChangeCatalogue()` / `hostFor(view)` / `focusView(view)` / `runCommand(command, ...args)` / `filePlacement(view)` / `fileResource(view)` / `capabilities.editors` / `capabilities.diagnostics` |
 | `VscodeCatalogueEntry` | `view` / `appId` / `title` / `source: "file" \| "view"` / `role: "stage" \| "primary-sidebar" \| "secondary-sidebar" \| "panel"` / `containerId?` / `containerTitle?` / `viewGroupId?` |
@@ -225,12 +226,12 @@ editor:
 
 1. catalogue 增（`source: "view"` 或 `"file"`）；
 2. consumer 注册 `prac.view`（id = `vscode:view:<id>` / `vscode:file:<placement>:<resource>`）；
-3. frame 按 `ViewGroupDeclaration` 的 kind / role + placement 落成 view group（container / stack / select）；region 只是几何槽位；
+3. frame 按 `ViewGroupDeclaration` 的 `apiVersion + kind` / role + placement 落成 view group（container / stack / select）；region 只是几何槽位；
 4. `hostFor(view)` 返回 mount 组件；
 5. `vscode-embed` 的 view host → `mountViewInto(viewId, element)`；
 6. 当前最小实现：`tryMountView` 取 descriptor，直接 `createInstance(ViewPane)`，`render()`、`setVisible(true)`，放进 `.monaco-pane-view`，并注册到 `PracViewsService`；这还不是 container context；
 7. 目标：`VscodeViewHost` 负责 mount / release，并调用 `PracViewsService.registerExternalView` / `unregisterExternalView`；`focusView` / title action / container action 通过 `PracViewsService.getViewWithId` 找到 mounted pane；
-8. 如果目标 group 的 `ViewGroupDeclaration.kind` 不是 container/editor，则没有 `VscodeGroupBinding`；`VscodeViewHost` 仍能挂载，但使用 unbound context，container 级方法返回 `null` / 不可用，view 自己的 actions / `viewsWelcome` 继续；
+8. 如果目标 group 的 `ViewGroupDeclaration` 不是 `vscode.prac/v1` 的 `Container` / `Editor`，则没有 `VscodeGroupBinding`；`VscodeViewHost` 仍能挂载，但使用 unbound context，container 级方法返回 `null` / 不可用，view 自己的 actions / `viewsWelcome` 继续；
 9. catalogue 减或视图离场：`releaseView`、`removeView`、剪持久化位置；`VscodeViewHost` 注销 external view。
 
 当前第 6 步**没有 `ViewPaneContainer`**：`ViewPane` 是直接创建的。container context 目前是最小实现：
@@ -299,7 +300,7 @@ editor:
 architecture 只定形状，不定机制：
 
 - **group 是 frame 的**：`ViewGroup`（运行时）/ `ViewGroupState`（数据）/ active / order 都在 frame；adaptor 不拥有 group；
-- **`VscodeGroupBinding` 是 adaptor 侧的绑定**：只匹配 `source = vscode` 且 kind = `container | editor` 的 `ViewGroupDeclaration`；kind 在声明时确定，不由 group 内容推断；plain group 没有 binding。
+- **`VscodeGroupBinding` 是 adaptor 侧的绑定**：只匹配 `apiVersion = vscode.prac/v1`、kind = `Container / Editor` 的 `ViewGroupDeclaration`；kind 在声明时确定，不由 group 内容推断；plain group 没有 binding。
 - **group mode 与 binding kind 不是同一个轴**：group mode 是 `stack` / `select`；binding kind 是 `container` / `editor` / none；声明决定 binding，placement 只决定 view 在哪个 group。
 - **container 是 prac 的具名 view group，默认 stack**；成员由 placement 派生，不是 adaptor 的成员表；
 - container context 应位于 **adaptor 内部**，围绕 `ViewPane` / `ViewPaneContainer`；它通过 `PracLayoutFace` 和 frame 的 view host 协作，不拥有 layout；
