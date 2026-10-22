@@ -13,6 +13,8 @@ prac 的 container 是**具名 view group，默认 stack**；成员由 placement
 
 这个 step 要定的是：adaptor 用哪种 **container context** 承接 VS Code 的 container 行为——view 集合、可见性、顺序、collapse、title / menu、focus、drag / drop——并让 DSH view 和 VS Code view 能同时出现在一个 container 里。
 
+container context 是 **`VscodeGroupBinding` 的一个 mode**，不是 group 本身。group 由 frame 的 `GroupHost` 拥有；binding 只承接 VS Code 语义。
+
 ## Motivation
 
 当前 adaptor 直接把 `ViewPane` 挂进 frame 给的 host；它没有 `ViewPaneContainer` 这一层。后果：
@@ -34,12 +36,17 @@ UI umbrella 已经定了方向和 G：container 是 prac 的组合单元，conta
 - **G**：view 移出原 container 后，container 的 title actions / context keys 归当前 container；view 自己的 title actions / `viewsWelcome` 跟随；原 container 的 actions / context keys 不跟随。
 - **frame 不认识 VS Code container**：container context 在 adaptor 内部，frame 只看到 view group / host。
 - **container context 不能成为第二成员权威**：它承接 VS Code 语义，但 view 是否在 container 里仍由 prac placement 决定。
+- **group 是 frame 的**：`GroupHost` / group state / active / order 都在 frame；`VscodeGroupBinding` 是 adaptor 侧的绑定。
+- **binding 有三种 mode**：`container` / `editor` / `unbound`；unbound 是没有 VS Code container 的合法状态。
+- **`IViewsService` 用 external view registry**：binding 注册 / 注销 `ViewPane`；`getViewWithId` / `getActiveViewWithId` / `isViewVisible` 优先查 registry；container 级方法在 unbound 下返回 `null` / 不可用。
 - **container bar / group bar 由 frame 画**：adaptor 提供 action / context，不自己画第二套 bar。
 - **`paneHeader` 是 view 自报的呈现事实**：frame 用它决定是否保留 native pane header，不按来源前缀猜。
 - **`PracLayoutFace` 以 view group / grid cell 为落点**：region 只是几何槽位；editor group 的 `addGroup` 走 group / cell channel，不是只建 region。
 - **role 名是 `stage` / `primary sidebar` / `secondary sidebar` / `panel`**：left / center / right / bottom 只是默认物理位置。
 
 ## 设计空间
+
+目标是 **`VscodeGroupBinding`**；下面的 A–D 是 container context / binding 内部实现的不同机制，不是 group 的 owner。
 
 ### A. headless real `ViewPaneContainer`
 
@@ -79,9 +86,10 @@ container context 拥有一个 stack，成员是 host，不要求成员是 `View
 
 1. Explorer container 同时显示 Open Editors / Folders / Outline，确认它是 stack，不是 select；
 2. 往 Explorer container 里放一个 DSH React view；
-3. 把 Folders 移到一个 DSH group；
+3. 把 Folders 移到一个 DSH group（unbound group）；
 4. 额外验证 stage grid cell ↔ view group ↔ editor group 的映射：`addGroup` / `setGroupRegionChannel` 能否创建 grid cell / select view group，而不是只建 region；
-5. 记录：
+5. 记录 external view registry：Folders 的 `ViewPane` 在新 group 下 `getViewWithId` / `isViewVisible` / focus 是否走 binding 注册；container 级方法是否返回 `null`；
+6. 记录：
    - container bar 是否仍切 container；
    - Folders 的 title / icon / `viewLocation` / `ViewTitle` actions 是否错位；
    - Explorer 的 `ViewContainerTitle` actions 是否还作用于已移出的 view；
@@ -97,7 +105,8 @@ container context 拥有一个 stack，成员是 host，不要求成员是 `View
 4. **G 的投影**：view 移出后，`viewContainer` / `viewLocation` / `ViewContainerTitle` 的 context 在哪里覆盖、哪里抑制、哪里接受失效？
 5. **action / menu**：view-scoped / container-scoped / global 的 owner 与 scope 怎么判？
 6. **focus / visibility / collapse**：upstream container 的语义与 frame 的 stack/fold 如何不打架？
-7. **editor group**：`PracEditorGroup` 是否复用同一套 container context，还是保持 editor 专用链？
+7. **`IViewsService` 注册**：subclass 还是 patch `ViewsService`；`getActiveViewWithId` / container 级方法在 unbound 下如何返回；`focusedViewContextKey` 谁维护？
+8. **editor group**：`EditorGroupBinding` 是否复用同一套 binding 基类，还是保持 editor 专用链？
 
 ## Validation
 
@@ -110,6 +119,8 @@ container context 拥有一个 stack，成员是 host，不要求成员是 `View
 - collapse / visibility / focus 有一致行为；
 - stage 的 grid cell / select view group / editor group binding 能建立，不出现第二成员权威；
 - container bar / group bar 由 frame 画，adaptor 只供 action / context；
+- unbound group 的 `ViewPane` 仍能被 `IViewsService` 找到；container 级 actions / context keys 不出现；
+- `VscodeGroupBinding` 的注册 / 注销与 `PracViewsService` 的 external registry 一致；
 - spike 记录能支持或推翻所选机制。
 
 ## Related
