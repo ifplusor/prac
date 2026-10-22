@@ -169,7 +169,7 @@ view group 的成员
 
 **不是 view 的东西**：view group 是 stack / select 的组；container 是具名 view group；part 是区域角色；overlay 是浮层条目；action / command / keybinding 是命令面；decoration / sash / focus ring 是 frame chrome。
 
-**host 能力由来源定义**：`hostKind` 是 source-owned，不是 core 的分派键；core 只认 `ViewHost` 接口和 capabilities。
+**host 能力由来源定义**：`hostKind` 是 source-owned，不是 core 的分派键；core 只认 `ViewHost` 接口和 `MoveIntent`。
 
 | source host kind（示例） | 能力 | 移动语义 |
 | --- | --- | --- |
@@ -212,8 +212,8 @@ adapter 大在：observe → normalize → bind → project → context → host
 
 ### 2.1 组合规则
 
-- **frame 只认 catalogue + placement**。frame 不读来源目录，不按来源前缀分派；唯一窄分派是 `ViewHost` 接口 / capabilities，不是 `hostKind` 字符串。
-- **一个 host 一个 view**。host 的身份是 view id，不是“某次放置”；移动时尽量搬 host，不重建。
+- **frame 只认 catalogue + placement**。frame 不读来源目录，不按来源前缀分派；唯一窄分派是 `ViewHost` 接口 / `MoveIntent`，不是 `hostKind` 字符串。
+- **一个 host 一个 view**。host 的身份是 view id，不是“某次放置”；默认移动是目标先建、源后释放，source 可以用 `MoveIntent` 优化，frame 不按 hostKind 分支。
 - **host 的契约是 React + boundary**。frame 给盒子、隔离边界、active；host 自己观察尺寸、自己 mount / release、自己把焦点交给 view。
 - **stable host 不是全局承诺**：只对 DOM-only / React view；editor 走 model + viewState；`view-pane` 跨 container 允许重建；webview / iframe 明确 reload（或稳定层 + 几何，不 reparent）。
 - **activation 显式**。mount 不等于 activation；view 成为 front / 可见时，来源收到 `activate(viewId)`；编辑器靠它打开文件、给 pane `setVisible(true)`。
@@ -237,14 +237,14 @@ adapter 大在：observe → normalize → bind → project → context → host
 - **container 是 prac 的组合单元**：成员永远由 placement 决定；来源的 `containerId` 不能把它拉回；container 不能因为来源消失就丢掉放进来的别家 view。
 - **不是所有 UI 都是 view**：view group 是组，part 是区域角色，overlay 是浮层条目，action / command / keybinding 是命令面；只有 view 挂载。
 - **一个 React host 契约**：禁止 `ViewHandle.layout/setVisible/focus/dispose` 这类第二套 imperative 渲染模型。
-- **host 的能力要诚实**：webview / iframe、editor、opaque view 的移动语义由 `ViewHost` capabilities 说明；`hostKind` 只是来源词汇。
+- **移动是 source-owned**：core 传 `MoveIntent`；默认目标先建、源后释放；webview / iframe 默认 reload，DOM-only / editor 可以由 source 优化；`hostKind` 只是来源词汇。
 - **frame 不装载代码、不认识来源**：frame 不 import / require / eval 来源 bundle；不出现 `vscode:` / `dsh:` 渲染分支。
 - **一个持久化权威**：frame 的 layout store 是唯一持久化点；来源状态不持久化；overlay、注意力栈不持久化。
 
 ## 3. Drawbacks（代价与边界）
 
 - **container 语义不随 view 走**：VS Code 的 `ViewPaneContainer` commands / context keys / visibility 依赖成员关系。view 被移出原 container 后，原 container 的 title actions / context keys 不跟随；view 自己的 title actions / `viewsWelcome` 跟随。这是“组合优先于上游 container 语义”的代价。
-- **webview / iframe 移动会 reload**：host 重挂会换 browsing context；不假装能稳定，稳定 host 只承诺 DOM-only view。
+- **webview / iframe 移动会 reload**：host 重挂会换 browsing context；默认移动不承诺稳定，source 要用优化必须显式。
 - **editor 跨区域不是纯 host 搬运**：走到已有组的区域时可能 `moveEditor`；activation 必须显式，且按 placement 而不是 resource。
 - **混合 select group 的 tab 顺序有同步成本**：group total order 权威；source 端 editor move 要投影回 group，非 editor view 的位置尽量保留。frame 的统一 group bar 承接 editor 的 dirty / preview / close / pinned 呈现，但不接管 source 语义。
 - **来源消失不等于 container 消失**：container 里还有别家 view 时保留；元数据可墓碑化，显式 `forget` 才删。
@@ -302,7 +302,7 @@ adapter 大在：observe → normalize → bind → project → context → host
 - **生命周期**：改标题 / 可用性不 remount；`when` 关 / 开原位恢复；卸载只移除自己；HMR 后布局不丢。
 - **container / group mode**：Explorer container 同时显示多个 view；stage cell 默认是 select group；stack container 没有 group bar。
 - **placement**：view 换 container 只改 placement；移动整个 region 只改 topology；tab 重排只改 placement 的 order。
-- **stage / editor**：grid cell = region，内容根默认是 select view group；editor view host `editor-pane`；VS Code adapter 维护 editor 子集与 `EditorGroupModel` 的映射；track resize / 加删行列 / 移 cell 正确；移动承诺按 `ViewHost` capabilities 区分：DOM-only 不 release，editor 用 model + viewState，view-pane 可重建，webview / iframe reload；activation 打开正确文件。
+- **stage / editor**：grid cell = region，内容根默认是 select view group；editor view host `editor-pane`；VS Code adapter 维护 editor 子集与 `EditorGroupModel` 的映射；track resize / 加删行列 / 移 cell 正确；移动默认目标先建、源后释放；DOM-only / editor 可由 source 通过 `MoveIntent` 优化，view-pane 可重建，webview / iframe reload；activation 打开正确文件。
 - **G**：把 Folders 移出 Explorer 后，原 container 的 title actions / context keys 不跟随；view 自己的 title actions / `viewsWelcome` 跟随。
 - **浮层**：VS Code 的菜单 / quick pick / 通知 / dialog 与 DSH toast / modal 同层按 order 共存；view 内部 hover / completion 不被抬出去。
 

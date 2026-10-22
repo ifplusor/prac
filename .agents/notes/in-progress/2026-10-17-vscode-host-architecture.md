@@ -132,7 +132,7 @@ View（prac runtime）
 ```
 
 - `kind` 是 view 类型；
-- `hostKind` 是 source-owned 的 spec 字段，core 不解析；core 只认 `ViewHost` 接口 / capabilities；
+- `hostKind` 是 source-owned 的 spec 字段，core 不解析；core 只认 `ViewHost` 接口；
 - 两者不混；
 - `prac.view` 承载的是 view CR；`vscode-host` 的具体实现是 `VscodeView`；
 - `containerId` 只是默认落位 hint，不是成员关系；
@@ -224,6 +224,7 @@ interface VscodeViewHost {
   mount(element: HTMLElement): void;
   release(): void;
   focus(): void;
+  focusable: boolean;
   readonly viewId: string;
 }
 ```
@@ -232,6 +233,22 @@ interface VscodeViewHost {
 - release：注销 external view，dispose；
 - 没有 group binding 时，使用 unbound context；
 - `IViewsService` 的 external registry 由 host 维护，不由 group binding 维护。
+
+移动默认是：
+
+```text
+1. 在目标 group 创建新的 VscodeViewHost
+2. mount 成功
+3. 释放源 host
+4. 失败则保留源 host
+```
+
+`hostFactory(decl, { move: MoveIntent })` 的 `move` 只是 hint；`vscode-host` 可以：
+
+- `view-pane` 重建；
+- editor 用 model + viewState / `moveEditor` 优化；
+- webview 默认 reload；
+- 不承诺所有 view 都保留内部状态。
 
 ### 3.4 frame 契约
 
@@ -371,7 +388,7 @@ frame 侧（stack chrome / grid）不属于这张 note 的 steps，见各自的 
 
 - **声明翻译**：VS Code container / view → `VscodeViewGroup` / `VscodeView`；`kind` / `spec.groupKind` 在声明时确定；
 - **binding 不跟 view**：Folders 移出 Explorer 后，Explorer group 的 ContainerBinding 仍在；目标 plain group 没有 binding；
-- **view host**：移动后的 Folders 仍由 `VscodeViewHost` 挂载，`IViewsService.getViewWithId` 可找到；
+- **view host / move**：移动后的 Folders 仍由 `VscodeViewHost` 挂载，`IViewsService.getViewWithId` 可找到；默认目标先建、源后释放；`MoveIntent` 只作优化 hint；
 - **G**：原 container actions / context keys 不跟随；view actions / welcome 跟随；
 - **group mode**：Explorer 多 view 同时可见；editor group 是 select；
 - **recovery**：reload 后 definition / declaration 重建，binding 按 declaration 重建，不根据 group 内容推断；
