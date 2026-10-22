@@ -206,3 +206,10 @@
 - 修正：container group 匹配已有的 `.../container:<containerId>` 子区域；未出现时等待 layout 变化再 sync；注册 transient 失败不破坏其它 group。
 - 修正：`ViewGroupLayoutBridge` 不把用户已 hidden 的 view 重新显示。
 - live gates 全绿：`verify:containers` 13/13、`verify:stack`、`verify:split`、`verify:persistence`、`verify:bottom` 均 exit 0。
+
+### 2026-10-22 — live gates / editor group rollback（slice 22）
+
+- 起 3084 rig，先跑 `verify:containers`：发现 container group 全部注册到 `left`，触发 region 冲突；改为匹配已有 `.../container:<id>` 子区域，transient 失败等下一次 sync。
+- `verify:file` 发现单一 editor group 破坏 split editor 的第二 group；暂时回退 file → editor group 的自动 materialization，让既有 editor host 继续管理文件。
+- `ViewGroupLayoutBridge` 不再把用户 hidden 的 view 重新显示。
+- live：`verify:containers` 13/13、`verify:file` 全绿、`verify:stack` / `split` / `persistence` / `bottom` 全绿。
