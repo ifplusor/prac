@@ -125,3 +125,9 @@
 - 新增 `frameBridge.ts`：`ViewGroupLayoutBridge` 把 `ViewGroup.placements` 投影到现有 layout store。
 - 成员/顺序/active 跟随 group；离开 group 或 dispose 时移除。
 - 验证：ui-layout 172 passed；check/build 通过（build 有既存 zustand unresolved 警告，不影响产物）。
+
+### 2026-10-22 — ViewGroupHost frame registry（slice 10）
+
+- 新增 `frameGroups.ts`：`ViewGroupHost` 管理 group id ↔ region 的一对一绑定与 bridge 生命周期。
+- 重复 group / region、未知 region 拒绝；unregister 不 dispose group runtime。
+- 验证：ui-layout 175 passed；check/build 通过。
