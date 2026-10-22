@@ -299,3 +299,8 @@
 - 新增 `GroupAction` / `GroupActionBinding`；`GroupBarItem` 带 `regionId` / `actions` / `runAction`。
 - `ViewGroupHost.barItems` 从 group binding 投影 actions；frame container bar 优先渲染 binding actions，没有时回退 `prac.containerActions` slot。
 - live：verify:containers 全绿；ui-layout 188 passed。
+
+### 2026-10-22 — container action live gate（slice 38）
+
+- `verify:containers` 新增 action bar 检查：至少一个 group/container action 按钮可点击，点击后 bar 仍在。
+- live 全绿；无 prac-owned console error。
