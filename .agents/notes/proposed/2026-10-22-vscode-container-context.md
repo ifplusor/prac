@@ -13,7 +13,7 @@ prac 的 container 是**具名 view group，默认 stack**；成员由 placement
 
 这个 step 要定的是：adaptor 用哪种 **container context** 承接 VS Code 的 container 行为——view 集合、可见性、顺序、collapse、title / menu、focus、drag / drop——并让 DSH view 和 VS Code view 能同时出现在一个 container 里。
 
-container context 属于 **`ContainerBinding`**，而 `ContainerBinding` 是 `VscodeGroupBinding` 的一种；它不是 group 本身。group 的数据面是 `ViewGroupState`，运行时是 frame 的 `ViewGroup`；binding 只承接 VS Code 语义。
+container context 属于 **`ContainerBinding`**；`ContainerBinding` 只挂到 `ViewGroupDeclaration.kind = container` 的 group。binding 的 kind 在声明时确定，不从 group 内容推断。group 的数据面是 `ViewGroupState`，运行时是 frame 的 `ViewGroup`。
 
 ## Motivation
 
@@ -37,9 +37,10 @@ UI umbrella 已经定了方向和 G：container 是 prac 的组合单元，conta
 - **frame 不认识 VS Code container**：container context 在 adaptor 内部，frame 只看到 view group / host。
 - **container context 不能成为第二成员权威**：它承接 VS Code 语义，但 view 是否在 container 里仍由 prac placement 决定。
 - **group 是 frame 的**：`ViewGroup`（运行时）/ `ViewGroupState`（数据）/ active / order 都在 frame；`VscodeGroupBinding` 是 adaptor 侧的 `ViewGroup.binding?`。
-- **binding kind 有三种**：`container` / `editor` / `view-host`；`view-host` 是没有 VS Code container/editor、但仍需承载 `ViewPane` 的合法状态。
-- **group mode 与 binding kind 不是同一个轴**：group mode 是 `stack` / `select`；binding kind 是 `container` / `editor` / `view-host` / none。前者决定内容怎么显示，后者决定接哪个 VS Code runtime。
-- **`IViewsService` 用 external view registry**：binding 注册 / 注销 `ViewPane`；`getViewWithId` / `getActiveViewWithId` / `isViewVisible` 优先查 registry；container 级方法在 view-host 下返回 `null` / 不可用。
+- **binding kind 只有两种**：`container` / `editor`；kind 由 `ViewGroupDeclaration` 在声明时确定，不由 group 内容推断。
+- **没有 `view-host` binding**：VS Code view 被移到 plain group 时，没有 group binding；`VscodeViewHost` 用 unbound context 挂载。
+- **group mode 与 binding kind 不是同一个轴**：group mode 是 `stack` / `select`；binding kind 是 `container` / `editor` / none。前者决定内容怎么显示，后者由 group declaration 决定。
+- **`IViewsService` 用 external view registry**：`VscodeViewHost` 注册 / 注销 `ViewPane`；`getViewWithId` / `getActiveViewWithId` / `isViewVisible` 优先查 registry；没有 container binding 时，container 级方法返回 `null` / 不可用。
 - **container bar / group bar 由 frame 画**：adaptor 提供 action / context，不自己画第二套 bar。
 - **`paneHeader` 是 view 自报的呈现事实**：frame 用它决定是否保留 native pane header，不按来源前缀猜。
 - **`PracLayoutFace` 以 view group / grid cell 为落点**：region 只是几何槽位；editor group 的 `addGroup` 走 group / cell channel，不是只建 region。
@@ -87,7 +88,7 @@ container context 拥有一个 stack，成员是 host，不要求成员是 `View
 
 1. Explorer container 同时显示 Open Editors / Folders / Outline，确认它是 stack，不是 select；
 2. 往 Explorer container 里放一个 DSH React view；
-3. 把 Folders 移到一个 DSH group（view-host group）；
+3. 把 Folders 移到一个 DSH group（plain group，没有 group binding）；
 4. 额外验证 stage grid cell ↔ view group ↔ editor group 的映射：`addGroup` / `setGroupRegionChannel` 能否创建 grid cell / select view group，而不是只建 region；
 5. 记录 external view registry：Folders 的 `ViewPane` 在新 group 下 `getViewWithId` / `isViewVisible` / focus 是否走 binding 注册；container 级方法是否返回 `null`；
 6. 记录：
@@ -106,7 +107,7 @@ container context 拥有一个 stack，成员是 host，不要求成员是 `View
 4. **G 的投影**：view 移出后，`viewContainer` / `viewLocation` / `ViewContainerTitle` 的 context 在哪里覆盖、哪里抑制、哪里接受失效？
 5. **action / menu**：view-scoped / container-scoped / global 的 owner 与 scope 怎么判？
 6. **focus / visibility / collapse**：upstream container 的语义与 frame 的 stack/fold 如何不打架？
-7. **`IViewsService` 注册**：subclass 还是 patch `ViewsService`；`getActiveViewWithId` / container 级方法在 view-host 下如何返回；`focusedViewContextKey` 谁维护？
+7. **`IViewsService` 注册**：subclass 还是 patch `ViewsService`；`getActiveViewWithId` / container 级方法在 plain group 下如何返回；`focusedViewContextKey` 谁维护？
 8. **editor group**：`EditorGroupBinding` 是否复用同一套 binding 基类，还是保持 editor 专用链？
 
 ## Validation
@@ -120,8 +121,8 @@ container context 拥有一个 stack，成员是 host，不要求成员是 `View
 - collapse / visibility / focus 有一致行为；
 - stage 的 grid cell / select view group / editor group binding 能建立，不出现第二成员权威；
 - container bar / group bar 由 frame 画，adaptor 只供 action / context；
-- view-host group 的 `ViewPane` 仍能被 `IViewsService` 找到；container 级 actions / context keys 不出现；
-- `VscodeGroupBinding` 的注册 / 注销与 `PracViewsService` 的 external registry 一致；
+- plain group 的 `ViewPane` 仍能被 `IViewsService` 找到；container 级 actions / context keys 不出现；
+- `VscodeViewHost` 的注册 / 注销与 `PracViewsService` 的 external registry 一致；
 - spike 记录能支持或推翻所选机制。
 
 ## Related
