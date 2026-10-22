@@ -112,7 +112,7 @@ Server（node）
 | --- | --- | --- | --- |
 | `PracVscodeFace` | consumers 的 adaptor 前台：catalogue / `hostFor` / `focusView` / `runCommand` / file placement / capabilities | consumers、诊断/门 | frame 的 layout |
 | `VscodeCatalogueEntry` | catalogue 的一行数据：`view` / `appId` / `title` / `source` / `role` / `containerId` / `containerTitle` / `viewGroupId?`（`location?` 只作来源提示） | `ui-vscode-views` / `ui-vscode-editor` / arrangement | 怎么渲染 |
-| `ViewGroupDeclaration` | 来源对 group 的声明：id / title / icon / role / order / hideIfEmpty / kind；kind 在声明时确定；arrangement 落成 `ViewGroupState` | adaptor / consumers | group 成员 / placement |
+| `ViewGroupDeclaration` | 来源对 group 的声明：`source` + `kind`（source-defined，如 vscode/container、vscode/editor）+ id / title / icon / role / order / hideIfEmpty；kind 在声明时确定、不可变；frame 视为 opaque tag；arrangement 落成 `ViewGroupState` | adaptor / consumers | group 成员 / placement |
 | `prac.view` | frame 的 view 注册槽：每个 view 的一次注册（id / label / icon / `paneHeader` / 宿主组件） | consumers | view 的来源 |
 
 #### 2.2.2 embed / workbench
@@ -123,7 +123,7 @@ Server（node）
 | `WorkbenchFace`（目标名） | workbench 对 embedder 的内部面：view / file mount、focus / release、placements、capabilities；**不承载 part mount** | `vscode-embed` | consumers / `PracVscodeFace` |
 | `EmbeddedWorkbench` | VS Code workbench 本体：workbench 服务、`IWorkbenchLayoutService`、view / editor host、overlay | `WorkbenchFace` | frame / consumers |
 | `PracEditorHost` | adaptor 侧 editor runtime 的 owner：`IEditorGroupsService`、select view group / grid cell、editor group model / panes | workbench、`vscode-host` 的 group channel | prac 的 editor group 类型 / container |
-| `VscodeGroupBinding` | `ViewGroup.binding?` 的实现：只挂到 `ViewGroupDeclaration.kind = container \| editor` 的 group；kind 在声明时确定，不从 group 内容推断；拥有 container / editor context、actions；不拥有 view host | workbench、frame 的 `ViewGroup` | group state / placement / view host |
+| `VscodeGroupBinding` | `ViewGroup.binding?` 的实现：只匹配 `source = vscode` 且 kind = container \| editor 的 `ViewGroupDeclaration`；kind 在声明时确定，不从 group 内容推断；拥有 container / editor context、actions；不拥有 view host | workbench、frame 的 `ViewGroup` | group state / placement / view host |
 | `VscodeViewHost` | 每个 VS Code view 的运行时 host：mount / release `ViewPane` / `EditorPane`；注册 / 注销 `IViewsService`；有 group binding 时用它的 context，没有时用 unbound context | frame 的 `ViewGroup`、`VscodeGroupBinding` | group state / placement |
 | `PracViewsService` | `IViewsService` 的 subclass / patch：维护 external view registry；`VscodeViewHost` 注册 / 注销 ViewPane；其余方法 delegate | workbench、`VscodeViewHost` | group state / placement |
 | `ViewPane` | 一个 view 的 UI（上游 `ViewPane`） | `tryMountView` | frame |
@@ -172,7 +172,7 @@ editor:
 | --- | --- |
 | workspace / session identity | DSH |
 | 布局拓扑、view group、placement、container 成员、stack/tab/fold/sash、持久化 | frame（`ui-layout`） |
-| `ContainerRecord` / container 元数据 | prac |
+| `ContainerRecord` / 元数据 | prac（arrangement 的 view group registry 写入）；随 layout store 持久化 |
 | workbench、`ViewPaneContainer` / container context、editor group runtime、`VscodeGroupBinding`、`IViewsService` external registry、overlay | adaptor（`vscode-host` / workbench） |
 | view catalogue（文件 + 视图） | adaptor（来自 `IEditorService` / `IViewDescriptorService`） |
 | `prac.view` 注册 | consumers |
@@ -299,7 +299,7 @@ editor:
 architecture 只定形状，不定机制：
 
 - **group 是 frame 的**：`ViewGroup`（运行时）/ `ViewGroupState`（数据）/ active / order 都在 frame；adaptor 不拥有 group；
-- **`VscodeGroupBinding` 是 adaptor 侧的绑定**：只挂到 `ViewGroupDeclaration.kind = container | editor` 的 group；kind 在声明时确定，不由 group 内容推断；plain group 没有 binding。
+- **`VscodeGroupBinding` 是 adaptor 侧的绑定**：只匹配 `source = vscode` 且 kind = `container | editor` 的 `ViewGroupDeclaration`；kind 在声明时确定，不由 group 内容推断；plain group 没有 binding。
 - **group mode 与 binding kind 不是同一个轴**：group mode 是 `stack` / `select`；binding kind 是 `container` / `editor` / none；声明决定 binding，placement 只决定 view 在哪个 group。
 - **container 是 prac 的具名 view group，默认 stack**；成员由 placement 派生，不是 adaptor 的成员表；
 - container context 应位于 **adaptor 内部**，围绕 `ViewPane` / `ViewPaneContainer`；它通过 `PracLayoutFace` 和 frame 的 view host 协作，不拥有 layout；
