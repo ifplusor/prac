@@ -88,6 +88,30 @@ describe("VscodeGroupHost", () => {
     expect(unregisterViewGroup).toHaveBeenCalledWith("g1");
   });
 
+  it("reconciles groups and views from a catalogue", () => {
+    const host = new VscodeGroupHost({
+      layout: { registerViewGroup: () => {}, unregisterViewGroup: () => {} },
+      definition: definition(),
+      viewDefinition: viewDefinition(),
+    });
+    const entry = {
+      view: "vscode:view:workbench.view.explorer",
+      appId: "workbench.view.explorer",
+      title: "Explorer",
+      source: "view" as const,
+      location: "sidebar" as const,
+      containerId: "workbench.view.explorer",
+    };
+
+    host.sync([entry], ["left"]);
+    expect(host.has("vscode:group:workbench.view.explorer")).toBe(true);
+    expect(host.hasView(entry.view)).toBe(true);
+
+    host.sync([], ["left"]);
+    expect(host.ids()).toEqual([]);
+    expect(host.viewIds()).toEqual([]);
+  });
+
   it("adds a view to a hosted group", () => {
     const host = new VscodeGroupHost({
       layout: { registerViewGroup: () => {}, unregisterViewGroup: () => {} },

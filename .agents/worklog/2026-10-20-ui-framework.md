@@ -159,3 +159,10 @@
 - `VscodeGroupHost.addView/removeView`：materialize `VscodeView`、加入 hosted group。
 - `viewFromCatalogue`；assembly 从 catalogue 同步 container views，移除消失的 view。
 - 验证：ui-layout 175 passed；vscode-host 19 passed；check/build 通过。
+
+### 2026-10-22 — catalogue sync in VscodeGroupHost（slice 15）
+
+- `VscodeGroupHost.sync(entries, regionIds)`：group + container views 的增量 reconcile。
+- assembly 改为调用 `groupHost.sync`，去掉内联同步逻辑。
+- 新增 sync 测试（添加/移除 group + view）。
+- 验证：vscode-host 20 passed；check/build 通过。

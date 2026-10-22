@@ -43,7 +43,7 @@ import { createVscodeEmbed } from "prac-vscode-embed/client";
 import { EXTENSIONS_GALLERY } from "prac-vscode";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "./public.js";
 import { createVscodeResourceDefinitions } from "./adapter.js";
-import { VscodeGroupHost, planViewGroups, viewFromCatalogue } from "./groups.js";
+import { VscodeGroupHost } from "./groups.js";
 import type { VscodeGroupRuntime } from "./resources.js";
 export * from "./resources.js";
 export * from "./adapter.js";
@@ -323,34 +323,12 @@ export function apply(ctx: Context): void {
     viewDefinition: resources.views,
   });
 
-  /** Project the catalogue's containers into frame groups (idempotent). */
+  /** Project the catalogue's containers and views into frame groups (idempotent). */
   const syncGroups = (): void => {
-    const regions = ctx.pracLayout.listRegions().map((region) => region.id);
-    const planned = planViewGroups(face.catalogue(), regions);
-    const wanted = new Set(planned.map((item) => item.resource.metadata.id));
-    for (const groupId of groupHost.ids()) {
-      if (!wanted.has(groupId)) groupHost.remove(groupId);
-    }
-    for (const item of planned) {
-      if (!groupHost.has(item.resource.metadata.id)) {
-        groupHost.add(item.resource, item.regionId);
-      }
-    }
-
-    const entries = face.catalogue();
-    const wantedViews = new Set(
-      entries.filter((entry) => entry.containerId !== undefined).map((entry) => entry.view),
+    groupHost.sync(
+      face.catalogue(),
+      ctx.pracLayout.listRegions().map((region) => region.id),
     );
-    for (const viewId of groupHost.viewIds()) {
-      if (!wantedViews.has(viewId)) groupHost.removeView(viewId);
-    }
-    for (const entry of entries) {
-      if (entry.containerId === undefined) continue;
-      const groupId = `vscode:group:${entry.containerId}`;
-      if (groupHost.has(groupId) && !groupHost.hasView(entry.view)) {
-        groupHost.addView(groupId, viewFromCatalogue(entry));
-      }
-    }
   };
 
   ctx.effect(() => {
