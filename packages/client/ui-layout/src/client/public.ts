@@ -16,6 +16,7 @@
 
 export type {
   Dir,
+  GridNode,
   LayoutState,
   LayoutFace,
   PracLayoutFace,

@@ -242,8 +242,33 @@ export interface SplitNode {
   readonly children: LayoutNode[];
 }
 
+/**
+ * A two-dimensional grid of child regions.
+ *
+ * The grid is topology, not sizing: cells are ordinary regions (or splits),
+ * laid out row-major. The first slice gives every cell one row and one column.
+ */
+export interface GridNode {
+  readonly type: "grid";
+  readonly id: string;
+  readonly rows: number;
+  readonly columns: number;
+  /** Common placement fields, so a grid can sit where a split can. */
+  readonly size?: number;
+  readonly flex?: boolean;
+  readonly max?: number;
+  readonly priority?: LayoutPriority;
+  readonly label?: string;
+  readonly collapsed?: boolean;
+  readonly active?: string;
+  readonly min?: number;
+  readonly stack?: boolean;
+  readonly entry?: boolean;
+  readonly children: readonly LayoutNode[];
+}
+
 /** One node of the region tree. */
-export type LayoutNode = RegionNode | SplitNode;
+export type LayoutNode = RegionNode | SplitNode | GridNode;
 
 /** Where one view sits, and in what order inside its region. */
 export interface ViewRecord {

@@ -11,6 +11,7 @@
 import type { RegionInfo } from "./catalogue.js";
 import {
   BOTTOM_REGION,
+  type GridNode,
   CENTER_MIN,
   CENTER_REGION,
   DEFAULT_MIN,
@@ -44,6 +45,19 @@ export function regionNode(id: string, size: number, extra: Partial<RegionNode> 
     min: DEFAULT_MIN,
     ...extra,
   };
+}
+
+/** Build a row-major grid node from its cells. */
+export function gridNode(
+  id: string,
+  rows: number,
+  columns: number,
+  children: readonly LayoutNode[],
+): GridNode {
+  if (children.length > rows * columns) {
+    throw new Error(`grid ${id} has more cells than its ${rows}x${columns} shape`);
+  }
+  return { type: "grid", id, rows, columns, children };
 }
 
 /**
@@ -192,6 +206,7 @@ export function firstRegionId(node: LayoutNode): string {
  * @returns one entry per region, in tree order.
  */
 export function regionInfos(node: LayoutNode): RegionInfo[] {
+  if (node.type === "grid") return node.children.flatMap((child) => regionInfos(child));
   if (node.type === "split") {
     // A stack is **one** position (its split id), not a list of internal leaves: a row is not a
     // place a view can be moved to. The split's id is what `place`/`select` address.
@@ -199,7 +214,7 @@ export function regionInfos(node: LayoutNode): RegionInfo[] {
     return node.children.flatMap((child) => regionInfos(child));
   }
   return [
-    { id: node.id, collapsed: node.collapsed },
+    { id: node.id, collapsed: node.collapsed ?? false },
     ...(node.children ?? []).flatMap((child) => regionInfos(child)),
   ];
 }
@@ -499,9 +514,9 @@ export function nodeBasis(node: LayoutNode): Basis {
   if (node.collapsed)
     return { flex: false, size: 0, min: 0, max: 0, priority: node.priority ?? "normal" };
   return {
-    flex: node.flex,
-    size: node.size,
-    min: node.min,
+    flex: node.flex ?? false,
+    size: node.size ?? 0,
+    min: node.min ?? 0,
     max: node.max ?? Number.POSITIVE_INFINITY,
     priority: node.priority ?? "normal",
   };
@@ -1321,7 +1336,9 @@ export function visibleViews(state: LayoutState, regionId: string): string[] {
  * @param node - the subtree to test.
  */
 export function isPresent(state: LayoutState, node: LayoutNode): boolean {
-  if (node.type === "split") return node.children.some((child) => isPresent(state, child));
+  if (node.type === "grid" || node.type === "split") {
+    return node.children.some((child) => isPresent(state, child));
+  }
   // A stack row is present only while it has a visible view. Its `flex`/`collapsed` fields describe
   // the header/row, not an empty holding cell; a hidden or removed view must not leave a blank row.
   if (node.entry === true) return visibleViews(state, node.id).length > 0;
@@ -1409,6 +1426,7 @@ export function sashSizes(
  * @param node - the subtree to measure.
  */
 export function subtreeMin(node: LayoutNode): number {
+  if (node.type === "grid") return Math.max(0, ...node.children.map(subtreeMin));
   if (node.type === "split")
     return node.children.reduce((total, child) => total + subtreeMin(child), 0);
   const children = node.children;
@@ -1466,6 +1484,22 @@ export function resolveSizes(state: LayoutState, width: number, height: number):
         const bar = (node.children?.length ?? 0) > 1 ? HEADER_HEIGHT : 0;
         visit(child, w, Math.max(0, h - bar));
       }
+      return;
+    }
+    if (node.type === "grid") {
+      out.set(node.id, { width: w, height: h });
+      const cells = node.children.filter((child) => isPresent(state, child));
+      const columns = Math.max(1, node.columns);
+      const rows = Math.max(1, node.rows);
+      cells.forEach((child, index) => {
+        const column = index % columns;
+        const row = Math.floor(index / columns);
+        visit(
+          child,
+          column === columns - 1 ? w - (w / columns) * column : w / columns,
+          row === rows - 1 ? h - (h / rows) * row : h / rows,
+        );
+      });
       return;
     }
     out.set(node.id, { width: w, height: h });
@@ -1697,6 +1731,7 @@ interface RegionAncestryStep {
  * @returns the steps, or undefined when the region is not in this subtree.
  */
 function regionAncestry(tree: LayoutNode, regionId: string): RegionAncestryStep[] | undefined {
+  if (tree.type === "grid") return undefined;
   if (tree.type === "region") return tree.id === regionId ? [] : undefined;
   for (let index = 0; index < tree.children.length; index += 1) {
     const below = regionAncestry(tree.children[index], regionId);

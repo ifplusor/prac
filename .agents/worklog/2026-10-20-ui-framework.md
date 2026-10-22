@@ -242,3 +242,11 @@
 
 - 新增 `ViewGroupHost` 回归：group unregister 后，同 id 新 group 可以重新注册到同一 region。
 - 验证：ui-layout 178 passed；check/build 通过。
+
+### 2026-10-22 — grid data layer（slice 28）
+
+- `GridNode` 进入 `LayoutNode`（rows/columns + row-major children），`gridNode()` helper。
+- model：regionInfos / replace / isPresent / subtreeMin / resolveSizes / regionAncestry 处理 grid。
+- frame：grid 作为 CSS grid 渲染，cell 可继续是 region/split。
+- 新增 `grid.spec.ts`；ui-layout 182 passed，check/build 通过。
+- 默认 stage 仍是 split tree，尚未接线。

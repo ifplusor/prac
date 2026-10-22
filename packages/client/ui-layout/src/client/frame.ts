@@ -29,12 +29,11 @@ import {
   DSH_MAIN_PREFIX,
   DSH_RIGHTBAR_VIEW,
   DSH_SIDEBAR_VIEW,
-  DSH_VIEW_SOURCE,
   VIEW_SLOT,
   declaredViewIcon,
   declaredViewLabel,
-  isDeclaredView,
-  viewSource,
+  declaredViewPaneHeader,
+  viewKind,
 } from "./catalogue.js";
 import {
   SASH_SIZE,
@@ -178,14 +177,14 @@ function renderDshView(
  * The **declaration** decides the dispatch, never the position and never the id's
  * name: DSH's own slots render through DSH's slot face, and a view the
  * `prac.view` slot declares renders that declaration (membership is read from the
- * registry — see {@link isDeclaredView}). Anything else renders nothing.
+ * registry — see {@link viewKind}). Anything else renders nothing.
  *
  * @param props - the placed view's identity, slot face and region box.
  */
 function View({ viewId, renderSlot, box, viewportWidth }: ViewProps): ReactNode {
-  const source = viewSource(viewId);
-  if (source === DSH_VIEW_SOURCE) return renderDshView(viewId, renderSlot, box, viewportWidth);
-  if (isDeclaredView(viewId)) return renderSlot(VIEW_SLOT, {}, { only: viewId });
+  const kind = viewKind(viewId);
+  if (kind === "declared") return renderSlot(VIEW_SLOT, {}, { only: viewId });
+  if (kind === "dsh") return renderDshView(viewId, renderSlot, box, viewportWidth);
   return null;
 }
 
@@ -1465,9 +1464,11 @@ export function createFrame(
     /**
      * The frame's controls over a view that already brings its own pane header.
      *
-     * B owns the title: a `vscode:*` row keeps its VS Code pane header (title + actions) and the
-     * frame draws only the fold switch and the title drag area on top of it. The strip is
-     * transparent and stops before the pane's action buttons, so the one title stays the pane's.
+     * The view owns the header, so the row keeps it (title + actions) and the frame
+     * draws only the fold switch and the title drag area on top of it. The strip is
+     * transparent and stops before the pane's action buttons, so the one title stays
+     * the pane's. "Brings a pane header" is the view's declaration
+     * (`paneHeader: true`), not a `vscode:` prefix.
      *
      * @param node - the stack row.
      * @param viewId - the view on the row.
@@ -1568,13 +1569,17 @@ export function createFrame(
               : child === null
                 ? null
                 : // The chosen child may be a split (a stack took a region's place in this list).
-                  child.type === "split"
+                  child.type === "split" || child.type === "grid"
                   ? renderNode(child, dir)
                   : renderRegion(child, dir, true),
           ],
         );
       }
       const views = visibleViews(state, node.id);
+      // Whether the row's view brings its own pane header. A declaration, not a
+      // source-prefix guess: the frame renders the same shape for every view that
+      // says it has one.
+      const paneHeader = views.length === 1 && declaredViewPaneHeader(views[0] ?? "");
       const sashState: EntrySashState =
         node.entry === true ? entrySashState(state, node.id, rowHeights) : "disabled";
       return createElement(
@@ -1657,11 +1662,8 @@ export function createFrame(
               // row, and the allocation is what says which.
               node.entry === true ? sizes.get(node.id)?.height : undefined,
             ),
-            // The B overlay is absolute inside its row; the row is the containing block.
-            ...(node.entry === true &&
-            views.length === 1 &&
-            node.collapsed !== true &&
-            viewSource(views[0] ?? "") === "vscode:"
+            // The overlay is absolute inside its row; the row is the containing block.
+            ...(node.entry === true && views.length === 1 && node.collapsed !== true && paneHeader
               ? { position: "relative" }
               : {}),
           },
@@ -1687,16 +1689,12 @@ export function createFrame(
                             overflow: "hidden",
                           },
                         },
-                        viewBody(
-                          viewId,
-                          box,
-                          viewSource(viewId) === "vscode:" ? "frame" : undefined,
-                        ),
+                        viewBody(viewId, box, paneHeader ? "frame" : undefined),
                       );
-                // B: a view with its own pane header owns the row title. The expanded row is just
+                // A view with its own pane header owns the row title. The expanded row is just
                 // the view plus the frame's fold/drag overlay; a folded row has no view, so the
                 // frame's own header (with the declared title) is what remains.
-                if (viewSource(viewId) === "vscode:") {
+                if (paneHeader) {
                   return node.collapsed === true
                     ? [entryHeader(node, viewId)]
                     : [stackBody, entryOverlay(node, viewId)];
@@ -1719,6 +1717,26 @@ export function createFrame(
      */
     const renderNode = (node: LayoutNode, dir: Dir): ReactElement => {
       if (node.type === "region") return renderRegion(node, dir);
+      if (node.type === "grid") {
+        const cells = node.children.filter((child) => isPresent(state, child));
+        return createElement(
+          "div",
+          {
+            key: node.id,
+            "data-prac-grid": node.id,
+            style: {
+              display: "grid",
+              gridTemplateColumns: `repeat(${node.columns}, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${node.rows}, minmax(0, 1fr))`,
+              width: "100%",
+              height: "100%",
+              minWidth: 0,
+              minHeight: 0,
+            },
+          },
+          ...cells.map((child) => renderNode(child, dir)),
+        );
+      }
       const present = node.children.filter((child) => isPresent(state, child));
       const parts: ReactElement[] = [];
       // The sashes are absolutely positioned, so the children flow edge to edge and the boundary
