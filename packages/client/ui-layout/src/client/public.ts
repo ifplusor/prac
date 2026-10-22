@@ -41,3 +41,26 @@ export type { RegionInfo, ViewInfo } from "./catalogue.js";
  * literal and the `SlotMap` row it needs.
  */
 export type ViewSlotKey = typeof import("./catalogue.js").VIEW_SLOT;
+
+// The CRD-lite mechanism and the core runtime shapes. Runtime constructors live
+// in `client/index.ts`; this module exposes the types consumers may name.
+export type {
+  Diagnostic,
+  GroupBinding,
+  MaterializeContext,
+  MaterializeOutcome,
+  MaterializedResource,
+  MoveIntent,
+  ResourceEnvelope,
+  ResourceMetadata,
+  ResourcePhase,
+  ViewDefinition,
+  ViewGroupDefinition,
+  ViewGroupResource,
+  ViewGroupRuntime,
+  ViewHost,
+  ViewResource,
+  ViewRuntime,
+} from "./resource.js";
+export type { View } from "./view.js";
+export type { ViewGroup, ViewGroupMode, ViewGroupState } from "./viewGroup.js";

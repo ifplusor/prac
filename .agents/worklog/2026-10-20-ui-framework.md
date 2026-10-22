@@ -72,3 +72,10 @@
 - 新增 `resource.spec.ts`：category 隔离、duplicate、materialize、dependency、async、failure isolation、owner dispose、pending、binding factory。
 - 验证：`pnpm --filter prac-client-ui-layout test` 158 passed；`check` / `build` 通过。
 - 尚未接入 frame / vscode adaptor。
+
+### 2026-10-22 — View / ViewGroup runtime（slice 2）
+
+- 新增 `view.ts` / `viewGroup.ts`：view host mount/release/focus、group mode/order/active、binding 替换/dispose。
+- 新增 `viewGroup.spec.ts`；resource 类型通过 `public.ts` 导出。
+- 验证：`pnpm --filter prac-client-ui-layout test` 165 passed；`check` / `build` 通过。
+- 尚未接入 placement / frame，也尚未实现跨 group 的 target-first move。

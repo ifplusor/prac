@@ -73,6 +73,8 @@ declare global {
 import { VIEW_SLOT, readDeclaredViewIds, type RegionInfo, type ViewInfo } from "./catalogue.js";
 export type { PracLayoutFace, RegionInfo, ViewInfo };
 export * from "./resource.js";
+export * from "./view.js";
+export * from "./viewGroup.js";
 
 /**
  * Install the mechanism: declare the frame's slots, publish the faces, keep the
