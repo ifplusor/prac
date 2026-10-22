@@ -248,11 +248,21 @@ export interface SplitNode {
  * The grid is topology, not sizing: cells are ordinary regions (or splits),
  * laid out row-major. The first slice gives every cell one row and one column.
  */
+/** Where one grid child sits; spans default to one row/column. */
+export interface GridPlacement {
+  readonly row: number;
+  readonly column: number;
+  readonly rowSpan?: number;
+  readonly columnSpan?: number;
+}
+
 export interface GridNode {
   readonly type: "grid";
   readonly id: string;
   readonly rows: number;
   readonly columns: number;
+  /** Explicit placements by child id; absent means row-major. */
+  readonly placements?: Readonly<Record<string, GridPlacement>>;
   /** Common placement fields, so a grid can sit where a split can. */
   readonly size?: number;
   readonly flex?: boolean;

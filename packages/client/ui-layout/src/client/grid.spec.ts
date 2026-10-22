@@ -69,6 +69,39 @@ describe("grid node", () => {
     }
   });
 
+  it("honours explicit placements and spans", () => {
+    const tree = gridNode(
+      "stage",
+      2,
+      2,
+      [regionNode("a", 0, { flex: true }), regionNode("b", 0, { flex: true })],
+      {
+        placements: {
+          a: { row: 0, column: 0, columnSpan: 2 },
+          b: { row: 1, column: 1 },
+        },
+      },
+    );
+    const layout: LayoutState = {
+      viewportWidth: 1000,
+      viewportHeight: 800,
+      tree,
+      views: {},
+      catalogueVersion: 0,
+      activePanelId: null,
+    };
+    const sizes = resolveSizes(layout, 1000, 800);
+    expect(sizes.get("a")).toEqual({ width: 1000, height: 400 });
+    expect(sizes.get("b")).toEqual({ width: 500, height: 400 });
+  });
+
+  it("persists placements through JSON", () => {
+    const tree = gridNode("stage", 2, 2, [regionNode("a", 0)], {
+      placements: { a: { row: 1, column: 1, rowSpan: 1, columnSpan: 1 } },
+    });
+    expect(JSON.parse(JSON.stringify(tree))).toEqual(tree);
+  });
+
   it("rejects more cells than the declared shape", () => {
     expect(() => gridNode("bad", 1, 1, [regionNode("a", 0), regionNode("b", 0)])).toThrow(
       /more cells/,

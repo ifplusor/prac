@@ -1731,7 +1731,7 @@ export function createFrame(
                   { display: "contents" }
                 : {
                     display: "grid",
-                    gridTemplateColumns: `repeat(${Math.max(1, cells.length)}, minmax(0, 1fr))`,
+                    gridTemplateColumns: `repeat(${Math.max(1, node.placements === undefined ? cells.length : node.columns)}, minmax(0, 1fr))`,
                     gridTemplateRows: `repeat(${node.rows}, minmax(0, 1fr))`,
                     width: "100%",
                     height: "100%",
@@ -1739,7 +1739,29 @@ export function createFrame(
                     minHeight: 0,
                   },
           },
-          ...cells.map((child) => renderNode(child, dir)),
+          ...cells.map((child, index) => {
+            // A one-cell, unplaced grid is transparent: no extra flex wrapper.
+            if (node.placements === undefined && cells.length <= 1) return renderNode(child, dir);
+            const placement = node.placements?.[child.id] ?? {
+              row: Math.floor(index / Math.max(1, node.columns)),
+              column: index % Math.max(1, node.columns),
+            };
+            const rendered = renderNode(child, dir);
+            return createElement(
+              "div",
+              {
+                key: `cell:${child.id}`,
+                style: {
+                  gridRow: `${placement.row + 1} / span ${placement.rowSpan ?? 1}`,
+                  gridColumn: `${placement.column + 1} / span ${placement.columnSpan ?? 1}`,
+                  minWidth: 0,
+                  minHeight: 0,
+                  display: "flex",
+                },
+              },
+              rendered,
+            );
+          }),
         );
       }
       const present = node.children.filter((child) => isPresent(state, child));

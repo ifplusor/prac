@@ -1498,15 +1498,20 @@ export function resolveSizes(state: LayoutState, width: number, height: number):
     if (node.type === "grid") {
       out.set(node.id, { width: w, height: h });
       const cells = node.children.filter((child) => isPresent(state, child));
-      const columns = node.rows === 1 ? Math.max(1, cells.length) : Math.max(1, node.columns);
+      const columns =
+        node.rows === 1 && node.placements === undefined
+          ? Math.max(1, cells.length)
+          : Math.max(1, node.columns);
       const rows = Math.max(1, node.rows);
       cells.forEach((child, index) => {
-        const column = index % columns;
-        const row = Math.floor(index / columns);
+        const placement = node.placements?.[child.id] ?? {
+          row: Math.floor(index / Math.max(1, node.columns)),
+          column: index % Math.max(1, node.columns),
+        };
         visit(
           child,
-          column === columns - 1 ? w - (w / columns) * column : w / columns,
-          row === rows - 1 ? h - (h / rows) * row : h / rows,
+          (w / columns) * (placement.columnSpan ?? 1),
+          (h / rows) * (placement.rowSpan ?? 1),
         );
       });
       return;

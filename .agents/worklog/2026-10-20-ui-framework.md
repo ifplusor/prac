@@ -274,3 +274,9 @@
 - 默认 stage 为 1×1 `GridNode`；grid 在只有 1 个 cell 时渲染 `display: contents`，不改变父 split 几何。
 - live 复验：`verify:views`、`verify:containers`、`verify:file` 全绿。
 - 多 cell grid 的 split 语义留待后续，不在本轮强行改默认树。
+
+### 2026-10-22 — grid placements / spans（slice 34）
+
+- `GridPlacement`（row/column/rowSpan/columnSpan）进入 `GridNode.placements`；`gridNode` 校验越界。
+- frame 按 placement 写 `gridRow/gridColumn`；`resolveSizes` 按 span 分配；单 cell/未放置保持透明。
+- 新增 span、JSON 持久化、越界测试；live views/containers 全绿。
