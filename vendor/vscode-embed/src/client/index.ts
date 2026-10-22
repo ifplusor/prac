@@ -245,6 +245,24 @@ export interface VscodeEmbedHandle {
    */
   view(viewId: string): () => ReactElement;
   /**
+   * Mount one view directly into an element the embedder owns.
+   *
+   * This is the imperative sibling of {@link VscodeEmbedHandle.view}: the frame
+   * may move a `ViewHost` between view groups without going through a React
+   * component. If the app has not published its face yet, the element is recorded
+   * and mounted on publish.
+   *
+   * @param viewId - the workbench view id.
+   * @param element - the element to mount the view into.
+   */
+  mountViewInto(viewId: string, element: HTMLElement): void;
+  /**
+   * Release one directly mounted view.
+   *
+   * @param viewId - the workbench view id.
+   */
+  releaseView(viewId: string): void;
+  /**
    * Make one view the focused view.
    *
    * @param viewId - the workbench view id.
@@ -331,6 +349,13 @@ export interface VscodeEmbedHandle {
    * @returns primary and secondary actions, ready for an embedder action bar.
    */
   containerActions(containerId: string): readonly PracVscodeAction[];
+  /**
+   * Run one container-title action by id.
+   *
+   * @param containerId - the view container id.
+   * @param actionId - the action id from {@link containerActions}.
+   */
+  runAction(containerId: string, actionId: string): void;
   /**
    * The **float layer** component: where the app's own root is mounted.
    *
@@ -777,10 +802,21 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
     version: (): number => record.face?.capabilities.diagnostics.version() ?? 0,
   };
 
+  const mountViewInto = (viewId: string, element: HTMLElement): void => {
+    mountView(record, viewId, element);
+  };
+
+  const releaseView = (viewId: string): void => {
+    record.viewHosts.delete(viewId);
+    record.face?.releaseView(viewId);
+  };
+
   return {
     boot,
     floatHost,
     view,
+    mountViewInto,
+    releaseView,
     file,
     focusView: (viewId: string): void => {
       record.face?.focusView(viewId);
@@ -790,6 +826,8 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
     capabilities: { editors, diagnostics },
     containerActions: (containerId: string): readonly PracVscodeAction[] =>
       record.face?.containerActions(containerId) ?? [],
+    runAction: (containerId: string, actionId: string): void =>
+      record.face?.runAction(containerId, actionId),
     placements: () => record.face?.listPlacements() ?? [],
     enableTimelineProbe: (): void => {
       record.face?.enableTimelineProbe();

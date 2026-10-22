@@ -233,6 +233,7 @@ interface VscodeViewHost {
 
 - mount：创建 `ViewPane` / `EditorPane`，注册 external view；
 - release：注销 external view，dispose；
+- frame 可以通过 `PracVscodeFace.mountView` / `releaseView` 直接驱动 `VscodeViewHost`，不必经过 React 组件；app 未 publish 时由 embed 记录元素、publish 后挂载；
 - 没有 group binding 时，使用 unbound context；
 - `IViewsService` 的 external registry 由 host 维护，不由 group binding 维护。
 

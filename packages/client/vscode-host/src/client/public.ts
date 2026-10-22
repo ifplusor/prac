@@ -91,6 +91,22 @@ export interface PracVscodeFace {
    */
   hostFor(view: string): () => ReactElement | null;
   /**
+   * Mount one VS Code view into an element the frame owns.
+   *
+   * The imperative path used by `ViewHost`; it works before the app publishes its
+   * face (the embed records the element and mounts on publish).
+   *
+   * @param view - a `vscode:view:<app view id>` view id.
+   * @param element - the element to mount the view into.
+   */
+  mountView(view: string, element: HTMLElement): void;
+  /**
+   * Release one imperatively mounted VS Code view.
+   *
+   * @param view - a `vscode:view:<app view id>` view id.
+   */
+  releaseView(view: string): void;
+  /**
    * Focus the workbench view behind a view id, so its title actions run in the
    * view's own context.
    *
@@ -351,5 +367,6 @@ export type {
   VscodeViewGroupDefinitionOptions,
   VscodeViewGroupSpec,
   VscodeViewHost,
+  VscodeViewHostAdapter,
   VscodeViewSpec,
 } from "./resources.js";

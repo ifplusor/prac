@@ -263,6 +263,14 @@ export function apply(ctx: Context): void {
       const vscodeView = vscodeViewIdOf(view);
       return vscodeView === undefined ? () => null : embed.view(vscodeView);
     },
+    mountView: (view: string, element: HTMLElement): void => {
+      const vscodeView = vscodeViewIdOf(view);
+      if (vscodeView !== undefined) embed.mountViewInto(vscodeView, element);
+    },
+    releaseView: (view: string): void => {
+      const vscodeView = vscodeViewIdOf(view);
+      if (vscodeView !== undefined) embed.releaseView(vscodeView);
+    },
     focusView: (view: string): void => {
       const vscodeView = vscodeViewIdOf(view);
       if (vscodeView !== undefined) embed.focusView(vscodeView);

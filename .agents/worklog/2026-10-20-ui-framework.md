@@ -94,3 +94,10 @@
 - `bindingFactory` 改为接收完整 `ViewGroupResource`，以拿到 `metadata.id`。
 - 新增 `resources.spec.ts`；`vscode-host` 增加 `test` script。
 - 验证：ui-layout 168 passed；vscode-host 7 passed；两边 check/build 通过。
+
+### 2026-10-22 — imperative view host path（slice 5）
+
+- `prac-vscode-embed` 新增 `mountViewInto` / `releaseView`：frame 可直接挂载/释放 view，不必经过 React 组件；app 未 publish 时先记录元素。
+- `PracVscodeFace` 新增 `mountView` / `releaseView`；映射 `vscode:view:<app view id>`。
+- `createVscodeViewHost` 把 `VscodeView` + adapter 变成 `ViewHost`；source-owned `viewId`。
+- 验证：embed check 通过；vscode-host 8 passed；两边 check/build 通过。

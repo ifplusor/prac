@@ -104,6 +104,37 @@ export class VscodeGroupBinding implements GroupBinding {
   }
 }
 
+/** The imperative source adapter behind a `VscodeViewHost`. */
+export interface VscodeViewHostAdapter {
+  mount(viewId: string, element: HTMLElement): void;
+  release(viewId: string): void;
+  focus?(viewId: string): void;
+  readonly focusable?: boolean;
+}
+
+/**
+ * Build a `VscodeViewHost` for one view resource.
+ *
+ * The app's view id comes from the source-owned spec when present; otherwise the
+ * prac id convention is stripped. The adapter decides how to mount/release.
+ */
+export function createVscodeViewHost(
+  view: VscodeView,
+  adapter: VscodeViewHostAdapter,
+): VscodeViewHost {
+  const appViewId = view.spec.viewId ?? stripViewPrefix(view.metadata.id);
+  return new VscodeViewHost(view.metadata.id, {
+    mount: (element) => adapter.mount(appViewId, element),
+    release: () => adapter.release(appViewId),
+    focus: () => adapter.focus?.(appViewId),
+    focusable: adapter.focusable ?? true,
+  });
+}
+
+function stripViewPrefix(id: string): string {
+  return id.startsWith("vscode:view:") ? id.slice("vscode:view:".length) : id;
+}
+
 /** A thin source-owned view host wrapper. */
 export class VscodeViewHost implements ViewHost {
   constructor(

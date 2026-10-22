@@ -4,6 +4,7 @@ import {
   VscodeViewDefinition,
   VscodeViewGroupDefinition,
   VscodeViewHost,
+  createVscodeViewHost,
   VSCODE_API_VERSION,
   type VscodeView,
   type VscodeViewGroup,
@@ -114,6 +115,22 @@ describe("VscodeViewDefinition", () => {
     expect(createHost).toHaveBeenCalledWith(expect.objectContaining({ metadata: { id: "v1" } }), {
       move: intent,
     });
+  });
+
+  it("builds a host that delegates to the source adapter", () => {
+    const mount = vi.fn();
+    const release = vi.fn();
+    const focus = vi.fn();
+    const wrapped = createVscodeViewHost(viewResource(), { mount, release, focus });
+
+    const element = {} as HTMLElement;
+    wrapped.mount(element);
+    wrapped.focus();
+    wrapped.release();
+
+    expect(mount).toHaveBeenCalledWith("workbench.view.explorer", element);
+    expect(focus).toHaveBeenCalledWith("workbench.view.explorer");
+    expect(release).toHaveBeenCalledWith("workbench.view.explorer");
   });
 
   it("rejects an empty hostKind", () => {
