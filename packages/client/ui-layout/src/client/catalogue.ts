@@ -66,6 +66,16 @@ let declaredViewIds: ReadonlySet<string> = new Set<string>();
 let declaredViewLabels: ReadonlyMap<string, string> = new Map<string, string>();
 /** The icon class each `prac.view` entry declares, keyed by view id. */
 let declaredViewIcons: ReadonlyMap<string, string> = new Map<string, string>();
+/**
+ * Which declared views bring a **native pane header**.
+ *
+ * A pane header is the view's own title bar (VS Code's `ViewPane` draws one). The
+ * frame still owns the row's title, fold and drag, but it draws them as an overlay
+ * over that header instead of as a separate row header, and hides the native
+ * title so the two do not compete. Whether a view has one is the **view's** fact,
+ * not its source's: the frame must not infer it from a `vscode:` prefix.
+ */
+let declaredViewPaneHeaders: ReadonlySet<string> = new Set<string>();
 
 /**
  * Re-read the `prac.view` slot registry into {@link declaredViewIds}.
@@ -77,18 +87,21 @@ export function readDeclaredViewIds(slots: Context["slots"]): ReadonlySet<string
   const ids = new Set<string>();
   const labels = new Map<string, string>();
   const icons = new Map<string, string>();
+  const paneHeaders = new Set<string>();
   for (const entry of slots.entries(VIEW_SLOT)) {
     const id = entry.options.id;
     if (id === undefined || id === "") continue;
     ids.add(id);
     const label = entry.options.label;
     if (typeof label === "string" && label !== "") labels.set(id, label);
-    const icon = (entry.options as { icon?: unknown }).icon;
-    if (typeof icon === "string" && icon !== "") icons.set(id, icon);
+    const options = entry.options as { icon?: unknown; paneHeader?: unknown };
+    if (typeof options.icon === "string" && options.icon !== "") icons.set(id, options.icon);
+    if (options.paneHeader === true) paneHeaders.add(id);
   }
   declaredViewIds = ids;
   declaredViewLabels = labels;
   declaredViewIcons = icons;
+  declaredViewPaneHeaders = paneHeaders;
   return ids;
 }
 
@@ -117,6 +130,43 @@ export function declaredViewLabel(viewId: string): string | undefined {
  */
 export function declaredViewIcon(viewId: string): string | undefined {
   return declaredViewIcons.get(viewId);
+}
+
+/**
+ * Whether a declared view brings a native pane header of its own.
+ *
+ * The fact is declared through the `prac.view` entry (`paneHeader: true`), never
+ * inferred from the view id's source segment. A stack row for such a view keeps
+ * the view's header and draws the frame's fold/drag control as an overlay; a row
+ * for any other view is the frame's own header.
+ *
+ * @param viewId - the view identity.
+ * @returns whether the view declares a pane header.
+ */
+export function declaredViewPaneHeader(viewId: string): boolean {
+  return declaredViewPaneHeaders.has(viewId);
+}
+
+/**
+ * How the frame should render a view id.
+ *
+ * **Membership wins over the id's source segment**: a `prac.view` declaration is
+ * authoritative even when its id starts with `dsh:` (a producer owns its ids, so
+ * a prefix is not a dispatch rule). `dsh:` is only the fallback for DSH's own
+ * slots, which are not declared into `prac.view`.
+ */
+export type ViewKind = "declared" | "dsh" | "unknown";
+
+/**
+ * Classify a view id for rendering.
+ *
+ * @param viewId - the view identity.
+ * @returns `"declared"` for a `prac.view` entry, `"dsh"` for one of DSH's own
+ *   slots, `"unknown"` otherwise.
+ */
+export function viewKind(viewId: string): ViewKind {
+  if (isDeclaredView(viewId)) return "declared";
+  return viewSource(viewId) === DSH_VIEW_SOURCE ? "dsh" : "unknown";
 }
 
 /**

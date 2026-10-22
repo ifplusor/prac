@@ -1,6 +1,8 @@
 # VS Code 的内部结构（参考）
 
 > 这篇记 VS Code 自己的结构：它内部怎么分成两半、平台服务是什么、扩展宿主协议跑在什么通道上、诊断是怎么走的、agent / MCP / 工具 / skill / prompt 分别做在哪一层，以及 UI 布局的 frame / part / container / pane / view 概念模型。
+
+> **词表边界**：本篇只用 VS Code 自己的词；prac 的映射见 [concepts.md](concepts.md) 与 [architecture.md](architecture.md)，不把这里的词带进 prac 的模型。
 > **行号与数字都指 pinned `1.137.0` checkout。**
 
 > **覆盖什么**：运行形态 / 平台服务 / UI 布局 / 扩展的 UI 能力范围 / 扩展宿主协议 / 诊断 / 激活 / agent 层。

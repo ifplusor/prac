@@ -6,7 +6,9 @@ import {
   catalogueViewIds,
   isDeclaredView,
   declaredViewLabel,
+  declaredViewPaneHeader,
   readDeclaredViewIds,
+  viewKind,
   viewSource,
 } from "./catalogue.js";
 
@@ -22,6 +24,7 @@ type SlotEntry = {
     readonly id?: string;
     readonly label?: string;
     readonly icon?: string;
+    readonly paneHeader?: boolean;
   };
 };
 
@@ -116,5 +119,32 @@ describe("readDeclaredViewIds / isDeclaredView", () => {
     expect(declaredViewLabel("vscode:view:outline")).toBe("Outline");
     readDeclaredViewIds(registry({}));
     expect(declaredViewLabel("vscode:view:outline")).toBeUndefined();
+  });
+
+  it("reads whether a view brings its own pane header, and forgets it when it leaves", () => {
+    readDeclaredViewIds(
+      registry({
+        [VIEW_SLOT]: [
+          { options: { id: "vscode:view:outline", paneHeader: true } },
+          { options: { id: "prac:notes" } },
+        ],
+      }),
+    );
+    expect(declaredViewPaneHeader("vscode:view:outline")).toBe(true);
+    // Absent is not "false by source": a view without the declaration has no header.
+    expect(declaredViewPaneHeader("prac:notes")).toBe(false);
+    readDeclaredViewIds(registry({}));
+    expect(declaredViewPaneHeader("vscode:view:outline")).toBe(false);
+  });
+});
+
+describe("viewKind", () => {
+  it("lets a declaration win over the id's source segment", () => {
+    readDeclaredViewIds(registry({ [VIEW_SLOT]: [{ options: { id: "dsh:declared" } }] }));
+    // The producer owns its ids; a `dsh:` prefix is not a dispatch rule.
+    expect(viewKind("dsh:declared")).toBe("declared");
+    expect(viewKind("dsh:sidebar")).toBe("dsh");
+    expect(viewKind("vscode:view:outline")).toBe("unknown");
+    readDeclaredViewIds(registry({}));
   });
 });

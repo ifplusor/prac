@@ -24,7 +24,7 @@
  * @module prac-client-ui-vscode-views/client
  */
 
-import { createElement, useLayoutEffect, useRef } from "react";
+import { createElement, useLayoutEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
@@ -42,6 +42,9 @@ const CONTAINER_ACTIONS = "prac.containerActions" as const;
 /**
  * One container's title actions, rendered by the frame's container bar.
  *
+ * The adapter resolves the action tree (including submenus); this component only
+ * draws it and asks the adapter to run the original action by id.
+ *
  * @param props - the app face and the container id.
  */
 function ContainerActions({
@@ -51,42 +54,107 @@ function ContainerActions({
   host: PracVscodeFace;
   containerId: string;
 }): ReactElement | null {
+  const [openId, setOpenId] = useState<string | null>(null);
   const actions: readonly PracVscodeAction[] = host.containerActions(containerId);
   if (actions.length === 0) return null;
+  const run = (id: string): void => {
+    setOpenId(null);
+    host.runAction(containerId, id);
+  };
+  const buttonStyle = {
+    font: "inherit",
+    fontSize: "11px",
+    height: "100%",
+    padding: "0 5px",
+    border: 0,
+    background: "transparent",
+    color: "inherit",
+    cursor: "pointer",
+  } as const;
+  const itemStyle = {
+    font: "inherit",
+    fontSize: "11px",
+    display: "block",
+    width: "100%",
+    padding: "4px 10px",
+    border: 0,
+    background: "transparent",
+    color: "inherit",
+    textAlign: "left",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  } as const;
   return createElement(
     "div",
     {
       "data-prac-container-action-bar": containerId,
-      style: { display: "flex", alignItems: "center", height: "100%", gap: "2px" },
+      style: { display: "flex", alignItems: "center", height: "100%", position: "relative" },
     },
-    ...actions.map((action) =>
-      createElement(
-        "button",
-        {
-          key: action.id,
-          type: "button",
-          "data-prac-container-action": action.id,
-          title: action.tooltip ?? action.label,
-          "aria-label": action.label,
-          disabled: !action.enabled,
-          onClick: () => {
-            void host.runCommand(action.id);
+    ...actions.map((action) => {
+      const hasSubmenu = action.submenu !== undefined && action.submenu.length > 0;
+      const open = hasSubmenu && openId === action.id;
+      return createElement(
+        "div",
+        { key: action.id, style: { position: "relative", height: "100%" } },
+        createElement(
+          "button",
+          {
+            type: "button",
+            "data-prac-container-action": action.id,
+            title: action.tooltip ?? action.label,
+            "aria-label": action.label,
+            "aria-haspopup": hasSubmenu ? "menu" : undefined,
+            "aria-expanded": hasSubmenu ? open : undefined,
+            disabled: !action.enabled,
+            onClick: () => {
+              if (hasSubmenu) {
+                setOpenId(open ? null : action.id);
+              } else {
+                run(action.id);
+              }
+            },
+            style: { ...buttonStyle, opacity: action.enabled ? 1 : 0.55 },
           },
-          style: {
-            font: "inherit",
-            fontSize: "11px",
-            height: "100%",
-            padding: "0 5px",
-            border: 0,
-            background: "transparent",
-            color: "inherit",
-            cursor: action.enabled ? "pointer" : "default",
-            opacity: action.enabled ? 1 : 0.55,
-          },
-        },
-        action.label,
-      ),
-    ),
+          action.label,
+        ),
+        open
+          ? createElement(
+              "div",
+              {
+                role: "menu",
+                "data-prac-container-submenu": action.id,
+                style: {
+                  position: "absolute",
+                  top: "100%",
+                  right: 0,
+                  minWidth: "160px",
+                  zIndex: 20,
+                  padding: "4px 0",
+                  background: "var(--vscode-menu-background, #252526)",
+                  color: "var(--vscode-menu-foreground, #cccccc)",
+                  border: "1px solid var(--vscode-menu-border, #454545)",
+                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.36)",
+                },
+              },
+              ...(action.submenu ?? []).map((child) =>
+                createElement(
+                  "button",
+                  {
+                    key: child.id,
+                    type: "button",
+                    role: "menuitem",
+                    "data-prac-container-action": child.id,
+                    disabled: !child.enabled,
+                    onClick: () => run(child.id),
+                    style: { ...itemStyle, opacity: child.enabled ? 1 : 0.55 },
+                  },
+                  child.checked ? `✓ ${child.label}` : child.label,
+                ),
+              ),
+            )
+          : null,
+      );
+    }),
   );
 }
 
@@ -140,10 +208,12 @@ export function apply(ctx: Context): void {
             // a fresh component, and a new identity on every render would remount
             // the whole view (and its pane header) forever.
             const View = host.hostFor(view);
-            // `icon` is this adapter's extra slot option; the registry's base
-            // options type does not know it, so keep it out of the literal's
-            // excess-property check.
-            const options = { name: SLOT, id: view, label, icon };
+            // `icon` and `paneHeader` are this adapter's extra slot options; the
+            // registry's base options type does not know them, so keep them out of
+            // the literal's excess-property check. `paneHeader` is what tells the
+            // frame to overlay its fold/drag control on the app's own pane header
+            // instead of drawing a second row header.
+            const options = { name: SLOT, id: view, label, icon, paneHeader: true };
             registered.set(view, {
               label,
               icon,

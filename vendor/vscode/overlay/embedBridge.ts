@@ -91,6 +91,8 @@ export interface PracVscodeAction {
   readonly enabled: boolean;
   readonly checked: boolean;
   readonly tooltip?: string;
+  /** Children of a submenu action; absent for a leaf action. */
+  readonly submenu?: readonly PracVscodeAction[];
 }
 
 export interface WorkbenchFace {
@@ -154,6 +156,16 @@ export interface WorkbenchFace {
    * @returns the container's primary and secondary actions.
    */
   containerActions: (containerId: string) => readonly PracVscodeAction[];
+  /**
+   * Run one container-title action by id.
+   *
+   * Runs the original `IAction` (not `runCommand(id)`), so a menu item's args,
+   * precondition and custom `run` stay intact.
+   *
+   * @param containerId - the view container id.
+   * @param actionId - the action id from {@link containerActions}.
+   */
+  runAction: (containerId: string, actionId: string) => void;
   /**
    * Mount **one placement's editing surface** into an external host element.
    *

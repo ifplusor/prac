@@ -45,6 +45,7 @@ import { IHostService } from "../services/host/browser/host.js";
 import { INotificationService } from "../../platform/notification/common/notification.js";
 import { ICommandService } from "../../platform/commands/common/commands.js";
 import { IViewsService } from "../../workbench/services/views/common/viewsService.js";
+import { SubmenuAction } from "../../base/common/actions.js";
 import type { IAction } from "../../base/common/actions.js";
 import { ViewContainerMenuActions } from "../../workbench/browser/parts/views/viewMenuActions.js";
 import { ViewsService } from "../../workbench/services/views/browser/viewsService.js";
@@ -311,6 +312,8 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   /** Views the embedder mounted, by view id — one pane each, created on demand. */
   /** Container title-menu actions, one per container, created lazily. */
   private readonly containerMenuActions = new Map<string, ViewContainerMenuActions>();
+  /** The original actions behind the latest container action tree, for `run`. */
+  private readonly containerActionRuns = new Map<string, Map<string, IAction>>();
 
   private readonly mountedViews = new Map<
     string,
@@ -560,6 +563,8 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
             listViews: () => this.listViews(),
             onDidChangeViews: (listener: () => void) => this.onDidChangeViews(listener),
             containerActions: (containerId: string) => this.containerActions(containerId),
+            runAction: (containerId: string, actionId: string) =>
+              this.runAction(containerId, actionId),
             mountFileInto: (placement: string, resource: string, element: HTMLElement) =>
               this.mountFileInto(placement, resource, element),
             focusFile: (placement: string, resource: string) => this.focusFile(placement, resource),
@@ -902,15 +907,38 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       );
       this.containerMenuActions.set(containerId, menu);
     }
-    const toAction = (action: IAction): PracVscodeAction => ({
-      id: action.id,
-      label: action.label,
-      icon: typeof action.class === "string" ? action.class : undefined,
-      enabled: action.enabled,
-      checked: action.checked,
-      tooltip: action.tooltip,
-    });
-    return [...menu.getPrimaryActions(), ...menu.getSecondaryActions()].map(toAction);
+    const runs = new Map<string, IAction>();
+    const toAction = (action: IAction): PracVscodeAction => {
+      runs.set(action.id, action);
+      const submenu =
+        action instanceof SubmenuAction
+          ? action.actions.map((child) => toAction(child))
+          : undefined;
+      return {
+        id: action.id,
+        label: action.label,
+        icon: typeof action.class === "string" ? action.class : undefined,
+        enabled: action.enabled,
+        checked: action.checked,
+        tooltip: action.tooltip,
+        ...(submenu === undefined ? {} : { submenu }),
+      };
+    };
+    const actions = [...menu.getPrimaryActions(), ...menu.getSecondaryActions()].map(toAction);
+    this.containerActionRuns.set(containerId, runs);
+    return actions;
+  }
+
+  /**
+   * Run one container-title action by id, through its original `IAction`.
+   *
+   * @param containerId - the container id.
+   * @param actionId - the action id from {@link EmbeddedWorkbench.containerActions}.
+   */
+  runAction(containerId: string, actionId: string): void {
+    const action = this.containerActionRuns.get(containerId)?.get(actionId);
+    if (action === undefined) return;
+    void action.run();
   }
 
   //#region View catalogue
