@@ -62,7 +62,7 @@ export type {
   ViewResource,
   ViewRuntime,
 } from "./resource.js";
-export type { View } from "./view.js";
+export type { FrameView, View } from "./view.js";
 export type { ViewGroup, ViewGroupMode, ViewGroupPlacement, ViewGroupState } from "./viewGroup.js";
 export type { MoveViewRequest } from "./move.js";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import type { ViewHost, ViewRuntime } from "prac-client-ui-layout/client";
+import type { FrameView, ViewHost } from "prac-client-ui-layout/client";
 import {
   VscodeViewDefinition,
   VscodeViewGroupDefinition,
@@ -51,7 +51,20 @@ function fakeGroup(id: string, mode: "stack" | "select" = "stack"): VscodeGroupR
     get binding() {
       return binding;
     },
+    add: () => {},
+    remove: () => {},
     dispose: vi.fn(),
+  };
+}
+
+function fakeView(id: string): FrameView {
+  return {
+    id,
+    host: undefined,
+    mount: () => {},
+    release: () => {},
+    focus: () => {},
+    dispose: () => {},
   };
 }
 
@@ -103,7 +116,7 @@ describe("VscodeViewGroupDefinition", () => {
 
 describe("VscodeViewDefinition", () => {
   it("materializes a view and wraps its host", () => {
-    const runtime: ViewRuntime = { dispose: () => {} };
+    const runtime: FrameView = fakeView("v1");
     const hostSpy = host();
     const definition = new VscodeViewDefinition({
       createView: () => runtime,
@@ -119,7 +132,7 @@ describe("VscodeViewDefinition", () => {
   it("passes the move intent to the source host factory", () => {
     const createHost = vi.fn(() => host());
     const definition = new VscodeViewDefinition({
-      createView: () => ({ dispose: () => {} }),
+      createView: () => fakeView("v1"),
       createHost,
     });
     const intent = {
@@ -153,7 +166,7 @@ describe("VscodeViewDefinition", () => {
 
   it("rejects an empty hostKind", () => {
     const definition = new VscodeViewDefinition({
-      createView: () => ({ dispose: () => {} }),
+      createView: () => fakeView("v1"),
       createHost: () => host(),
     });
     expect(() => definition.validate({ hostKind: "" })).toThrow(/hostKind/);

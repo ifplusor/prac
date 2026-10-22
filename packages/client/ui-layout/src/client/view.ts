@@ -11,8 +11,17 @@
 
 import type { MoveIntent, ViewHost, ViewRuntime } from "./resource.js";
 
+/** The structural view shape the frame consumes. */
+export interface FrameView extends ViewRuntime {
+  readonly id: string;
+  readonly host: ViewHost | undefined;
+  mount(host: ViewHost, element: HTMLElement): void;
+  release(): void;
+  focus(): void;
+}
+
 /** A materialized view runtime. */
-export class View implements ViewRuntime {
+export class View implements FrameView {
   #host: ViewHost | undefined;
 
   constructor(readonly id: string) {}

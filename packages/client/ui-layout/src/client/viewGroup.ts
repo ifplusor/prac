@@ -9,7 +9,7 @@
  */
 
 import type { GroupBinding, ViewGroupRuntime } from "./resource.js";
-import type { View } from "./view.js";
+import type { FrameView } from "./view.js";
 
 /** How a group presents its member views. */
 export type ViewGroupMode = "stack" | "select";
@@ -33,7 +33,7 @@ export interface ViewGroupPlacement {
 
 /** Runtime group: one per `ViewGroupState`. */
 export class ViewGroup implements ViewGroupRuntime {
-  readonly #views = new Map<string, View>();
+  readonly #views = new Map<string, FrameView>();
   readonly #order: string[] = [];
   #mode: ViewGroupMode;
   #active: string | undefined;
@@ -86,12 +86,12 @@ export class ViewGroup implements ViewGroupRuntime {
   }
 
   /** Look up a member view without changing its host. */
-  get(viewId: string): View | undefined {
+  get(viewId: string): FrameView | undefined {
     return this.#views.get(viewId);
   }
 
   /** Add a view to the end of the group order. */
-  add(view: View): void {
+  add(view: FrameView): void {
     this.#assertLive();
     if (this.#views.has(view.id)) throw new Error(`view already in group: ${view.id}`);
     this.#views.set(view.id, view);

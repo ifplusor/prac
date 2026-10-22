@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import type { ViewRuntime } from "prac-client-ui-layout/client";
+import type { FrameView } from "prac-client-ui-layout/client";
 import { createVscodeResourceDefinitions } from "./adapter.js";
 import {
   VscodeGroupBinding,
@@ -44,9 +44,18 @@ function definitions() {
     placements: [],
     onDidChange: () => () => {},
     setBinding: () => {},
+    add: () => {},
+    remove: () => {},
     dispose: () => {},
   };
-  const view: ViewRuntime = { dispose: () => {} };
+  const view: FrameView = {
+    id: "v1",
+    host: undefined,
+    mount: () => {},
+    release: () => {},
+    focus: () => {},
+    dispose: () => {},
+  };
   return {
     face,
     mountView,

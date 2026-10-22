@@ -152,3 +152,10 @@
 - `vscode-host/index.ts` 创建 `VscodeGroupHost`；`syncGroups` 从 catalogue 派生 group resource、按 location 选 region、注册/移除。
 - catalogue 变化时增量同步；plugin cleanup 清理 groups。
 - 验证：ui-layout 175 passed；vscode-host 18 passed；check/build 通过。
+
+### 2026-10-22 — catalogue views into groups（slice 14）
+
+- 新增 `FrameView` 结构接口；`PracLayoutFace.createView` 返回 `FrameView`。
+- `VscodeGroupHost.addView/removeView`：materialize `VscodeView`、加入 hosted group。
+- `viewFromCatalogue`；assembly 从 catalogue 同步 container views，移除消失的 view。
+- 验证：ui-layout 175 passed；vscode-host 19 passed；check/build 通过。

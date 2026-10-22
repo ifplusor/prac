@@ -15,6 +15,7 @@ import type {
   ViewDefinition,
   ViewGroupDefinition,
   ViewGroupResource,
+  FrameView,
   FrameViewGroup,
   ViewGroupRuntime,
   ViewHost,
@@ -65,13 +66,15 @@ export interface VscodeView extends ViewResource {
 export interface VscodeGroupRuntime extends FrameViewGroup {
   readonly binding?: GroupBinding;
   setBinding(binding: GroupBinding | undefined): void;
+  add(view: FrameView): void;
+  remove(viewId: string): void;
 }
 
 /** The adapter's factory for the core group runtime. */
 export type VscodeGroupFactory = (id: string, mode: "stack" | "select") => VscodeGroupRuntime;
 
 /** The adapter's factory for the core view runtime. */
-export type VscodeViewFactory = (id: string) => ViewRuntime;
+export type VscodeViewFactory = (id: string) => FrameView;
 
 /** The adapter's factory for a view host. */
 export type VscodeHostFactory = (

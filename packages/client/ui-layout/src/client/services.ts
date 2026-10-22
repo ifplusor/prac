@@ -63,7 +63,7 @@ import {
   structuralRegion,
 } from "./model.js";
 import type { LayoutStore } from "./store.js";
-import { View } from "./view.js";
+import { View, type FrameView } from "./view.js";
 import { ViewGroup } from "./viewGroup.js";
 import { ViewGroupHost, type FrameGroup, type FrameViewGroup } from "./frameGroups.js";
 
@@ -320,7 +320,7 @@ export function createServices(
     createViewGroup(id: string, mode: "stack" | "select"): ViewGroup {
       return new ViewGroup(id, mode);
     },
-    createView(id: string): View {
+    createView(id: string): FrameView {
       return new View(id);
     },
     registerViewGroup(group: FrameViewGroup, regionId: string): FrameGroup {

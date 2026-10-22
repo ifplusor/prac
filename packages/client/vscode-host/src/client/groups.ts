@@ -8,11 +8,13 @@
  * @module prac-client-vscode-host/client/groups
  */
 
-import type { FrameViewGroup } from "prac-client-ui-layout/client";
+import type { FrameView, FrameViewGroup } from "prac-client-ui-layout/client";
 import type { VscodeCatalogueEntry } from "./public.js";
 import type { VscodeGroupRuntime } from "./resources.js";
 import {
   VSCODE_API_VERSION,
+  type VscodeView,
+  type VscodeViewDefinition,
   type VscodeViewGroup,
   type VscodeViewGroupDefinition,
 } from "./resources.js";
@@ -27,11 +29,13 @@ export interface VscodeGroupLayout {
 export interface VscodeGroupHostOptions {
   readonly layout: VscodeGroupLayout;
   readonly definition: VscodeViewGroupDefinition;
+  readonly viewDefinition: VscodeViewDefinition;
 }
 
 /** Materializes and registers VS Code view groups. */
 export class VscodeGroupHost {
   readonly #groups = new Map<string, { group: VscodeGroupRuntime; regionId: string }>();
+  readonly #views = new Map<string, { group: VscodeGroupRuntime; view: FrameView }>();
 
   constructor(private readonly options: VscodeGroupHostOptions) {}
 
@@ -63,11 +67,45 @@ export class VscodeGroupHost {
     return [...this.#groups.keys()];
   }
 
+  /** Materialize a view and add it to a hosted group. */
+  addView(groupId: string, resource: VscodeView): FrameView {
+    const entry = this.#groups.get(groupId);
+    if (!entry) throw new Error(`view group is not hosted: ${groupId}`);
+    if (this.#views.has(resource.metadata.id)) {
+      throw new Error(`view already hosted: ${resource.metadata.id}`);
+    }
+    const view = this.options.viewDefinition.materialize(resource) as unknown as FrameView;
+    entry.group.add(view);
+    this.#views.set(resource.metadata.id, { group: entry.group, view });
+    return view;
+  }
+
+  /** Remove one hosted view from its group. */
+  removeView(viewId: string): void {
+    const entry = this.#views.get(viewId);
+    if (!entry) return;
+    this.#views.delete(viewId);
+    entry.group.remove(viewId);
+  }
+
+  /** The view ids currently hosted. */
+  viewIds(): readonly string[] {
+    return [...this.#views.keys()];
+  }
+
+  /** Whether this host owns a view id. */
+  hasView(viewId: string): boolean {
+    return this.#views.has(viewId);
+  }
+
   /** Remove one hosted group; its runtime is disposed by the host. */
   remove(groupId: string): void {
     const entry = this.#groups.get(groupId);
     if (!entry) return;
     this.#groups.delete(groupId);
+    for (const [viewId, view] of this.#views) {
+      if (view.group === entry.group) this.#views.delete(viewId);
+    }
     this.options.layout.unregisterViewGroup(groupId);
     entry.group.dispose();
   }
@@ -100,6 +138,21 @@ export function viewGroupsFromCatalogue(
 }
 
 /** The frame region a catalogue location defaults to. */
+/** Build a view resource from one catalogue entry. */
+export function viewFromCatalogue(entry: VscodeCatalogueEntry): VscodeView {
+  return {
+    apiVersion: VSCODE_API_VERSION,
+    kind: "View",
+    metadata: { id: entry.view },
+    spec: {
+      hostKind: entry.source === "file" ? "editor-pane" : "view-pane",
+      viewId: entry.appId,
+      title: entry.title,
+      ...(entry.containerId === undefined ? {} : { containerId: entry.containerId }),
+    },
+  };
+}
+
 /** One planned group resource and its default region. */
 export interface PlannedVscodeGroup {
   readonly resource: VscodeViewGroup;

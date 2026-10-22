@@ -6,9 +6,11 @@ import {
   viewGroupsFromCatalogue,
 } from "./groups.js";
 import {
+  VscodeViewDefinition,
   VscodeViewGroupDefinition,
   VSCODE_API_VERSION,
   type VscodeGroupRuntime,
+  type VscodeView,
   type VscodeViewGroup,
 } from "./resources.js";
 
@@ -34,8 +36,29 @@ function fakeGroup(id: string, mode: "stack" | "select" = "stack"): VscodeGroupR
     get binding() {
       return binding;
     },
+    add: vi.fn(),
+    remove: vi.fn(),
     dispose: vi.fn(),
   };
+}
+
+function viewDefinition(): VscodeViewDefinition {
+  return new VscodeViewDefinition({
+    createView: (id) => ({
+      id,
+      host: undefined,
+      mount: () => {},
+      release: () => {},
+      focus: () => {},
+      dispose: () => {},
+    }),
+    createHost: () => ({
+      mount: () => {},
+      release: () => {},
+      focus: () => {},
+      focusable: true,
+    }),
+  });
 }
 
 function definition(): VscodeViewGroupDefinition {
@@ -52,6 +75,7 @@ describe("VscodeGroupHost", () => {
     const host = new VscodeGroupHost({
       layout: { registerViewGroup, unregisterViewGroup },
       definition: definition(),
+      viewDefinition: viewDefinition(),
     });
 
     const group = host.add(groupResource(), "left");
@@ -64,6 +88,27 @@ describe("VscodeGroupHost", () => {
     expect(unregisterViewGroup).toHaveBeenCalledWith("g1");
   });
 
+  it("adds a view to a hosted group", () => {
+    const host = new VscodeGroupHost({
+      layout: { registerViewGroup: () => {}, unregisterViewGroup: () => {} },
+      definition: definition(),
+      viewDefinition: viewDefinition(),
+    });
+    host.add(groupResource(), "left");
+    const view: VscodeView = {
+      apiVersion: VSCODE_API_VERSION,
+      kind: "View",
+      metadata: { id: "v1" },
+      spec: { hostKind: "view-pane", viewId: "workbench.view.explorer" },
+    };
+
+    host.addView("g1", view);
+
+    expect(host.hasView("v1")).toBe(true);
+    host.removeView("v1");
+    expect(host.hasView("v1")).toBe(false);
+  });
+
   it("does not keep a group when registration fails", () => {
     const host = new VscodeGroupHost({
       layout: {
@@ -73,6 +118,7 @@ describe("VscodeGroupHost", () => {
         unregisterViewGroup: () => {},
       },
       definition: definition(),
+      viewDefinition: viewDefinition(),
     });
 
     expect(() => host.add(groupResource(), "missing")).toThrow(/no region/);
