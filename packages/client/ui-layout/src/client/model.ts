@@ -136,7 +136,7 @@ export function defaultTree(): SplitNode {
           gridNode(
             "stage",
             1,
-            1,
+            3,
             [
               regionNode(CENTER_REGION, 0, {
                 flex: true,
@@ -1785,6 +1785,19 @@ export function regionInDirection(
   const { dir, before } = sideGeometry(side);
   for (let step = path.length - 1; step >= 0; step -= 1) {
     const { parent, index } = path[step];
+    if (parent.type === "grid") {
+      const columns = Math.max(1, parent.columns);
+      const row = Math.floor(index / columns);
+      const column = index % columns;
+      const nextRow = row + (side === "up" ? -1 : side === "down" ? 1 : 0);
+      const nextColumn = column + (side === "left" ? -1 : side === "right" ? 1 : 0);
+      if (nextRow < 0 || nextColumn < 0 || nextRow >= parent.rows || nextColumn >= columns) {
+        continue;
+      }
+      const neighbour = parent.children[nextRow * columns + nextColumn];
+      if (neighbour === undefined) continue;
+      return edgeRegionId(neighbour, side === "left" || side === "up" ? "last" : "first");
+    }
     if (parent.type !== "split" || parent.dir !== dir) continue;
     const neighbour = parent.children[index + (before ? -1 : 1)];
     if (neighbour === undefined) continue;
@@ -1799,7 +1812,7 @@ export function splitRegionWith(
   side: Side,
   splitId: string,
   newRegionId: string,
-  options?: { embedder?: boolean },
+  options?: { embedder?: boolean; gridCells?: boolean },
 ): LayoutState {
   // The id may name a **split** now (a stack takes the region's place), and splitting *it* is what a
   // caller means: the new pane lands beside the whole stack, not between two of its rows.
@@ -1819,6 +1832,23 @@ export function splitRegionWith(
     // the app's shape and must survive being empty (its view may not be placed yet).
     ...(options?.embedder === true ? { embedder: true } : {}),
   });
+  if (options?.gridCells === true) {
+    const ancestry = regionAncestry(state.tree, regionId);
+    const parent = ancestry?.[ancestry.length - 1];
+    if (
+      parent !== undefined &&
+      parent.parent.type === "grid" &&
+      parent.parent.children.length < parent.parent.rows * parent.parent.columns
+    ) {
+      const children = [...parent.parent.children];
+      children.splice(before ? parent.index : parent.index + 1, 0, fresh);
+      return {
+        ...state,
+        tree: replaceNode(state.tree, parent.parent.id, () => ({ ...parent.parent, children })),
+      };
+    }
+  }
+
   const replacement: SplitNode = {
     type: "split",
     id: splitId,

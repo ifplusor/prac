@@ -376,6 +376,7 @@ export function createServices(
           side,
           splitId,
           newRegionId,
+          { gridCells: true },
         );
         if (next === state) return state;
         return place(next, viewId, newRegionId);
@@ -418,6 +419,7 @@ export function createServices(
         const newRegionId = nextNodeId("region", state);
         const next = splitRegionWith(state, regionId, side, splitId, newRegionId, {
           embedder: true,
+          gridCells: true,
         });
         if (next === state) return state;
         created = newRegionId;

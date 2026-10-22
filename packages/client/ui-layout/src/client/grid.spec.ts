@@ -57,6 +57,18 @@ describe("grid node", () => {
     expect(removed.tree.type).toBe("grid");
   });
 
+  it("can add a cell when the caller asks for grid cells", () => {
+    const layout = state();
+    layout.tree = gridNode("stage", 1, 3, [regionNode("a", 0, { flex: true })]);
+    const next = splitRegionWith(layout, "a", "right", "split-a", "new-a", {
+      gridCells: true,
+    });
+    expect(next.tree.type).toBe("grid");
+    if (next.tree.type === "grid") {
+      expect(next.tree.children.map((child) => child.id)).toEqual(["a", "new-a"]);
+    }
+  });
+
   it("rejects more cells than the declared shape", () => {
     expect(() => gridNode("bad", 1, 1, [regionNode("a", 0), regionNode("b", 0)])).toThrow(
       /more cells/,
