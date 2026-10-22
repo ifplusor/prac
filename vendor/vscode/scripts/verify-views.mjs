@@ -449,7 +449,9 @@ const rowIds = (state) => state.rows.map((row) => row.id);
 const regionControlIds = (state) => state.regionControls;
 const regionInfoIds = (state) => state.regionInfos.map((region) => region.id);
 
-const gutter = 5; // the sash between two regions, in px (prac-client-ui-layout's SASH_SIZE)
+// The sash is an absolute overlay and takes no flex space (frame.ts), so
+// collapsing a region gives its full width back; there is no gutter to add.
+const gutter = 0;
 
 // Decision 21: this gate is the recall surface's **UI contract**, so it stays
 // mostly as it is — what it drops is the model half of rules that are unit tests

@@ -220,3 +220,9 @@
 - `viewGroupIdFor` 将 file view 映射到其 region 的 editor group；`planViewGroups` 用 region 后缀定位。
 - assembly 的 active-editor 同步改用 active.region 对应的 editor group。
 - live：`verify:file` 全绿（含 split editor / 两 group / 两 surface），`verify:containers` 13/13 全绿。
+
+### 2026-10-22 — views gate sash expectation（slice 24）
+
+- `verify:views` 的 `spaceAndWidthComeBack` 失败来自陈旧常量：gate 假设 sash 占 5px flex 空间，但 frame 的 sash 是 absolute overlay、不占布局。
+- 改为 `gutter = 0`；`verify:views` 全绿，`spaceAndWidthComeBack = true`。
+- 根 `pnpm check` 0 errors。
