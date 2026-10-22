@@ -1498,7 +1498,7 @@ export function resolveSizes(state: LayoutState, width: number, height: number):
     if (node.type === "grid") {
       out.set(node.id, { width: w, height: h });
       const cells = node.children.filter((child) => isPresent(state, child));
-      const columns = Math.max(1, node.columns);
+      const columns = node.rows === 1 ? Math.max(1, cells.length) : Math.max(1, node.columns);
       const rows = Math.max(1, node.rows);
       cells.forEach((child, index) => {
         const column = index % columns;

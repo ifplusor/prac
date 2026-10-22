@@ -1725,13 +1725,13 @@ export function createFrame(
             key: node.id,
             "data-prac-grid": node.id,
             style:
-              node.rows * node.columns <= 1
-                ? // A 1×1 stage grid is topology, not a second box: `display: contents`
+              cells.length <= 1
+                ? // One cell is topology, not a second box: `display: contents`
                   // keeps the cell in the parent split's geometry.
                   { display: "contents" }
                 : {
                     display: "grid",
-                    gridTemplateColumns: `repeat(${node.columns}, minmax(0, 1fr))`,
+                    gridTemplateColumns: `repeat(${Math.max(1, cells.length)}, minmax(0, 1fr))`,
                     gridTemplateRows: `repeat(${node.rows}, minmax(0, 1fr))`,
                     width: "100%",
                     height: "100%",

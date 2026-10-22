@@ -268,3 +268,9 @@
 - 默认 stage 改为 1×1 `GridNode`；1×1 grid 渲染为 `display: contents`，不引入第二层盒模型。
 - `regionAncestry` / `removeRegion` 支持 grid parent；grid 失去最后 cell 也保留空 grid。
 - live 全绿：`verify:containers` 13/13、`verify:file`、`verify:views`、`verify:split`。
+
+### 2026-10-22 — stage grid display:contents（slice 32）
+
+- 默认 stage 为 1×1 `GridNode`；grid 在只有 1 个 cell 时渲染 `display: contents`，不改变父 split 几何。
+- live 复验：`verify:views`、`verify:containers`、`verify:file` 全绿。
+- 多 cell grid 的 split 语义留待后续，不在本轮强行改默认树。
