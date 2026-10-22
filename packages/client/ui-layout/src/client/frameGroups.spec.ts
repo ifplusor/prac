@@ -48,6 +48,20 @@ describe("ViewGroupHost", () => {
     expect(() => host.register(new ViewGroup("g3"), "missing")).toThrow(/unknown region/);
   });
 
+  it("can register a fresh group after the old one leaves", () => {
+    const store = memoryStore();
+    const host = new ViewGroupHost(store);
+    host.register(new ViewGroup("g1"), "left");
+    host.unregister("g1");
+
+    const next = new ViewGroup("g1");
+    next.add(new View("v2"));
+    host.register(next, "left");
+
+    expect(store.get().views["v2"]).toBeDefined();
+    expect(host.get("g1")?.group).toBe(next);
+  });
+
   it("unregisters without disposing the group", () => {
     const store = memoryStore();
     const host = new ViewGroupHost(store);

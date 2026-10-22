@@ -237,3 +237,8 @@
 
 - 新增 `VscodeGroupHost.sync` 回归：view 从 catalogue 消失后再次出现，可以重新 materialize / add。
 - 验证：vscode-host 24 passed；check/build 通过。
+
+### 2026-10-22 — group recovery re-register（slice 27）
+
+- 新增 `ViewGroupHost` 回归：group unregister 后，同 id 新 group 可以重新注册到同一 region。
+- 验证：ui-layout 178 passed；check/build 通过。
