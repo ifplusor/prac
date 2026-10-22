@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import type { ViewGroupRuntime, ViewHost, ViewRuntime } from "prac-client-ui-layout/client";
+import type { ViewHost, ViewRuntime } from "prac-client-ui-layout/client";
 import {
   VscodeViewDefinition,
   VscodeViewGroupDefinition,
   VscodeViewHost,
   createVscodeViewHost,
   VSCODE_API_VERSION,
+  type VscodeGroupRuntime,
   type VscodeView,
   type VscodeViewGroup,
 } from "./resources.js";
@@ -37,13 +38,30 @@ function host(): ViewHost {
   };
 }
 
+function fakeGroup(id: string, mode: "stack" | "select" = "stack"): VscodeGroupRuntime {
+  let binding: { dispose(): void } | undefined;
+  return {
+    id,
+    state: { id, mode, order: [] },
+    placements: [],
+    onDidChange: () => () => {},
+    setBinding: (next) => {
+      binding = next;
+    },
+    get binding() {
+      return binding;
+    },
+    dispose: vi.fn(),
+  };
+}
+
 describe("VscodeViewGroupDefinition", () => {
   it("maps container to stack and editor to select", () => {
     const created: Array<{ id: string; mode: string }> = [];
     const definition = new VscodeViewGroupDefinition({
-      createGroup: (id, mode): ViewGroupRuntime => {
+      createGroup: (id, mode): VscodeGroupRuntime => {
         created.push({ id, mode });
-        return { dispose: () => {} };
+        return fakeGroup(id, mode);
       },
     });
 
@@ -58,14 +76,14 @@ describe("VscodeViewGroupDefinition", () => {
 
   it("rejects an unknown groupKind", () => {
     const definition = new VscodeViewGroupDefinition({
-      createGroup: () => ({ dispose: () => {} }),
+      createGroup: (id) => fakeGroup(id),
     });
     expect(() => definition.validate({ groupKind: "panel" })).toThrow(/groupKind/);
   });
 
   it("keeps the binding optional", () => {
     const definition = new VscodeViewGroupDefinition({
-      createGroup: () => ({ dispose: () => {} }),
+      createGroup: (id) => fakeGroup(id),
     });
     expect(definition.bindingFactory(groupResource("container"))).toBeUndefined();
   });
@@ -73,7 +91,7 @@ describe("VscodeViewGroupDefinition", () => {
   it("passes the group id to the binding factory", () => {
     const createBinding = vi.fn(() => ({ dispose: () => {} }));
     const definition = new VscodeViewGroupDefinition({
-      createGroup: () => ({ dispose: () => {} }),
+      createGroup: (id) => fakeGroup(id),
       createBinding,
     });
 

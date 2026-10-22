@@ -379,3 +379,5 @@ export type {
 export type { VscodeGroupBindingRuntime } from "./resources.js";
 
 export type { ContainerContextMode, ResolvedContainerContext } from "./context.js";
+
+export type { VscodeGroupHost, VscodeGroupHostOptions, VscodeGroupLayout } from "./groups.js";

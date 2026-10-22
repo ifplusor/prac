@@ -10,7 +10,7 @@
 
 import { ensureStackShape, placeQuietly, removeView } from "./model.js";
 import type { LayoutStore } from "./store.js";
-import type { ViewGroup } from "./viewGroup.js";
+import type { FrameViewGroup } from "./frameGroups.js";
 
 /** One group projected into one frame region. */
 export class ViewGroupLayoutBridge {
@@ -19,7 +19,7 @@ export class ViewGroupLayoutBridge {
   #disposed = false;
 
   constructor(
-    private readonly group: ViewGroup,
+    private readonly group: FrameViewGroup,
     private readonly store: LayoutStore,
     readonly regionId: string,
   ) {

@@ -68,4 +68,4 @@ export type { MoveViewRequest } from "./move.js";
 
 export type { ViewGroupLayoutBridge } from "./frameBridge.js";
 
-export type { FrameGroup, ViewGroupHost } from "./frameGroups.js";
+export type { FrameGroup, FrameViewGroup, ViewGroupHost } from "./frameGroups.js";

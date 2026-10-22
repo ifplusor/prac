@@ -137,3 +137,11 @@
 - `createServices` 创建 `ViewGroupHost`；`PracLayoutFace` 新增 `registerViewGroup` / `unregisterViewGroup`。
 - `index.ts` 在 frame effect 清理时 `viewGroups.dispose()`。
 - 验证：ui-layout 175 passed；check/build 通过。
+
+### 2026-10-22 — VscodeGroupHost + structural group runtime（slice 12）
+
+- core 增加 `FrameViewGroup` 结构接口；`ViewGroupHost` / bridge / face 接受结构类型，不再要求具体 class。
+- `VscodeGroupHost`：materialize group、attach binding、register 到 region、remove/dispose。
+- `viewGroupsFromCatalogue` / `regionForLocation`。
+- vscode-host 测试不再运行时 import core loader artifact。
+- 验证：ui-layout 175 passed；vscode-host 17 passed；check/build 通过。

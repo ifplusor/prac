@@ -10,8 +10,7 @@
  */
 
 import type { RegionInfo, ViewInfo } from "./catalogue.js";
-import type { FrameGroup } from "./frameGroups.js";
-import type { ViewGroup } from "./viewGroup.js";
+import type { FrameGroup, FrameViewGroup } from "./frameGroups.js";
 
 // DSH's declaration merges reach this program through the **type-only** imports
 // the other modules already make (`PropsRenderSlots` from ui-slots,
@@ -563,7 +562,7 @@ export interface PracLayoutFace {
    * @param regionId - the existing frame region.
    * @returns the registered group/region pair.
    */
-  registerViewGroup(group: ViewGroup, regionId: string): FrameGroup;
+  registerViewGroup(group: FrameViewGroup, regionId: string): FrameGroup;
   /**
    * Remove a view group's frame projection.
    *

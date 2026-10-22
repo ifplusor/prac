@@ -45,6 +45,7 @@ import type { PracVscodeFace, VscodeCatalogueEntry } from "./public.js";
 export * from "./resources.js";
 export * from "./adapter.js";
 export * from "./context.js";
+export * from "./groups.js";
 
 /** Same-origin prefix the host half serves the app bundle under. */
 const VSCODE_ROUTE = "/prac-vscode";

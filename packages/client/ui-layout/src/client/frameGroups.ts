@@ -10,13 +10,23 @@
  */
 
 import { findRegion } from "./model.js";
+import type { GroupBinding, ViewGroupRuntime } from "./resource.js";
 import type { LayoutStore } from "./store.js";
 import { ViewGroupLayoutBridge } from "./frameBridge.js";
-import type { ViewGroup } from "./viewGroup.js";
+import type { ViewGroupPlacement, ViewGroupState } from "./viewGroup.js";
+
+/** The structural group shape the frame consumes. */
+export interface FrameViewGroup extends ViewGroupRuntime {
+  readonly id: string;
+  readonly state: ViewGroupState;
+  readonly placements: readonly ViewGroupPlacement[];
+  onDidChange(listener: () => void): () => void;
+  setBinding?(binding: GroupBinding | undefined): void;
+}
 
 /** One registered group and its frame region. */
 export interface FrameGroup {
-  readonly group: ViewGroup;
+  readonly group: FrameViewGroup;
   readonly regionId: string;
   readonly bridge: ViewGroupLayoutBridge;
 }
@@ -29,7 +39,7 @@ export class ViewGroupHost {
   constructor(private readonly store: LayoutStore) {}
 
   /** Register a group in an existing region. */
-  register(group: ViewGroup, regionId: string): FrameGroup {
+  register(group: FrameViewGroup, regionId: string): FrameGroup {
     if (this.#groups.has(group.id)) throw new Error(`view group already registered: ${group.id}`);
     if (this.#regions.has(regionId)) {
       throw new Error(`region already hosts a view group: ${regionId}`);

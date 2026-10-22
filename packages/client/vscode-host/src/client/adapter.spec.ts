@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import type { ViewGroupRuntime, ViewRuntime } from "prac-client-ui-layout/client";
+import type { ViewRuntime } from "prac-client-ui-layout/client";
 import { createVscodeResourceDefinitions } from "./adapter.js";
 import {
   VscodeGroupBinding,
@@ -38,7 +38,14 @@ function definitions() {
     containerActions: () => [{ id: "collapse", label: "Collapse", enabled: true, checked: false }],
     runAction,
   };
-  const group: ViewGroupRuntime = { dispose: () => {} };
+  const group: import("./resources.js").VscodeGroupRuntime = {
+    id: "g1",
+    state: { id: "g1", mode: "stack", order: [] },
+    placements: [],
+    onDidChange: () => () => {},
+    setBinding: () => {},
+    dispose: () => {},
+  };
   const view: ViewRuntime = { dispose: () => {} };
   return {
     face,
