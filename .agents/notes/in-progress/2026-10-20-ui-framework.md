@@ -128,7 +128,7 @@ view group 的成员
 - **`ViewGroupState`**：每个 group 都有 id / mode / active / order / tombstone；`active` 只属于 select；无名 group 也有 state，但没有 `ContainerRecord`。
 - **group CR**（如 `VscodeViewGroup`）：CR 风格的 group 声明：`apiVersion` + `kind` + `metadata`（id / labels / annotations）+ `spec`（title / icon / role / order / hideIfEmpty 等）。`apiVersion + kind` 在声明时确定、不可变；frame 把它当 opaque 类型，不解析 source 语义。group 由 arrangement / frame 落成 `ViewGroupState`，declaration 不是 record。
 - **Definition（CRD）**：source adapter 注册具体 definition（如 `VscodeViewGroupDefinition` / `VscodeViewDefinition`）；定义 `apiVersion` / `kind` / schema / validation / factory。**Definition = 类型，Declaration / CR = 实例。** CRD 机制见 [2026-10-22-ui-crd.md](../proposed/2026-10-22-ui-crd.md)。
-- **view CR**（如 `VscodeView`）：同一套 CR 信封：`apiVersion` + `kind` + `metadata`（id / labels / annotations）+ `spec`（label / icon / `paneHeader` / `hostKind` 等）。kind 是 view 类型，`hostKind` 是执行能力，两者不混；`prac.view` 承载的就是这个声明。
+- **view CR**（如 `VscodeView`）：同一套 CR 信封：`apiVersion` + `kind` + `metadata` + `spec`。`spec` 由来源定义（例如 `hostKind` / label / icon / `paneHeader`）；`hostKind` 是 **source-owned**，core 不解析；`prac.view` 承载的就是这个声明。
 - **`ViewGroup`**：运行时对象，1:1 对应 `ViewGroupState`；持有 slots / hosts / `binding?`。source binding 是 runtime-only，不进 state。
 - **`ContainerRecord`**：由 group CR materialize 出来的具名 group 记录，保存 `apiVersion` / `kind` / `metadata` / `spec` / `available` / `tombstone`；由 arrangement 的 view group registry 写入，随 `ViewGroupState` 一起进 frame 的 layout store；来源声明 CR，不拥有 record。成员不存，按 placement 派生。
 - **身份**：placement 的目标是 `viewGroupId`；`ContainerRecord` 以同一个 `viewGroupId` 为 key；region id 只是布局节点 id；来源 container id 通过 group CR 映射，不是第二套成员键。
@@ -169,9 +169,9 @@ view group 的成员
 
 **不是 view 的东西**：view group 是 stack / select 的组；container 是具名 view group；part 是区域角色；overlay 是浮层条目；action / command / keybinding 是命令面；decoration / sash / focus ring 是 frame chrome。
 
-**host kind 表达可组合性**，不是来源名：
+**host 能力由来源定义**：`hostKind` 是 source-owned，不是 core 的分派键；core 只认 `ViewHost` 接口和 capabilities。
 
-| host kind | 能力 | 移动语义 |
+| source host kind（示例） | 能力 | 移动语义 |
 | --- | --- | --- |
 | `react` | 完全可组合；frame 给盒子，React host 在盒子里建隔离根 | 只换盒子；DOM-only view 保持状态 |
 | `view-pane` | 独立 `ViewPane`；可换盒子 | 同 placement DOM 保持；跨 container 可重建；webview view 的 iframe 例外 |
@@ -212,7 +212,7 @@ adapter 大在：observe → normalize → bind → project → context → host
 
 ### 2.1 组合规则
 
-- **frame 只认 catalogue + placement**。frame 不读来源目录，不按来源前缀分派；host kind 是唯一窄分派。
+- **frame 只认 catalogue + placement**。frame 不读来源目录，不按来源前缀分派；唯一窄分派是 `ViewHost` 接口 / capabilities，不是 `hostKind` 字符串。
 - **一个 host 一个 view**。host 的身份是 view id，不是“某次放置”；移动时尽量搬 host，不重建。
 - **host 的契约是 React + boundary**。frame 给盒子、隔离边界、active；host 自己观察尺寸、自己 mount / release、自己把焦点交给 view。
 - **stable host 不是全局承诺**：只对 DOM-only / React view；editor 走 model + viewState；`view-pane` 跨 container 允许重建；webview / iframe 明确 reload（或稳定层 + 几何，不 reparent）。
@@ -237,7 +237,7 @@ adapter 大在：observe → normalize → bind → project → context → host
 - **container 是 prac 的组合单元**：成员永远由 placement 决定；来源的 `containerId` 不能把它拉回；container 不能因为来源消失就丢掉放进来的别家 view。
 - **不是所有 UI 都是 view**：view group 是组，part 是区域角色，overlay 是浮层条目，action / command / keybinding 是命令面；只有 view 挂载。
 - **一个 React host 契约**：禁止 `ViewHandle.layout/setVisible/focus/dispose` 这类第二套 imperative 渲染模型。
-- **host kind 的能力要诚实**：webview / iframe、editor、opaque view 的移动语义由 host kind 说明。
+- **host 的能力要诚实**：webview / iframe、editor、opaque view 的移动语义由 `ViewHost` capabilities 说明；`hostKind` 只是来源词汇。
 - **frame 不装载代码、不认识来源**：frame 不 import / require / eval 来源 bundle；不出现 `vscode:` / `dsh:` 渲染分支。
 - **一个持久化权威**：frame 的 layout store 是唯一持久化点；来源状态不持久化；overlay、注意力栈不持久化。
 
@@ -302,7 +302,7 @@ adapter 大在：observe → normalize → bind → project → context → host
 - **生命周期**：改标题 / 可用性不 remount；`when` 关 / 开原位恢复；卸载只移除自己；HMR 后布局不丢。
 - **container / group mode**：Explorer container 同时显示多个 view；stage cell 默认是 select group；stack container 没有 group bar。
 - **placement**：view 换 container 只改 placement；移动整个 region 只改 topology；tab 重排只改 placement 的 order。
-- **stage / editor**：grid cell = region，内容根默认是 select view group；editor view host `editor-pane`；VS Code adapter 维护 editor 子集与 `EditorGroupModel` 的映射；track resize / 加删行列 / 移 cell 正确；移动承诺按 host kind 区分：DOM-only 不 release，editor 用 model + viewState，view-pane 可重建，webview / iframe reload；activation 打开正确文件。
+- **stage / editor**：grid cell = region，内容根默认是 select view group；editor view host `editor-pane`；VS Code adapter 维护 editor 子集与 `EditorGroupModel` 的映射；track resize / 加删行列 / 移 cell 正确；移动承诺按 `ViewHost` capabilities 区分：DOM-only 不 release，editor 用 model + viewState，view-pane 可重建，webview / iframe reload；activation 打开正确文件。
 - **G**：把 Folders 移出 Explorer 后，原 container 的 title actions / context keys 不跟随；view 自己的 title actions / `viewsWelcome` 跟随。
 - **浮层**：VS Code 的菜单 / quick pick / 通知 / dialog 与 DSH toast / modal 同层按 order 共存；view 内部 hover / completion 不被抬出去。
 

@@ -122,7 +122,7 @@ ViewGroup（frame 运行时）
 
 ```text
 VscodeViewDefinition（CRD）
-  apiVersion / kind / schema / validation / hostKind / hostFactory
+  apiVersion / kind / schema / validation / hostFactory
         ↓
 VscodeView（CR）
   apiVersion / kind / metadata / spec
@@ -132,7 +132,7 @@ View（prac runtime）
 ```
 
 - `kind` 是 view 类型；
-- `hostKind` 是执行能力；
+- `hostKind` 是 source-owned 的 spec 字段，core 不解析；core 只认 `ViewHost` 接口 / capabilities；
 - 两者不混；
 - `prac.view` 承载的是 view CR；`vscode-host` 的具体实现是 `VscodeView`；
 - `containerId` 只是默认落位 hint，不是成员关系；
@@ -194,7 +194,7 @@ interface VscodeView extends ViewResource {}
 - `Definition = 类型 / CRD`；
 - `Declaration = 实例 / CR`；
 - `VscodeViewGroup.spec.groupKind` 决定 `bindingFactory`；
-- `VscodeView.spec.hostKind` 决定 `hostFactory`；
+- `VscodeView.spec.hostKind`（source-owned）决定 `hostFactory`；core 不解析；
 - 没有 `source` 作为独立字段；`apiVersion` 已经表达来源；
 - kind 改变 = 新 CR / 迁移，不是改字段。
 
