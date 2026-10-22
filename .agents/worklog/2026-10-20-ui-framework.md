@@ -311,3 +311,9 @@
 - 回退默认 stage 到 split tree，保留 `GridNode` / placement / cell split 数据层。
 - sash 拖拽改为 document capture 监听，避免 view host 吞 pointermove。
 - live：`verify:resize` 恢复全绿。
+
+### 2026-10-22 — grid stage + resize fallback（slice 40）
+
+- 恢复默认 stage 为 1×1 GridNode。
+- `readSplitDrawn` 对无 DOM box 的 grid child 使用 `resolveSizes` fallback；横向 sash 现在能 resize grid 边界。
+- live 全绿：resize / containers / views / file。

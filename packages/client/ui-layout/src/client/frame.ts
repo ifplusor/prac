@@ -587,12 +587,22 @@ function readSplitDrawn(store: LayoutStore, splitId: string, dir: Dir): Map<stri
   const node = findNode(state.tree, splitId);
   const drawn = new Map<string, number>();
   if (node === null || node.type !== "split") return drawn;
+  // A grid can be `display: contents` (one cell), so it has no DOM box of its
+  // own; fall back to the model's resolved box for that child.
+  const resolved = resolveSizes(state, state.viewportWidth, state.viewportHeight);
   for (const child of node.children.filter((entry) => isPresent(state, entry))) {
     const element =
       document.querySelector(`[data-prac-region="${CSS.escape(child.id)}"]`) ??
-      document.querySelector(`[data-prac-split="${CSS.escape(child.id)}"]`);
+      document.querySelector(`[data-prac-split="${CSS.escape(child.id)}"]`) ??
+      document.querySelector(`[data-prac-grid="${CSS.escape(child.id)}"]`);
     const rect = element?.getBoundingClientRect();
-    if (rect !== undefined) drawn.set(child.id, dir === "row" ? rect.width : rect.height);
+    const measured = rect === undefined ? undefined : dir === "row" ? rect.width : rect.height;
+    const fallback = resolved.get(child.id);
+    const size =
+      measured !== undefined && measured > 0
+        ? measured
+        : fallback?.[dir === "row" ? "width" : "height"];
+    if (size !== undefined) drawn.set(child.id, size);
   }
   return drawn;
 }
