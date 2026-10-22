@@ -233,7 +233,9 @@ const explorerSections = await page.evaluate(() => {
 const actionBars = await page.evaluate(() =>
   [...document.querySelectorAll("[data-prac-container-action-bar]")].map((bar) => ({
     container: bar.getAttribute("data-prac-container-action-bar"),
-    buttons: [...bar.querySelectorAll("button[data-prac-group-action], button[data-prac-container-action]")]
+    buttons: [
+      ...bar.querySelectorAll("button[data-prac-group-action], button[data-prac-container-action]"),
+    ]
       .map((button) => ({
         id:
           button.getAttribute("data-prac-group-action") ??
@@ -323,8 +325,9 @@ report({
     "one container at a time, and it is the one clicked":
       visits.length >= 8 &&
       visits.every((visit) => visit.shown.length === 1 && visit.shown[0] === visit.container),
-    "the container action bar renders actionable buttons":
-      actionBars.some((bar) => bar.buttons.length > 0 && bar.buttons.some((button) => !button.disabled)),
+    "the container action bar renders actionable buttons": actionBars.some(
+      (bar) => bar.buttons.length > 0 && bar.buttons.some((button) => !button.disabled),
+    ),
     "a container action click is dispatched without losing the bar": actionClicked === true,
     "a container holds no bar of its own (its children are views, not containers)": visits.every(
       (visit) => visit.innerBar === null,
