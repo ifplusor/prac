@@ -77,58 +77,12 @@ VS Code 的 UI 模型是 part / container / pane / view / editor group；prac �
 | **group** | `VscodeViewGroupDefinition` | `VscodeViewGroup` | `ViewGroupState` → `ViewGroup` |
 | **view** | `VscodeViewDefinition` | `VscodeView` | `View` + `VscodeViewHost` |
 
-prac core 只提供 **CRD 机制**，不提供 `vscode` 的 definition：
+prac core 的 CRD-lite 机制见 [UI resource model](../proposed/2026-10-22-ui-crd.md)：`ResourceDefinition` / `ResourceDeclaration` / registry / materializer。`vscode-host` 只注册 concrete definition 并产生 concrete CR：`VscodeViewGroupDefinition` / `VscodeViewGroup`、`VscodeViewDefinition` / `VscodeView`。
 
-```ts
-interface ResourceDefinition<TSpec, TMaterialized> {
-  apiVersion: string;
-  kind: string;
-  validate(spec: unknown): TSpec;
-  default(spec: unknown): TSpec;
-  materialize(decl: ResourceDeclaration<TSpec>, ctx: MaterializeContext): TMaterialized;
-}
-
-interface ResourceDeclaration<TSpec> {
-  apiVersion: string;
-  kind: string;
-  metadata: { id: string; labels?; annotations? };
-  spec: TSpec;
-}
-```
-
-- `ResourceRegistry`：`(apiVersion, kind) → ResourceDefinition`；
-- `ResourceMaterializer`：调用 definition 的 `validate` / `default` / `materialize`；
 - `VscodeViewGroupDefinition` / `VscodeViewDefinition` 由 `vscode-host` 注册；
-- frame / arrangement 只认 `ResourceDefinition` / `ResourceDeclaration`，不认 `vscode`。
-
-所有 declaration 共用 `ResourceDeclaration` 信封：
-
-- `apiVersion + kind` 是类型，声明时确定、不可变；
-- `metadata` 是身份；
-- `spec` 是可变配置；
-- frame 把类型当 opaque，只通过 registry 查 `ResourceDefinition` / schema / factory。
-
-### 2.1.1 CRD-lite：复杂度预算
-
-只借 CRD 的 **类型 / 实例分离**，不把 Kubernetes 的控制器框架搬进 prac：
-
-| 保留 | 不做 |
-| --- | --- |
-| 2 条 CRD：`VscodeViewGroup` / `VscodeView`（必要时再拆） | 通用 resource framework |
-| 1 个 CR 信封：`apiVersion / kind / metadata / spec` | 任意 UI 概念都做 CRD |
-| 1 个 definition registry（`Map`） | API server / etcd / watch / informer |
-| 1 个 materializer：declaration → state → runtime | controller / operator / reconcile loop 框架 |
-| `validate` / `default` / factory 函数 | JSON Schema / admission webhook / conversion webhook |
-| 一个 declared group 最多一个 group binding | 多 binding / attachment 层 |
-| 一个 view 一个 view host | `status` / conditions / finalizers / ownerReferences |
-
-- **只有 view 和 view group 是 CR**；`VscodeViewGroup` / `VscodeView` 两条 CRD 起步，action / overlay / part / host 仍走各自的 contribution 模型，不 CRD 化。
-- **不按 view 类型细拆 CRD**：tree / webview / React 用 `VscodeView` 的 spec 表达，除非 validation / factory 真的分叉。
-- **Definition 是 TypeScript 接口 + 函数**，不是独立的 schema 服务。
-- **kind 不可变**；第一版不做多版本转换，只保留 `apiVersion` 字段。
-- **一个 group 只有一个 declaration 来源**；不做多 source 合并 group kind。
-- **不加 `GroupHost` / attachment / multi-binding**；`ViewGroup.binding?` 已经够用。
-
+- `VscodeViewGroup` / `VscodeView` 由 `vscode-host` 产生；
+- frame / arrangement 只认 core 的 `ResourceDefinition` / `ResourceDeclaration`，不认 `vscode`；
+- 只有 view / view group 是 CR；action / overlay / part / host 不 CRD 化。
 
 ### 2.2 group
 
@@ -428,6 +382,7 @@ frame 侧（stack chrome / grid）不属于这张 note 的 steps，见各自的 
 
 - [2026-09-09-vscode-dsh-integration.md](2026-09-09-vscode-dsh-integration.md)：总 umbrella。
 - [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)：UI umbrella；view group / placement / G。
+- [2026-10-22-ui-crd.md](../proposed/2026-10-22-ui-crd.md)：UI 的 CRD-lite 机制。
 - [2026-10-22-vscode-container-context.md](../proposed/2026-10-22-vscode-container-context.md)：container context step。
 - [2026-10-05-vscode-dsh-layout-boundary.md](2026-10-05-vscode-dsh-layout-boundary.md)：视图隔离、区域骨架。
 - [2026-10-06-vscode-view-catalogue.md](2026-10-06-vscode-view-catalogue.md)：view catalogue。
