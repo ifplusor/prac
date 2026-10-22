@@ -43,7 +43,7 @@ import { createVscodeEmbed } from "prac-vscode-embed/client";
 import { EXTENSIONS_GALLERY } from "prac-vscode";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "./public.js";
 import { createVscodeResourceDefinitions } from "./adapter.js";
-import { EDITOR_GROUP_ID, VscodeGroupHost } from "./groups.js";
+import { VscodeGroupHost, editorGroupId } from "./groups.js";
 import type { VscodeGroupRuntime } from "./resources.js";
 export * from "./resources.js";
 export * from "./adapter.js";
@@ -347,7 +347,12 @@ export function apply(ctx: Context): void {
     const syncEditor = (): void => {
       const active = editors.snapshot().find((entry) => entry.active);
       if (active === undefined) return;
-      groupHost.select(EDITOR_GROUP_ID, `vscode:file:${active.placement}:${active.resource}`);
+      if (active.region !== null) {
+        groupHost.select(
+          editorGroupId(active.region),
+          `vscode:file:${active.placement}:${active.resource}`,
+        );
+      }
     };
     syncEditor();
     return editors.subscribe(syncEditor);

@@ -174,6 +174,7 @@ export function viewGroupsFromCatalogue(
     readonly containerId?: string;
     readonly containerTitle?: string;
     readonly source?: "file" | "view";
+    readonly region?: string | null;
   }[],
 ): VscodeViewGroup[] {
   const byContainer = new Map<string, { title?: string }>();
@@ -191,11 +192,30 @@ export function viewGroupsFromCatalogue(
       ...(title === undefined ? {} : { title }),
     },
   }));
+  const editorRegions = new Set<string>();
+  for (const entry of entries) {
+    if (entry.source === "file" && typeof entry.region === "string" && entry.region !== "") {
+      editorRegions.add(entry.region);
+    }
+  }
+  for (const region of editorRegions) {
+    groups.push({
+      apiVersion: VSCODE_API_VERSION,
+      kind: "ViewGroup",
+      metadata: { id: editorGroupId(region) },
+      spec: { groupKind: "editor", title: "Editor" },
+    });
+  }
   return groups;
 }
 
-/** The one editor group the initial slice hosts. */
-export const EDITOR_GROUP_ID = "vscode:group:editor";
+/** Prefix for one editor group per frame region. */
+export const EDITOR_GROUP_PREFIX = "vscode:group:editor:";
+
+/** The editor-group id for one frame region. */
+export function editorGroupId(region: string): string {
+  return `${EDITOR_GROUP_PREFIX}${region}`;
+}
 
 /** The group a catalogue entry belongs to, or undefined when it has no home yet. */
 export function viewGroupIdFor(entry: VscodeCatalogueEntry): string | undefined {
@@ -239,7 +259,11 @@ export function planViewGroups(
   const planned: PlannedVscodeGroup[] = [];
   for (const resource of viewGroupsFromCatalogue(entries)) {
     const entry = entries.find((candidate) => candidate.containerId === resource.spec.containerId);
-    if (resource.spec.groupKind === "editor") continue;
+    if (resource.spec.groupKind === "editor") {
+      const region = resource.metadata.id.slice(EDITOR_GROUP_PREFIX.length);
+      if (regionIds.includes(region)) planned.push({ resource, regionId: region });
+      continue;
+    }
     const containerId = resource.spec.containerId;
     const regionId =
       containerId === undefined

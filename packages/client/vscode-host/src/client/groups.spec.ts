@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import {
   VscodeGroupHost,
+  editorGroupId,
   planViewGroups,
   regionForLocation,
   viewGroupsFromCatalogue,
@@ -216,6 +217,38 @@ describe("viewGroupsFromCatalogue", () => {
     expect(planned.find((item) => item.resource.spec.containerId === "b")?.regionId).toBe(
       "bottom/container:b",
     );
+  });
+
+  it("creates one editor group per file region", () => {
+    const groups = viewGroupsFromCatalogue([
+      { source: "file", region: "center" },
+      { source: "file", region: "center" },
+      { source: "file", region: "right" },
+    ]);
+
+    expect(groups.map((group) => group.metadata.id)).toEqual([
+      editorGroupId("center"),
+      editorGroupId("right"),
+    ]);
+  });
+
+  it("plans an editor group in its own region", () => {
+    const planned = planViewGroups(
+      [
+        {
+          view: "vscode:file:p1:a",
+          appId: "a",
+          title: "a",
+          source: "file",
+          location: "stage",
+          region: "right",
+        },
+      ],
+      ["center", "right"],
+    );
+
+    expect(planned[0]?.resource.metadata.id).toBe(editorGroupId("right"));
+    expect(planned[0]?.regionId).toBe("right");
   });
 
   it("maps locations to default frame regions", () => {

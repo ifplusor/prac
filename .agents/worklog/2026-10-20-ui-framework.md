@@ -213,3 +213,10 @@
 - `verify:file` 发现单一 editor group 破坏 split editor 的第二 group；暂时回退 file → editor group 的自动 materialization，让既有 editor host 继续管理文件。
 - `ViewGroupLayoutBridge` 不再把用户 hidden 的 view 重新显示。
 - live：`verify:containers` 13/13、`verify:file` 全绿、`verify:stack` / `split` / `persistence` / `bottom` 全绿。
+
+### 2026-10-22 — per-region editor groups / live validation（slice 23）
+
+- `viewGroupsFromCatalogue` 按 file entry 的 `region` 建 `vscode:group:editor:<region>`，不再只有一个 editor group。
+- `viewGroupIdFor` 将 file view 映射到其 region 的 editor group；`planViewGroups` 用 region 后缀定位。
+- assembly 的 active-editor 同步改用 active.region 对应的 editor group。
+- live：`verify:file` 全绿（含 split editor / 两 group / 两 surface），`verify:containers` 13/13 全绿。
