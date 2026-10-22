@@ -76,13 +76,13 @@ adaptor 自己维护 container 的 view 列表 / 可见性 / 顺序 / actions，
 - **风险**：container 的 stack / 多 view / container actions / context keys 无法成立；G 无法满足；Explorer 这类 container 会退化。
 - **结论**：只能作为 baseline / 反例，不作为目标。
 
-### D. 混合 container host
+### D. 混合 host 的 container binding
 
-container context 拥有一个 stack，成员是 host，不要求成员是 `ViewPane`；VS Code view 的 host 是 `ViewPane`，DSH view 的 host 是 React host。
+frame 的 `ViewGroup` 仍然拥有 stack / order / visibility；`ContainerBinding` 只把 host 挂到这个 stack 上，不拥有 stack。成员可以是 `ViewPane`，也可以是 React host。
 
 - **优点**：直接对应“container 是 prac 的 stack view group”；天然支持跨来源。
 - **风险**：container 的 title / menu / context 仍要借 upstream 或自己接；`ViewPane` 仍会查来源 container，G 需要额外覆盖；collapse / visibility / focus 要统一。
-- **关键问题**：container context 是“host stack owner”，还是“VS Code container 的 runtime”？两者边界要划清。
+- **关键问题**：`ContainerBinding` 只提供 host / context / action；stack 和 active 仍归 frame。
 
 ## Spike
 
