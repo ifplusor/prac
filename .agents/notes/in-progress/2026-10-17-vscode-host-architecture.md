@@ -5,7 +5,9 @@ status: in-progress
 # Agent Note: vscode-host — 把 VS Code 的 UI 贡献翻译成 prac 的组合资源
 
 > **这是哪件工作**：prac 的 VS Code adaptor（`vscode-host`）。它是 prac UI 的 sub-umbrella，定义 adaptor 的边界、对象、契约、生命周期与 surface ownership。
-> **关系**：UI umbrella 见 [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)；总集成 umbrella 见 [2026-09-09-vscode-dsh-integration.md](2026-09-09-vscode-dsh-integration.md)；container context 见 [2026-10-22-vscode-container-context.md](../proposed/2026-10-22-vscode-container-context.md)。
+> **关系**：UI umbrella 见 [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)；CRD 机制见 [2026-10-22-ui-crd.md](../proposed/2026-10-22-ui-crd.md)；总集成 umbrella 见 [2026-09-09-vscode-dsh-integration.md](2026-09-09-vscode-dsh-integration.md)；container context 见 [2026-10-22-vscode-container-context.md](../proposed/2026-10-22-vscode-container-context.md)。
+>
+> **边界**：本 note 只定义 VS Code adaptor 的 concrete definition / resource、binding、view host；CRD 机制不在本 note。
 > **状态**：已接受为方向（in-progress）。每个 surface 的机制留给自己的 step。
 
 ## Summary

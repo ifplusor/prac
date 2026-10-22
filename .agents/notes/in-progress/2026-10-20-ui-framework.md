@@ -5,7 +5,9 @@ status: in-progress
 # Agent Note: UI framework — 把两个生态的 UI 贡献收进一个组合体系
 
 > **这是哪件工作**：prac 的 UI umbrella。目标只有一个：**VS Code 内置 / 扩展贡献的 UI，与 DSH 插件贡献的 UI，进入同一个目录、同一套摆放、同一套生命周期，能一起工作。**
-> **关系**：贡献面与术语见 [docs/ui-surface-map.md](../../../docs/ui-surface-map.md)；VS Code adaptor 见 [2026-10-17-vscode-host-architecture.md](../in-progress/2026-10-17-vscode-host-architecture.md)；stack / grid 行为见 [2026-10-15-ui-layout-stack.md](../resolved/2026-10-15-ui-layout-stack.md) / [2026-10-15-ui-layout-grid.md](2026-10-15-ui-layout-grid.md)。
+> **关系**：贡献面与术语见 [docs/ui-surface-map.md](../../../docs/ui-surface-map.md)；CRD 机制见 [2026-10-22-ui-crd.md](../proposed/2026-10-22-ui-crd.md)；VS Code adaptor 见 [2026-10-17-vscode-host-architecture.md](../in-progress/2026-10-17-vscode-host-architecture.md)；stack / grid 行为见 [2026-10-15-ui-layout-stack.md](../resolved/2026-10-15-ui-layout-stack.md) / [2026-10-15-ui-layout-grid.md](2026-10-15-ui-layout-grid.md)。
+>
+> **note map**：组合模型 / placement / host → 本 note；CRD 机制 → `2026-10-22-ui-crd.md`；VS Code 的翻译与 binding / view host → `2026-10-17-vscode-host-architecture.md`；container context step → `2026-10-22-vscode-container-context.md`。
 
 ## Summary
 

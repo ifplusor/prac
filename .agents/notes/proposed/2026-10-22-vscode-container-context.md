@@ -5,7 +5,9 @@ status: proposed
 # Agent Note: vscode-host 的 container context — ViewPaneContainer、view group 与 editor group 的接缝
 
 > **这是哪件工作**：vscode-host adaptor 的 container context step。它决定 adaptor 如何承接 VS Code 的 container 语义，同时不把 container 变成 prac 的成员权威。
-> **关系**：adaptor 骨架见 [2026-10-17-vscode-host-architecture.md](../in-progress/2026-10-17-vscode-host-architecture.md)；UI umbrella 见 [2026-10-20-ui-framework.md](../in-progress/2026-10-20-ui-framework.md)。
+> **关系**：adaptor 骨架见 [2026-10-17-vscode-host-architecture.md](../in-progress/2026-10-17-vscode-host-architecture.md)；CRD 机制见 [2026-10-22-ui-crd.md](2026-10-22-ui-crd.md)；UI umbrella 见 [2026-10-20-ui-framework.md](../in-progress/2026-10-20-ui-framework.md)。
+>
+> **边界**：本 note 是 container context step，只处理 `VscodeViewGroup` 的 container binding / `ViewPaneContainer` / G；不重定义 CRD 或 group/view 模型。
 
 ## Summary
 
