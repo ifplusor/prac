@@ -56,12 +56,17 @@
 | **view group state** | — | 每个 group 都有：id / mode / active / order / tombstone；无名 group 也有；order 是兄弟顺序 |
 | **placement** | — | view → viewGroup 的成员边；order / hidden / folded / size；不是拓扑节点 |
 | **container record** | container | 只对具名 group 存在；title / icon / location / actions / hideIfEmpty / available |
+| **ViewGroupState / ViewGroup** | — | group 的数据面 / 运行时；数据持久化，binding 不持久化 |
+| **ViewGroupDefinition / ViewGroupResource** | — | core 的 group CRD / CR 信封；VS Code 具体为 `VscodeViewGroupDefinition` / `VscodeViewGroup` |
+| **ViewDefinition / ViewResource** | — | core 的 view CRD / CR 信封；VS Code 具体为 `VscodeViewDefinition` / `VscodeView` |
+| **ViewHost** | — | view 的运行时边界：mount / release / focus；`hostKind` 由 source 定义 |
+| **MoveIntent** | — | 移动 hint；默认目标先建、源后释放 |
 | **container** | group（指 prac 组合单元时） | **具名的 view group，默认 stack**；`editor group` 只在上游出现，不是 prac 类型 |
 | **layout topology** | layout tree / region tree | 拓扑可以是 split → grid → region；view group 是 region 的内容根，不是第四个节点；region 位置 = parent + slot（split index / grid anchor+span），rect 由 layout kernel 计算 |
 | **split / grid / region / cell** | — | `grid` 是二维节点；`cell` 只在 grid 内使用 |
 | **stage** | center stage / center workbench | arrangement 的 role，默认物理位置 center；VS Code 的 workbench 是另一层，不混用 |
-| **primary sidebar / secondary sidebar / panel** | left / right / bottom | arrangement 的 role；默认物理位置分别是 left / right / bottom，物理方位不是 role 名 |
-| **host kind** | source-specific kind | 用 `react` / `view-pane` / `editor-pane` / `slot` / `opaque`；不用 `vscode-view` / `vscode-editor` / `dsh-slot` |
+| **primarySidebar / secondarySidebar / panel** | left / right / bottom | arrangement 的 role id；显示名分别是 primary sidebar / secondary sidebar / panel；物理方位不是 role 名 |
+| **source host kind** | host kind / source-specific kind | 来源自己的 `hostKind` + `ViewHost`；内置示例 `react` / `view-pane` / `editor-pane` / `slot` / `opaque`；core 不枚举 |
 | **overlay host** | — | frame 拥有 host / layer / order；behavior 可以是 source-managed 或 frame-managed |
 | **source-managed overlay** | source-owned float | `shell.overlay` entry；来源自己定位 / 关闭 / 焦点 |
 | **frame-managed overlay** | frame-owned overlay | `pracOverlay`；frame 定位 / 关闭 / 焦点 / 栈 |

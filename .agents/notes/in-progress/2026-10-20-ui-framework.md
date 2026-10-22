@@ -76,7 +76,7 @@ view group 的成员
 
 - **Grid 是一等节点**：`stage` 的内容是一个 grid；每个 cell 是一个 **region**，region 的内容根默认是一个 **select view group**（editor group），可以换成任何 view group 或 view——editor、tree view、DSH React view 都可以。文件编辑器、custom editor、webview panel 都是 editor view；它们在 VS Code adapter 内部映射到 `EditorGroupModel`。
 - **树与 grid 的关系**：树仍然是组合结构（split → grid → region），grid 是树里的一个节点，不是另一棵树；grid 内部是二维的，外部仍然是一个盒子。这样“`stage` 是 grid”不会破坏“基础层是 partition tree”。
-- **region 的位置**：结构位置 = `parentId` + slot；split 用 child index / track，grid 用 cell anchor + span（`rowStart / rowSpan / colStart / colSpan`）；绝对 rect 由 layout kernel 计算，不持久化。`stage` / `primary sidebar` / `secondary sidebar` / `panel` 是 arrangement 的 role；left / center / right / bottom 是它们的默认物理位置，不是 role 名。
+- **region 的位置**：结构位置 = `parentId` + slot；split 用 child index / track，grid 用 cell anchor + span（`rowStart / rowSpan / colStart / colSpan`）；绝对 rect 由 layout kernel 计算，不持久化。`stage` / `primarySidebar` / `secondarySidebar` / `panel` 是 arrangement 的 role；left / center / right / bottom 是它们的默认物理位置，不是 role 名。
 - **grid 的 resize**：行 / 列 track 与 cell 的 `min` / `max` / `priority` / `snap` 是局部约束；拖一条 track 只影响该 grid 的行 / 列，不做全局求解。
 - **stack 的行高 / 折叠**按已实现的 stack 行为；grid 的 resize 契约见 grid note。
 
@@ -85,12 +85,12 @@ view group 的成员
 | role | 默认物理位置 | 内容 |
 | --- | --- | --- |
 | **stage** | center | grid；editor groups / 任何 view |
-| **primary sidebar** | left | container stack |
-| **secondary sidebar** | right | container stack |
+| **primarySidebar** | left | container stack |
+| **secondarySidebar** | right | container stack |
 | **panel** | bottom | container stack |
 
 - **role 是组件语义，物理位置是默认值**：`left` / `center` / `right` / `bottom` / `top` 是方位，不是 role 名。`top` 目前没有对应的 frame region role；如果以后有顶部区域，单独命名，不用 `top` 当 role id。
-- **stage 是外层 split 的 center 节点**；它的内容是一个 **grid**，和 primary sidebar / secondary sidebar / panel 平级，但不是同一种节点。
+- **stage 是外层 split 的 center 节点**；它的内容是一个 **grid**，和 primarySidebar / secondarySidebar / panel 平级，但不是同一种节点。
 - **grid 的每个 cell 是 region**；cell 的内容根默认是 **select view group**（editor group），也可以换成任何 view group 或 view——editor、custom editor、webview panel、DSH React view 都可以。
 - **stage 是 editor view 的默认家**：文件编辑器、custom editor、webview panel、settings / keybindings 的 editor placement 默认落在这里；DSH view 也可以被放进某个 cell。
 - **stage 是 arrangement 的 role，不是独立节点**：它的几何由 grid 表达；默认形状由 arrangement 提供模板，live 拓扑由 frame 的 layout kernel 独占，用户变更赢，来源只能请求。
@@ -101,7 +101,7 @@ view group 的成员
 
 | 事 | 谁决定 |
 | --- | --- |
-| **默认拓扑**（初始 primary sidebar / stage / secondary sidebar / panel；stage 的 grid 形状） | arrangement 提供模板；frame 的 layout kernel 落成 |
+| **默认拓扑**（初始 primarySidebar / stage / secondarySidebar / panel；stage 的 grid 形状） | arrangement 提供模板；frame 的 layout kernel 落成 |
 | **live 拓扑**（现在这棵树） | **frame / layout kernel 独占**；只有它能改 |
 | **用户变更**（split / merge / 移动 / 加删行列 / resize） | 用户通过 frame 的操作；用户意图赢 |
 | **来源请求**（如 VS Code `addGroup`、编辑器要求拆组） | source adapter 通过窄通道**请求**，由 frame / arrangement 决定是否/如何应用；来源不能直接写树 |

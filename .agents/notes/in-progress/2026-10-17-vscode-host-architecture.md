@@ -187,7 +187,7 @@ interface VscodeViewGroupDefinition implements ViewGroupDefinition {
 interface VscodeViewGroup extends ViewGroupResource {}
 
 interface VscodeViewDefinition implements ViewDefinition {
-  hostFactory(decl: VscodeView): VscodeViewHost;
+  hostFactory(decl: VscodeView, options?: { move?: MoveIntent }): VscodeViewHost;
 }
 
 interface VscodeView extends ViewResource {}
@@ -291,7 +291,7 @@ materialization 的 phase / async / dispose 规则见 [UI resource model](../pro
 
 - declaration / definition 不持久化，由 source 重建；
 - layout / `ContainerRecord` 从 layout store 恢复；
-- binding 按 declaration 的 `apiVersion + kind` 重建；
+- binding 按 declaration 的 `apiVersion + kind + spec.groupKind` 重建；
 - 不根据 group 内容推断，也不依赖 attach 顺序。
 
 **动态安装 / 卸载**
@@ -314,7 +314,7 @@ materialization 的 phase / async / dispose 规则见 [UI resource model](../pro
 
 | surface | VS Code 侧 | owner | step |
 | --- | --- | --- | --- |
-| part / region | titlebar / banner / activitybar / primary sidebar / secondary sidebar / panel / statusbar；`Layout`/`Grid` | frame 负责布局与 role；adaptor 负责 part 语义 | future part context |
+| part / region | titlebar / banner / activitybar / primarySidebar / secondarySidebar / panel / statusbar；`Layout`/`Grid` | frame 负责布局与 role；adaptor 负责 part 语义 | future part context |
 | view container / view | `ViewContainer` / `ViewPaneContainer` / `ViewPane` / `ViewContainerModel` | adaptor 翻译为 declaration；frame 拥有 group / placement；binding / view host 承接 runtime | [container context](../proposed/2026-10-22-vscode-container-context.md) |
 | action / menu | `ViewTitle` / `ViewContainerTitle` / `commands` / `keybindings` / `menus` | adaptor 供 action / context；frame 画 bar | future action/menu context |
 | status bar / overlay | status bar item；notifications / quick pick / input / dialog / context view / hover | adaptor 供内容；frame 供 overlay layer；source-managed behavior | future overlay/status context |
@@ -380,7 +380,7 @@ frame 侧（stack chrome / grid）不属于这张 note 的 steps，见各自的 
 
 - **`IViewsService` external registry**：subclass 还是 patch `ViewsService`；`getActiveViewWithId` / container 级方法在 plain group 下如何返回；`focusedViewContextKey` 谁维护。
 - **container context**：headless `ViewPaneContainer`，还是更小的 context？见 [container context](../proposed/2026-10-22-vscode-container-context.md)。
-- **part context**：frame 的 role（`stage` / `primary sidebar` / `secondary sidebar` / `panel`）与 VS Code 的 part 如何对应；left / center / right / bottom 只是默认物理位置。
+- **part context**：frame 的 role（`stage` / `primarySidebar` / `secondarySidebar` / `panel`）与 VS Code 的 part 如何对应；left / center / right / bottom 只是默认物理位置。
 - **action / menu scope**：view-scoped / container-scoped / global 的边界。
 - **overlay**：frame-hosted、source-managed 是否足够；frame-managed `pracOverlay` 何时需要。
 - **webview / custom editor**：是否共用同一个 host 契约。

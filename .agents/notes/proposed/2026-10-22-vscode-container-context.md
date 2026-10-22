@@ -39,14 +39,14 @@ UI umbrella 已经定了方向和 G：container 是 prac 的组合单元，conta
 - **frame 不认识 VS Code container**：container context 在 adaptor 内部，frame 只看到 view group / host。
 - **container context 不能成为第二成员权威**：它承接 VS Code 语义，但 view 是否在 container 里仍由 prac placement 决定。
 - **group 是 frame 的**：`ViewGroup`（运行时）/ `ViewGroupState`（数据）/ active / order 都在 frame；`VscodeGroupBinding` 是 adaptor 侧的 `ViewGroup.binding?`。
-- **binding kind 只有两种**：`vscode.prac/v1 Container` / `vscode.prac/v1 Editor`；`apiVersion + kind + spec.groupKind` 由 `VscodeViewGroup` 在声明时确定，不由 group 内容推断。
+- **binding kind 只有两种**：`ViewGroup` + `spec.groupKind = container` / `editor`；`apiVersion + kind + spec.groupKind` 由 `VscodeViewGroup` 在声明时确定，不由 group 内容推断。
 - **没有 `view-host` binding**：VS Code view 被移到 plain group 时，没有 group binding；`VscodeViewHost` 用 unbound context 挂载。
 - **group mode 与 binding kind 不是同一个轴**：group mode 是 `stack` / `select`；binding kind 是 `container` / `editor` / none。前者决定内容怎么显示，后者由 group declaration 决定。
 - **`IViewsService` 用 external view registry**：`VscodeViewHost` 注册 / 注销 `ViewPane`；`getViewWithId` / `getActiveViewWithId` / `isViewVisible` 优先查 registry；没有 container binding 时，container 级方法返回 `null` / 不可用。
 - **container bar / group bar 由 frame 画**：adaptor 提供 action / context，不自己画第二套 bar。
 - **`paneHeader` 是 view 自报的呈现事实**：frame 用它决定是否保留 native pane header，不按来源前缀猜。
 - **`PracLayoutFace` 以 view group / grid cell 为落点**：region 只是几何槽位；editor group 的 `addGroup` 走 group / cell channel，不是只建 region。
-- **role 名是 `stage` / `primary sidebar` / `secondary sidebar` / `panel`**：left / center / right / bottom 只是默认物理位置。
+- **role id 是 `stage` / `primarySidebar` / `secondarySidebar` / `panel`**：left / center / right / bottom 只是默认物理位置。
 
 ## 设计空间
 
