@@ -127,6 +127,7 @@ view group 的成员
 - **container bar** 在父层 select 上切 container；**group bar** 只属于 select view group；stack container 没有 group bar。
 - **`ViewGroupState`**：每个 group 都有 id / mode / active / order / tombstone；`active` 只属于 select；无名 group 也有 state，但没有 `ContainerRecord`。
 - **`ViewGroupDeclaration`**：CR 风格的 group 声明：`apiVersion` + `kind` + `metadata`（id / labels / annotations）+ `spec`（title / icon / role / order / hideIfEmpty 等）。`apiVersion + kind` 在声明时确定、不可变；frame 把它当 opaque 类型，不解析 source 语义。group 由 arrangement / frame 落成 `ViewGroupState`，declaration 不是 record。
+- **`ViewDeclaration`**：同一套 CR 信封：`apiVersion` + `kind` + `metadata`（id / labels / annotations）+ `spec`（label / icon / `paneHeader` / `hostKind` 等）。kind 是 view 类型，`hostKind` 是执行能力，两者不混；`prac.view` 承载的就是这个声明。
 - **`ViewGroup`**：运行时对象，1:1 对应 `ViewGroupState`；持有 slots / hosts / `binding?`。source binding 是 runtime-only，不进 state。
 - **`ContainerRecord`**：由 `ViewGroupDeclaration` materialize 出来的具名 group 记录，保存 `apiVersion` / `kind` / `metadata` / `spec` / `available` / `tombstone`；由 arrangement 的 view group registry 写入，随 `ViewGroupState` 一起进 frame 的 layout store；来源声明 CR，不拥有 record。成员不存，按 placement 派生。
 - **身份**：placement 的目标是 `viewGroupId`；`ContainerRecord` 以同一个 `viewGroupId` 为 key；region id 只是布局节点 id；来源 container id 通过 `ViewGroupDeclaration` 映射，不是第二套成员键。

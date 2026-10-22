@@ -113,8 +113,9 @@ Server（node）
 | `PracVscodeFace` | consumers 的 adaptor 前台：catalogue / `hostFor` / `focusView` / `runCommand` / file placement / capabilities | consumers、诊断/门 | frame 的 layout |
 | `VscodeCatalogueEntry` | catalogue 的一行数据：`view` / `appId` / `title` / `source` / `role` / `containerId` / `containerTitle` / `viewGroupId?`（`location?` 只作来源提示） | `ui-vscode-views` / `ui-vscode-editor` / arrangement | 怎么渲染 |
 | `ViewGroupDeclaration` | CR 风格的 group 声明：`apiVersion` + `kind` + `metadata` + `spec`；`apiVersion + kind` 在声明时确定、不可变；frame 视为 opaque 类型；arrangement 落成 `ViewGroupState` | adaptor / consumers | group 成员 / placement |
-| `ViewGroupKindDefinition` | kind registry 的一项：`apiVersion` / `kind` / schema / validation / binding factory；由 source adapter 注册 | adaptor / frame registry | 具体 group 实例 |
-| `prac.view` | frame 的 view 注册槽：每个 view 的一次注册（id / label / icon / `paneHeader` / 宿主组件） | consumers | view 的来源 |
+| `ViewGroupKindDefinition` | group kind registry 的一项：`apiVersion` / `kind` / schema / validation / binding factory；由 source adapter 注册 | adaptor / frame registry | 具体 group 实例 |
+| `ViewKindDefinition` | view kind registry 的一项：`apiVersion` / `kind` / schema / validation / `hostKind` / host factory；由 source adapter 注册 | adaptor / frame registry | 具体 view 实例 |
+| `prac.view` | frame 的 view 注册槽：承载 `ViewDeclaration`（`apiVersion` / `kind` / `metadata` / `spec`）；`spec` 含 label / icon / `paneHeader` / `hostKind` / 宿主组件 | consumers | view 的来源 |
 
 #### 2.2.2 embed / workbench
 
@@ -194,7 +195,7 @@ editor:
 | `PracVscodeFace` | `catalogue()` / `onDidChangeCatalogue()` / `hostFor(view)` / `focusView(view)` / `runCommand(command, ...args)` / `filePlacement(view)` / `fileResource(view)` / `capabilities.editors` / `capabilities.diagnostics` |
 | `VscodeCatalogueEntry` | `view` / `appId` / `title` / `source: "file" \| "view"` / `role: "stage" \| "primary-sidebar" \| "secondary-sidebar" \| "panel"` / `containerId?` / `containerTitle?` / `viewGroupId?` |
 | `PracLayoutFace` | `getState` / `subscribe` / `listViews` / `listViewGroups` / `place`（目标 `viewGroupId`）/ `placeQuietly` / `removeView` / `ensureViewGroup` / `moveViewGroup` / grid cell 操作 |
-| `prac.view` | `{ name: "prac.view", id, label, icon, paneHeader? }` |
+| `prac.view` | `ViewDeclaration`：`{ apiVersion, kind, metadata: { id, labels?, annotations? }, spec: { label, icon, paneHeader?, hostKind, ... } }` |
 
 `WorkbenchFace` 现在只承担 view / file / capability face；part mount 是旧组合模型的残留，不在目标契约里。
 
