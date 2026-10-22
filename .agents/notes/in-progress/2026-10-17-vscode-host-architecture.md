@@ -276,14 +276,16 @@ interface VscodeViewHost {
 
 ### 3.6 生命周期
 
+materialization 的 phase / async / dispose 规则见 [UI resource model](../proposed/2026-10-22-ui-crd.md) §4。这里只列 vscode-host 的顺序：
+
 **正常启动**
 
 1. frame 恢复 layout / group state；
 2. `vscode-host` 注册 `VscodeViewGroupDefinition` / `VscodeViewDefinition`；
 3. `vscode-host` 产生 `VscodeViewGroup` / `VscodeView`；
-4. arrangement materialize `ViewGroupState` / `ViewGroup`；
-5. 对 `vscode.prac/v1 ViewGroup` 的 `spec.groupKind = container / editor` 创建 `VscodeGroupBinding`；
-6. frame 挂载 view 时，`VscodeViewHost` mount / 注册 external registry。
+4. arrangement materialize `ViewGroupState` / `ViewGroup`；未 ready 的 resource 保持 waiting；
+5. 对 `vscode.prac/v1 ViewGroup` 的 `spec.groupKind = container / editor` 创建 `VscodeGroupBinding`；binding 失败不阻塞 group；
+6. frame 挂载 view 时，`VscodeViewHost` mount / 注册 external registry；host 失败不阻塞 frame。
 
 **recovery / reload**
 
@@ -305,7 +307,7 @@ interface VscodeViewHost {
 - workbench 未启动：不创建半成品 pane；
 - declaration 无效：诊断，不 materialize；
 - view 已注册但未落位：host 不渲染；
-- source 卸载：只移除自己的 view，不删别家 group；
+- source 卸载：只移除自己的 view，不删别家 group；`releaseOwner` 释放该 source 的 binding / host；
 - code server / workbench 失败：adaptor 报错，frame 不接管启动。
 
 ## 4. Surface ownership
