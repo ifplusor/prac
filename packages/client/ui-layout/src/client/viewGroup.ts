@@ -22,6 +22,15 @@ export interface ViewGroupState {
   readonly order: readonly string[];
 }
 
+/** One member's placement as the frame sees it. */
+export interface ViewGroupPlacement {
+  readonly viewId: string;
+  readonly groupId: string;
+  readonly order: number;
+  readonly active: boolean;
+  readonly visible: boolean;
+}
+
 /** Runtime group: one per `ViewGroupState`. */
 export class ViewGroup implements ViewGroupRuntime {
   readonly #views = new Map<string, View>();
@@ -30,6 +39,7 @@ export class ViewGroup implements ViewGroupRuntime {
   #active: string | undefined;
   #binding: GroupBinding | undefined;
   #disposed = false;
+  readonly #listeners = new Set<() => void>();
 
   constructor(
     readonly id: string,
@@ -53,6 +63,23 @@ export class ViewGroup implements ViewGroupRuntime {
     return this.#binding;
   }
 
+  /** The group's members in frame order, with the active flag. */
+  get placements(): readonly ViewGroupPlacement[] {
+    return this.#order.map((viewId, order) => ({
+      viewId,
+      groupId: this.id,
+      order,
+      active: this.#active === viewId,
+      visible: true,
+    }));
+  }
+
+  /** Subscribe to state changes; returns an unsubscribe function. */
+  onDidChange(listener: () => void): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
+
   /** Whether this group currently holds the view. */
   has(viewId: string): boolean {
     return this.#views.has(viewId);
@@ -70,6 +97,7 @@ export class ViewGroup implements ViewGroupRuntime {
     this.#views.set(view.id, view);
     this.#order.push(view.id);
     if (this.#mode === "select" && this.#active === undefined) this.#active = view.id;
+    this.#emit();
   }
 
   /** Remove a view from the group and release its host. */
@@ -84,6 +112,7 @@ export class ViewGroup implements ViewGroupRuntime {
     if (this.#active === viewId) {
       this.#active = this.#order[0];
     }
+    this.#emit();
   }
 
   /** Select a view. Only a select group has an active view. */
@@ -97,6 +126,7 @@ export class ViewGroup implements ViewGroupRuntime {
       throw new Error(`unknown view: ${viewId}`);
     }
     this.#active = viewId;
+    this.#emit();
   }
 
   /** Reorder the whole group; the set must match the current members. */
@@ -110,6 +140,7 @@ export class ViewGroup implements ViewGroupRuntime {
       seen.add(viewId);
     }
     this.#order.splice(0, this.#order.length, ...order);
+    this.#emit();
   }
 
   /** Set or clear the source binding. The previous binding is disposed. */
@@ -118,6 +149,7 @@ export class ViewGroup implements ViewGroupRuntime {
     if (this.#binding === binding) return;
     this.#binding?.dispose();
     this.#binding = binding;
+    this.#emit();
   }
 
   /** Release all hosted views and the current binding. */
@@ -129,9 +161,15 @@ export class ViewGroup implements ViewGroupRuntime {
     this.#order.length = 0;
     this.#binding?.dispose();
     this.#binding = undefined;
+    this.#emit();
+    this.#listeners.clear();
   }
 
   #assertLive(): void {
     if (this.#disposed) throw new Error(`view group disposed: ${this.id}`);
+  }
+
+  #emit(): void {
+    for (const listener of this.#listeners) listener();
   }
 }

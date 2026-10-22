@@ -113,3 +113,9 @@
 - 新增 `context.ts`：`resolveContainerContext(view, binding)`，把 G 收敛为 group / unbound 两种有效 container context；source container 保留但不跟随。
 - `VscodeViewSpec.containerId`、`VscodeGroupBinding.containerId`。
 - 验证：vscode-host 13 passed；check/build 通过。
+
+### 2026-10-22 — group placements / change events（slice 8）
+
+- `ViewGroup.placements`：order + active + visible 的 frame 投影。
+- `ViewGroup.onDidChange`：成员 / active / order / binding / dispose 变化通知。
+- 验证：ui-layout 170 passed；check/build 通过。
