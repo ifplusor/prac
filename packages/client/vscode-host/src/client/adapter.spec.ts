@@ -47,6 +47,7 @@ function definitions() {
     add: () => {},
     remove: () => {},
     select: () => {},
+    reorder: () => {},
     dispose: () => {},
   };
   const view: FrameView = {

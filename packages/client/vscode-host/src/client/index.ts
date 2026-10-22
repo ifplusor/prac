@@ -353,6 +353,14 @@ export function apply(ctx: Context): void {
           `vscode:file:${active.placement}:${active.resource}`,
         );
       }
+      const byRegion = new Map<string, string[]>();
+      for (const entry of editors.snapshot()) {
+        if (entry.region === null) continue;
+        const views = byRegion.get(entry.region) ?? [];
+        views.push(`vscode:file:${entry.placement}:${entry.resource}`);
+        byRegion.set(entry.region, views);
+      }
+      for (const [region, order] of byRegion) groupHost.reorder(editorGroupId(region), order);
     };
     syncEditor();
     return editors.subscribe(syncEditor);

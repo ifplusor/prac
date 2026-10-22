@@ -226,3 +226,9 @@
 - `verify:views` 的 `spaceAndWidthComeBack` 失败来自陈旧常量：gate 假设 sash 占 5px flex 空间，但 frame 的 sash 是 absolute overlay、不占布局。
 - 改为 `gutter = 0`；`verify:views` 全绿，`spaceAndWidthComeBack = true`。
 - 根 `pnpm check` 0 errors。
+
+### 2026-10-22 — editor group order + live file gate（slice 25）
+
+- `VscodeGroupRuntime.reorder`；`VscodeGroupHost.reorder` 按 app editor 顺序投影到 group。
+- assembly 在 editors 订阅中按 region 分组重排 file views。
+- `verify:file` 全绿（含 split editor 两 group / 两 surface）。

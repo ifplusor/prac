@@ -69,6 +69,7 @@ export interface VscodeGroupRuntime extends FrameViewGroup {
   add(view: FrameView): void;
   remove(viewId: string): void;
   select(viewId: string | undefined): void;
+  reorder(order: readonly string[]): void;
 }
 
 /** The adapter's factory for the core group runtime. */

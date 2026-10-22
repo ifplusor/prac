@@ -54,6 +54,7 @@ function fakeGroup(id: string, mode: "stack" | "select" = "stack"): VscodeGroupR
     add: () => {},
     remove: () => {},
     select: () => {},
+    reorder: () => {},
     dispose: vi.fn(),
   };
 }

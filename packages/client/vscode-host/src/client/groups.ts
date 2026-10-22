@@ -132,6 +132,18 @@ export class VscodeGroupHost {
     group.group.select(viewId);
   }
 
+  /** Reorder a group to the app's order; unknown views are ignored. */
+  reorder(groupId: string, order: readonly string[]): void {
+    const entry = this.#groups.get(groupId);
+    if (!entry) return;
+    const current = new Set(
+      [...this.#views].filter(([, view]) => view.group === entry.group).map(([viewId]) => viewId),
+    );
+    const next = order.filter((viewId) => current.has(viewId));
+    if (next.length !== current.size) return;
+    entry.group.reorder(next);
+  }
+
   /** Remove one hosted view from its group. */
   removeView(viewId: string): void {
     const entry = this.#views.get(viewId);
