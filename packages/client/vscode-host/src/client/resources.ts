@@ -73,7 +73,11 @@ export interface VscodeGroupRuntime extends FrameViewGroup {
 }
 
 /** The adapter's factory for the core group runtime. */
-export type VscodeGroupFactory = (id: string, mode: "stack" | "select") => VscodeGroupRuntime;
+export type VscodeGroupFactory = (
+  id: string,
+  mode: "stack" | "select",
+  label?: string,
+) => VscodeGroupRuntime;
 
 /** The adapter's factory for the core view runtime. */
 export type VscodeViewFactory = (id: string) => FrameView;
@@ -219,6 +223,7 @@ export class VscodeViewGroupDefinition implements ViewGroupDefinition {
     return this.options.createGroup(
       decl.metadata.id,
       spec.groupKind === "editor" ? "select" : "stack",
+      spec.title,
     );
   }
 

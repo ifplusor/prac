@@ -18,6 +18,7 @@ export type ViewGroupMode = "stack" | "select";
 export interface ViewGroupState {
   readonly id: string;
   readonly mode: ViewGroupMode;
+  readonly label?: string;
   readonly active?: string;
   readonly order: readonly string[];
 }
@@ -44,6 +45,7 @@ export class ViewGroup implements ViewGroupRuntime {
   constructor(
     readonly id: string,
     mode: ViewGroupMode = "stack",
+    readonly label?: string,
   ) {
     this.#mode = mode;
   }
@@ -53,6 +55,7 @@ export class ViewGroup implements ViewGroupRuntime {
     return {
       id: this.id,
       mode: this.#mode,
+      ...(this.label === undefined ? {} : { label: this.label }),
       ...(this.#active === undefined ? {} : { active: this.#active }),
       order: [...this.#order],
     };

@@ -35,6 +35,7 @@ import {
   declaredViewPaneHeader,
   viewKind,
 } from "./catalogue.js";
+import type { ViewGroupHost } from "./frameGroups.js";
 import {
   SASH_SIZE,
   type Box,
@@ -990,7 +991,10 @@ interface FrameProps {
  */
 export function createFrame(
   store: LayoutStore,
-  sources: { readonly currentSession: CurrentSessionSource },
+  sources: {
+    readonly currentSession: CurrentSessionSource;
+    readonly viewGroups?: ViewGroupHost;
+  },
 ): (props: FrameProps) => ReactElement {
   return function PracFrame({ renderSlot, useSessions, usePanelInfo }: FrameProps): ReactElement {
     const state = useLayout(store);
@@ -1329,6 +1333,12 @@ export function createFrame(
       const actionKey = selectedId.startsWith("container:")
         ? selectedId.slice("container:".length)
         : selectedId;
+      const groups = new Map(
+        (sources.viewGroups?.barItems(node.id) ?? []).map((item): [string, { label: string }] => [
+          item.groupId,
+          item,
+        ]),
+      );
       return createElement(
         "div",
         { key: "containers", "data-prac-container-bar": node.id, style: TAB_STRIP_STYLE },
@@ -1355,9 +1365,10 @@ export function createFrame(
                 ...(isPresent(state, child) ? {} : { opacity: 0.55 }),
               },
             },
-            // Either shape may carry the name (a child that became a stack is a split — see
-            // `SplitNode.label`), and the id is only the last resort.
-            child.label ?? viewLabel(child.id),
+            // The group's own label wins; otherwise either shape may carry the name
+            // (a child that became a stack is a split — see `SplitNode.label`), and the
+            // id is only the last resort.
+            groups.get(child.id)?.label ?? child.label ?? viewLabel(child.id),
           ),
         ),
         createElement(

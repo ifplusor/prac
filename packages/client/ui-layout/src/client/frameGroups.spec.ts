@@ -48,6 +48,16 @@ describe("ViewGroupHost", () => {
     expect(() => host.register(new ViewGroup("g3"), "missing")).toThrow(/unknown region/);
   });
 
+  it("projects group bar items with label and active view", () => {
+    const store = memoryStore();
+    const host = new ViewGroupHost(store);
+    const group = new ViewGroup("g1", "select", "Explorer");
+    group.add(new View("v1"));
+    host.register(group, "left");
+
+    expect(host.barItems("left")).toEqual([{ groupId: "g1", label: "Explorer", active: "v1" }]);
+  });
+
   it("can register a fresh group after the old one leaves", () => {
     const store = memoryStore();
     const host = new ViewGroupHost(store);

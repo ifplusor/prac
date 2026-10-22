@@ -123,6 +123,7 @@ export function apply(ctx: Context): void {
       // from the session adapter, which is where this shell keeps navigation now.
       createFrame(store, {
         currentSession: ctx.uiSession.adapter.current,
+        viewGroups,
       }),
     );
     const disposePanelInfo = ctx.slots.provideRoot({ hooks: { panelInfo } });

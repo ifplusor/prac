@@ -598,7 +598,7 @@ export interface PracLayoutFace {
    * @param regionId - the existing frame region.
    * @returns the registered group/region pair.
    */
-  createViewGroup(id: string, mode: "stack" | "select"): FrameViewGroup;
+  createViewGroup(id: string, mode: "stack" | "select", label?: string): FrameViewGroup;
   createView(id: string): FrameView;
   registerViewGroup(group: FrameViewGroup, regionId: string): FrameGroup;
   /**

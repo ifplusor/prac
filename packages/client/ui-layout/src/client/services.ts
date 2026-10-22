@@ -317,8 +317,8 @@ export function createServices(
         return { ...state, views: { ...state.views, [viewId]: { ...view, hidden: true } } };
       });
     },
-    createViewGroup(id: string, mode: "stack" | "select"): ViewGroup {
-      return new ViewGroup(id, mode);
+    createViewGroup(id: string, mode: "stack" | "select", label?: string): ViewGroup {
+      return new ViewGroup(id, mode, label);
     },
     createView(id: string): FrameView {
       return new View(id);

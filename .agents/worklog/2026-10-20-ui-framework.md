@@ -286,3 +286,10 @@
 - 收口剩余 6 个未提交改动：paneHeader 声明、container action submenu、`runAction`、docs 边界；已提交 `399d0c8`。
 - 新增 `VscodeGroupHost` 回归：container group 消失后重新出现，group + view 都能重建。
 - vscode-host 25 passed；check/build 通过。
+
+### 2026-10-22 — group label / bar data（slice 36）
+
+- `ViewGroup` 增加可选 label；`ViewGroupState` 暴露 label。
+- `ViewGroupHost.barItems(regionId)` 返回 groupId / label / active。
+- frame container bar 优先使用 group label；`PracLayoutFace.createViewGroup` 接收 label；VS Code definition 传 `spec.title`。
+- live：verify:containers 全绿；ui-layout 187 passed。

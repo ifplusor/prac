@@ -54,6 +54,21 @@ export class ViewGroupHost {
     return frameGroup;
   }
 
+  /** One group bar item: the group hosted in a region and which member is active. */
+  barItems(regionId: string): readonly {
+    readonly groupId: string;
+    readonly label: string;
+    readonly active?: string;
+  }[] {
+    return [...this.#groups.values()]
+      .filter((entry) => entry.regionId === regionId || entry.regionId.startsWith(`${regionId}/`))
+      .map((entry) => ({
+        groupId: entry.group.id,
+        label: entry.group.state.label ?? entry.group.id,
+        ...(entry.group.state.active === undefined ? {} : { active: entry.group.state.active }),
+      }));
+  }
+
   /** Look up a registered group. */
   get(groupId: string): FrameGroup | undefined {
     return this.#groups.get(groupId);
