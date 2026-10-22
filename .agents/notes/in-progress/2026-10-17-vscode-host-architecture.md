@@ -93,6 +93,27 @@ interface Resource<TSpec> {
 - `spec` 是可变配置；
 - frame 把类型当 opaque，只通过 `ViewGroupDefinition` / `ViewDefinition` 查 schema / validation / factory。
 
+### 2.1.1 CRD-lite：复杂度预算
+
+只借 CRD 的 **类型 / 实例分离**，不把 Kubernetes 的控制器框架搬进 prac：
+
+| 保留 | 不做 |
+| --- | --- |
+| 2 类资源：`ViewGroup` / `View` | 通用 resource framework |
+| 1 个 CR 信封：`apiVersion / kind / metadata / spec` | 任意 UI 概念都做 CRD |
+| 1 个 definition registry（`Map`） | API server / etcd / watch / informer |
+| 1 个 materializer：declaration → state → runtime | controller / operator / reconcile loop 框架 |
+| `validate` / `default` / factory 函数 | JSON Schema / admission webhook / conversion webhook |
+| 一个 declared group 最多一个 group binding | 多 binding / attachment 层 |
+| 一个 view 一个 view host | `status` / conditions / finalizers / ownerReferences |
+
+- **只有 view 和 view group 是 CR**；action / overlay / part / host 仍走各自的 contribution 模型，不 CRD 化。
+- **Definition 是 TypeScript 接口 + 函数**，不是独立的 schema 服务。
+- **kind 不可变**；第一版不做多版本转换，只保留 `apiVersion` 字段。
+- **一个 group 只有一个 declaration 来源**；不做多 source 合并 group kind。
+- **不加 `GroupHost` / attachment / multi-binding**；`ViewGroup.binding?` 已经够用。
+
+
 ### 2.2 group
 
 ```text
