@@ -411,6 +411,18 @@ export interface EditorsActions {
    * @param resource - the file's URI, as a string.
    */
   activate(resource: string): void;
+  /**
+   * Move one placement to a new index inside its group.
+   *
+   * This is the editor model's half of a frame tab reorder: the embedder's
+   * order is the group order, and the workbench's model has to agree before the
+   * next editor event is read back.
+   *
+   * @param placement - the placement whose editor moves.
+   * @param resource - the app's URI for the file.
+   * @param index - the target index among the group's editors.
+   */
+  reorder(placement: string, resource: string, index: number): void;
 }
 
 /**

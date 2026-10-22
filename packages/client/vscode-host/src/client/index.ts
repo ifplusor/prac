@@ -300,6 +300,8 @@ export function apply(ctx: Context): void {
           activate: (resource: string) => embed.capabilities.editors.actions.activate(resource),
           close: (placement: string, resource: string) =>
             embed.capabilities.editors.actions.close(placement, resource),
+          reorder: (placement: string, resource: string, index: number) =>
+            embed.capabilities.editors.actions.reorder(placement, resource, index),
         },
       },
       diagnostics: {
@@ -321,7 +323,46 @@ export function apply(ctx: Context): void {
     layout: ctx.pracLayout,
     definition: resources.groups,
     viewDefinition: resources.views,
+    filePlacement: (viewId) => face.filePlacement(viewId),
+    onReorder: (groupId, order) => {
+      if (!groupId.startsWith("vscode:group:editor:")) return;
+      order.forEach((file, index) =>
+        face.capabilities.editors.actions.reorder(file.placement, file.resource, index),
+      );
+    },
   });
+
+  /** Editor order the frame last asked the workbench for, per region. */
+  const frameEditorOrder = new Map<string, string>();
+
+  /**
+   * Walk the frame's file views and make the editor model follow their order.
+   * File views are not `VscodeGroupHost` members (they have no container), so
+   * this is the second bridge, and it is the one a tab drag moves.
+   */
+  const syncFrameEditorOrder = (): void => {
+    const byRegion = new Map<
+      string,
+      { order: number; file: { placement: string; resource: string } }[]
+    >();
+    for (const view of ctx.pracLayout.listViews()) {
+      if (view.region === null || view.hidden || !view.id.startsWith("vscode:file:")) continue;
+      const file = face.filePlacement(view.id);
+      if (file === undefined) continue;
+      const list = byRegion.get(view.region) ?? [];
+      list.push({ order: view.order ?? 0, file });
+      byRegion.set(view.region, list);
+    }
+    for (const [region, entries] of byRegion) {
+      entries.sort((a, b) => a.order - b.order);
+      const key = JSON.stringify(entries.map((entry) => entry.file));
+      if (frameEditorOrder.get(region) === key) continue;
+      frameEditorOrder.set(region, key);
+      entries.forEach((entry, index) =>
+        face.capabilities.editors.actions.reorder(entry.file.placement, entry.file.resource, index),
+      );
+    }
+  };
 
   /** Project the catalogue's containers and views into frame groups (idempotent). */
   const syncGroups = (): void => {
@@ -329,6 +370,7 @@ export function apply(ctx: Context): void {
       face.catalogue(),
       ctx.pracLayout.listRegions().map((region) => region.id),
     );
+    syncFrameEditorOrder();
   };
 
   ctx.effect(() => {

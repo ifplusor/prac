@@ -85,6 +85,10 @@ const facts = () =>
       )
         .split("/")
         .pop(),
+      appOrder: globalThis.__vscodeEmbed.face.capabilities.editors
+        .snapshot()
+        .map((entry) => entry.resource.split("/").pop())
+        .filter((name) => ["a.txt", "b.txt", "c.txt"].includes(name)),
     };
   });
 
@@ -147,6 +151,7 @@ const checks = {
   activatePullsTheApp: activated.app === "a.txt",
   // 4. Dragging is the only thing that reorders, and it changes nothing else.
   dragReorders: same(dragged.tabs, ["b.txt", "c.txt", "a.txt"]),
+  dragReordersTheEditorModel: same(dragged.appOrder, ["b.txt", "c.txt", "a.txt"]),
   dragKeepsTheFront: dragged.front === "a.txt" && dragged.surface === "a.txt",
   // 3b. It **stays** that way: a reconciliation that keeps flipping would differ here.
   activateSettles: same(activated, activatedLater),

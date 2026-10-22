@@ -186,6 +186,14 @@ export interface PracVscodeFace {
          * @param resource - the app's URI for the file.
          */
         close(placement: string, resource: string): void;
+        /**
+         * Move a placement to a new index in its editor group.
+         *
+         * @param placement - the placement to move.
+         * @param resource - the app's URI for the file.
+         * @param index - target index among the group's editors.
+         */
+        reorder(placement: string, resource: string, index: number): void;
       };
     };
     /**

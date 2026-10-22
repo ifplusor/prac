@@ -327,3 +327,9 @@
 
 - `ViewGroupHost` 订阅 layout store；frame 端 reorder 后，若 group 成员都可见，写回 `group.reorder`。
 - 新增 reorder 回写单测；live file/containers 全绿。
+
+### 2026-10-22 — editor order 回写（slice 43，B）
+
+- `EditorsActions` 增加 `reorder(placement, resource, index)`；workbench 用 `PracEditorGroup.moveEditor(editor, group, { index })`。
+- `vscode-host` 订阅 frame 文件视图顺序，写回 editor model；`verify-tabs` 新增 `dragReordersTheEditorModel`。
+- live：verify-tabs 全绿；ui-layout 189 / vscode-host 26 / check 0。

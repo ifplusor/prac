@@ -398,6 +398,8 @@ export interface VscodeEmbedHandle {
          * @param resource - the app's URI for the file.
          */
         close(placement: string, resource: string): void;
+        /** Move one placement to a new index in its editor group. */
+        reorder(placement: string, resource: string, index: number): void;
       };
     };
     /**
@@ -772,6 +774,9 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
       },
       close: (placement: string, resource: string): void => {
         record.face?.capabilities.editors.actions.close(placement, resource);
+      },
+      reorder: (placement: string, resource: string, index: number): void => {
+        record.face?.capabilities.editors.actions.reorder(placement, resource, index);
       },
     },
   };

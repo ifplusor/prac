@@ -30,6 +30,15 @@ export interface VscodeGroupHostOptions {
   readonly layout: VscodeGroupLayout;
   readonly definition: VscodeViewGroupDefinition;
   readonly viewDefinition: VscodeViewDefinition;
+  /** Map a file view id to its editor placement, when it is a file view. */
+  readonly filePlacement?: (
+    viewId: string,
+  ) => { readonly placement: string; readonly resource: string } | undefined;
+  /** Write a frame reorder into the editor model. */
+  readonly onReorder?: (
+    groupId: string,
+    order: readonly { readonly placement: string; readonly resource: string }[],
+  ) => void;
 }
 
 /** Materializes and registers VS Code view groups. */
@@ -141,7 +150,12 @@ export class VscodeGroupHost {
     );
     const next = order.filter((viewId) => current.has(viewId));
     if (next.length !== current.size) return;
+    if (next.every((viewId, index) => entry.group.state.order[index] === viewId)) return;
     entry.group.reorder(next);
+    const files = next
+      .map((viewId) => this.options.filePlacement?.(viewId))
+      .filter((file): file is { placement: string; resource: string } => file !== undefined);
+    if (files.length > 0) this.options.onReorder?.(groupId, files);
   }
 
   /** Remove one hosted view from its group. */

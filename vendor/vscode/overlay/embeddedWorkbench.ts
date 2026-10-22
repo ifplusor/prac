@@ -1581,6 +1581,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     actions: {
       activate: (resource: string) => void;
       close: (placement: string, resource: string) => void;
+      reorder: (placement: string, resource: string, index: number) => void;
     };
   } {
     let revision = 0;
@@ -1686,6 +1687,19 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
             const group = this.editorGroupService.getGroup(groupId);
             if (group !== undefined) void group.openEditor(editor, { preserveFocus: true });
           }
+        },
+        reorder: (placement: string, resource: string, index: number) => {
+          const groupId = this.placements.get(placement)?.group;
+          if (groupId === undefined) return;
+          const group = this.editorGroupService.getGroup(groupId) as PracEditorGroup | undefined;
+          if (group === undefined) return;
+          const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
+            ? URI.parse(resource)
+            : URI.file(resource);
+          const editor = group.editors.find(
+            (candidate) => candidate.resource?.toString() === uri.toString(),
+          );
+          if (editor !== undefined) group.moveEditor(editor, group, { index });
         },
         close: (placement: string, resource: string) => {
           const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)

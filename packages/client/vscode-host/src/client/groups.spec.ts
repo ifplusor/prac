@@ -115,6 +115,36 @@ describe("VscodeGroupHost", () => {
     expect(host.viewIds()).toEqual([]);
   });
 
+  it("writes a frame reorder into the editor model", () => {
+    const onReorder = vi.fn();
+    const host = new VscodeGroupHost({
+      layout: { registerViewGroup: () => {}, unregisterViewGroup: () => {} },
+      definition: definition(),
+      viewDefinition: viewDefinition(),
+      filePlacement: (viewId) =>
+        viewId.startsWith("vscode:file:")
+          ? { placement: viewId.split(":")[2] ?? "", resource: "file:///a" }
+          : undefined,
+      onReorder,
+    });
+    host.add(groupResource(), "left");
+    const view = (id: string): VscodeView => ({
+      apiVersion: VSCODE_API_VERSION,
+      kind: "View",
+      metadata: { id },
+      spec: { hostKind: "editor-pane" },
+    });
+    host.addView("g1", view("vscode:file:p1:file:///a"));
+    host.addView("g1", view("vscode:file:p2:file:///b"));
+
+    host.reorder("g1", ["vscode:file:p2:file:///b", "vscode:file:p1:file:///a"]);
+
+    expect(onReorder).toHaveBeenCalledWith("g1", [
+      { placement: "p2", resource: "file:///a" },
+      { placement: "p1", resource: "file:///a" },
+    ]);
+  });
+
   it("can re-add a view after it disappears from the catalogue", () => {
     const host = new VscodeGroupHost({
       layout: { registerViewGroup: () => {}, unregisterViewGroup: () => {} },
