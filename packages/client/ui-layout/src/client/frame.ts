@@ -35,7 +35,7 @@ import {
   declaredViewPaneHeader,
   viewKind,
 } from "./catalogue.js";
-import type { ViewGroupHost } from "./frameGroups.js";
+import type { GroupBarItem, ViewGroupHost } from "./frameGroups.js";
 import {
   SASH_SIZE,
   type Box,
@@ -1334,8 +1334,8 @@ export function createFrame(
         ? selectedId.slice("container:".length)
         : selectedId;
       const groups = new Map(
-        (sources.viewGroups?.barItems(node.id) ?? []).map((item): [string, { label: string }] => [
-          item.groupId,
+        (sources.viewGroups?.barItems(node.id) ?? []).map((item): [string, GroupBarItem] => [
+          item.regionId,
           item,
         ]),
       );
@@ -1383,7 +1383,37 @@ export function createFrame(
               height: "100%",
             },
           },
-          renderSlot("prac.containerActions", {}, { entryKey: actionKey }),
+          (() => {
+            const group = groups.get(activeId);
+            if (group?.actions !== undefined && group.actions.length > 0) {
+              return group.actions.map((action) =>
+                createElement(
+                  "button",
+                  {
+                    key: action.id,
+                    type: "button",
+                    "data-prac-group-action": action.id,
+                    title: action.tooltip ?? action.label,
+                    disabled: !action.enabled,
+                    onClick: () => group.runAction?.(action.id),
+                    style: {
+                      font: "inherit",
+                      fontSize: "11px",
+                      height: "100%",
+                      padding: "0 5px",
+                      border: 0,
+                      background: "transparent",
+                      color: "inherit",
+                      cursor: action.enabled ? "pointer" : "default",
+                      opacity: action.enabled ? 1 : 0.55,
+                    },
+                  },
+                  action.label,
+                ),
+              );
+            }
+            return renderSlot("prac.containerActions", {}, { entryKey: actionKey });
+          })(),
         ),
       );
     };

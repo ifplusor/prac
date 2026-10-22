@@ -10,7 +10,12 @@
  */
 
 import { findRegion } from "./model.js";
-import type { GroupBinding, ViewGroupRuntime } from "./resource.js";
+import type {
+  GroupAction,
+  GroupActionBinding,
+  GroupBinding,
+  ViewGroupRuntime,
+} from "./resource.js";
 import type { LayoutStore } from "./store.js";
 import { ViewGroupLayoutBridge } from "./frameBridge.js";
 import type { ViewGroupPlacement, ViewGroupState } from "./viewGroup.js";
@@ -19,9 +24,20 @@ import type { ViewGroupPlacement, ViewGroupState } from "./viewGroup.js";
 export interface FrameViewGroup extends ViewGroupRuntime {
   readonly id: string;
   readonly state: ViewGroupState;
+  readonly binding?: GroupBinding;
   readonly placements: readonly ViewGroupPlacement[];
   onDidChange(listener: () => void): () => void;
   setBinding?(binding: GroupBinding | undefined): void;
+}
+
+/** One bar entry projected from a hosted group. */
+export interface GroupBarItem {
+  readonly groupId: string;
+  readonly regionId: string;
+  readonly label: string;
+  readonly active?: string;
+  readonly actions?: readonly GroupAction[];
+  readonly runAction?: (actionId: string) => void;
 }
 
 /** One registered group and its frame region. */
@@ -55,18 +71,24 @@ export class ViewGroupHost {
   }
 
   /** One group bar item: the group hosted in a region and which member is active. */
-  barItems(regionId: string): readonly {
-    readonly groupId: string;
-    readonly label: string;
-    readonly active?: string;
-  }[] {
+  barItems(regionId: string): readonly GroupBarItem[] {
     return [...this.#groups.values()]
       .filter((entry) => entry.regionId === regionId || entry.regionId.startsWith(`${regionId}/`))
-      .map((entry) => ({
-        groupId: entry.group.id,
-        label: entry.group.state.label ?? entry.group.id,
-        ...(entry.group.state.active === undefined ? {} : { active: entry.group.state.active }),
-      }));
+      .map((entry) => {
+        const binding = entry.group.binding as Partial<GroupActionBinding> | undefined;
+        return {
+          groupId: entry.group.id,
+          regionId: entry.regionId,
+          label: entry.group.state.label ?? entry.group.id,
+          ...(entry.group.state.active === undefined ? {} : { active: entry.group.state.active }),
+          ...(typeof binding?.actions === "function"
+            ? {
+                actions: binding.actions(),
+                runAction: (actionId: string) => binding.runAction?.(actionId),
+              }
+            : {}),
+        };
+      });
   }
 
   /** Look up a registered group. */

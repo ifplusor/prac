@@ -293,3 +293,9 @@
 - `ViewGroupHost.barItems(regionId)` 返回 groupId / label / active。
 - frame container bar 优先使用 group label；`PracLayoutFace.createViewGroup` 接收 label；VS Code definition 传 `spec.title`。
 - live：verify:containers 全绿；ui-layout 187 passed。
+
+### 2026-10-22 — binding actions in group bar（slice 37）
+
+- 新增 `GroupAction` / `GroupActionBinding`；`GroupBarItem` 带 `regionId` / `actions` / `runAction`。
+- `ViewGroupHost.barItems` 从 group binding 投影 actions；frame container bar 优先渲染 binding actions，没有时回退 `prac.containerActions` slot。
+- live：verify:containers 全绿；ui-layout 188 passed。

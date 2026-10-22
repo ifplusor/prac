@@ -51,9 +51,26 @@ export interface ViewRuntime {
   dispose(): void;
 }
 
+/** One action a group bar may render. */
+export interface GroupAction {
+  readonly id: string;
+  readonly label: string;
+  readonly icon?: string;
+  readonly enabled: boolean;
+  readonly checked: boolean;
+  readonly tooltip?: string;
+  readonly submenu?: readonly GroupAction[];
+}
+
 /** A source-specific group runtime binding. */
 export interface GroupBinding {
   dispose(): void;
+}
+
+/** A group binding that can also drive its title bar. */
+export interface GroupActionBinding extends GroupBinding {
+  actions(): readonly GroupAction[];
+  runAction(actionId: string): void;
 }
 
 /** A per-view runtime boundary. */

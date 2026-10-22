@@ -47,6 +47,8 @@ export type ViewSlotKey = typeof import("./catalogue.js").VIEW_SLOT;
 // in `client/index.ts`; this module exposes the types consumers may name.
 export type {
   Diagnostic,
+  GroupAction,
+  GroupActionBinding,
   GroupBinding,
   MaterializeContext,
   MaterializeOutcome,
@@ -69,4 +71,4 @@ export type { MoveViewRequest } from "./move.js";
 
 export type { ViewGroupLayoutBridge } from "./frameBridge.js";
 
-export type { FrameGroup, FrameViewGroup, ViewGroupHost } from "./frameGroups.js";
+export type { FrameGroup, FrameViewGroup, GroupBarItem, ViewGroupHost } from "./frameGroups.js";

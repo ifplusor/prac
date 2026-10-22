@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { defaultTree } from "./model.js";
 import type { LayoutState } from "./contract.js";
 import type { LayoutStore } from "./store.js";
+import type { GroupActionBinding } from "./resource.js";
 import { View } from "./view.js";
 import { ViewGroup } from "./viewGroup.js";
 import { ViewGroupHost } from "./frameGroups.js";
@@ -55,7 +56,28 @@ describe("ViewGroupHost", () => {
     group.add(new View("v1"));
     host.register(group, "left");
 
-    expect(host.barItems("left")).toEqual([{ groupId: "g1", label: "Explorer", active: "v1" }]);
+    expect(host.barItems("left")).toEqual([
+      { groupId: "g1", regionId: "left", label: "Explorer", active: "v1" },
+    ]);
+  });
+
+  it("projects binding actions into the bar item", () => {
+    const store = memoryStore();
+    const host = new ViewGroupHost(store);
+    const group = new ViewGroup("g1", "select", "Explorer");
+    const runAction = vi.fn();
+    const binding: GroupActionBinding = {
+      dispose: () => {},
+      actions: () => [{ id: "collapse", label: "Collapse", enabled: true, checked: false }],
+      runAction,
+    };
+    group.setBinding(binding);
+    host.register(group, "left");
+
+    const item = host.barItems("left")[0];
+    expect(item?.actions).toHaveLength(1);
+    item?.runAction?.("collapse");
+    expect(runAction).toHaveBeenCalledWith("collapse");
   });
 
   it("can register a fresh group after the old one leaves", () => {
