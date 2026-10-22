@@ -166,3 +166,11 @@
 - assembly 改为调用 `groupHost.sync`，去掉内联同步逻辑。
 - 新增 sync 测试（添加/移除 group + view）。
 - 验证：vscode-host 20 passed；check/build 通过。
+
+### 2026-10-22 — editor group / file views（slice 16）
+
+- `viewGroupsFromCatalogue` 在存在 file entry 时创建 `vscode:group:editor`（select）。
+- `viewGroupIdFor` 统一 container / file → group id。
+- `planViewGroups` 把 editor group 放到 `center`。
+- `VscodeGroupHost.sync` 现在也 materialize file views。
+- 验证：vscode-host 22 passed；check/build 通过。
