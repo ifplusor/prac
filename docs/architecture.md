@@ -86,7 +86,7 @@
 
 **区域是骨架，视图是单位**（James 2026-10-05）：
 
-- 视图按**窗口**的方式管——独立、可在区域之间移动、各有各的状态；frame 拥有的是**区域**，不拥有视图内部。
+- 视图按**窗口**的方式管——独立、可在区域之间移动、各有各的状态；frame 拥有的是**区域**，不拥有视图内部。**当前移动会 remount（editor 的 activation 依赖这一点）**；host 稳定、移动不丢状态是 UI architecture note 的稳定 host 阶段（迁移顺序里的 Stage 4），需先补 activation 契约。
 - **只有一种可显示的东西：视图**——它怎么渲染由**一组属性**决定（放置 / 排布 / 呈现 / 寿命），像窗口管理器里只有窗口。**持久化按「放置」分**：放在基础区域里的（区域、顺序、折叠、在屏、选中）**进持久化**；放在**悬浮层**里的是**这一次的呈现**、不进。**"浮层视图"描述的是放置，不是类**（右键菜单 / 命令面板 / 通知是放在悬浮层的视图）。**框架装饰**（sash、拖拽落点提示、焦点环）不是视图。条目**离开目录**时要释放宿主并剪掉它在持久化里的位置 / 顺序 / 选中。
 - 两者**是同样的视图、同样的隔离契约**。**框架 chrome**（sash、拖拽落点提示、焦点环）是唯一的例外——它不是视图。
 
@@ -107,28 +107,36 @@
 
 **区域名绑定布局模式——机制提供模式，数据决定谁用哪些**：
 
-| 区域（位置） | 分区（拆子区域） | `stack`（顺序） | `tab`（选择） | 默认模式 |
-| ------------ | ---------------- | --------------- | ------------- | -------- |
-| `left`       | 无               | 有              | 有            | `stack`  |
-| `right`      | 无               | 有              | 有            | `stack`  |
-| `center`     | 有               | 无              | 有            | `tab`    |
-| `bottom`     | 无               | 无              | 有            | `tab`    |
+| role | 默认物理位置 | 内容 | 默认模式 |
+| --- | --- | --- | --- |
+| `stage` | center | grid；select view group | 选择 |
+| `primarySidebar` | left | container stack | 选择（container 之间） |
+| `secondarySidebar` | right | container stack | 选择（container 之间） |
+| `panel` | bottom | container stack | 选择（container 之间） |
 
 - **基础层只有"分区 / 顺序 / 选择"三种模式，叠放只在悬浮层**：叠放 = 同时可见 + 需要定序；tab 同一时刻只显示一个 ⇒ 它属"选择"、不是叠放。**基础层不需要 z 序**（"显示哪一个"是**选中**，是布局的状态，走注意力只是改变它交互的过程）。
-- **区域是位置，角色是角色，两者分开**（VS Code 自己就这么分：`workbench.sideBar.location` 允许 primary 侧栏换边）：角色用**平台的角色名**，绑到 DSH 的槽；**区域 id 是位置词** `left` / `right`（进持久化，不动）；**借来的名字不动**（`dsh:sidebar`、`workbench.parts.sidebar`）。
+- **role 是组件语义，物理位置是默认值**：`stage` / `primarySidebar` / `secondarySidebar` / `panel` 是 role；left / center / right / bottom 是默认物理位置，不是 role 名。stage 的内容是 grid；container 内部是 stack；select view group 内部是 tab。
+
+- **选择只有一级**：选择区域的 `active` 是一个 childId；选择区域的孩子不能是选择区域。container 是**具名 view group，默认 stack**；select view group 内部是 tab；嵌套区域只能是 stack/分区（用户拆分或来源子组），不能是第二层选择。将来若真需要嵌套选择，再引入 `activePath` 与每级 bar，现在不做。
+- **区域之间的偏序**：**包含**（父 → 子，偏序）、**先于**（顺序/分区的兄弟，全序）、**备选**（选择的兄弟，不是序，是选一）。可见内容按模式递归求值；选择只走 active 分支。
+- **container 不是可选高级形态**：它是**具名 view group，默认 stack**；父层 select 在 container 之间选一；`part` 才是可选的高级形态，不是单位。来源的 container 只通过来源目录的 `containerId` / `containerTitle` 进来，由编排落成具名 view group；frame 不认 container。
+- **来源隔离**：`prac.view` 只带 `id` / `label` / `icon` / `paneHeader`；`source` / `containerId` / `location` 只进编排。frame 不读来源目录；`paneHeader` 是视图自报的呈现事实，不是来源标记，frame 不按 `vscode:` 前缀决定 chrome。
+- **role 是角色，物理位置是默认值，两者分开**（VS Code 自己就这么分：`workbench.sideBar.location` 允许 primary 侧栏换边）：角色用**平台的角色名**，绑到 DSH 的槽；left / center / right / bottom 只是默认物理位置；**借来的名字不动**（`dsh:sidebar`、`workbench.parts.sidebar`）。
 
 | 角色               | 绑到谁                | 借的是谁的名                                                        |
 | ------------------ | --------------------- | ------------------------------------------------------------------- |
+| `stage`            | frame 的 stage        | —                                                                   |
 | `primarySidebar`   | DSH 的 `dsh:sidebar`  | VS Code：Primary Side Bar                                           |
 | `secondarySidebar` | DSH 的 `dsh:rightbar` | VS Code：Secondary Side Bar（`ViewContainerLocation.AuxiliaryBar`） |
+| `panel`            | frame 的 panel        | —                                                                   |
 
 - **一个派生要求**：视图在区域之间搬时，目标区域可能不支持它来源处的模式 ⇒ **视图的呈现与它所属的分组解耦**（分组决定怎么显示，视图只管内容），否则视图不能真正自由搬运。
 
 ### 3.2 IDE 那一半怎么进来
 
 - **编辑器**：一个文件可以有一个或多个 **editor / 放置**；同一个文件可以同时出现在多个 editor group / 区域（对齐 VS Code 的 Split Editor）。**分栏是区域**，**tab 是组 / 区域的**；**身份是放置**，不是文件。
-- **editor group 是 prac 自己的对象**：`PracEditorHost` 在区域里承载组；组用上游的 `EditorGroupModel` / `EditorPanes`，不用上游的 `EditorPart` / `EditorGroupView`；一个载文件的区域 = 一个组，拆区域 = 新组；只放侧栏 / 面板的区域没有组。frame 只给区域 / 盒子，不认识组。
-- 扩展贡献的视图（tree view 等）也按视图进来；容器与 part 是可选的高级形态（整块标准 IDE 区域），不是组合的单位。
+- **editor group 不是 prac 类型**：它是 **select view group + editor binding**；`PracEditorHost` 是 adaptor 侧的 editor runtime，承载该组并用上游的 `EditorGroupModel` / `EditorPanes`，不用上游的 `EditorPart` / `EditorGroupView`。一个载文件的 view group = 一个组，拆 cell / group = 新组；只放侧栏 / 面板的 view group 没有组。frame 只给 view group / 盒子，不认识组。
+- 扩展贡献的视图（tree view 等）也按视图进来；container 是具名 view group（默认 stack）；只有 part 是可选的高级形态（整块标准 IDE 区域），不是组合的单位。
 - 现在的落点是「编辑器 / 侧栏」这类面，其余 IDE 面按同一套规矩逐步接。
 - 已知的坑：视图要进 VS Code 自己的可见性模型，否则 body 会是 "no data provider registered"。
 
@@ -276,7 +284,7 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随 DSH 插
    **要接受的一处不一致**：**UI 里禁用的扩展，agent 那边仍会加载**——这是 web 形态的必然，不是缺陷（桌面/远程形态相反：那边渲染器存储本来就在服务端）。**「对齐 remote 形态」买不到那份状态**：remote 形态里渲染器的存储走 `'storage'` 通道，而那个通道是 **main process（客户端机器）** 的，code server 根本没注册它（只有 extensions / logger / userDataProfiles / remoteextensionsenvironment / request / telemetry / remoteFileSystem / remoteTerminal / remoteExtensionsScanner / mcp…）。
    **按 agent 仍卡在 seam**：查询入参没有会话标识（`packages/lsp/lsp/src/types.ts:38-57`）。逐条核实与来往见[工作记录](../.agents/worklog/2026-09-09-vscode-dsh-integration.md)。
 5. **VS Code 扩展贡献的 view**：**树视图通了**——数据侧本来就没问题（挂 cSpell 的 `cSpellIssuesViewByFile`，body 是**扩展自己**给的 `No issues found.`；数据 attach 走 registry、不经过容器，`mainThreadTreeViews.ts:212-215`），**真正缺的是尺寸**：pane 挂进 embedder 的元素后没人给它尺寸（容器是 splitview 干的），于是只剩一个 59px 的头、body 0 高，**内容全在 DOM 里但看不见**。2026-09-21 已修（`vendor/vscode/overlay` 里 view 也照 part 的做法：设元素尺寸 + `orthogonalSize` + `layout(size)`，并跟宿主 resize），实测 pane 640×560、body 13px→618px。**仍缺**：① **webview 视图**（`type=webview`）——overlay 与 iframe 都建出来了，但**宿主页有两条硬要求**（2026-09-21 核实）：**(a) 必须在安全上下文**（`pre/index.html` 一开头 `if (!crypto.subtle) throw`，且它要注册 service worker，`areServiceWorkersEnabled()` = `!!navigator.serviceWorker`）⇒ **plain HTTP 的内网地址（`http://192.168.x.x`）根本起不来**；**(b) 宿主页的 hostname 必须等于、或前缀等于 `parentOriginHash`**（`:345-363` = base32(sha256(`{parentOrigin, salt: webviewOrigin}`))，而渲染器正是把它当 `{{uuid}}` 填进端点模板，`webviewElement.ts:480,577`）⇒ 固定的 IP/localhost **永远不可能**满足。**这两条合起来解释了上游为什么默认 CDN**：只有「HTTPS + 通配名」的域才能同时满足它们。⇒ **prac 想要的「内网 + 无 DNS + plain HTTP」下 webview 做不了**；这不是挂法问题（第二端口试过：宿主页 200，之后 SW/内容一概不来，已撤销）。**已定（James 2026-09-21）：走 ② 自建 HTTPS + 通配名，零补丁**——prac 只把部署给的端点模板交给页面（`PRAC_VSCODE_WEBVIEW_ENDPOINT` → index injection → 启动选项 `webviewEndpoint`，见 `packages/host/vscode/README.md`）；**本机已端到端验过**（自签 `*.localhost` 通配证书 + 本地 TLS 前端）：宿主页 200、`fake.html` 200、service worker 真跑起来、扩展资源经它取回（那几条 `…vscode-resource.vscode-cdn.net` 的 200 是 SW 合成的，**没有外网流量**）。部署侧要提供通配 DNS + 受信任通配证书。**两处都已修**（2026-09-21）：① **盒模型**——pane 现在挂进 `.monaco-pane-view` 里（`paneview.css` 就是靠这个祖先给出 `--pane-header-size` 与 `.pane-body{flex:1}`），`.pane-body` 从 640×0 变成 640×538；② **overlay 的挂载点**——CSS anchor 查找跨不过**影根边界**（隔离之后那条边界从 `.monaco-workbench` 子树变成影根；判别实验：锚点在影根里、浮层在文档里 ⇒ 落到 `[0,0]`，同树则逐像素重合）。所以 overlay 的根要挂进**锚点所在的那棵树**（视图自己的隔离根），而不是 `document.body`——那是**一处上游补丁** `patches/0002`，只影响 webview，不动 `getContainer`，免得快速输入 / 通知那些靠 workbench 作用域 CSS 的组件受影响。修完 overlay 精确贴合 pane body（640×538、top 22px，iframe 同位置），webview 内容上屏；八道门全绿。② **没编译出来的内建扩展**（`references-view` / `npm` / `emmet`…，激活直接 `Cannot find module …/out/extension` ⇒ 它们的视图自然没数据）。**哪几个视图要进 prac 的界面**也还没定。
-6. **container / part 这类高级形态什么时候真的需要**（现在是按视图组合就够）。
+6. **part 这类高级形态什么时候真的需要**；container 已由**具名 view group（默认 stack）**承载，缺的是 views / actions / context 的完整语义，而不是 container 这个对象。
 7. **多窗口 / 多标签页**：**搁置**（James 2026-09-21：先保持简单，以后再说）。已核实的底子：多标签页在 DSH 身份层就是**一个 client**（浏览器会话 cookie）；VS Code 自己的多窗口机制是 **auxiliary window**（`window.open` 出来的窗口 attach 到同一个 workbench 实例，**不新增扩展宿主**），但它绕开 prac 的 frame（内容由 workbench 自己搬），要用得先在 prac 侧设计"窗口"这个概念。今天两个标签各 boot 一个实例 ⇒ 两个宿主。
 8. **阶段二**（决策空间 / 以审决策为主界面）：保持搁置，重新进入主线需要重新裁决。
 9. ~~**借用件的浮层路由**~~（**2026-10-07 已落地**）：应用的根住在框架的 `shell.overlay` 里（见 §3.1），所以它自己创建的面（命令面板 / 菜单 / 悬停 / 通知 / 模态）都在框架这一个悬浮层内、由框架定序；部件与视图照旧在各视图的隔离根里。**随之要背的**：借用件的根进了隔离根 ⇒ 它内部**不能再依赖 document 级的查询**（例如按元素找宿主），宿主元素要由框架那一侧交过来。
@@ -286,6 +294,7 @@ code server 归主干起停（空闲端口、等 `/version` 就绪、随 DSH 插
 ## 8. 相关
 
 - [concepts.md](concepts.md)：**词表与体系**——prac 的两个名词（视图 / 区域）、一条链（来源 → 注册表 → 编排 → 渲染），以及哪些词是借来的、哪些已退役。
+- [2026-10-20-ui-framework.md](../.agents/notes/in-progress/2026-10-20-ui-framework.md)：**UI framework umbrella 的 in-progress 设计**——两个生态的贡献面、组合模型、host 边界、container 组合与渐进切片。
 - [philosophy.md](philosophy.md)：两个轴 + 认识论循环 + 决策单元（§1.2 的出发点）。
 - [dsh.md](dsh.md) / [vscode.md](vscode.md)：两个被依赖系统的内部结构（事实参考）。
 - [.agents/notes/](../.agents/notes/)：决策记忆（每个「为什么 + 放弃了什么」）与实现进度、差距、踩坑。
