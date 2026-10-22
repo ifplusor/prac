@@ -112,9 +112,9 @@ Server（node）
 | --- | --- | --- | --- |
 | `PracVscodeFace` | consumers 的 adaptor 前台：catalogue / `hostFor` / `focusView` / `runCommand` / file placement / capabilities | consumers、诊断/门 | frame 的 layout |
 | `VscodeCatalogueEntry` | catalogue 的一行数据：`view` / `appId` / `title` / `source` / `role` / `containerId` / `containerTitle` / `viewGroupId?`（`location?` 只作来源提示） | `ui-vscode-views` / `ui-vscode-editor` / arrangement | 怎么渲染 |
-| `ViewGroupDeclaration` | CR 风格的 group 声明：`apiVersion` + `kind` + `metadata` + `spec`；`apiVersion + kind` 在声明时确定、不可变；frame 视为 opaque 类型；arrangement 落成 `ViewGroupState` | adaptor / consumers | group 成员 / placement |
-| `ViewGroupKindDefinition` | group kind registry 的一项：`apiVersion` / `kind` / schema / validation / binding factory；由 source adapter 注册 | adaptor / frame registry | 具体 group 实例 |
-| `ViewKindDefinition` | view kind registry 的一项：`apiVersion` / `kind` / schema / validation / `hostKind` / host factory；由 source adapter 注册 | adaptor / frame registry | 具体 view 实例 |
+| `ViewGroupDeclaration` | group 的 CR：`apiVersion` + `kind` + `metadata` + `spec`；`apiVersion + kind` 在声明时确定、不可变；frame 视为 opaque 类型；arrangement 落成 `ViewGroupState`；**Declaration = 实例** | adaptor / consumers | group 成员 / placement |
+| `ViewGroupDefinition` | group 的 CRD：`apiVersion` / `kind` / schema / validation / binding factory；由 source adapter 注册；**Definition = 类型** | adaptor / frame registry | 具体 group 实例 |
+| `ViewDefinition` | view 的 CRD：`apiVersion` / `kind` / schema / validation / `hostKind` / host factory；由 source adapter 注册；**Definition = 类型** | adaptor / frame registry | 具体 view 实例 |
 | `prac.view` | frame 的 view 注册槽：承载 `ViewDeclaration`（`apiVersion` / `kind` / `metadata` / `spec`）；`spec` 含 label / icon / `paneHeader` / `hostKind` / 宿主组件 | consumers | view 的来源 |
 
 #### 2.2.2 embed / workbench
