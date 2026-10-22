@@ -304,3 +304,10 @@
 
 - `verify:containers` 新增 action bar 检查：至少一个 group/container action 按钮可点击，点击后 bar 仍在。
 - live 全绿；无 prac-owned console error。
+
+### 2026-10-22 — resize regression / stage grid default（slice 39）
+
+- 发现默认 1×1/1×3 stage grid 会让 `resizeBoundary` 面对 grid child，横向 sash 拖拽 no-op；`verify:resize` 红。
+- 回退默认 stage 到 split tree，保留 `GridNode` / placement / cell split 数据层。
+- sash 拖拽改为 document capture 监听，避免 view host 吞 pointermove。
+- live：`verify:resize` 恢复全绿。

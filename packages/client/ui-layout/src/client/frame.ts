@@ -679,9 +679,9 @@ function startSashDrag(
     );
   };
   const cleanup = (): void => {
-    window.removeEventListener("pointermove", move);
-    window.removeEventListener("pointerup", finish);
-    window.removeEventListener("pointercancel", finish);
+    document.removeEventListener("pointermove", move, true);
+    document.removeEventListener("pointerup", finish, true);
+    document.removeEventListener("pointercancel", finish, true);
     window.removeEventListener("blur", cancel);
     if (sashDrag === drag) sashDrag = null;
     if (sashCleanup === cleanup) sashCleanup = null;
@@ -694,9 +694,11 @@ function startSashDrag(
   };
   const cancel = (): void => finish();
   sashCleanup = cleanup;
-  window.addEventListener("pointermove", move, { passive: false });
-  window.addEventListener("pointerup", finish);
-  window.addEventListener("pointercancel", finish);
+  // Capture on the document: a view host may stop pointer events inside its
+  // own subtree, and the boundary must keep following the pointer regardless.
+  document.addEventListener("pointermove", move, { passive: false, capture: true });
+  document.addEventListener("pointerup", finish, true);
+  document.addEventListener("pointercancel", finish, true);
   window.addEventListener("blur", cancel);
   element?.setPointerCapture?.(pointerId);
 }
