@@ -27,9 +27,11 @@
  *    restores it. This is the (b) option from the integration note: the frame
  *    stays React-owned (DSH-style), and VS Code content remains *hosted* — a
  *    region renders a view, and the `vscode:view:<app view id>` view renders the
- *    host component the client mechanism publishes (`ctx.pracVscode.hostFor(view)`);
- *    the view is re-parented there, never recreated. The host
- *    mechanism is never bypassed.
+ *    host component the client mechanism publishes (`ctx.pracVscode.hostFor(view)`).
+ *    The host component re-parents the existing pane while it stays in one place;
+ *    **a move across regions currently remounts it** (the editor uses that mount as
+ *    its activation), which is the stable-host gap tracked in the UI architecture
+ *    note. The host mechanism is never bypassed.
  * 4. **Roles, not positions, are what the borrowed face speaks.** DSH's
  *    plugins still call `ctx.layout`; that compat shim translates positional
  *    vocabulary into placements using the roles the arrangement binds
@@ -70,6 +72,7 @@ declare global {
 }
 import { VIEW_SLOT, readDeclaredViewIds, type RegionInfo, type ViewInfo } from "./catalogue.js";
 export type { PracLayoutFace, RegionInfo, ViewInfo };
+export * from "./resource.js";
 
 /**
  * Install the mechanism: declare the frame's slots, publish the faces, keep the

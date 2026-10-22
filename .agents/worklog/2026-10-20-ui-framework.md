@@ -63,3 +63,12 @@
 - **DnD**：frame 管 view / container 的顺序与移动；host 管 view 内的 DnD；跨边界 DnD 需要 payload 契约，当前不做。
 - **keybinding**：frame 全局 vs host-local；frame 不抢 host 内的按键（需要显式边界）。
 - **HMR**：代码替换可能重置 host 状态；不承诺“代码替换不丢 view 状态”。
+
+## 实施记录
+
+### 2026-10-22 — resource layer（slice 1）
+
+- 新增 `ui-layout/src/client/resource.ts`：category-specific definitions、registries、shared `ResourceStateStore`、materializer、phase、async、dependency retry、owner dispose、failure diagnostic。
+- 新增 `resource.spec.ts`：category 隔离、duplicate、materialize、dependency、async、failure isolation、owner dispose、pending、binding factory。
+- 验证：`pnpm --filter prac-client-ui-layout test` 158 passed；`check` / `build` 通过。
+- 尚未接入 frame / vscode adaptor。
