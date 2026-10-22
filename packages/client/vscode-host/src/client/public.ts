@@ -377,3 +377,5 @@ export type {
   VscodeResourceDefinitions,
 } from "./adapter.js";
 export type { VscodeGroupBindingRuntime } from "./resources.js";
+
+export type { ContainerContextMode, ResolvedContainerContext } from "./context.js";

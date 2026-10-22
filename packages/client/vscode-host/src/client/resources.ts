@@ -48,6 +48,8 @@ export interface VscodeViewSpec extends Readonly<Record<string, unknown>> {
   readonly hostKind: string;
   /** The app's own view id, for diagnostics and catalogue pairing. */
   readonly viewId?: string;
+  /** The source container the view was declared in. */
+  readonly containerId?: string;
   readonly title?: string;
   readonly icon?: string;
   readonly paneHeader?: string;
@@ -90,6 +92,7 @@ export interface VscodeViewDefinitionOptions {
 
 /** Runtime hooks behind one VS Code group binding. */
 export interface VscodeGroupBindingRuntime {
+  readonly containerId?: string;
   actions?(): readonly import("./public.js").PracVscodeAction[];
   runAction?(actionId: string): void;
   dispose?(): void;
@@ -104,6 +107,11 @@ export class VscodeGroupBinding implements GroupBinding {
     readonly groupKind: VscodeGroupKind,
     private readonly runtime?: VscodeGroupBindingRuntime,
   ) {}
+
+  /** The container this binding currently represents, if any. */
+  get containerId(): string | undefined {
+    return this.runtime?.containerId;
+  }
 
   /** Container title actions the frame may render. */
   actions(): readonly import("./public.js").PracVscodeAction[] {

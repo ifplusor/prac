@@ -107,3 +107,9 @@
 - `VscodeGroupBinding` 增加 `actions()` / `runAction()`；`VscodeViewGroupSpec` 增加 `containerId`。
 - 新增 `adapter.ts`：`createVscodeResourceDefinitions({ face, createGroup, createView })`，把 binding / host 接到 `PracVscodeFace`。
 - 验证：vscode-host 10 passed；embed check 通过；vscode-host check/build 通过。
+
+### 2026-10-22 — container context projection（slice 7）
+
+- 新增 `context.ts`：`resolveContainerContext(view, binding)`，把 G 收敛为 group / unbound 两种有效 container context；source container 保留但不跟随。
+- `VscodeViewSpec.containerId`、`VscodeGroupBinding.containerId`。
+- 验证：vscode-host 13 passed；check/build 通过。
