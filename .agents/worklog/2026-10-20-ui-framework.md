@@ -185,3 +185,9 @@
 - `VscodeGroupRuntime.select`；`VscodeGroupHost.select` 只在 view 属于该 group 时调用。
 - `vscode-host` 订阅 `capabilities.editors`，把 app active file 投影为 editor group 的 active。
 - 验证：vscode-host 22 passed；check/build 通过。
+
+### 2026-10-22 — region-change recovery / dispose（slice 19）
+
+- `VscodeGroupHost.regionOf`；sync 在 group region 变化时 unregister + re-add，而不是静默保留旧 region。
+- 新增 group region change 与 dispose 测试（groups/views 清空、unregister 调用）。
+- 验证：vscode-host 24 passed；check/build 通过。

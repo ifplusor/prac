@@ -57,6 +57,11 @@ export class VscodeGroupHost {
     return group;
   }
 
+  /** The frame region a hosted group currently occupies. */
+  regionOf(groupId: string): string | undefined {
+    return this.#groups.get(groupId)?.regionId;
+  }
+
   /** Reconcile groups and container views against a catalogue and region set. */
   sync(entries: readonly VscodeCatalogueEntry[], regionIds: readonly string[]): void {
     const planned = planViewGroups(entries, regionIds);
@@ -65,7 +70,11 @@ export class VscodeGroupHost {
       if (!wantedGroups.has(groupId)) this.remove(groupId);
     }
     for (const item of planned) {
-      if (!this.has(item.resource.metadata.id)) this.add(item.resource, item.regionId);
+      const groupId = item.resource.metadata.id;
+      if (this.has(groupId) && this.regionOf(groupId) !== item.regionId) {
+        this.remove(groupId);
+      }
+      if (!this.has(groupId)) this.add(item.resource, item.regionId);
     }
 
     const wantedViews = new Set(

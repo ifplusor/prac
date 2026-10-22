@@ -113,6 +113,53 @@ describe("VscodeGroupHost", () => {
     expect(host.viewIds()).toEqual([]);
   });
 
+  it("re-registers a group when its region changes", () => {
+    const registerViewGroup = vi.fn();
+    const unregisterViewGroup = vi.fn();
+    const host = new VscodeGroupHost({
+      layout: { registerViewGroup, unregisterViewGroup },
+      definition: definition(),
+      viewDefinition: viewDefinition(),
+    });
+    const entry = {
+      view: "vscode:view:workbench.view.explorer",
+      appId: "workbench.view.explorer",
+      title: "Explorer",
+      source: "view" as const,
+      location: "sidebar" as const,
+      containerId: "workbench.view.explorer",
+    };
+
+    host.sync([entry], ["left", "right"]);
+    host.sync([{ ...entry, location: "auxiliarybar" }], ["left", "right"]);
+
+    expect(unregisterViewGroup).toHaveBeenCalledWith("vscode:group:workbench.view.explorer");
+    expect(registerViewGroup).toHaveBeenCalledTimes(2);
+    expect(host.regionOf("vscode:group:workbench.view.explorer")).toBe("right");
+  });
+
+  it("disposes all groups and views", () => {
+    const unregisterViewGroup = vi.fn();
+    const host = new VscodeGroupHost({
+      layout: { registerViewGroup: () => {}, unregisterViewGroup },
+      definition: definition(),
+      viewDefinition: viewDefinition(),
+    });
+    host.add(groupResource(), "left");
+    host.addView("g1", {
+      apiVersion: VSCODE_API_VERSION,
+      kind: "View",
+      metadata: { id: "v1" },
+      spec: { hostKind: "view-pane" },
+    });
+
+    host.dispose();
+
+    expect(unregisterViewGroup).toHaveBeenCalledWith("g1");
+    expect(host.ids()).toEqual([]);
+    expect(host.viewIds()).toEqual([]);
+  });
+
   it("adds a view to a hosted group", () => {
     const host = new VscodeGroupHost({
       layout: { registerViewGroup: () => {}, unregisterViewGroup: () => {} },
