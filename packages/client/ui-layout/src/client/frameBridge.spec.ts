@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { defaultTree } from "./model.js";
+import { defaultTree, place } from "./model.js";
 import type { LayoutState } from "./contract.js";
 import type { LayoutStore } from "./store.js";
 import { View } from "./view.js";
@@ -45,6 +45,17 @@ describe("ViewGroupLayoutBridge", () => {
     group.reorder(["v2", "v1"]);
     expect(store.get().views["v2"]?.order).toBe(0);
     expect(store.get().views["v1"]?.order).toBe(1);
+  });
+
+  it("moves an existing placement instead of creating a second record", () => {
+    const store = memoryStore();
+    store.update((state) => place(state, "v1", "right"));
+    const group = new ViewGroup("g1");
+    group.add(new View("v1"));
+    new ViewGroupLayoutBridge(group, store, "left");
+
+    expect(Object.keys(store.get().views)).toEqual(["v1"]);
+    expect(store.get().views["v1"]?.region).toMatch(/^left/);
   });
 
   it("removes views that leave the group and on dispose", () => {

@@ -174,3 +174,8 @@
 - `planViewGroups` 把 editor group 放到 `center`。
 - `VscodeGroupHost.sync` 现在也 materialize file views。
 - 验证：vscode-host 22 passed；check/build 通过。
+
+### 2026-10-22 — placement authority validation（slice 17）
+
+- 新增 frame bridge 测试：已有 placement 被 group 移动时只保留一个 view record，不产生第二份。
+- 验证：ui-layout 176 passed；check 通过。
