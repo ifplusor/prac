@@ -1,10 +1,8 @@
 {
   "name": "gate-dynamic",
-  "publisher": "prac",
   "version": "1.0.0",
-  "engines": { "vscode": "^1.0.0" },
+  "publisher": "prac",
   "main": "./extension.js",
-  "activationEvents": ["*"],
   "contributes": {
     "views": {
       "explorer": [
@@ -15,5 +13,11 @@
         }
       ]
     }
+  },
+  "activationEvents": [
+    "*"
+  ],
+  "engines": {
+    "vscode": "^1.0.0"
   }
 }

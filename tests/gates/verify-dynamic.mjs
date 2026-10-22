@@ -60,9 +60,7 @@ await run("prac.gate.show");
 await waitFor((current) => current.catalogue.length === 1);
 await page.evaluate((view) => globalThis.__pracLayout?.setFront(view), VIEW);
 await page.evaluate(() =>
-  document
-    .querySelector('[data-prac-container="left/container:workbench.view.explorer"]')
-    ?.click(),
+  document.querySelector('[data-prac-container="left/container:workbench.view.explorer"]')?.click(),
 );
 await page.waitForTimeout(1200);
 const shown = await state();
@@ -84,12 +82,14 @@ report({
   checks: {
     "the fixture view starts absent": before.catalogue.length === 0 && before.frames.length === 0,
     "the view enters the catalogue": shown.catalogue.length === 1,
-    "the view materializes in the frame": shown.frames.length === 1 && shown.frames[0]?.hidden === false,
+    "the view materializes in the frame":
+      shown.frames.length === 1 && shown.frames[0]?.hidden === false,
     "the view leaves the catalogue": hidden.catalogue.length === 0,
     "the view is removed from the frame": hidden.frames.length === 0,
     "the host is released": hidden.hosts === 0,
     "the view returns": shownAgain.catalogue.length === 1 && shownAgain.frames.length === 1,
-    "no prac-owned console errors": own("__pracLayout").length === 0 && own("vscode-embed:").length === 0,
+    "no prac-owned console errors":
+      own("__pracLayout").length === 0 && own("vscode-embed:").length === 0,
   },
   ok: "OK: a contributed view enters and leaves the catalogue without a reload; its frame placement follows.",
 });
