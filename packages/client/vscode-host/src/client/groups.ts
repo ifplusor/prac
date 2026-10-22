@@ -8,6 +8,8 @@
  * @module prac-client-vscode-host/client/groups
  */
 
+import type { FrameViewGroup } from "prac-client-ui-layout/client";
+import type { VscodeCatalogueEntry } from "./public.js";
 import type { VscodeGroupRuntime } from "./resources.js";
 import {
   VSCODE_API_VERSION,
@@ -17,7 +19,7 @@ import {
 
 /** The frame operations the group host needs. */
 export interface VscodeGroupLayout {
-  registerViewGroup(group: VscodeGroupRuntime, regionId: string): unknown;
+  registerViewGroup(group: FrameViewGroup, regionId: string): unknown;
   unregisterViewGroup(groupId: string): void;
 }
 
@@ -49,6 +51,16 @@ export class VscodeGroupHost {
     }
     this.#groups.set(resource.metadata.id, { group, regionId });
     return group;
+  }
+
+  /** Whether this host owns a group id. */
+  has(groupId: string): boolean {
+    return this.#groups.has(groupId);
+  }
+
+  /** The group ids currently hosted. */
+  ids(): readonly string[] {
+    return [...this.#groups.keys()];
   }
 
   /** Remove one hosted group; its runtime is disposed by the host. */
@@ -88,6 +100,33 @@ export function viewGroupsFromCatalogue(
 }
 
 /** The frame region a catalogue location defaults to. */
+/** One planned group resource and its default region. */
+export interface PlannedVscodeGroup {
+  readonly resource: VscodeViewGroup;
+  readonly regionId: string;
+}
+
+/**
+ * Plan group resources from a catalogue and the frame's current regions.
+ *
+ * A group's default region comes from the catalogue's location hint. When that
+ * region does not exist, the first available region is used; with no regions at
+ * all the group is omitted (registration would fail).
+ */
+export function planViewGroups(
+  entries: readonly VscodeCatalogueEntry[],
+  regionIds: readonly string[],
+): readonly PlannedVscodeGroup[] {
+  const planned: PlannedVscodeGroup[] = [];
+  for (const resource of viewGroupsFromCatalogue(entries)) {
+    const entry = entries.find((candidate) => candidate.containerId === resource.spec.containerId);
+    const desired = entry === undefined ? undefined : regionForLocation(entry.location);
+    const regionId = desired !== undefined && regionIds.includes(desired) ? desired : regionIds[0];
+    if (regionId !== undefined) planned.push({ resource, regionId });
+  }
+  return planned;
+}
+
 export function regionForLocation(
   location: "stage" | "sidebar" | "panel" | "auxiliarybar",
 ): string {

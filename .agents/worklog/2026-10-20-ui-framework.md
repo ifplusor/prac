@@ -145,3 +145,10 @@
 - `viewGroupsFromCatalogue` / `regionForLocation`。
 - vscode-host 测试不再运行时 import core loader artifact。
 - 验证：ui-layout 175 passed；vscode-host 17 passed；check/build 通过。
+
+### 2026-10-22 — vscode group assembly（slice 13）
+
+- `PracLayoutFace` 新增 `createViewGroup` / `createView`，由 core services 实例化 runtime。
+- `vscode-host/index.ts` 创建 `VscodeGroupHost`；`syncGroups` 从 catalogue 派生 group resource、按 location 选 region、注册/移除。
+- catalogue 变化时增量同步；plugin cleanup 清理 groups。
+- 验证：ui-layout 175 passed；vscode-host 18 passed；check/build 通过。

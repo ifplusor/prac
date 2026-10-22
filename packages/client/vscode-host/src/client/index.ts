@@ -42,6 +42,9 @@ import type { ILayout } from "@deepseek-ai/dsh-client-ui-layout/client";
 import { createVscodeEmbed } from "prac-vscode-embed/client";
 import { EXTENSIONS_GALLERY } from "prac-vscode";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "./public.js";
+import { createVscodeResourceDefinitions } from "./adapter.js";
+import { VscodeGroupHost, planViewGroups } from "./groups.js";
+import type { VscodeGroupRuntime } from "./resources.js";
 export * from "./resources.js";
 export * from "./adapter.js";
 export * from "./context.js";
@@ -308,6 +311,38 @@ export function apply(ctx: Context): void {
       },
     },
   };
+  const resources = createVscodeResourceDefinitions({
+    face,
+    createGroup: (id, mode) =>
+      ctx.pracLayout.createViewGroup(id, mode) as unknown as VscodeGroupRuntime,
+    createView: (id) => ctx.pracLayout.createView(id),
+  });
+  const groupHost = new VscodeGroupHost({ layout: ctx.pracLayout, definition: resources.groups });
+
+  /** Project the catalogue's containers into frame groups (idempotent). */
+  const syncGroups = (): void => {
+    const regions = ctx.pracLayout.listRegions().map((region) => region.id);
+    const planned = planViewGroups(face.catalogue(), regions);
+    const wanted = new Set(planned.map((item) => item.resource.metadata.id));
+    for (const groupId of groupHost.ids()) {
+      if (!wanted.has(groupId)) groupHost.remove(groupId);
+    }
+    for (const item of planned) {
+      if (!groupHost.has(item.resource.metadata.id)) {
+        groupHost.add(item.resource, item.regionId);
+      }
+    }
+  };
+
+  ctx.effect(() => {
+    syncGroups();
+    const off = face.onDidChangeCatalogue(syncGroups);
+    return () => {
+      off();
+      groupHost.dispose();
+    };
+  }, `${name}: view-group catalogue`);
+
   ctx.effect(() => ctx.provide("pracVscode", face), `${name}: pracVscode service`);
   // Diagnostics hook: lets a live gate exercise the command path directly,
   // without pretending a DOM click reached the workbench.

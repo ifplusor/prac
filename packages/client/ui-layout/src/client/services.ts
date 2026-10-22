@@ -63,6 +63,8 @@ import {
   structuralRegion,
 } from "./model.js";
 import type { LayoutStore } from "./store.js";
+import { View } from "./view.js";
+import { ViewGroup } from "./viewGroup.js";
 import { ViewGroupHost, type FrameGroup, type FrameViewGroup } from "./frameGroups.js";
 
 /** Whether a view's region sits inside the subtree a region id names. */
@@ -314,6 +316,12 @@ export function createServices(
         const view = ensureView(state, viewId);
         return { ...state, views: { ...state.views, [viewId]: { ...view, hidden: true } } };
       });
+    },
+    createViewGroup(id: string, mode: "stack" | "select"): ViewGroup {
+      return new ViewGroup(id, mode);
+    },
+    createView(id: string): View {
+      return new View(id);
     },
     registerViewGroup(group: FrameViewGroup, regionId: string): FrameGroup {
       return viewGroups.register(group, regionId);

@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import { VscodeGroupHost, regionForLocation, viewGroupsFromCatalogue } from "./groups.js";
+import {
+  VscodeGroupHost,
+  planViewGroups,
+  regionForLocation,
+  viewGroupsFromCatalogue,
+} from "./groups.js";
 import {
   VscodeViewGroupDefinition,
   VSCODE_API_VERSION,
@@ -85,6 +90,35 @@ describe("viewGroupsFromCatalogue", () => {
 
     expect(groups.map((group) => group.metadata.id)).toEqual(["vscode:group:a", "vscode:group:b"]);
     expect(groups[0]?.spec.title).toBe("A");
+  });
+
+  it("plans groups by location and falls back to the first region", () => {
+    const planned = planViewGroups(
+      [
+        {
+          containerId: "a",
+          containerTitle: "A",
+          location: "sidebar",
+          view: "v",
+          appId: "a",
+          title: "A",
+          source: "view",
+        },
+        {
+          containerId: "b",
+          containerTitle: "B",
+          location: "panel",
+          view: "v",
+          appId: "b",
+          title: "B",
+          source: "view",
+        },
+      ],
+      ["left", "bottom"],
+    );
+
+    expect(planned.find((item) => item.resource.spec.containerId === "a")?.regionId).toBe("left");
+    expect(planned.find((item) => item.resource.spec.containerId === "b")?.regionId).toBe("bottom");
   });
 
   it("maps locations to default frame regions", () => {
