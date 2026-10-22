@@ -8,4 +8,5 @@
 | [architecture.md](architecture.md) | **目标架构**：prac 要成为什么、每条结构为哪个目标而存在（面向目标的设计，不是实现现状）                                                        |
 | [dsh.md](dsh.md)                   | **被依赖的系统**：DSH 的内部结构（`dsh web` 到像素的链、界面怎么拼、状态与持久化、已有能力：工具族 / LSP / MCP）                               |
 | [vscode.md](vscode.md)             | **被依赖的系统**：VS Code 的内部结构（两半与主线程、平台服务、extHost 协议与载体、诊断怎么走、agent / MCP / 工具 / skill / prompt 做在哪一层） |
+| [ui-surface-map.md](ui-surface-map.md) | **UI 参考**：两个生态的 UI 贡献面 → prac 的格子，以及 UI 术语表 |
 | [theory/](theory/)                 | 继承的 LLM 限制理论：固有特征、记忆模型、双 Agent、设计模式                                                                                    |

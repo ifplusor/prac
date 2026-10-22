@@ -189,3 +189,5 @@ status: in-progress
 - [../../../docs/architecture.md](../../../docs/architecture.md)：面向目标的设计（这一版）。
 - [../resolved/2026-09-08-prac-positioning-and-dev-workflow-model.md](../resolved/2026-09-08-prac-positioning-and-dev-workflow-model.md)：prac 的定位与开发工作流模型。
 - [../../../docs/vscode.md](../../../docs/vscode.md)：VS Code 自身的结构（两半与主线程、平台服务层、extHost 协议与载体）；DSH 那半在 [../../../docs/dsh.md](../../../docs/dsh.md)。
+- [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)：**UI framework umbrella**（两生态贡献面、content/container/host、跨来源组合、渐进切片）；几何见 §4.3。
+- [2026-10-17-vscode-host-architecture.md](2026-10-17-vscode-host-architecture.md)：VS Code adaptor 的层、对象、契约、surface。
