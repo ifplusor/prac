@@ -108,6 +108,14 @@ export class VscodeGroupHost {
     return view;
   }
 
+  /** Select a view in a hosted group when it belongs to that group. */
+  select(groupId: string, viewId: string): void {
+    const group = this.#groups.get(groupId);
+    const view = this.#views.get(viewId);
+    if (!group || !view || view.group !== group.group) return;
+    group.group.select(viewId);
+  }
+
   /** Remove one hosted view from its group. */
   removeView(viewId: string): void {
     const entry = this.#views.get(viewId);

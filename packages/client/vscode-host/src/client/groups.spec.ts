@@ -38,6 +38,7 @@ function fakeGroup(id: string, mode: "stack" | "select" = "stack"): VscodeGroupR
     },
     add: vi.fn(),
     remove: vi.fn(),
+    select: vi.fn(),
     dispose: vi.fn(),
   };
 }

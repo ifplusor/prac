@@ -179,3 +179,9 @@
 
 - 新增 frame bridge 测试：已有 placement 被 group 移动时只保留一个 view record，不产生第二份。
 - 验证：ui-layout 176 passed；check 通过。
+
+### 2026-10-22 — editor group follows active editor（slice 18）
+
+- `VscodeGroupRuntime.select`；`VscodeGroupHost.select` 只在 view 属于该 group 时调用。
+- `vscode-host` 订阅 `capabilities.editors`，把 app active file 投影为 editor group 的 active。
+- 验证：vscode-host 22 passed；check/build 通过。

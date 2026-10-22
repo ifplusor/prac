@@ -46,6 +46,7 @@ function definitions() {
     setBinding: () => {},
     add: () => {},
     remove: () => {},
+    select: () => {},
     dispose: () => {},
   };
   const view: FrameView = {

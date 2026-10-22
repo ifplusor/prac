@@ -43,7 +43,7 @@ import { createVscodeEmbed } from "prac-vscode-embed/client";
 import { EXTENSIONS_GALLERY } from "prac-vscode";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "./public.js";
 import { createVscodeResourceDefinitions } from "./adapter.js";
-import { VscodeGroupHost } from "./groups.js";
+import { EDITOR_GROUP_ID, VscodeGroupHost } from "./groups.js";
 import type { VscodeGroupRuntime } from "./resources.js";
 export * from "./resources.js";
 export * from "./adapter.js";
@@ -339,6 +339,17 @@ export function apply(ctx: Context): void {
       groupHost.dispose();
     };
   }, `${name}: view-group catalogue`);
+
+  ctx.effect(() => {
+    const editors = face.capabilities.editors;
+    const syncEditor = (): void => {
+      const active = editors.snapshot().find((entry) => entry.active);
+      if (active === undefined) return;
+      groupHost.select(EDITOR_GROUP_ID, `vscode:file:${active.placement}:${active.resource}`);
+    };
+    syncEditor();
+    return editors.subscribe(syncEditor);
+  }, `${name}: active editor group`);
 
   ctx.effect(() => ctx.provide("pracVscode", face), `${name}: pracVscode service`);
   // Diagnostics hook: lets a live gate exercise the command path directly,
