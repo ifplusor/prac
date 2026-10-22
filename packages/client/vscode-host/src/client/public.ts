@@ -370,3 +370,10 @@ export type {
   VscodeViewHostAdapter,
   VscodeViewSpec,
 } from "./resources.js";
+
+export type {
+  VscodeFaceAdapter,
+  VscodeResourceAdapterOptions,
+  VscodeResourceDefinitions,
+} from "./adapter.js";
+export type { VscodeGroupBindingRuntime } from "./resources.js";

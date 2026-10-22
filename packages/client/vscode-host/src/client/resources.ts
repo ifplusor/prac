@@ -30,6 +30,7 @@ export type VscodeGroupKind = "container" | "editor";
 /** Spec for one `VscodeViewGroup`. */
 export interface VscodeViewGroupSpec extends Readonly<Record<string, unknown>> {
   readonly groupKind: VscodeGroupKind;
+  readonly containerId?: string;
   readonly title?: string;
   readonly icon?: string;
   readonly order?: number;
@@ -87,6 +88,13 @@ export interface VscodeViewDefinitionOptions {
   readonly createHost: VscodeHostFactory;
 }
 
+/** Runtime hooks behind one VS Code group binding. */
+export interface VscodeGroupBindingRuntime {
+  actions?(): readonly import("./public.js").PracVscodeAction[];
+  runAction?(actionId: string): void;
+  dispose?(): void;
+}
+
 /** A source-owned group binding for a VS Code group. */
 export class VscodeGroupBinding implements GroupBinding {
   #disposed = false;
@@ -94,45 +102,25 @@ export class VscodeGroupBinding implements GroupBinding {
   constructor(
     readonly groupId: string,
     readonly groupKind: VscodeGroupKind,
-    private readonly delegate?: GroupBinding,
+    private readonly runtime?: VscodeGroupBindingRuntime,
   ) {}
+
+  /** Container title actions the frame may render. */
+  actions(): readonly import("./public.js").PracVscodeAction[] {
+    return this.#disposed ? [] : (this.runtime?.actions?.() ?? []);
+  }
+
+  /** Run one container title action by id. */
+  runAction(actionId: string): void {
+    if (this.#disposed) return;
+    this.runtime?.runAction?.(actionId);
+  }
 
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    this.delegate?.dispose();
+    this.runtime?.dispose?.();
   }
-}
-
-/** The imperative source adapter behind a `VscodeViewHost`. */
-export interface VscodeViewHostAdapter {
-  mount(viewId: string, element: HTMLElement): void;
-  release(viewId: string): void;
-  focus?(viewId: string): void;
-  readonly focusable?: boolean;
-}
-
-/**
- * Build a `VscodeViewHost` for one view resource.
- *
- * The app's view id comes from the source-owned spec when present; otherwise the
- * prac id convention is stripped. The adapter decides how to mount/release.
- */
-export function createVscodeViewHost(
-  view: VscodeView,
-  adapter: VscodeViewHostAdapter,
-): VscodeViewHost {
-  const appViewId = view.spec.viewId ?? stripViewPrefix(view.metadata.id);
-  return new VscodeViewHost(view.metadata.id, {
-    mount: (element) => adapter.mount(appViewId, element),
-    release: () => adapter.release(appViewId),
-    focus: () => adapter.focus?.(appViewId),
-    focusable: adapter.focusable ?? true,
-  });
-}
-
-function stripViewPrefix(id: string): string {
-  return id.startsWith("vscode:view:") ? id.slice("vscode:view:".length) : id;
 }
 
 /** A thin source-owned view host wrapper. */
@@ -157,6 +145,37 @@ export class VscodeViewHost implements ViewHost {
   focus(): void {
     this.delegate.focus();
   }
+}
+
+/** The imperative source adapter behind a `VscodeViewHost`. */
+export interface VscodeViewHostAdapter {
+  mount(viewId: string, element: HTMLElement): void;
+  release(viewId: string): void;
+  focus?(viewId: string): void;
+  readonly focusable?: boolean;
+}
+
+/**
+ * Build a `VscodeViewHost` for one view resource.
+ *
+ * The app's view id comes from the source-owned spec when present; otherwise the
+ * prac id convention is stripped. The adapter decides how to mount/release.
+ */
+export function createVscodeViewHost(
+  view: VscodeView,
+  adapter: VscodeViewHostAdapter,
+): VscodeViewHost {
+  const appViewId = view.spec.viewId ?? stripViewPrefix(view.metadata.id);
+  return new VscodeViewHost(view.metadata.id, {
+    mount: (element: HTMLElement) => adapter.mount(appViewId, element),
+    release: () => adapter.release(appViewId),
+    focus: () => adapter.focus?.(appViewId),
+    focusable: adapter.focusable ?? true,
+  });
+}
+
+function stripViewPrefix(id: string): string {
+  return id.startsWith("vscode:view:") ? id.slice("vscode:view:".length) : id;
 }
 
 /** `ViewGroupDefinition` for `vscode.prac/v1 ViewGroup`. */

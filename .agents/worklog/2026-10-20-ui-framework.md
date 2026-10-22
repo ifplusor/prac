@@ -101,3 +101,9 @@
 - `PracVscodeFace` 新增 `mountView` / `releaseView`；映射 `vscode:view:<app view id>`。
 - `createVscodeViewHost` 把 `VscodeView` + adapter 变成 `ViewHost`；source-owned `viewId`。
 - 验证：embed check 通过；vscode-host 8 passed；两边 check/build 通过。
+
+### 2026-10-22 — face adapter composition（slice 6）
+
+- `VscodeGroupBinding` 增加 `actions()` / `runAction()`；`VscodeViewGroupSpec` 增加 `containerId`。
+- 新增 `adapter.ts`：`createVscodeResourceDefinitions({ face, createGroup, createView })`，把 binding / host 接到 `PracVscodeFace`。
+- 验证：vscode-host 10 passed；embed check 通过；vscode-host check/build 通过。

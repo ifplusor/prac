@@ -43,6 +43,7 @@ import { createVscodeEmbed } from "prac-vscode-embed/client";
 import { EXTENSIONS_GALLERY } from "prac-vscode";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "./public.js";
 export * from "./resources.js";
+export * from "./adapter.js";
 
 /** Same-origin prefix the host half serves the app bundle under. */
 const VSCODE_ROUTE = "/prac-vscode";
