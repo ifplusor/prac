@@ -49,7 +49,9 @@ export function apply(ctx: Context): void {
   // is what keeps this slot's use of it checked.
   const host: PracVscodeFace = ctx.pracVscode;
   const slots: SlotRegistry = ctx.slots;
-  const layout: PracLayoutFace = ctx.pracLayout;
+  // The type-only import and the ambient merge can come through different
+  // declaration copies (vscode-host bundles its own), so cast at the boundary.
+  const layout: PracLayoutFace = ctx.pracLayout as unknown as PracLayoutFace;
   /** The catalogue entries this package declares views for: the open files. */
   const fileEntries = (): readonly VscodeCatalogueEntry[] =>
     host.catalogue().filter((entry) => entry.source === "file");
@@ -159,10 +161,13 @@ export function apply(ctx: Context): void {
           for (const { view } of entries) {
             if (registered.has(view)) continue;
             // The component renders an empty host until the app has mounted the
-            // file, then fills it — the bridge's direction, one level up.
+            // file, then fills it — the bridge's direction, one level up. The
+            // app's editor brings its own pane header, so the frame overlays its
+            // fold/drag control instead of drawing a second row header.
+            const options = { name: SLOT, id: view, paneHeader: true };
             registered.set(
               view,
-              slots.register({ name: SLOT, id: view }, () => host.hostFor(view)() ?? null),
+              slots.register(options, () => host.hostFor(view)() ?? null),
             );
           }
         };

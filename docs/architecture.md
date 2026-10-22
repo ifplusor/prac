@@ -107,12 +107,12 @@
 
 **区域名绑定布局模式——机制提供模式，数据决定谁用哪些**：
 
-| role | 默认物理位置 | 内容 | 默认模式 |
-| --- | --- | --- | --- |
-| `stage` | center | grid；select view group | 选择 |
-| `primarySidebar` | left | container stack | 选择（container 之间） |
-| `secondarySidebar` | right | container stack | 选择（container 之间） |
-| `panel` | bottom | container stack | 选择（container 之间） |
+| role               | 默认物理位置 | 内容                    | 默认模式               |
+| ------------------ | ------------ | ----------------------- | ---------------------- |
+| `stage`            | center       | grid；select view group | 选择                   |
+| `primarySidebar`   | left         | container stack         | 选择（container 之间） |
+| `secondarySidebar` | right        | container stack         | 选择（container 之间） |
+| `panel`            | bottom       | container stack         | 选择（container 之间） |
 
 - **基础层只有"分区 / 顺序 / 选择"三种模式，叠放只在悬浮层**：叠放 = 同时可见 + 需要定序；tab 同一时刻只显示一个 ⇒ 它属"选择"、不是叠放。**基础层不需要 z 序**（"显示哪一个"是**选中**，是布局的状态，走注意力只是改变它交互的过程）。
 - **role 是组件语义，物理位置是默认值**：`stage` / `primarySidebar` / `secondarySidebar` / `panel` 是 role；left / center / right / bottom 是默认物理位置，不是 role 名。stage 的内容是 grid；container 内部是 stack；select view group 内部是 tab。

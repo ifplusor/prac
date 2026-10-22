@@ -108,6 +108,16 @@ function recordingFace(views: LayoutState["views"] = {}): {
     createRegionBeside: () => undefined,
     regionInDirection: () => undefined,
     setFront: () => {},
+    createViewGroup: (() => {
+      throw new Error("not used by this test double");
+    }) as PracLayoutFace["createViewGroup"],
+    createView: (() => {
+      throw new Error("not used by this test double");
+    }) as PracLayoutFace["createView"],
+    registerViewGroup: (() => {
+      throw new Error("not used by this test double");
+    }) as PracLayoutFace["registerViewGroup"],
+    unregisterViewGroup: () => {},
   } satisfies PracLayoutFace;
   return { face, calls, children };
 }

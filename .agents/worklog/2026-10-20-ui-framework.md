@@ -191,3 +191,10 @@
 - `VscodeGroupHost.regionOf`；sync 在 group region 变化时 unregister + re-add，而不是静默保留旧 region。
 - 新增 group region change 与 dispose 测试（groups/views 清空、unregister 调用）。
 - 验证：vscode-host 24 passed；check/build 通过。
+
+### 2026-10-22 — workspace verification（slice 20）
+
+- `pnpm test`：所有 package 通过（ui-layout 176、vscode-host 24、web-app 24 等）。
+- `pnpm check`：0 errors；仅 3 个既存 warning。
+- 修复新增 `PracLayoutFace` 方法导致的 arrangement test double 与 vscode-editor declaration-copy 类型问题。
+- docs 格式化通过。
