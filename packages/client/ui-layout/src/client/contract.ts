@@ -29,7 +29,6 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
     /** The per-view action surface a `prac.view` owner may fill; keyed by view id. */
     "prac.viewActions": { kind: "keyed"; scope: "root" };
     /** The per-container action surface; keyed by container id. */
-    "prac.containerActions": { kind: "keyed"; scope: "root" };
     // The child slots of the `root` slot prac registers — declared by their **owner**, which
     // is the frame (see the `ui-slots` contract: a slot table is merged by the plugin that
     // owns the slot, and reading entries stays string-keyed and dynamic). prac owns the frame

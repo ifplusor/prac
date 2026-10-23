@@ -119,13 +119,7 @@ interface PointerDragEvent {
  * keys, so a dispatch to a key the frame did not declare is a type error.
  */
 type RenderSlot = import("@deepseek-ai/dsh-client-ui-slots").PropsRenderSlots<
-  | "sidebar"
-  | "main"
-  | "rightbar"
-  | "shell.overlay"
-  | "prac.view"
-  | "prac.viewActions"
-  | "prac.containerActions"
+  "sidebar" | "main" | "rightbar" | "shell.overlay" | "prac.view" | "prac.viewActions"
 >["renderSlot"];
 
 // ── the frame ─────────────────────────────────────────────────────────
@@ -1352,6 +1346,10 @@ export function createFrame(
           item,
         ]),
       );
+      const groupAt = (childId: string): GroupBarItem | undefined =>
+        groups.get(childId) ??
+        groups.get(`${node.id}/${childId}`) ??
+        [...groups.values()].find((item) => item.regionId.endsWith(`/${childId}`));
       return createElement(
         "div",
         { key: "containers", "data-prac-container-bar": node.id, style: TAB_STRIP_STYLE },
@@ -1381,7 +1379,7 @@ export function createFrame(
             // The group's own label wins; otherwise either shape may carry the name
             // (a child that became a stack is a split — see `SplitNode.label`), and the
             // id is only the last resort.
-            groups.get(child.id)?.label ?? child.label ?? viewLabel(child.id),
+            groupAt(child.id)?.label ?? child.label ?? viewLabel(child.id),
           ),
         ),
         createElement(
@@ -1389,6 +1387,7 @@ export function createFrame(
           {
             key: "actions",
             "data-prac-container-actions": actionKey,
+            "data-prac-container-action-bar": actionKey,
             style: {
               display: "flex",
               alignItems: "center",
@@ -1397,7 +1396,7 @@ export function createFrame(
             },
           },
           (() => {
-            const group = groups.get(activeId);
+            const group = groupAt(activeId);
             if (group?.actions !== undefined && group.actions.length > 0) {
               return group.actions.map((action) =>
                 createElement(
@@ -1425,7 +1424,7 @@ export function createFrame(
                 ),
               );
             }
-            return renderSlot("prac.containerActions", {}, { entryKey: actionKey });
+            return null;
           })(),
         ),
       );

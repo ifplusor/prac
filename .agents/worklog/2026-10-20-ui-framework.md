@@ -345,3 +345,9 @@
 - 默认 stage 改为 2×2（1 cell 时仍 display: contents）。
 - `splitRegionWith(..., {gridCells:true})` 现在按 source side 计算显式 placement，并扩展 rows/columns；不再靠 row-major 追加。
 - 新增 side placement 单测；live 全绿：split/resize/containers/persistence/bottom/stack/views/file/tabs。
+
+### 2026-10-23 — group action 单一来源（slice 46，D）
+
+- 删除 `prac.containerActions` slot 与 `ui-vscode-views` 的 ContainerActions 注册；container bar actions 只从 `VscodeGroupBinding` 投影。
+- frame 修正 group 查找（node/child 全路径）；action bar 标记 `data-prac-container-action-bar`。
+- live：verify:containers 全绿；ui-layout 191 / check 0。

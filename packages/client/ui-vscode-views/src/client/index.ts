@@ -24,139 +24,15 @@
  * @module prac-client-ui-vscode-views/client
  */
 
-import { createElement, useLayoutEffect, useRef, useState } from "react";
+import { createElement, useLayoutEffect, useRef } from "react";
 import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
-import type {
-  PracVscodeAction,
-  PracVscodeFace,
-  VscodeCatalogueEntry,
-} from "prac-client-vscode-host/client";
+import type { PracVscodeFace, VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 import type { ViewSlotKey } from "prac-client-ui-layout/client";
 
 /** The slot these views are registered into (checked against the mechanism's key). */
 const SLOT: ViewSlotKey = "prac.view";
-const CONTAINER_ACTIONS = "prac.containerActions" as const;
-
-/**
- * One container's title actions, rendered by the frame's container bar.
- *
- * The adapter resolves the action tree (including submenus); this component only
- * draws it and asks the adapter to run the original action by id.
- *
- * @param props - the app face and the container id.
- */
-function ContainerActions({
-  host,
-  containerId,
-}: {
-  host: PracVscodeFace;
-  containerId: string;
-}): ReactElement | null {
-  const [openId, setOpenId] = useState<string | null>(null);
-  const actions: readonly PracVscodeAction[] = host.containerActions(containerId);
-  if (actions.length === 0) return null;
-  const run = (id: string): void => {
-    setOpenId(null);
-    host.runAction(containerId, id);
-  };
-  const buttonStyle = {
-    font: "inherit",
-    fontSize: "11px",
-    height: "100%",
-    padding: "0 5px",
-    border: 0,
-    background: "transparent",
-    color: "inherit",
-    cursor: "pointer",
-  } as const;
-  const itemStyle = {
-    font: "inherit",
-    fontSize: "11px",
-    display: "block",
-    width: "100%",
-    padding: "4px 10px",
-    border: 0,
-    background: "transparent",
-    color: "inherit",
-    textAlign: "left",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-  } as const;
-  return createElement(
-    "div",
-    {
-      "data-prac-container-action-bar": containerId,
-      style: { display: "flex", alignItems: "center", height: "100%", position: "relative" },
-    },
-    ...actions.map((action) => {
-      const hasSubmenu = action.submenu !== undefined && action.submenu.length > 0;
-      const open = hasSubmenu && openId === action.id;
-      return createElement(
-        "div",
-        { key: action.id, style: { position: "relative", height: "100%" } },
-        createElement(
-          "button",
-          {
-            type: "button",
-            "data-prac-container-action": action.id,
-            title: action.tooltip ?? action.label,
-            "aria-label": action.label,
-            "aria-haspopup": hasSubmenu ? "menu" : undefined,
-            "aria-expanded": hasSubmenu ? open : undefined,
-            disabled: !action.enabled,
-            onClick: () => {
-              if (hasSubmenu) {
-                setOpenId(open ? null : action.id);
-              } else {
-                run(action.id);
-              }
-            },
-            style: { ...buttonStyle, opacity: action.enabled ? 1 : 0.55 },
-          },
-          action.label,
-        ),
-        open
-          ? createElement(
-              "div",
-              {
-                role: "menu",
-                "data-prac-container-submenu": action.id,
-                style: {
-                  position: "absolute",
-                  top: "100%",
-                  right: 0,
-                  minWidth: "160px",
-                  zIndex: 20,
-                  padding: "4px 0",
-                  background: "var(--vscode-menu-background, #252526)",
-                  color: "var(--vscode-menu-foreground, #cccccc)",
-                  border: "1px solid var(--vscode-menu-border, #454545)",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.36)",
-                },
-              },
-              ...(action.submenu ?? []).map((child) =>
-                createElement(
-                  "button",
-                  {
-                    key: child.id,
-                    type: "button",
-                    role: "menuitem",
-                    "data-prac-container-action": child.id,
-                    disabled: !child.enabled,
-                    onClick: () => run(child.id),
-                    style: { ...itemStyle, opacity: child.enabled ? 1 : 0.55 },
-                  },
-                  child.checked ? `✓ ${child.label}` : child.label,
-                ),
-              ),
-            )
-          : null,
-      );
-    }),
-  );
-}
 
 /**
  * Declare one view per entry of the app's view catalogue, and keep it in sync.
@@ -293,44 +169,6 @@ export function apply(ctx: Context): void {
         };
       }),
     "prac-client-ui-vscode-views: one view per app view",
-  );
-
-  // One container-action registration per container the app offers. The frame's
-  // container bar picks the active container's entry; the actions come from the
-  // workbench's `MenuId.ViewContainerTitle` menu.
-  ctx.effect(
-    () =>
-      slots.inject(CONTAINER_ACTIONS, () => {
-        const registered = new Map<string, { dispose: () => void }>();
-        const sync = (): void => {
-          const ids = new Set<string>();
-          for (const entry of host.catalogue()) {
-            if (entry.source === "view" && entry.containerId !== undefined)
-              ids.add(entry.containerId);
-          }
-          for (const [id, record] of Array.from(registered)) {
-            if (ids.has(id)) continue;
-            record.dispose();
-            registered.delete(id);
-          }
-          for (const id of ids) {
-            if (registered.has(id)) continue;
-            registered.set(id, {
-              dispose: slots.register({ name: CONTAINER_ACTIONS, key: id }, () =>
-                createElement(ContainerActions, { host, containerId: id }),
-              ),
-            });
-          }
-        };
-        sync();
-        const stop = host.onDidChangeCatalogue(sync);
-        return () => {
-          stop();
-          for (const { dispose } of registered.values()) dispose();
-          registered.clear();
-        };
-      }),
-    "prac-client-ui-vscode-views: container actions",
   );
 }
 
