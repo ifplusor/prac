@@ -19,6 +19,7 @@ import {
   type Sizing,
   type Box,
   type Dir,
+  type GridPlacement,
   type LayoutNode,
   type LayoutState,
   type RegionNode,
@@ -135,8 +136,8 @@ export function defaultTree(): SplitNode {
           // empty work area is still present.
           gridNode(
             "stage",
-            1,
-            3,
+            2,
+            2,
             [
               regionNode(CENTER_REGION, 0, {
                 flex: true,
@@ -1858,16 +1859,64 @@ export function splitRegionWith(
   if (options?.gridCells === true) {
     const ancestry = regionAncestry(state.tree, regionId);
     const parent = ancestry?.[ancestry.length - 1];
-    if (
-      parent !== undefined &&
-      parent.parent.type === "grid" &&
-      parent.parent.children.length < parent.parent.rows * parent.parent.columns
-    ) {
-      const children = [...parent.parent.children];
+    if (parent !== undefined && parent.parent.type === "grid") {
+      const grid = parent.parent;
+      const shape = gridShape(grid, grid.children.length);
+      const placements = new Map<string, GridPlacement>();
+      grid.children.forEach((child, index) => {
+        placements.set(
+          child.id,
+          grid.placements?.[child.id] ?? {
+            row: Math.floor(index / shape.columns),
+            column: index % shape.columns,
+          },
+        );
+      });
+      const source = placements.get(regionId) ?? { row: 0, column: 0 };
+      const horizontal = side === "left" || side === "right";
+      const at = horizontal
+        ? side === "left"
+          ? source.column
+          : source.column + (source.columnSpan ?? 1)
+        : side === "up"
+          ? source.row
+          : source.row + (source.rowSpan ?? 1);
+      // Make room by shifting the cells at/after the insertion line. The grid
+      // grows to its content; it is not a fixed 2×2 board.
+      for (const [id, placement] of placements) {
+        if (horizontal) {
+          if (placement.column >= at) {
+            placements.set(id, { ...placement, column: placement.column + 1 });
+          }
+        } else if (placement.row >= at) {
+          placements.set(id, { ...placement, row: placement.row + 1 });
+        }
+      }
+      placements.set(
+        newRegionId,
+        horizontal ? { row: source.row, column: at } : { row: at, column: source.column },
+      );
+      const columns = Math.max(
+        1,
+        ...[...placements.values()].map(
+          (placement) => placement.column + (placement.columnSpan ?? 1),
+        ),
+      );
+      const rows = Math.max(
+        1,
+        ...[...placements.values()].map((placement) => placement.row + (placement.rowSpan ?? 1)),
+      );
+      const children = [...grid.children];
       children.splice(before ? parent.index : parent.index + 1, 0, fresh);
       return {
         ...state,
-        tree: replaceNode(state.tree, parent.parent.id, () => ({ ...parent.parent, children })),
+        tree: replaceNode(state.tree, grid.id, () => ({
+          ...grid,
+          rows,
+          columns,
+          children,
+          placements: Object.fromEntries(placements),
+        })),
       };
     }
   }

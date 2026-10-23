@@ -339,3 +339,9 @@
 - 新增 `gridShape`：无显式 placement 时按 cell 数量流动，1 cell 全尺寸，2/3 cells 单带，4 cells 2×2。
 - 默认 stage 仍是 1×3；2×2 默认在 split 上会破坏 left/down 几何，已回退。
 - live：verify-split 全绿；grid 190 passed。
+
+### 2026-10-23 — 2D stage placements（slice 45，C）
+
+- 默认 stage 改为 2×2（1 cell 时仍 display: contents）。
+- `splitRegionWith(..., {gridCells:true})` 现在按 source side 计算显式 placement，并扩展 rows/columns；不再靠 row-major 追加。
+- 新增 side placement 单测；live 全绿：split/resize/containers/persistence/bottom/stack/views/file/tabs。

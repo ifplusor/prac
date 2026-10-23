@@ -80,6 +80,38 @@ describe("grid node", () => {
     expect(removed.tree.type).toBe("grid");
   });
 
+  it("places split cells on the side the caller asked for", () => {
+    const layout = state();
+    layout.tree = gridNode("stage", 2, 2, [regionNode("a", 0, { flex: true })]);
+    const right = splitRegionWith(layout, "a", "right", "s1", "b", { gridCells: true });
+    expect(right.tree.type).toBe("grid");
+    if (right.tree.type === "grid") {
+      expect(right.tree.rows).toBe(1);
+      expect(right.tree.columns).toBe(2);
+      expect(right.tree.placements).toMatchObject({
+        a: { row: 0, column: 0 },
+        b: { row: 0, column: 1 },
+      });
+    }
+    const left = splitRegionWith(right, "a", "left", "s2", "c", { gridCells: true });
+    if (left.tree.type === "grid") {
+      expect(left.tree.placements).toMatchObject({
+        c: { row: 0, column: 0 },
+        a: { row: 0, column: 1 },
+        b: { row: 0, column: 2 },
+      });
+    }
+    const down = splitRegionWith(left, "a", "down", "s3", "d", { gridCells: true });
+    if (down.tree.type === "grid") {
+      expect(down.tree.placements).toMatchObject({
+        c: { row: 0, column: 0 },
+        a: { row: 0, column: 1 },
+        b: { row: 0, column: 2 },
+        d: { row: 1, column: 1 },
+      });
+    }
+  });
+
   it("can add a cell when the caller asks for grid cells", () => {
     const layout = state();
     layout.tree = gridNode("stage", 1, 3, [regionNode("a", 0, { flex: true })]);
