@@ -426,7 +426,10 @@ function RecallSurface({ layout, onFocus }: RecallSurfaceProps): ReactElement | 
         "data-prac-recall-selected": index === active ? "" : undefined,
         draggable: true,
         onDragStart: (event: {
-          readonly dataTransfer: { setData(type: string, value: string): void; effectAllowed: string } | null;
+          readonly dataTransfer: {
+            setData(type: string, value: string): void;
+            effectAllowed: string;
+          } | null;
           readonly preventDefault: () => void;
         }) => {
           if (event.dataTransfer === null) return;
