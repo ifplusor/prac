@@ -20,7 +20,8 @@
     "verify:grid": "node tests/gates/verify-grid.mjs",
     "verify:grid-resize": "node tests/gates/verify-grid-resize.mjs",
     "verify:grid-merge": "node tests/gates/verify-grid-merge.mjs",
-    "verify:grid-view": "node tests/gates/verify-grid-view.mjs"
+    "verify:grid-view": "node tests/gates/verify-grid-view.mjs",
+    "verify:grid-tab": "node tests/gates/verify-grid-tab.mjs"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

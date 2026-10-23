@@ -422,3 +422,8 @@
 
 - 新增 `docs/ui-acceptance.md`：一条命令、gate 清单、动态 fixture 前提、profile 写入权限、known noise、加 gate 流程。
 - UI framework note 的 Related 增加该文档。
+
+### 2026-10-23 — tab → cell 直接拖（slice 59）
+
+- grid cell drop 识别 tab 的 `text/plain`，直接 place；tab strip 内 reorder 不变。
+- 新增 `verify:grid-tab`；全量 verify:ui 17 阶段全绿。

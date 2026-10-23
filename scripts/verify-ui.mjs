@@ -31,6 +31,7 @@ const gates = [
   ["grid:resize", "tests/gates/verify-grid-resize.mjs"],
   ["grid:merge", "tests/gates/verify-grid-merge.mjs"],
   ["grid:view", "tests/gates/verify-grid-view.mjs"],
+  ["grid:tab", "tests/gates/verify-grid-tab.mjs"],
   ["resize", "tests/gates/verify-resize.mjs"],
   ["persistence", "tests/gates/verify-persistence.mjs"],
   ["bottom", "tests/gates/verify-bottom.mjs"],

@@ -1826,6 +1826,16 @@ export function createFrame(
                   if (canDrag) event.preventDefault();
                 },
                 onDrop: (event: ReactDragEvent<HTMLElement>) => {
+                  const tab = event.dataTransfer?.getData("text/plain");
+                  if (tab !== undefined && tab !== "") {
+                    const landing =
+                      child.type === "region" ? child : edgeRegion(state, child, "left");
+                    if (landing !== null) {
+                      event.preventDefault();
+                      store.update((current) => place(current, tab, landing.id));
+                    }
+                    return;
+                  }
                   const view = event.dataTransfer?.getData("text/prac-view");
                   if (view !== undefined && view !== "") {
                     const landing =
