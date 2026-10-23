@@ -1670,11 +1670,10 @@ export function mergeGridCells(
   const children = grid.children
     .filter((child) => child.id !== sourceId)
     .map((child) => (child.id === targetId ? split : child));
-  const nextPlacements = {
-    ...placements,
-    [targetId]: { ...target, row, column, rowSpan, columnSpan },
-  };
+  const nextPlacements = { ...placements };
   delete nextPlacements[sourceId];
+  delete nextPlacements[targetId];
+  nextPlacements[split.id] = { ...target, row, column, rowSpan, columnSpan };
   const rows = Math.max(
     1,
     ...Object.values(nextPlacements).map((placement) => placement.row + (placement.rowSpan ?? 1)),

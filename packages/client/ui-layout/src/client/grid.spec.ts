@@ -250,6 +250,34 @@ describe("grid node", () => {
     });
   });
 
+  it("unmerges nested merged cells in order", () => {
+    const layout = state();
+    layout.tree = gridNode(
+      "stage",
+      1,
+      3,
+      [regionNode("a", 0), regionNode("b", 0), regionNode("c", 0)],
+      {
+        placements: {
+          a: { row: 0, column: 0 },
+          b: { row: 0, column: 1 },
+          c: { row: 0, column: 2 },
+        },
+      },
+    );
+    const ab = mergeGridCells(layout.tree, "stage", "a", "b");
+    if (ab.type !== "grid") return;
+    const abc = mergeGridCells(ab, "stage", ab.children[0]!.id, "c");
+    if (abc.type !== "grid") return;
+    expect(abc.children).toHaveLength(1);
+    const backToAb = unmergeGridCell(abc, "stage", abc.children[0]!.id);
+    if (backToAb.type !== "grid") return;
+    expect(backToAb.children.map((child) => child.id)).toEqual([ab.children[0]!.id, "c"]);
+    const backToAbc = unmergeGridCell(backToAb, "stage", ab.children[0]!.id);
+    if (backToAbc.type !== "grid") return;
+    expect(backToAbc.children.map((child) => child.id)).toEqual(["a", "b", "c"]);
+  });
+
   it("refuses a non-adjacent merge", () => {
     const layout = state();
     layout.tree = gridNode("stage", 2, 2, [regionNode("a", 0), regionNode("b", 0)], {

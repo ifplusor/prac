@@ -412,3 +412,8 @@
 
 - `GridNode.merged` 记录合并前 source/target placement；unmerge 恢复原始 span，不再均匀切分。
 - 新增 unequal span 单测；live merge gate 与全量 verify:ui 16 阶段全绿。
+
+### 2026-10-23 — nested merge placement fix（slice 58）
+
+- merge 的 union placement 改 key 为 split id（不再 key target child）；nested merge 正确。
+- 新增 nested merge/unmerge 单测；全量 verify:ui 16 阶段全绿。
