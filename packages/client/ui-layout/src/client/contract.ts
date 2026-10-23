@@ -262,6 +262,13 @@ export interface GridNode {
   readonly columns: number;
   /** Explicit placements by child id; absent means row-major. */
   readonly placements?: Readonly<Record<string, GridPlacement>>;
+  /**
+   * The placements a merged cell was made from, keyed by the merged split id.
+   * Kept so unmerge can restore unequal spans instead of dividing evenly.
+   */
+  readonly merged?: Readonly<
+    Record<string, { readonly source: GridPlacement; readonly target: GridPlacement }>
+  >;
   /** Common placement fields, so a grid can sit where a split can. */
   readonly size?: number;
   readonly flex?: boolean;

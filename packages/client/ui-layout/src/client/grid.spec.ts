@@ -225,6 +225,31 @@ describe("grid node", () => {
     });
   });
 
+  it("restores unequal spans when unmerging", () => {
+    const layout = state();
+    layout.tree = gridNode(
+      "stage",
+      3,
+      1,
+      [regionNode("a", 0, { flex: true }), regionNode("b", 0, { flex: true })],
+      {
+        placements: {
+          a: { row: 0, column: 0, rowSpan: 1 },
+          b: { row: 1, column: 0, rowSpan: 2 },
+        },
+      },
+    );
+    const merged = mergeGridCells(layout.tree, "stage", "a", "b");
+    expect(merged.type).toBe("grid");
+    if (merged.type !== "grid") return;
+    const unmerged = unmergeGridCell(merged, "stage", merged.children[0]!.id);
+    if (unmerged.type !== "grid") return;
+    expect(unmerged.placements).toMatchObject({
+      a: { row: 0, column: 0, rowSpan: 1 },
+      b: { row: 1, column: 0, rowSpan: 2 },
+    });
+  });
+
   it("refuses a non-adjacent merge", () => {
     const layout = state();
     layout.tree = gridNode("stage", 2, 2, [regionNode("a", 0), regionNode("b", 0)], {

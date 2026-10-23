@@ -407,3 +407,8 @@
 
 - recall row dragstart 将面板变为 0.2 透明并 pointer-events:none；dragend 恢复。
 - verify:grid-view 断言 `data-prac-recall-dragging=true`；全量 verify:ui 16 阶段全绿。
+
+### 2026-10-23 — unmerge span restore（slice 57）
+
+- `GridNode.merged` 记录合并前 source/target placement；unmerge 恢复原始 span，不再均匀切分。
+- 新增 unequal span 单测；live merge gate 与全量 verify:ui 16 阶段全绿。

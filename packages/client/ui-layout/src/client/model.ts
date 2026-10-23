@@ -1686,7 +1686,16 @@ export function mergeGridCells(
     ),
   );
   return replaceNode(tree, gridId, (node) =>
-    node.type === "grid" ? { ...node, rows, columns, children, placements: nextPlacements } : node,
+    node.type === "grid"
+      ? {
+          ...node,
+          rows,
+          columns,
+          children,
+          placements: nextPlacements,
+          merged: { ...node.merged, [split.id]: { source, target } },
+        }
+      : node,
   );
 }
 
@@ -1713,28 +1722,35 @@ export function unmergeGridCell(tree: LayoutNode, gridId: string, cellId: string
   const pieces = cell.children.length;
   const nextPlacements = { ...placements };
   delete nextPlacements[cellId];
-  cell.children.forEach((child, index) => {
-    if (cell.dir === "row") {
-      const width = Math.max(1, Math.floor((target.columnSpan ?? 1) / pieces));
-      nextPlacements[child.id] = {
-        row: target.row,
-        column: target.column + width * index,
-        rowSpan: target.rowSpan ?? 1,
-        columnSpan: index === pieces - 1 ? (target.columnSpan ?? pieces) - width * index : width,
-      };
-    } else {
-      const height = Math.max(1, Math.floor((target.rowSpan ?? 1) / pieces));
-      nextPlacements[child.id] = {
-        row: target.row + height * index,
-        column: target.column,
-        rowSpan: index === pieces - 1 ? (target.rowSpan ?? pieces) - height * index : height,
-        columnSpan: target.columnSpan ?? 1,
-      };
-    }
-  });
+  const merged = grid.merged?.[cellId];
+  if (merged !== undefined) {
+    nextPlacements[cell.children[0]!.id] = merged.source;
+    nextPlacements[cell.children[1]!.id] = merged.target;
+  } else
+    cell.children.forEach((child, index) => {
+      if (cell.dir === "row") {
+        const width = Math.max(1, Math.floor((target.columnSpan ?? 1) / pieces));
+        nextPlacements[child.id] = {
+          row: target.row,
+          column: target.column + width * index,
+          rowSpan: target.rowSpan ?? 1,
+          columnSpan: index === pieces - 1 ? (target.columnSpan ?? pieces) - width * index : width,
+        };
+      } else {
+        const height = Math.max(1, Math.floor((target.rowSpan ?? 1) / pieces));
+        nextPlacements[child.id] = {
+          row: target.row + height * index,
+          column: target.column,
+          rowSpan: index === pieces - 1 ? (target.rowSpan ?? pieces) - height * index : height,
+          columnSpan: target.columnSpan ?? 1,
+        };
+      }
+    });
   const children = grid.children.flatMap((child) =>
     child.id === cellId ? cell.children : [child],
   );
+  const nextMerged = { ...grid.merged };
+  delete nextMerged[cellId];
   const rows = Math.max(
     1,
     ...Object.values(nextPlacements).map((placement) => placement.row + (placement.rowSpan ?? 1)),
@@ -1746,7 +1762,16 @@ export function unmergeGridCell(tree: LayoutNode, gridId: string, cellId: string
     ),
   );
   return replaceNode(tree, gridId, (node) =>
-    node.type === "grid" ? { ...node, rows, columns, children, placements: nextPlacements } : node,
+    node.type === "grid"
+      ? {
+          ...node,
+          rows,
+          columns,
+          children,
+          placements: nextPlacements,
+          ...(Object.keys(nextMerged).length === 0 ? {} : { merged: nextMerged }),
+        }
+      : node,
   );
 }
 
