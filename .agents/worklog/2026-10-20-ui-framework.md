@@ -438,3 +438,7 @@
 - GridNode 增加 column/row weights；resolveSizes/frame CSS 按权重分配。
 - grid 增加 track 分隔条拖动；`setGridTrackWeight` / `resizeGridTrack` 模型。
 - 新增 `verify:grid-free`；全量 verify:ui 20 阶段全绿。
+
+### 2026-10-23 — track resize API
+
+- `PracLayoutFace` 增加 `setGridTrackWeight` / `resizeGridTrack`；services 接线。

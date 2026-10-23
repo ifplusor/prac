@@ -692,6 +692,31 @@ export interface PracLayoutFace {
    */
   resizeGridCell(gridId: string, cellId: string, rowSpan: number, columnSpan: number): void;
   /**
+   * Set one grid track's relative weight.
+   *
+   * @param gridId - the grid.
+   * @param axis - column or row.
+   * @param index - zero-based track.
+   * @param weight - positive relative weight.
+   */
+  setGridTrackWeight(gridId: string, axis: "column" | "row", index: number, weight: number): void;
+  /**
+   * Drag a boundary between two grid tracks.
+   *
+   * @param gridId - the grid.
+   * @param axis - column or row.
+   * @param boundary - zero-based track to grow.
+   * @param delta - pointer movement along the axis, in pixels.
+   * @param extent - grid pixel extent along the axis.
+   */
+  resizeGridTrack(
+    gridId: string,
+    axis: "column" | "row",
+    boundary: number,
+    delta: number,
+    extent: number,
+  ): void;
+  /**
    * Split a region in two **without moving a view into it**, and report the new region's id.
    *
    * This is the workbench's channel for `addGroup`: VS Code's editor part asks for a *group*

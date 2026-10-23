@@ -49,6 +49,8 @@ import {
   moveGridCell,
   unmergeGridCell,
   resizeGridCell,
+  resizeGridTrack,
+  setGridTrackWeight,
   place,
   placeQuietly,
   regionInfos,
@@ -404,6 +406,31 @@ export function createServices(
     unmergeGridCell(gridId: string, cellId: string): void {
       store.update((state) => {
         const tree = unmergeGridCell(state.tree, gridId, cellId);
+        return tree === state.tree ? state : { ...state, tree };
+      });
+    },
+    /** Set one grid track's relative weight. */
+    setGridTrackWeight(
+      gridId: string,
+      axis: "column" | "row",
+      index: number,
+      weight: number,
+    ): void {
+      store.update((state) => {
+        const tree = setGridTrackWeight(state.tree, gridId, axis, index, weight);
+        return tree === state.tree ? state : { ...state, tree };
+      });
+    },
+    /** Drag a track boundary by a pixel delta. */
+    resizeGridTrack(
+      gridId: string,
+      axis: "column" | "row",
+      boundary: number,
+      delta: number,
+      extent: number,
+    ): void {
+      store.update((state) => {
+        const tree = resizeGridTrack(state.tree, gridId, axis, boundary, delta, extent);
         return tree === state.tree ? state : { ...state, tree };
       });
     },

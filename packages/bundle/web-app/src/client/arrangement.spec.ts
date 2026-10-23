@@ -112,6 +112,8 @@ function recordingFace(views: LayoutState["views"] = {}): {
     unmergeGridCell: () => {},
     moveGridCell: () => {},
     resizeGridCell: () => {},
+    resizeGridTrack: () => {},
+    setGridTrackWeight: () => {},
     createViewGroup: (() => {
       throw new Error("not used by this test double");
     }) as PracLayoutFace["createViewGroup"],
