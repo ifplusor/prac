@@ -40,8 +40,9 @@ still only partially represented: region-level `priority`, `max`, distribution
 and snap exist in the split resize path, but grid tracks have relative weights
 without pixel min/max, and there is no maximized cell or keyboard track resize.
 
-This section records what the implementation now answers; it does **not**
-promote the note. The status remains `proposed` until the decisions are signed.
+This section records what the implementation now answers. The direction was
+accepted on 2026-10-23 and the note is `in-progress`; the remaining proposal
+items are open work, not a reason to re-open the direction.
 
 ## Proposal
 

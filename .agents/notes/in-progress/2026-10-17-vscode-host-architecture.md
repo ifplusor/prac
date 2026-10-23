@@ -380,7 +380,7 @@ frame 侧（stack chrome / grid）不属于这张 note 的 steps，见各自的 
 ## 8. Open questions
 
 - **`IViewsService` external registry**：subclass 还是 patch `ViewsService`；`getActiveViewWithId` / container 级方法在 plain group 下如何返回；`focusedViewContextKey` 谁维护。
-- **container context**：headless `ViewPaneContainer`，还是更小的 context？见 [container context](../in-progress/2026-10-22-vscode-container-context.md)。
+- **container context**：已裁为 [D（混合 host 的 container binding）](../in-progress/2026-10-22-vscode-container-context.md)；剩余的是 external registry / G / focus 的实现问题，见该 note。
 - **part context**：frame 的 role（`stage` / `primarySidebar` / `secondarySidebar` / `panel`）与 VS Code 的 part 如何对应；left / center / right / bottom 只是默认物理位置。
 - **action / menu scope**：view-scoped / container-scoped / global 的边界。
 - **overlay**：frame-hosted、source-managed 是否足够；frame-managed `pracOverlay` 何时需要。

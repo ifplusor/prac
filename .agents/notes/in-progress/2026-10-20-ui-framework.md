@@ -288,7 +288,7 @@ adapter 大在：observe → normalize → bind → project → context → host
 
 1. **grid 的 cell / track 身份与持久化**：用 track id 还是索引；加删行列时 anchor 如何重写。  
    现状：cell 用显式 `GridPlacement`（child id 为 key），track 用 `columnWeights` / `rowWeights`，均在现有 `prac-layout/v1` 下持久化；add/remove 的 anchor 重写规则仍需签字。关闭条件：grid step note + 迁移测试。
-2. **G 的 adapter 投影**：虚拟 VS Code container / 窄 `ViewContainerContext` seam / 接受 source container context 失效。关闭条件：Folders 移入 DSH group 的 spike；设计见 [container context step](../in-progress/2026-10-22-vscode-container-context.md)。
+2. **G 的 adapter 投影**：已裁为 D（混合 host 的 container binding，见 [container context step](../in-progress/2026-10-22-vscode-container-context.md)）；剩余的是 Folders 移入 DSH group 的 spike 证据。关闭条件：spike + 签字。
 3. **host activation / focus 契约**：`activate(viewId)` 的调用者与顺序；shadow root / iframe 的焦点报告。关闭条件：host step note + focus 测试。
 4. **`ContainerRecord` / group state 生命周期**：命名 / 去名、来源消失、墓碑化。关闭条件：state 模型 + 测试。
 5. **editor group 与 `EditorGroupModel` 的同步算法**：source 端 reorder 如何投影回 select group total order，非 editor view 位置如何保留。  
