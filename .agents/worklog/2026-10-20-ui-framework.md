@@ -356,3 +356,9 @@
 
 - 新增 `verify:ui`：临时 XDG/HOME rig + dynamic fixture，串行跑 containers/stack/split/resize/persistence/bottom/views/file/tabs/dynamic，失败也清理。
 - 实际运行：10 个 gate 全绿，`UI ACCEPTANCE: all gates passed`。
+
+### 2026-10-23 — true extension lifecycle（slice 48）
+
+- 新增 phase-based `verify-extension-lifecycle`：`absent` 检查 catalogue/frame 清理，`restored` 检查重新安装后恢复。
+- `verify:ui` 现在会停 rig、移除 fixture、重启 rig 验证 absent；恢复 fixture、再重启验证 restored。
+- 实际运行：11 个阶段全绿，`UI ACCEPTANCE: all gates passed`。

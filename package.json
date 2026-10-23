@@ -15,7 +15,8 @@
     "verify:split": "node tests/gates/verify-split.mjs",
     "verify:resize": "node tests/gates/verify-resize.mjs",
     "verify:dynamic": "node tests/gates/verify-dynamic.mjs",
-    "verify:ui": "node scripts/verify-ui.mjs"
+    "verify:ui": "node scripts/verify-ui.mjs",
+    "verify:lifecycle": "node tests/gates/verify-extension-lifecycle.mjs"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
