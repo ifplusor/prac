@@ -9,7 +9,6 @@ import { openPrac, report, requireUrl } from "./harness.mjs";
 
 const phase = process.env.PHASE ?? "restored";
 const VIEW = "vscode:view:pracGateView";
-const APP = "pracGateView";
 
 const url = requireUrl();
 const { page, close } = await openPrac(url);
@@ -20,13 +19,13 @@ await page.waitForTimeout(2500);
 
 const state = () =>
   page.evaluate(
-    ({ view, app }) => ({
+    ({ view }) => ({
       catalogue:
         globalThis.__pracVscodeFace?.catalogue().filter((entry) => entry.view === view) ?? [],
       frames: globalThis.__pracLayout?.listViews().filter((entry) => entry.id === view) ?? [],
-      hosts: document.querySelectorAll(`[data-vscode-embed-view="${app}"]`).length,
+      hosts: document.querySelectorAll(`[data-prac-view-host][data-prac-view-id="${view}"]`).length,
     }),
-    { view: VIEW, app: APP },
+    { view: VIEW },
   );
 
 async function waitFor(predicate) {
@@ -35,6 +34,14 @@ async function waitFor(predicate) {
     await page.waitForTimeout(250);
   }
   throw new Error(`timed out; last state: ${JSON.stringify(await state())}`);
+}
+
+async function activateView() {
+  await page.click(
+    '[data-prac-container-bar="left"] [data-prac-container="left/container:workbench.view.explorer"]',
+  );
+  await page.evaluate((view) => globalThis.__pracLayout.setFront(view), VIEW);
+  await page.waitForTimeout(1200);
 }
 
 async function command(id) {
@@ -59,7 +66,10 @@ if (phase === "absent") {
   facts = await state();
 } else {
   await command("prac.gate.show");
-  await waitFor((value) => value.catalogue.length === 1 && value.frames.length === 1);
+  await activateView();
+  await waitFor(
+    (value) => value.catalogue.length === 1 && value.frames.length === 1 && value.hosts > 0,
+  );
   facts = await state();
 }
 
@@ -72,13 +82,15 @@ report({
       ? {
           "the view is absent from the catalogue": facts.catalogue.length === 0,
           "the view has no frame placement": facts.frames.length === 0,
+          "the view has no mounted host": facts.hosts === 0,
         }
       : {
           "the reinstalled extension contributes the view": facts.catalogue.length === 1,
           "the reinstalled view is placed in the frame": facts.frames.length === 1,
+          "the reinstalled view mounts a host": facts.hosts > 0,
         },
   ok:
     phase === "absent"
       ? "OK: with the extension removed, the view is absent from catalogue and frame."
-      : "OK: after reinstalling the extension and restarting the rig, the view is back.",
+      : "OK: after reinstalling the extension and restarting the rig, the view is back and mounted.",
 });

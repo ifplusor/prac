@@ -199,12 +199,15 @@ function IsolatedView({
   children,
   clickThrough = false,
   chrome,
+  viewId,
 }: {
   children?: ReactNode;
   /** The box itself lets events pass; its entries opt back in (the float layer). */
   clickThrough?: boolean;
   /** When the frame owns the row title, hide the view's own duplicate collapse affordance. */
   chrome?: "frame";
+  /** The view this boundary hosts, for diagnostics and gates. */
+  viewId?: string;
 }): ReactElement {
   const host = useRef<HTMLDivElement | null>(null);
   const [content, setContent] = useState<HTMLElement | null>(null);
@@ -222,6 +225,7 @@ function IsolatedView({
     {
       ref: host,
       "data-prac-view-host": "",
+      ...(viewId === undefined ? {} : { "data-prac-view-id": viewId }),
       ...(chrome === "frame" ? { "data-prac-view-chrome": "frame" } : {}),
       style: {
         display: "flex",
@@ -1280,7 +1284,7 @@ export function createFrame(
     const viewBody = (viewId: string, box: Box, chrome?: "frame"): ReactElement =>
       createElement(
         IsolatedView,
-        { key: viewId, ...(chrome === undefined ? {} : { chrome }) },
+        { key: viewId, viewId, ...(chrome === undefined ? {} : { chrome }) },
         createElement(View, {
           viewId,
           renderSlot,
