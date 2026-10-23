@@ -64,12 +64,14 @@ import {
   isPresent,
   frontView,
   gridShape,
+  gridTrackWeights,
   mergeGridCells,
   place,
   moveGridCell,
   unmergeGridCell,
   resizeBoundary,
   resizeGridCell,
+  resizeGridTrack,
   resolveSizes,
   setFront,
   selectChild,
@@ -1788,6 +1790,10 @@ export function createFrame(
       if (node.type === "grid") {
         const cells = node.children.filter((child) => isPresent(state, child));
         const shape = gridShape(node, cells.length);
+        const columnWeights = gridTrackWeights(node, "column", shape.columns);
+        const rowWeights = gridTrackWeights(node, "row", shape.rows);
+        const columnTotal = columnWeights.reduce((sum, value) => sum + value, 0);
+        const rowTotal = rowWeights.reduce((sum, value) => sum + value, 0);
         return createElement(
           "div",
           {
@@ -1800,12 +1806,13 @@ export function createFrame(
                   { display: "contents" }
                 : {
                     display: "grid",
-                    gridTemplateColumns: `repeat(${shape.columns}, minmax(0, 1fr))`,
-                    gridTemplateRows: `repeat(${shape.rows}, minmax(0, 1fr))`,
+                    gridTemplateColumns: columnWeights.map((weight) => `${weight}fr`).join(" "),
+                    gridTemplateRows: rowWeights.map((weight) => `${weight}fr`).join(" "),
                     width: "100%",
                     height: "100%",
                     minWidth: 0,
                     minHeight: 0,
+                    position: "relative",
                   },
           },
           ...cells.map((child, index) => {
@@ -2008,6 +2015,106 @@ export function createFrame(
               rendered,
             );
           }),
+          ...columnWeights.slice(0, -1).map((_, index) =>
+            createElement("div", {
+              key: `track:column:${index}`,
+              "data-prac-grid-track": `column:${index + 1}`,
+              title: "Drag to resize grid columns",
+              onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
+                if (event.button !== 0) return;
+                const gridElement = (event.currentTarget as HTMLElement).closest(
+                  "[data-prac-grid]",
+                );
+                const rect = gridElement?.getBoundingClientRect();
+                if (rect === undefined || rect.width <= 0) return;
+                let last = event.clientX;
+                const move = (pointer: PointerEvent): void => {
+                  const delta = pointer.clientX - last;
+                  last = pointer.clientX;
+                  store.update((current) => {
+                    const tree = resizeGridTrack(
+                      current.tree,
+                      node.id,
+                      "column",
+                      index,
+                      delta,
+                      rect.width,
+                    );
+                    return tree === current.tree ? current : { ...current, tree };
+                  });
+                };
+                const finish = (): void => {
+                  window.removeEventListener("pointermove", move);
+                  window.removeEventListener("pointerup", finish);
+                };
+                window.addEventListener("pointermove", move);
+                window.addEventListener("pointerup", finish, { once: true });
+                event.preventDefault();
+                event.stopPropagation();
+              },
+              style: {
+                position: "absolute",
+                left: `${(columnWeights.slice(0, index + 1).reduce((sum, value) => sum + value, 0) / columnTotal) * 100}%`,
+                top: 0,
+                bottom: 0,
+                width: 5,
+                transform: "translateX(-50%)",
+                zIndex: 3,
+                cursor: "col-resize",
+                background: "transparent",
+              },
+            }),
+          ),
+          ...rowWeights.slice(0, -1).map((_, index) =>
+            createElement("div", {
+              key: `track:row:${index}`,
+              "data-prac-grid-track": `row:${index + 1}`,
+              title: "Drag to resize grid rows",
+              onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
+                if (event.button !== 0) return;
+                const gridElement = (event.currentTarget as HTMLElement).closest(
+                  "[data-prac-grid]",
+                );
+                const rect = gridElement?.getBoundingClientRect();
+                if (rect === undefined || rect.height <= 0) return;
+                let last = event.clientY;
+                const move = (pointer: PointerEvent): void => {
+                  const delta = pointer.clientY - last;
+                  last = pointer.clientY;
+                  store.update((current) => {
+                    const tree = resizeGridTrack(
+                      current.tree,
+                      node.id,
+                      "row",
+                      index,
+                      delta,
+                      rect.height,
+                    );
+                    return tree === current.tree ? current : { ...current, tree };
+                  });
+                };
+                const finish = (): void => {
+                  window.removeEventListener("pointermove", move);
+                  window.removeEventListener("pointerup", finish);
+                };
+                window.addEventListener("pointermove", move);
+                window.addEventListener("pointerup", finish, { once: true });
+                event.preventDefault();
+                event.stopPropagation();
+              },
+              style: {
+                position: "absolute",
+                top: `${(rowWeights.slice(0, index + 1).reduce((sum, value) => sum + value, 0) / rowTotal) * 100}%`,
+                left: 0,
+                right: 0,
+                height: 5,
+                transform: "translateY(-50%)",
+                zIndex: 3,
+                cursor: "row-resize",
+                background: "transparent",
+              },
+            }),
+          ),
         );
       }
       const present = node.children.filter((child) => isPresent(state, child));

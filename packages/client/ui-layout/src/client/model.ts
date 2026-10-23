@@ -1504,6 +1504,22 @@ export function gridShape(
 }
 
 /**
+ * The relative weights of a grid's columns or rows, normalised to the number of
+ * tracks actually drawn. Missing weights are equal.
+ *
+ * @param node - the grid.
+ * @param axis - which tracks.
+ * @param count - how many tracks are drawn.
+ */
+export function gridTrackWeights(node: GridNode, axis: "column" | "row", count: number): number[] {
+  const source = axis === "column" ? node.columnWeights : node.rowWeights;
+  return Array.from({ length: count }, (_, index) => {
+    const value = source?.[index];
+    return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 1;
+  });
+}
+
+/**
  * The effective placement of every grid cell, with flow positions filled in for
  * cells that have no explicit placement yet.
  *
@@ -1774,6 +1790,79 @@ export function unmergeGridCell(tree: LayoutNode, gridId: string, cellId: string
   );
 }
 
+/**
+ * Set one grid track's relative weight.
+ *
+ * @param tree - the tree to update.
+ * @param gridId - the grid.
+ * @param axis - column or row.
+ * @param index - zero-based track.
+ * @param weight - positive relative weight.
+ * @returns the tree, or the same tree for an unknown grid/track.
+ */
+export function setGridTrackWeight(
+  tree: LayoutNode,
+  gridId: string,
+  axis: "column" | "row",
+  index: number,
+  weight: number,
+): LayoutNode {
+  const grid = findNode(tree, gridId);
+  if (grid === null || grid.type !== "grid") return tree;
+  const count =
+    axis === "column"
+      ? gridShape(grid, grid.children.length).columns
+      : gridShape(grid, grid.children.length).rows;
+  if (index < 0 || index >= count) return tree;
+  const weights = gridTrackWeights(grid, axis, count);
+  weights[index] = Math.max(0.05, weight);
+  return replaceNode(tree, gridId, (node) =>
+    node.type === "grid"
+      ? { ...node, [axis === "column" ? "columnWeights" : "rowWeights"]: weights }
+      : node,
+  );
+}
+
+/**
+ * Drag a boundary between two grid tracks by `delta` pixels.
+ *
+ * @param tree - the tree to update.
+ * @param gridId - the grid.
+ * @param axis - column or row.
+ * @param boundary - zero-based track to grow; the next track gives way.
+ * @param delta - pointer movement along the axis, in pixels.
+ * @param extent - the grid's pixel extent along the axis.
+ * @returns the tree, or the same tree for an edge/unknown boundary.
+ */
+export function resizeGridTrack(
+  tree: LayoutNode,
+  gridId: string,
+  axis: "column" | "row",
+  boundary: number,
+  delta: number,
+  extent: number,
+): LayoutNode {
+  const grid = findNode(tree, gridId);
+  if (grid === null || grid.type !== "grid" || extent <= 0) return tree;
+  const shape = gridShape(grid, grid.children.length);
+  const count = axis === "column" ? shape.columns : shape.rows;
+  if (boundary < 0 || boundary >= count - 1) return tree;
+  const weights = gridTrackWeights(grid, axis, count);
+  const total = weights.reduce((sum, value) => sum + value, 0);
+  const deltaWeight = (delta / extent) * total;
+  const left = weights[boundary] ?? 1;
+  const right = weights[boundary + 1] ?? 1;
+  const move = Math.max(-(left - 0.05), Math.min(right - 0.05, deltaWeight));
+  if (Math.abs(move) < 1e-6) return tree;
+  weights[boundary] = left + move;
+  weights[boundary + 1] = right - move;
+  return replaceNode(tree, gridId, (node) =>
+    node.type === "grid"
+      ? { ...node, [axis === "column" ? "columnWeights" : "rowWeights"]: weights }
+      : node,
+  );
+}
+
 export function resolveSizes(state: LayoutState, width: number, height: number): Map<string, Box> {
   const out = new Map<string, Box>();
   const visit = (node: LayoutNode, w: number, h: number): void => {
@@ -1793,16 +1882,24 @@ export function resolveSizes(state: LayoutState, width: number, height: number):
       out.set(node.id, { width: w, height: h });
       const cells = node.children.filter((child) => isPresent(state, child));
       const { columns, rows } = gridShape(node, cells.length);
+      const columnWeights = gridTrackWeights(node, "column", columns);
+      const rowWeights = gridTrackWeights(node, "row", rows);
+      const columnTotal = columnWeights.reduce((sum, value) => sum + value, 0);
+      const rowTotal = rowWeights.reduce((sum, value) => sum + value, 0);
       cells.forEach((child, index) => {
         const placement = node.placements?.[child.id] ?? {
           row: Math.floor(index / columns),
           column: index % columns,
         };
-        visit(
-          child,
-          (w / columns) * (placement.columnSpan ?? 1),
-          (h / rows) * (placement.rowSpan ?? 1),
-        );
+        const columnSpan = placement.columnSpan ?? 1;
+        const rowSpan = placement.rowSpan ?? 1;
+        const columnWidth = columnWeights
+          .slice(placement.column, placement.column + columnSpan)
+          .reduce((sum, value) => sum + value, 0);
+        const rowHeight = rowWeights
+          .slice(placement.row, placement.row + rowSpan)
+          .reduce((sum, value) => sum + value, 0);
+        visit(child, (w * columnWidth) / columnTotal, (h * rowHeight) / rowTotal);
       });
       return;
     }

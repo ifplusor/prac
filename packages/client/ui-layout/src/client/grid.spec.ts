@@ -6,6 +6,7 @@ import {
   mergeGridCells,
   moveGridCell,
   resizeGridCell,
+  resizeGridTrack,
   unmergeGridCell,
   isPresent,
   regionInfos,
@@ -284,6 +285,28 @@ describe("grid node", () => {
       placements: { a: { row: 0, column: 0 }, b: { row: 1, column: 1 } },
     });
     expect(mergeGridCells(layout.tree, "stage", "a", "b")).toBe(layout.tree);
+  });
+
+  it("allocates by track weights and resizes the boundary", () => {
+    const layout = state();
+    layout.tree = gridNode(
+      "stage",
+      1,
+      2,
+      [regionNode("a", 0, { flex: true }), regionNode("b", 0, { flex: true })],
+      {
+        placements: { a: { row: 0, column: 0 }, b: { row: 0, column: 1 } },
+        columnWeights: [1, 3],
+      },
+    );
+    const sizes = resolveSizes(layout, 1000, 800);
+    expect(sizes.get("a")).toEqual({ width: 250, height: 800 });
+    expect(sizes.get("b")).toEqual({ width: 750, height: 800 });
+
+    const resized = resizeGridTrack(layout.tree, "stage", "column", 0, 125, 1000);
+    const after = resolveSizes({ ...layout, tree: resized }, 1000, 800);
+    expect(after.get("a")?.width).toBeGreaterThan(250);
+    expect(after.get("b")?.width).toBeLessThan(750);
   });
 
   it("persists placements through JSON", () => {

@@ -260,6 +260,10 @@ export interface GridNode {
   readonly id: string;
   readonly rows: number;
   readonly columns: number;
+  /** Relative widths of the declared columns; absent means equal. */
+  readonly columnWeights?: readonly number[];
+  /** Relative heights of the declared rows; absent means equal. */
+  readonly rowWeights?: readonly number[];
   /** Explicit placements by child id; absent means row-major. */
   readonly placements?: Readonly<Record<string, GridPlacement>>;
   /**

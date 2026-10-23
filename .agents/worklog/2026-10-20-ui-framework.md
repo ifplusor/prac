@@ -432,3 +432,9 @@
 
 - verify:ui 纳入 upstream `verify-group`（split/focus/empty group）与 `verify-close`（dirty close dialog）。
 - 全量 19 阶段全绿。
+
+### 2026-10-23 — free grid track resize（slice 61）
+
+- GridNode 增加 column/row weights；resolveSizes/frame CSS 按权重分配。
+- grid 增加 track 分隔条拖动；`setGridTrackWeight` / `resizeGridTrack` 模型。
+- 新增 `verify:grid-free`；全量 verify:ui 20 阶段全绿。
