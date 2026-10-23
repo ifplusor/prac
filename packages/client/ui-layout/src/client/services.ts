@@ -45,6 +45,8 @@ import {
   regionInDirection as findRegionInDirection,
   firstRegionId,
   frontView,
+  moveGridCell,
+  resizeGridCell,
   place,
   placeQuietly,
   regionInfos,
@@ -380,6 +382,20 @@ export function createServices(
         );
         if (next === state) return state;
         return place(next, viewId, newRegionId);
+      });
+    },
+    /** Swap two cells in a grid. */
+    moveGridCell(gridId: string, cellId: string, targetId: string): void {
+      store.update((state) => {
+        const tree = moveGridCell(state.tree, gridId, cellId, targetId);
+        return tree === state.tree ? state : { ...state, tree };
+      });
+    },
+    /** Resize one grid cell; overlapping spans are refused. */
+    resizeGridCell(gridId: string, cellId: string, rowSpan: number, columnSpan: number): void {
+      store.update((state) => {
+        const tree = resizeGridCell(state.tree, gridId, cellId, rowSpan, columnSpan);
+        return tree === state.tree ? state : { ...state, tree };
       });
     },
     /**

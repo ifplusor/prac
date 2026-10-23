@@ -649,6 +649,23 @@ export interface PracLayoutFace {
    */
   splitView(viewId: string, side: Side): void;
   /**
+   * Swap two cells of a grid.
+   *
+   * @param gridId - the grid.
+   * @param cellId - the dragged cell.
+   * @param targetId - the cell it is dropped on.
+   */
+  moveGridCell(gridId: string, cellId: string, targetId: string): void;
+  /**
+   * Resize a cell's span. A span that overlaps another cell is refused.
+   *
+   * @param gridId - the grid.
+   * @param cellId - the cell.
+   * @param rowSpan - requested rows.
+   * @param columnSpan - requested columns.
+   */
+  resizeGridCell(gridId: string, cellId: string, rowSpan: number, columnSpan: number): void;
+  /**
    * Split a region in two **without moving a view into it**, and report the new region's id.
    *
    * This is the workbench's channel for `addGroup`: VS Code's editor part asks for a *group*

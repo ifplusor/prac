@@ -36,6 +36,9 @@ const before = await cells();
 const handles = await page.$$eval("[data-prac-grid-handle]", (nodes) =>
   nodes.map((node) => node.getAttribute("data-prac-grid-handle")),
 );
+const resizeHandles = await page.$$eval("[data-prac-grid-resize]", (nodes) =>
+  nodes.map((node) => node.getAttribute("data-prac-grid-resize")),
+);
 const source = before[0]?.id;
 const target = before[1]?.id;
 if (source === undefined || target === undefined)
@@ -78,10 +81,11 @@ const afterTarget = box(moved, target);
 
 report({
   url,
-  facts: { before, handles, moved, restored },
+  facts: { before, handles, resizeHandles, moved, restored },
   checks: {
     "the split produces two editable cells": before.length === 2 && handles.length === 2,
     "each cell has a drag handle": before.every((cell) => handles.includes(cell.id)),
+    "each cell has a resize handle": before.every((cell) => resizeHandles.includes(cell.id)),
     "the drag swaps the cells' boxes":
       afterSource?.x === beforeTarget?.x &&
       afterTarget?.x === beforeSource?.x &&

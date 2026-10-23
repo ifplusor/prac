@@ -108,6 +108,8 @@ function recordingFace(views: LayoutState["views"] = {}): {
     createRegionBeside: () => undefined,
     regionInDirection: () => undefined,
     setFront: () => {},
+    moveGridCell: () => {},
+    resizeGridCell: () => {},
     createViewGroup: (() => {
       throw new Error("not used by this test double");
     }) as PracLayoutFace["createViewGroup"],

@@ -374,3 +374,8 @@
 - model 新增 `gridPlacements` / `moveGridCell` / `resizeGridCell`；move 交换 placement，resize 拒绝重叠。
 - frame 多 cell grid 增加拖动 handle；drop 交换 cell。
 - 新增 `verify:grid` 并纳入 verify:ui；12 个阶段全绿。
+
+### 2026-10-23 — grid resize UI/API（slice 51）
+
+- `PracLayoutFace` 增加 `moveGridCell` / `resizeGridCell`；services 接线。
+- frame 每个多 cell 增加 resize handle（pointer drag 写 span）；grid gate 断言 handle 存在。

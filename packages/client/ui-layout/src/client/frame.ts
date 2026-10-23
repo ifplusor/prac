@@ -24,6 +24,7 @@ import {
 import type {
   DragEvent as ReactDragEvent,
   MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
   ReactElement,
   ReactNode,
 } from "react";
@@ -65,6 +66,7 @@ import {
   gridShape,
   moveGridCell,
   resizeBoundary,
+  resizeGridCell,
   resolveSizes,
   setFront,
   selectChild,
@@ -1869,6 +1871,81 @@ export function createFrame(
                       "aria-label": "Move grid cell",
                     },
                     "⠿",
+                  )
+                : null,
+              canDrag
+                ? createElement(
+                    "button",
+                    {
+                      type: "button",
+                      "data-prac-grid-resize": child.id,
+                      title: "Drag to resize this grid cell",
+                      onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
+                        if (event.button !== 0) return;
+                        const gridElement = (event.currentTarget as HTMLElement).closest(
+                          "[data-prac-grid]",
+                        );
+                        const rect = gridElement?.getBoundingClientRect();
+                        if (rect === undefined || rect.width <= 0 || rect.height <= 0) return;
+                        const startX = event.clientX;
+                        const startY = event.clientY;
+                        const rowSpan = placement.rowSpan ?? 1;
+                        const columnSpan = placement.columnSpan ?? 1;
+                        const move = (pointer: PointerEvent): void => {
+                          const rows = Math.max(
+                            1,
+                            rowSpan +
+                              Math.round(
+                                (pointer.clientY - startY) /
+                                  Math.max(1, rect.height / Math.max(1, shape.rows)),
+                              ),
+                          );
+                          const columns = Math.max(
+                            1,
+                            columnSpan +
+                              Math.round(
+                                (pointer.clientX - startX) /
+                                  Math.max(1, rect.width / Math.max(1, shape.columns)),
+                              ),
+                          );
+                          store.update((current) => {
+                            const tree = resizeGridCell(
+                              current.tree,
+                              node.id,
+                              child.id,
+                              rows,
+                              columns,
+                            );
+                            return tree === current.tree ? current : { ...current, tree };
+                          });
+                        };
+                        const finish = (): void => {
+                          window.removeEventListener("pointermove", move);
+                          window.removeEventListener("pointerup", finish);
+                        };
+                        window.addEventListener("pointermove", move);
+                        window.addEventListener("pointerup", finish, { once: true });
+                        event.preventDefault();
+                        event.stopPropagation();
+                      },
+                      style: {
+                        position: "absolute",
+                        right: 2,
+                        bottom: 2,
+                        zIndex: 2,
+                        width: 12,
+                        height: 12,
+                        padding: 0,
+                        border: "1px solid rgba(127,127,127,0.55)",
+                        borderRadius: 2,
+                        background: "rgba(127,127,127,0.25)",
+                        color: "inherit",
+                        cursor: "nwse-resize",
+                        opacity: 0.45,
+                      },
+                      "aria-label": "Resize grid cell",
+                    },
+                    "⤢",
                   )
                 : null,
               rendered,
