@@ -37,6 +37,8 @@ const gates = [
   ["bottom", "tests/gates/verify-bottom.mjs"],
   ["views", "vendor/vscode/scripts/verify-views.mjs"],
   ["file", "vendor/vscode/scripts/verify-file.mjs"],
+  ["editor:group", "vendor/vscode/scripts/verify-group.mjs"],
+  ["editor:close", "vendor/vscode/scripts/verify-close.mjs"],
   ["tabs", "vendor/vscode/scripts/verify-tabs.mjs"],
   ["dynamic", "tests/gates/verify-dynamic.mjs"],
 ];

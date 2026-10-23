@@ -427,3 +427,8 @@
 
 - grid cell drop 识别 tab 的 `text/plain`，直接 place；tab strip 内 reorder 不变。
 - 新增 `verify:grid-tab`；全量 verify:ui 17 阶段全绿。
+
+### 2026-10-23 — editor group lifecycle in acceptance（slice 60）
+
+- verify:ui 纳入 upstream `verify-group`（split/focus/empty group）与 `verify-close`（dirty close dialog）。
+- 全量 19 阶段全绿。
