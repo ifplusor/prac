@@ -320,4 +320,5 @@ adapter 大在：observe → normalize → bind → project → context → host
 | [2026-10-07-editor-host.md](../in-progress/2026-10-07-editor-host.md) | editor host 的对象与放置 |
 | [2026-10-22-vscode-container-context.md](../proposed/2026-10-22-vscode-container-context.md) | container context step |
 | [docs/concepts.md](../../../docs/concepts.md) | 词表与体系（旧词表；UI 术语以 ui-surface-map 为准） |
+| [docs/ui-acceptance.md](../../../docs/ui-acceptance.md) | 一条命令的 UI 验收与 gate 清单 |
 | [docs/architecture.md](../../../docs/architecture.md) | 目标架构（frame、能力、工作区） |

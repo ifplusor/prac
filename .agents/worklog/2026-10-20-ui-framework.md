@@ -417,3 +417,8 @@
 
 - merge 的 union placement 改 key 为 split id（不再 key target child）；nested merge 正确。
 - 新增 nested merge/unmerge 单测；全量 verify:ui 16 阶段全绿。
+
+### 2026-10-23 — UI acceptance docs
+
+- 新增 `docs/ui-acceptance.md`：一条命令、gate 清单、动态 fixture 前提、profile 写入权限、known noise、加 gate 流程。
+- UI framework note 的 Related 增加该文档。
