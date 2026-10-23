@@ -442,3 +442,9 @@
 ### 2026-10-23 — track resize API
 
 - `PracLayoutFace` 增加 `setGridTrackWeight` / `resizeGridTrack`；services 接线。
+
+### 2026-10-23 — notes / acceptance sync
+
+- UI framework open questions 1/5 标注当前实现（grid placement/weights、editor order/lifecycle）；状态不自我 promote。
+- grid proposed note 增加 Current implementation 段：2×2 stage、side placement、move/resize/merge/unmerge、track weights；max/priority/maximized 边界明确。
+- ui-acceptance 表补 grid:tab / grid:free / editor:group / editor:close。

@@ -30,11 +30,15 @@ workspace: the CLI resolves that profile from the user home even when
 | `grid:resize`        | dragging a cell's resize handle changes its span and persists        |
 | `grid:merge`         | Shift-drag merges adjacent cells; `⧉` unmerges and restores spans    |
 | `grid:view`          | a recall-catalogue row drags into a grid cell; placement persists    |
+| `grid:tab`           | a mounted tab drags into another grid cell; placement persists       |
+| `grid:free`          | dragging a track boundary changes column weights in pixels           |
 | `resize`             | track resize, distribution, floors, centre priority                  |
 | `persistence`        | versioned layout state reloads; stale regions are pruned             |
 | `bottom`             | empty bottom bar, filled span, collapse/expand                       |
 | `views`              | recall catalogue, hide/show, move, split, pixels                     |
 | `file`               | editor surface, tab activation, second group, close/reopen           |
+| `editor:group`       | split editor group, focus sides, empty group removal                 |
+| `editor:close`       | dirty-close dialog, Cancel and Don't Save                            |
 | `tabs`               | tab order, activation, frame→`EditorGroupModel` reorder              |
 | `dynamic`            | a contributed view enters/leaves the catalogue without reload        |
 | `lifecycle:absent`   | removing the extension removes catalogue/frame/host                  |

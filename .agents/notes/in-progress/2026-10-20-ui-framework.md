@@ -286,11 +286,13 @@ adapter 大在：observe → normalize → bind → project → context → host
 
 以下条目不阻塞这份 umbrella 的方向；每一条在对应 step note 中关闭。
 
-1. **grid 的 cell / track 身份与持久化**：用 track id 还是索引；加删行列时 anchor 如何重写。关闭条件：grid step note + 迁移测试。
+1. **grid 的 cell / track 身份与持久化**：用 track id 还是索引；加删行列时 anchor 如何重写。  
+   现状：cell 用显式 `GridPlacement`（child id 为 key），track 用 `columnWeights` / `rowWeights`，均在现有 `prac-layout/v1` 下持久化；add/remove 的 anchor 重写规则仍需签字。关闭条件：grid step note + 迁移测试。
 2. **G 的 adapter 投影**：虚拟 VS Code container / 窄 `ViewContainerContext` seam / 接受 source container context 失效。关闭条件：Folders 移入 DSH group 的 spike；设计见 [container context step](../proposed/2026-10-22-vscode-container-context.md)。
 3. **host activation / focus 契约**：`activate(viewId)` 的调用者与顺序；shadow root / iframe 的焦点报告。关闭条件：host step note + focus 测试。
 4. **`ContainerRecord` / group state 生命周期**：命名 / 去名、来源消失、墓碑化。关闭条件：state 模型 + 测试。
-5. **editor group 与 `EditorGroupModel` 的同步算法**：source 端 reorder 如何投影回 select group total order，非 editor view 位置如何保留。关闭条件：adapter 双向同步测试。
+5. **editor group 与 `EditorGroupModel` 的同步算法**：source 端 reorder 如何投影回 select group total order，非 editor view 位置如何保留。  
+   现状：frame file-order → `EditorGroupModel`、editor active/order → group 已有实现；`verify-tabs` 覆盖 drag → model，`verify-group` / `verify-close` 覆盖 group 生命周期；非 editor view 混排仍是开放边界。关闭条件：adapter 双向同步测试 + 签字。
 
 ## 6. Future possibilities / non-goals（范围与后续）
 

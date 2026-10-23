@@ -19,6 +19,30 @@ status: proposed
 
 **这条与"栈内高度的两个权威"无关**：那是布局模型的一致性问题（另见 [../in-progress/2026-10-05-vscode-dsh-layout-boundary.md](../in-progress/2026-10-05-vscode-dsh-layout-boundary.md) 的开放问题），两者只在"借用 VS Code 形状"这一点上偶然同向，不是彼此的解法。
 
+## Current implementation (for review)
+
+The stage is now a **`GridNode`** with explicit `GridPlacement` cells, not the
+single split tree this proposal started from:
+
+- default stage shape is **2×2**; one present cell renders transparently, so the
+  initial geometry is unchanged;
+- `splitView`/`createRegionBeside` place new cells **by source side**, expanding
+  rows/columns rather than appending row-major;
+- cells can be **moved** (swap placement), **resized** (span, overlap refused),
+  **merged** into a split cell, and **unmerged**; merge keeps the original
+  `GridPlacement`s so unmerge restores unequal spans;
+- `columnWeights` / `rowWeights` give free track resize; a drag on the track
+  boundary changes the relative weights, and the weights persist;
+- merge/unmerge placement data is persisted in the layout state.
+
+The proposal's `max` / `priority` / `Sizing` / edge snap / `maximized` items are
+still only partially represented: region-level `priority`, `max`, distribution
+and snap exist in the split resize path, but grid tracks have relative weights
+without pixel min/max, and there is no maximized cell or keyboard track resize.
+
+This section records what the implementation now answers; it does **not**
+promote the note. The status remains `proposed` until the decisions are signed.
+
 ## Proposal
 
 给区域补上 VS Code Grid 的那几件能力，分层做：
@@ -46,7 +70,7 @@ status: proposed
 
 ## Open questions
 
-- 升级到 grid 后，**持久化键是否仍留在 `v1`**（现状：不换版次，旧数据由人清）。
+- 升级到 grid 后，**持久化键是否仍留在 `v1`**（现状：不换版次，旧数据由人清；grid placements/weights 已在同一 key 下持久化）。
 - `flex` 退场后，现有默认树（常驻区的比例、底栏固定高）能否都用 `size` / `min` / `max` 表达。
 - `visible` 与既有的"空区域不渲染"如何对齐。
 - 第 4 步要不要做，以及那时 isolation 的宿主挂在哪一层。
