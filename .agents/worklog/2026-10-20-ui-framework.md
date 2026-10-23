@@ -397,3 +397,8 @@
 - `unmergeGridCell` 把 merged split cell 拆回 grid children，并分配 placement。
 - frame 合并 cell 显示 `⧉` unmerge 按钮；API 接线。
 - verify:grid-merge 增加 unmerge 断言；全量 verify:ui 15 阶段全绿。
+
+### 2026-10-23 — catalogue → grid cell（slice 55）
+
+- recall row 可 drag，写 `text/prac-view`；grid cell drop 解析 landing region 并 place view。
+- 新增 `verify:grid-view` 并纳入 verify:ui；16 阶段全绿。

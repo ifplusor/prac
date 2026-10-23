@@ -424,6 +424,15 @@ function RecallSurface({ layout, onFocus }: RecallSurfaceProps): ReactElement | 
         key: view.id,
         "data-prac-recall-row": view.id,
         "data-prac-recall-selected": index === active ? "" : undefined,
+        draggable: true,
+        onDragStart: (event: {
+          readonly dataTransfer: { setData(type: string, value: string): void; effectAllowed: string } | null;
+          readonly preventDefault: () => void;
+        }) => {
+          if (event.dataTransfer === null) return;
+          event.dataTransfer.setData("text/prac-view", view.id);
+          event.dataTransfer.effectAllowed = "move";
+        },
         style: {
           display: "flex",
           alignItems: "center",

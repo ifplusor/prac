@@ -19,7 +19,8 @@
     "verify:lifecycle": "node tests/gates/verify-extension-lifecycle.mjs",
     "verify:grid": "node tests/gates/verify-grid.mjs",
     "verify:grid-resize": "node tests/gates/verify-grid-resize.mjs",
-    "verify:grid-merge": "node tests/gates/verify-grid-merge.mjs"
+    "verify:grid-merge": "node tests/gates/verify-grid-merge.mjs",
+    "verify:grid-view": "node tests/gates/verify-grid-view.mjs"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

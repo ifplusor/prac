@@ -65,6 +65,7 @@ import {
   frontView,
   gridShape,
   mergeGridCells,
+  place,
   moveGridCell,
   unmergeGridCell,
   resizeBoundary,
@@ -1825,6 +1826,16 @@ export function createFrame(
                   if (canDrag) event.preventDefault();
                 },
                 onDrop: (event: ReactDragEvent<HTMLElement>) => {
+                  const view = event.dataTransfer?.getData("text/prac-view");
+                  if (view !== undefined && view !== "") {
+                    const landing =
+                      child.type === "region" ? child : edgeRegion(state, child, "left");
+                    if (landing !== null) {
+                      event.preventDefault();
+                      store.update((current) => place(current, view, landing.id));
+                    }
+                    return;
+                  }
                   if (!canDrag) return;
                   const source = event.dataTransfer?.getData("text/prac-grid-cell");
                   if (source === undefined || source === "") return;
