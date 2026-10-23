@@ -57,6 +57,7 @@ import {
   findSplit,
   isPresent,
   frontView,
+  gridShape,
   resizeBoundary,
   resolveSizes,
   setFront,
@@ -1772,6 +1773,7 @@ export function createFrame(
       if (node.type === "region") return renderRegion(node, dir);
       if (node.type === "grid") {
         const cells = node.children.filter((child) => isPresent(state, child));
+        const shape = gridShape(node, cells.length);
         return createElement(
           "div",
           {
@@ -1784,8 +1786,8 @@ export function createFrame(
                   { display: "contents" }
                 : {
                     display: "grid",
-                    gridTemplateColumns: `repeat(${Math.max(1, node.placements === undefined ? cells.length : node.columns)}, minmax(0, 1fr))`,
-                    gridTemplateRows: `repeat(${node.rows}, minmax(0, 1fr))`,
+                    gridTemplateColumns: `repeat(${shape.columns}, minmax(0, 1fr))`,
+                    gridTemplateRows: `repeat(${shape.rows}, minmax(0, 1fr))`,
                     width: "100%",
                     height: "100%",
                     minWidth: 0,
@@ -1796,8 +1798,8 @@ export function createFrame(
             // A one-cell, unplaced grid is transparent: no extra flex wrapper.
             if (node.placements === undefined && cells.length <= 1) return renderNode(child, dir);
             const placement = node.placements?.[child.id] ?? {
-              row: Math.floor(index / Math.max(1, node.columns)),
-              column: index % Math.max(1, node.columns),
+              row: Math.floor(index / shape.columns),
+              column: index % shape.columns,
             };
             const rendered = renderNode(child, dir);
             return createElement(

@@ -1480,6 +1480,28 @@ export function edgeRegion(
  * @param width - frame width in px.
  * @param height - frame height in px.
  */
+/**
+ * The rows and columns a grid actually draws at.
+ *
+ * Without explicit placements the grid **flows**: it uses only as many columns
+ * as there are cells (up to its declared capacity), and enough rows to hold
+ * them. That keeps a one-cell 2×2 stage full-size instead of quarter-size, while
+ * a four-cell stage still uses the full 2×2 shape.
+ */
+export function gridShape(
+  node: Extract<LayoutNode, { type: "grid" }>,
+  count: number,
+): { columns: number; rows: number } {
+  if (node.placements !== undefined) {
+    return { columns: Math.max(1, node.columns), rows: Math.max(1, node.rows) };
+  }
+  const columns =
+    count === 3 && node.columns === 2 && node.rows === 2
+      ? 3
+      : Math.max(1, Math.min(node.columns, count));
+  return { columns, rows: Math.max(1, Math.ceil(count / columns)) };
+}
+
 export function resolveSizes(state: LayoutState, width: number, height: number): Map<string, Box> {
   const out = new Map<string, Box>();
   const visit = (node: LayoutNode, w: number, h: number): void => {
@@ -1498,15 +1520,11 @@ export function resolveSizes(state: LayoutState, width: number, height: number):
     if (node.type === "grid") {
       out.set(node.id, { width: w, height: h });
       const cells = node.children.filter((child) => isPresent(state, child));
-      const columns =
-        node.rows === 1 && node.placements === undefined
-          ? Math.max(1, cells.length)
-          : Math.max(1, node.columns);
-      const rows = Math.max(1, node.rows);
+      const { columns, rows } = gridShape(node, cells.length);
       cells.forEach((child, index) => {
         const placement = node.placements?.[child.id] ?? {
-          row: Math.floor(index / Math.max(1, node.columns)),
-          column: index % Math.max(1, node.columns),
+          row: Math.floor(index / columns),
+          column: index % columns,
         };
         visit(
           child,

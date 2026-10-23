@@ -39,6 +39,29 @@ describe("grid node", () => {
     expect(isPresent(layout, layout.tree)).toBe(true);
   });
 
+  it("flows a partial 2×2 grid without shrinking a lone cell", () => {
+    const one = state();
+    one.tree = gridNode("stage", 2, 2, [regionNode("a", 0, { flex: true })]);
+    expect(resolveSizes(one, 1000, 800).get("a")).toEqual({ width: 1000, height: 800 });
+
+    const two = state();
+    two.tree = gridNode("stage", 2, 2, [
+      regionNode("a", 0, { flex: true }),
+      regionNode("b", 0, { flex: true }),
+    ]);
+    expect(resolveSizes(two, 1000, 800).get("a")).toEqual({ width: 500, height: 800 });
+
+    const three = state();
+    three.tree = gridNode("stage", 2, 2, [
+      regionNode("a", 0, { flex: true }),
+      regionNode("b", 0, { flex: true }),
+      regionNode("c", 0, { flex: true }),
+    ]);
+    const sizes = resolveSizes(three, 1000, 800);
+    expect(sizes.get("a")).toEqual({ width: 1000 / 3, height: 800 });
+    expect(sizes.get("c")).toEqual({ width: 1000 / 3, height: 800 });
+  });
+
   it("allocates each cell a box", () => {
     const layout = state();
     const sizes = resolveSizes(layout, 1000, 800);
