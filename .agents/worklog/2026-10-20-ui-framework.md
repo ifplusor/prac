@@ -379,3 +379,9 @@
 
 - `PracLayoutFace` 增加 `moveGridCell` / `resizeGridCell`；services 接线。
 - frame 每个多 cell 增加 resize handle（pointer drag 写 span）；grid gate 断言 handle 存在。
+
+### 2026-10-23 — grid resize live gate（slice 52）
+
+- 新增 `verify:grid-resize`：真实 pointer 拖动 resize handle，source cell 跨两行、target 收缩、span 持久化。
+- 纳入 verify:ui；扩展激活噪声加入 harness 已知噪声，split gate 稳定。
+- 全量：14 阶段全绿。

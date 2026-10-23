@@ -49,6 +49,7 @@ const KNOWN_NOISE = [
   "vsda",
   "Activating extension",
   "Cannot activate the",
+  "Activating extension",
   "extension-telemetry",
 ];
 
