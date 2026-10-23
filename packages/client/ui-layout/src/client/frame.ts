@@ -21,7 +21,12 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import type { MouseEvent as ReactMouseEvent, ReactElement, ReactNode } from "react";
+import type {
+  DragEvent as ReactDragEvent,
+  MouseEvent as ReactMouseEvent,
+  ReactElement,
+  ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import type { UsePanelInfo } from "@deepseek-ai/dsh-client-ui-layout/client";
 import type { UseSessions } from "@deepseek-ai/dsh-client-ui-session/client";
@@ -58,6 +63,7 @@ import {
   isPresent,
   frontView,
   gridShape,
+  moveGridCell,
   resizeBoundary,
   resolveSizes,
   setFront,
@@ -1805,18 +1811,66 @@ export function createFrame(
               column: index % shape.columns,
             };
             const rendered = renderNode(child, dir);
+            const canDrag = cells.length > 1;
             return createElement(
               "div",
               {
                 key: `cell:${child.id}`,
+                "data-prac-grid-cell": child.id,
+                onDragOver: (event: ReactDragEvent<HTMLElement>) => {
+                  if (canDrag) event.preventDefault();
+                },
+                onDrop: (event: ReactDragEvent<HTMLElement>) => {
+                  if (!canDrag) return;
+                  const source = event.dataTransfer?.getData("text/prac-grid-cell");
+                  if (source === undefined || source === "") return;
+                  event.preventDefault();
+                  store.update((current) => {
+                    const tree = moveGridCell(current.tree, node.id, source, child.id);
+                    return tree === current.tree ? current : { ...current, tree };
+                  });
+                },
                 style: {
                   gridRow: `${placement.row + 1} / span ${placement.rowSpan ?? 1}`,
                   gridColumn: `${placement.column + 1} / span ${placement.columnSpan ?? 1}`,
                   minWidth: 0,
                   minHeight: 0,
                   display: "flex",
+                  position: "relative",
                 },
               },
+              canDrag
+                ? createElement(
+                    "button",
+                    {
+                      type: "button",
+                      draggable: true,
+                      "data-prac-grid-handle": child.id,
+                      title: "Drag to move this grid cell",
+                      onDragStart: (event: ReactDragEvent<HTMLElement>) => {
+                        event.dataTransfer?.setData("text/prac-grid-cell", child.id);
+                        if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = "move";
+                      },
+                      style: {
+                        position: "absolute",
+                        top: 2,
+                        left: 2,
+                        zIndex: 2,
+                        width: 12,
+                        height: 12,
+                        padding: 0,
+                        border: "1px solid rgba(127,127,127,0.55)",
+                        borderRadius: 2,
+                        background: "rgba(127,127,127,0.25)",
+                        color: "inherit",
+                        cursor: "grab",
+                        opacity: 0.45,
+                      },
+                      "aria-label": "Move grid cell",
+                    },
+                    "⠿",
+                  )
+                : null,
               rendered,
             );
           }),

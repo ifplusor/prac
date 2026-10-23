@@ -16,7 +16,8 @@
     "verify:resize": "node tests/gates/verify-resize.mjs",
     "verify:dynamic": "node tests/gates/verify-dynamic.mjs",
     "verify:ui": "node scripts/verify-ui.mjs",
-    "verify:lifecycle": "node tests/gates/verify-extension-lifecycle.mjs"
+    "verify:lifecycle": "node tests/gates/verify-extension-lifecycle.mjs",
+    "verify:grid": "node tests/gates/verify-grid.mjs"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

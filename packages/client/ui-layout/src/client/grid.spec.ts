@@ -2,6 +2,9 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   findRegion,
   gridNode,
+  gridPlacements,
+  moveGridCell,
+  resizeGridCell,
   isPresent,
   regionInfos,
   regionNode,
@@ -148,6 +151,41 @@ describe("grid node", () => {
     const sizes = resolveSizes(layout, 1000, 800);
     expect(sizes.get("a")).toEqual({ width: 1000, height: 400 });
     expect(sizes.get("b")).toEqual({ width: 500, height: 400 });
+  });
+
+  it("moves a cell by swapping placements", () => {
+    const layout = state();
+    const next = moveGridCell(layout.tree, "stage", "a", "d");
+    expect(next.type).toBe("grid");
+    if (next.type !== "grid") return;
+    expect(gridPlacements(next)).toMatchObject({
+      a: { row: 1, column: 1 },
+      d: { row: 0, column: 0 },
+    });
+    expect(resolveSizes({ ...layout, tree: next }, 1000, 800).get("a")).toEqual({
+      width: 500,
+      height: 400,
+    });
+  });
+
+  it("resizes a lone cell and refuses an overlapping span", () => {
+    const one = state();
+    one.tree = gridNode("stage", 2, 2, [regionNode("a", 0, { flex: true })]);
+    const grown = resizeGridCell(one.tree, "stage", "a", 2, 2);
+    expect(resolveSizes({ ...one, tree: grown }, 1000, 800).get("a")).toEqual({
+      width: 1000,
+      height: 800,
+    });
+
+    const two = state();
+    two.tree = gridNode(
+      "stage",
+      2,
+      2,
+      [regionNode("a", 0, { flex: true }), regionNode("b", 0, { flex: true })],
+      { placements: { a: { row: 0, column: 0 }, b: { row: 0, column: 1 } } },
+    );
+    expect(resizeGridCell(two.tree, "stage", "a", 1, 2)).toBe(two.tree);
   });
 
   it("persists placements through JSON", () => {

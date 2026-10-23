@@ -368,3 +368,9 @@
 - frame 的 `IsolatedView` 带 `data-prac-view-id`，gate 能按 view id 断言 host。
 - lifecycle restored 先点 Explorer 容器 + setFront，再断言 host > 0；absent 断言 host = 0。
 - verify:ui 全绿（含 lifecycle restored mounted）。
+
+### 2026-10-23 — grid cell move（slice 50）
+
+- model 新增 `gridPlacements` / `moveGridCell` / `resizeGridCell`；move 交换 placement，resize 拒绝重叠。
+- frame 多 cell grid 增加拖动 handle；drop 交换 cell。
+- 新增 `verify:grid` 并纳入 verify:ui；12 个阶段全绿。

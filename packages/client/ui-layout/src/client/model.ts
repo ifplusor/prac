@@ -1503,6 +1503,108 @@ export function gridShape(
   return { columns, rows: Math.max(1, Math.ceil(count / columns)) };
 }
 
+/**
+ * The effective placement of every grid cell, with flow positions filled in for
+ * cells that have no explicit placement yet.
+ *
+ * @param node - the grid.
+ * @returns one placement per child id.
+ */
+export function gridPlacements(node: GridNode): Record<string, GridPlacement> {
+  const shape = gridShape(node, node.children.length);
+  return Object.fromEntries(
+    node.children.map((child, index) => [
+      child.id,
+      node.placements?.[child.id] ?? {
+        row: Math.floor(index / shape.columns),
+        column: index % shape.columns,
+      },
+    ]),
+  );
+}
+
+/**
+ * Swap two grid cells' placements. The views stay where they are; only their
+ * cells swap.
+ *
+ * @param tree - the tree to update.
+ * @param gridId - the grid.
+ * @param cellId - the dragged cell.
+ * @param targetId - the cell it was dropped on.
+ * @returns the tree, or the same tree when either cell is unknown.
+ */
+export function moveGridCell(
+  tree: LayoutNode,
+  gridId: string,
+  cellId: string,
+  targetId: string,
+): LayoutNode {
+  const grid = findNode(tree, gridId);
+  if (grid === null || grid.type !== "grid" || cellId === targetId) return tree;
+  const placements = gridPlacements(grid);
+  const source = placements[cellId];
+  const target = placements[targetId];
+  if (source === undefined || target === undefined) return tree;
+  return replaceNode(tree, gridId, (node) =>
+    node.type === "grid"
+      ? { ...node, placements: { ...placements, [cellId]: target, [targetId]: source } }
+      : node,
+  );
+}
+
+/**
+ * Resize one cell's span. A span that would overlap another cell is refused.
+ *
+ * @param tree - the tree to update.
+ * @param gridId - the grid.
+ * @param cellId - the cell to resize.
+ * @param rowSpan - requested rows (at least 1).
+ * @param columnSpan - requested columns (at least 1).
+ * @returns the tree, or the same tree for an unknown cell or an overlap.
+ */
+export function resizeGridCell(
+  tree: LayoutNode,
+  gridId: string,
+  cellId: string,
+  rowSpan: number,
+  columnSpan: number,
+): LayoutNode {
+  const grid = findNode(tree, gridId);
+  if (grid === null || grid.type !== "grid") return tree;
+  const placements = gridPlacements(grid);
+  const source = placements[cellId];
+  if (source === undefined) return tree;
+  const next: GridPlacement = {
+    ...source,
+    rowSpan: Math.max(1, Math.round(rowSpan)),
+    columnSpan: Math.max(1, Math.round(columnSpan)),
+  };
+  const overlaps = Object.entries(placements).some(([id, placement]) => {
+    if (id === cellId) return false;
+    return (
+      next.row < placement.row + (placement.rowSpan ?? 1) &&
+      next.row + (next.rowSpan ?? 1) > placement.row &&
+      next.column < placement.column + (placement.columnSpan ?? 1) &&
+      next.column + (next.columnSpan ?? 1) > placement.column
+    );
+  });
+  if (overlaps) return tree;
+  const all = { ...placements, [cellId]: next };
+  const columns = Math.max(
+    grid.columns,
+    ...Object.values(all).map((placement) => placement.column + (placement.columnSpan ?? 1)),
+  );
+  const rows = Math.max(
+    grid.rows,
+    ...Object.values(all).map((placement) => placement.row + (placement.rowSpan ?? 1)),
+  );
+  return replaceNode(tree, gridId, (node) =>
+    node.type === "grid"
+      ? { ...node, rows, columns, placements: { ...placements, [cellId]: next } }
+      : node,
+  );
+}
+
 export function resolveSizes(state: LayoutState, width: number, height: number): Map<string, Box> {
   const out = new Map<string, Box>();
   const visit = (node: LayoutNode, w: number, h: number): void => {

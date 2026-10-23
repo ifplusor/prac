@@ -27,6 +27,7 @@ const gates = [
   ["containers", "tests/gates/verify-containers.mjs"],
   ["stack", "tests/gates/verify-stack.mjs"],
   ["split", "tests/gates/verify-split.mjs"],
+  ["grid", "tests/gates/verify-grid.mjs"],
   ["resize", "tests/gates/verify-resize.mjs"],
   ["persistence", "tests/gates/verify-persistence.mjs"],
   ["bottom", "tests/gates/verify-bottom.mjs"],
