@@ -1605,6 +1605,91 @@ export function resizeGridCell(
   );
 }
 
+/**
+ * Merge two adjacent grid cells into one cell.
+ *
+ * The two cells' regions are kept: the target cell becomes a split holding both
+ * (the source region is no longer a grid child, but its views stay placed), and
+ * the target placement grows to the union rectangle. Non-adjacent cells, or a
+ * union that would overlap a third cell, are refused.
+ *
+ * @param tree - the tree to update.
+ * @param gridId - the grid.
+ * @param sourceId - the cell to fold into the target.
+ * @param targetId - the cell that survives.
+ * @returns the tree, or the same tree when the merge is not legal.
+ */
+export function mergeGridCells(
+  tree: LayoutNode,
+  gridId: string,
+  sourceId: string,
+  targetId: string,
+): LayoutNode {
+  const grid = findNode(tree, gridId);
+  if (grid === null || grid.type !== "grid" || sourceId === targetId) return tree;
+  const placements = gridPlacements(grid);
+  const source = placements[sourceId];
+  const target = placements[targetId];
+  if (source === undefined || target === undefined) return tree;
+  const row = Math.min(source.row, target.row);
+  const column = Math.min(source.column, target.column);
+  const rowSpan =
+    Math.max(source.row + (source.rowSpan ?? 1), target.row + (target.rowSpan ?? 1)) - row;
+  const columnSpan =
+    Math.max(source.column + (source.columnSpan ?? 1), target.column + (target.columnSpan ?? 1)) -
+    column;
+  // Adjacency: the union adds no gap and the rectangles touch.
+  const sourceArea = (source.rowSpan ?? 1) * (source.columnSpan ?? 1);
+  const targetArea = (target.rowSpan ?? 1) * (target.columnSpan ?? 1);
+  const touches =
+    rowSpan * columnSpan === sourceArea + targetArea &&
+    (source.row === target.row || source.column === target.column);
+  if (!touches) return tree;
+  const overlaps = Object.entries(placements).some(([id, placement]) => {
+    if (id === sourceId || id === targetId) return false;
+    return (
+      row < placement.row + (placement.rowSpan ?? 1) &&
+      row + rowSpan > placement.row &&
+      column < placement.column + (placement.columnSpan ?? 1) &&
+      column + columnSpan > placement.column
+    );
+  });
+  if (overlaps) return tree;
+
+  const sourceNode = grid.children.find((child) => child.id === sourceId);
+  const targetNode = grid.children.find((child) => child.id === targetId);
+  if (sourceNode === undefined || targetNode === undefined) return tree;
+  const dir: Dir = source.row === target.row ? "row" : "column";
+  const before = dir === "row" ? source.column < target.column : source.row < target.row;
+  const split: SplitNode = {
+    type: "split",
+    id: `merge:${gridId}:${targetId}:${sourceId}`,
+    dir,
+    children: before ? [sourceNode, targetNode] : [targetNode, sourceNode],
+  };
+  const children = grid.children
+    .filter((child) => child.id !== sourceId)
+    .map((child) => (child.id === targetId ? split : child));
+  const nextPlacements = {
+    ...placements,
+    [targetId]: { ...target, row, column, rowSpan, columnSpan },
+  };
+  delete nextPlacements[sourceId];
+  const rows = Math.max(
+    1,
+    ...Object.values(nextPlacements).map((placement) => placement.row + (placement.rowSpan ?? 1)),
+  );
+  const columns = Math.max(
+    1,
+    ...Object.values(nextPlacements).map(
+      (placement) => placement.column + (placement.columnSpan ?? 1),
+    ),
+  );
+  return replaceNode(tree, gridId, (node) =>
+    node.type === "grid" ? { ...node, rows, columns, children, placements: nextPlacements } : node,
+  );
+}
+
 export function resolveSizes(state: LayoutState, width: number, height: number): Map<string, Box> {
   const out = new Map<string, Box>();
   const visit = (node: LayoutNode, w: number, h: number): void => {

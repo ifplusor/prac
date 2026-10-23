@@ -385,3 +385,9 @@
 - 新增 `verify:grid-resize`：真实 pointer 拖动 resize handle，source cell 跨两行、target 收缩、span 持久化。
 - 纳入 verify:ui；扩展激活噪声加入 harness 已知噪声，split gate 稳定。
 - 全量：14 阶段全绿。
+
+### 2026-10-23 — grid cell merge（slice 53）
+
+- `mergeGridCells` 把相邻两 cell 合为一个 split cell，保留两边 region/view；拒绝非相邻/重叠。
+- Shift-drag handle 走 merge，普通 drag 仍 swap；API 接线。
+- 新增 `verify:grid-merge`；全量 verify:ui 15 阶段全绿。

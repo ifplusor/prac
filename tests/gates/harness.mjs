@@ -50,6 +50,8 @@ const KNOWN_NOISE = [
   "Activating extension",
   "Cannot activate the",
   "Activating extension",
+  "Cannot find module",
+  "Element already has context attribute",
   "extension-telemetry",
 ];
 

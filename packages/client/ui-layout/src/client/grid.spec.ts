@@ -3,6 +3,7 @@ import {
   findRegion,
   gridNode,
   gridPlacements,
+  mergeGridCells,
   moveGridCell,
   resizeGridCell,
   isPresent,
@@ -186,6 +187,34 @@ describe("grid node", () => {
       { placements: { a: { row: 0, column: 0 }, b: { row: 0, column: 1 } } },
     );
     expect(resizeGridCell(two.tree, "stage", "a", 1, 2)).toBe(two.tree);
+  });
+
+  it("merges adjacent cells into one split cell", () => {
+    const layout = state();
+    layout.tree = gridNode(
+      "stage",
+      2,
+      2,
+      [regionNode("a", 0, { flex: true }), regionNode("b", 0, { flex: true })],
+      { placements: { a: { row: 0, column: 0 }, b: { row: 0, column: 1 } } },
+    );
+    const merged = mergeGridCells(layout.tree, "stage", "a", "b");
+    expect(merged.type).toBe("grid");
+    if (merged.type !== "grid") return;
+    expect(merged.children).toHaveLength(1);
+    expect(merged.children[0]?.type).toBe("split");
+    if (merged.children[0]?.type !== "split") return;
+    expect(merged.children[0].children.map((child) => child.id)).toEqual(["a", "b"]);
+    expect(findRegion(merged, "a")).not.toBeNull();
+    expect(findRegion(merged, "b")).not.toBeNull();
+  });
+
+  it("refuses a non-adjacent merge", () => {
+    const layout = state();
+    layout.tree = gridNode("stage", 2, 2, [regionNode("a", 0), regionNode("b", 0)], {
+      placements: { a: { row: 0, column: 0 }, b: { row: 1, column: 1 } },
+    });
+    expect(mergeGridCells(layout.tree, "stage", "a", "b")).toBe(layout.tree);
   });
 
   it("persists placements through JSON", () => {

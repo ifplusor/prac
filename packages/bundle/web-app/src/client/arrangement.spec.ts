@@ -108,6 +108,7 @@ function recordingFace(views: LayoutState["views"] = {}): {
     createRegionBeside: () => undefined,
     regionInDirection: () => undefined,
     setFront: () => {},
+    mergeGridCells: () => {},
     moveGridCell: () => {},
     resizeGridCell: () => {},
     createViewGroup: (() => {

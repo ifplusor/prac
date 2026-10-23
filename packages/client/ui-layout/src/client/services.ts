@@ -45,6 +45,7 @@ import {
   regionInDirection as findRegionInDirection,
   firstRegionId,
   frontView,
+  mergeGridCells,
   moveGridCell,
   resizeGridCell,
   place,
@@ -388,6 +389,13 @@ export function createServices(
     moveGridCell(gridId: string, cellId: string, targetId: string): void {
       store.update((state) => {
         const tree = moveGridCell(state.tree, gridId, cellId, targetId);
+        return tree === state.tree ? state : { ...state, tree };
+      });
+    },
+    /** Merge two adjacent grid cells into one split cell. */
+    mergeGridCells(gridId: string, sourceId: string, targetId: string): void {
+      store.update((state) => {
+        const tree = mergeGridCells(state.tree, gridId, sourceId, targetId);
         return tree === state.tree ? state : { ...state, tree };
       });
     },

@@ -64,6 +64,7 @@ import {
   isPresent,
   frontView,
   gridShape,
+  mergeGridCells,
   moveGridCell,
   resizeBoundary,
   resizeGridCell,
@@ -1828,7 +1829,9 @@ export function createFrame(
                   if (source === undefined || source === "") return;
                   event.preventDefault();
                   store.update((current) => {
-                    const tree = moveGridCell(current.tree, node.id, source, child.id);
+                    const tree = event.shiftKey
+                      ? mergeGridCells(current.tree, node.id, source, child.id)
+                      : moveGridCell(current.tree, node.id, source, child.id);
                     return tree === current.tree ? current : { ...current, tree };
                   });
                 },
@@ -1848,7 +1851,7 @@ export function createFrame(
                       type: "button",
                       draggable: true,
                       "data-prac-grid-handle": child.id,
-                      title: "Drag to move this grid cell",
+                      title: "Drag to move this grid cell; Shift-drag to merge",
                       onDragStart: (event: ReactDragEvent<HTMLElement>) => {
                         event.dataTransfer?.setData("text/prac-grid-cell", child.id);
                         if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = "move";

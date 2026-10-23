@@ -29,6 +29,7 @@ const gates = [
   ["split", "tests/gates/verify-split.mjs"],
   ["grid", "tests/gates/verify-grid.mjs"],
   ["grid:resize", "tests/gates/verify-grid-resize.mjs"],
+  ["grid:merge", "tests/gates/verify-grid-merge.mjs"],
   ["resize", "tests/gates/verify-resize.mjs"],
   ["persistence", "tests/gates/verify-persistence.mjs"],
   ["bottom", "tests/gates/verify-bottom.mjs"],

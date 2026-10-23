@@ -657,6 +657,14 @@ export interface PracLayoutFace {
    */
   moveGridCell(gridId: string, cellId: string, targetId: string): void;
   /**
+   * Merge two adjacent grid cells into one split cell, keeping both regions.
+   *
+   * @param gridId - the grid.
+   * @param sourceId - the cell folded into the target.
+   * @param targetId - the cell that survives.
+   */
+  mergeGridCells(gridId: string, sourceId: string, targetId: string): void;
+  /**
    * Resize a cell's span. A span that overlaps another cell is refused.
    *
    * @param gridId - the grid.
