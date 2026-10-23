@@ -6,6 +6,7 @@ import {
   mergeGridCells,
   moveGridCell,
   resizeGridCell,
+  unmergeGridCell,
   isPresent,
   regionInfos,
   regionNode,
@@ -207,6 +208,21 @@ describe("grid node", () => {
     expect(merged.children[0].children.map((child) => child.id)).toEqual(["a", "b"]);
     expect(findRegion(merged, "a")).not.toBeNull();
     expect(findRegion(merged, "b")).not.toBeNull();
+  });
+
+  it("unmerges a merged cell back into two cells", () => {
+    const layout = state();
+    const merged = mergeGridCells(layout.tree, "stage", "a", "b");
+    expect(merged.type).toBe("grid");
+    if (merged.type !== "grid") return;
+    const unmerged = unmergeGridCell(merged, "stage", merged.children[0]!.id);
+    expect(unmerged.type).toBe("grid");
+    if (unmerged.type !== "grid") return;
+    expect(unmerged.children.map((child) => child.id)).toEqual(["a", "b", "c", "d"]);
+    expect(unmerged.placements).toMatchObject({
+      a: { row: 0, column: 0 },
+      b: { row: 0, column: 1 },
+    });
   });
 
   it("refuses a non-adjacent merge", () => {

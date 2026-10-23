@@ -47,6 +47,7 @@ import {
   frontView,
   mergeGridCells,
   moveGridCell,
+  unmergeGridCell,
   resizeGridCell,
   place,
   placeQuietly,
@@ -396,6 +397,13 @@ export function createServices(
     mergeGridCells(gridId: string, sourceId: string, targetId: string): void {
       store.update((state) => {
         const tree = mergeGridCells(state.tree, gridId, sourceId, targetId);
+        return tree === state.tree ? state : { ...state, tree };
+      });
+    },
+    /** Split a merged grid cell back into its children. */
+    unmergeGridCell(gridId: string, cellId: string): void {
+      store.update((state) => {
+        const tree = unmergeGridCell(state.tree, gridId, cellId);
         return tree === state.tree ? state : { ...state, tree };
       });
     },

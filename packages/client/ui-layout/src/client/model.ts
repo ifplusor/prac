@@ -1690,6 +1690,66 @@ export function mergeGridCells(
   );
 }
 
+/**
+ * Split a merged grid cell back into the cells its split holds.
+ *
+ * The inverse of {@link mergeGridCells}: a split child becomes its children, and
+ * each child receives a slice of the merged cell's rectangle along the split's
+ * axis. Only splits (not ordinary regions) are candidates.
+ *
+ * @param tree - the tree to update.
+ * @param gridId - the grid.
+ * @param cellId - the split cell to unmerge.
+ * @returns the tree, or the same tree when the cell is not a split.
+ */
+export function unmergeGridCell(tree: LayoutNode, gridId: string, cellId: string): LayoutNode {
+  const grid = findNode(tree, gridId);
+  if (grid === null || grid.type !== "grid") return tree;
+  const cell = grid.children.find((child) => child.id === cellId);
+  if (cell === undefined || cell.type !== "split" || cell.children.length < 2) return tree;
+  const placements = gridPlacements(grid);
+  const target = placements[cellId];
+  if (target === undefined) return tree;
+  const pieces = cell.children.length;
+  const nextPlacements = { ...placements };
+  delete nextPlacements[cellId];
+  cell.children.forEach((child, index) => {
+    if (cell.dir === "row") {
+      const width = Math.max(1, Math.floor((target.columnSpan ?? 1) / pieces));
+      nextPlacements[child.id] = {
+        row: target.row,
+        column: target.column + width * index,
+        rowSpan: target.rowSpan ?? 1,
+        columnSpan: index === pieces - 1 ? (target.columnSpan ?? pieces) - width * index : width,
+      };
+    } else {
+      const height = Math.max(1, Math.floor((target.rowSpan ?? 1) / pieces));
+      nextPlacements[child.id] = {
+        row: target.row + height * index,
+        column: target.column,
+        rowSpan: index === pieces - 1 ? (target.rowSpan ?? pieces) - height * index : height,
+        columnSpan: target.columnSpan ?? 1,
+      };
+    }
+  });
+  const children = grid.children.flatMap((child) =>
+    child.id === cellId ? cell.children : [child],
+  );
+  const rows = Math.max(
+    1,
+    ...Object.values(nextPlacements).map((placement) => placement.row + (placement.rowSpan ?? 1)),
+  );
+  const columns = Math.max(
+    1,
+    ...Object.values(nextPlacements).map(
+      (placement) => placement.column + (placement.columnSpan ?? 1),
+    ),
+  );
+  return replaceNode(tree, gridId, (node) =>
+    node.type === "grid" ? { ...node, rows, columns, children, placements: nextPlacements } : node,
+  );
+}
+
 export function resolveSizes(state: LayoutState, width: number, height: number): Map<string, Box> {
   const out = new Map<string, Box>();
   const visit = (node: LayoutNode, w: number, h: number): void => {

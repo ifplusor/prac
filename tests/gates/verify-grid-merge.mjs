@@ -66,16 +66,30 @@ await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForTimeout(2500);
 const restored = await cells();
 
+await page.click("[data-prac-grid-unmerge]");
+await page.waitForTimeout(1200);
+const unmerged = await cells();
+
+await page.reload({ waitUntil: "load" });
+await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
+await page.waitForTimeout(2500);
+const unmergedRestored = await cells();
+
 await close();
 report({
   url,
-  facts: { before, merged, restored },
+  facts: { before, merged, restored, unmerged, unmergedRestored },
   checks: {
     "the merge leaves one grid cell": merged.length === 1,
     "the cell holds both original regions":
       merged[0]?.children.includes("center") === true &&
       merged[0]?.children.some((id) => id === "region-2") === true,
     "the merge survives a reload": JSON.stringify(merged) === JSON.stringify(restored),
+    "unmerge restores two cells": unmerged.length === 2,
+    "unmerge keeps both regions":
+      unmerged.some((cell) => cell.children.includes("center")) &&
+      unmerged.some((cell) => cell.children.includes("region-2")),
+    "the unmerge survives a reload": JSON.stringify(unmerged) === JSON.stringify(unmergedRestored),
   },
-  ok: "OK: Shift-dragging a grid cell merges it into its neighbour and the merge persists.",
+  ok: "OK: Shift-dragging merges adjacent cells, and the merged cell unmerges back into two cells.",
 });

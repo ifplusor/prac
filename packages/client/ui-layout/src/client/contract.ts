@@ -665,6 +665,13 @@ export interface PracLayoutFace {
    */
   mergeGridCells(gridId: string, sourceId: string, targetId: string): void;
   /**
+   * Split a merged grid cell back into the cells its split holds.
+   *
+   * @param gridId - the grid.
+   * @param cellId - the merged cell.
+   */
+  unmergeGridCell(gridId: string, cellId: string): void;
+  /**
    * Resize a cell's span. A span that overlaps another cell is refused.
    *
    * @param gridId - the grid.

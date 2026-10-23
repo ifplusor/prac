@@ -66,6 +66,7 @@ import {
   gridShape,
   mergeGridCells,
   moveGridCell,
+  unmergeGridCell,
   resizeBoundary,
   resizeGridCell,
   resolveSizes,
@@ -1874,6 +1875,38 @@ export function createFrame(
                       "aria-label": "Move grid cell",
                     },
                     "⠿",
+                  )
+                : null,
+              child.type === "split" && child.id.startsWith("merge:")
+                ? createElement(
+                    "button",
+                    {
+                      type: "button",
+                      "data-prac-grid-unmerge": child.id,
+                      title: "Split this merged grid cell",
+                      onClick: () =>
+                        store.update((current) => {
+                          const tree = unmergeGridCell(current.tree, node.id, child.id);
+                          return tree === current.tree ? current : { ...current, tree };
+                        }),
+                      style: {
+                        position: "absolute",
+                        left: 2,
+                        bottom: 2,
+                        zIndex: 2,
+                        width: 12,
+                        height: 12,
+                        padding: 0,
+                        border: "1px solid rgba(127,127,127,0.55)",
+                        borderRadius: 2,
+                        background: "rgba(127,127,127,0.25)",
+                        color: "inherit",
+                        cursor: "pointer",
+                        opacity: 0.45,
+                      },
+                      "aria-label": "Unmerge grid cell",
+                    },
+                    "⧉",
                   )
                 : null,
               canDrag

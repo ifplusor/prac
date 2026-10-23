@@ -391,3 +391,9 @@
 - `mergeGridCells` 把相邻两 cell 合为一个 split cell，保留两边 region/view；拒绝非相邻/重叠。
 - Shift-drag handle 走 merge，普通 drag 仍 swap；API 接线。
 - 新增 `verify:grid-merge`；全量 verify:ui 15 阶段全绿。
+
+### 2026-10-23 — grid cell unmerge（slice 54）
+
+- `unmergeGridCell` 把 merged split cell 拆回 grid children，并分配 placement。
+- frame 合并 cell 显示 `⧉` unmerge 按钮；API 接线。
+- verify:grid-merge 增加 unmerge 断言；全量 verify:ui 15 阶段全绿。
