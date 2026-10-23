@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 ---
 
 # Agent Note: stage 的分栏与调整尺寸对齐 VS Code Grid
@@ -17,7 +17,7 @@ status: proposed
 | `leaf.maximized`（`ISerializedLeafNode`，`grid.ts:756-761`）⇒ 一块最大化 | 没有 |
 | 它会知道"某块正卡在最小值上"（`editorPart.ts:783`）⇒ 才有收起 / 恢复的反馈 | 没有 |
 
-**这条与"栈内高度的两个权威"无关**：那是布局模型的一致性问题（另见 [../in-progress/2026-10-05-vscode-dsh-layout-boundary.md](../in-progress/2026-10-05-vscode-dsh-layout-boundary.md) 的开放问题），两者只在"借用 VS Code 形状"这一点上偶然同向，不是彼此的解法。
+**这条与"栈内高度的两个权威"无关**：那是布局模型的一致性问题（另见 [2026-10-05-vscode-dsh-layout-boundary.md](2026-10-05-vscode-dsh-layout-boundary.md) 的开放问题），两者只在"借用 VS Code 形状"这一点上偶然同向，不是彼此的解法。
 
 ## Current implementation (for review)
 
@@ -77,5 +77,5 @@ promote the note. The status remains `proposed` until the decisions are signed.
 
 ## Related
 
-- [2026-10-05-vscode-dsh-layout-boundary.md](../in-progress/2026-10-05-vscode-dsh-layout-boundary.md)：区域骨架、隔离与对等；本提议接手它里面"栈内高度有两个权威"那条张力。
+- [2026-10-05-vscode-dsh-layout-boundary.md](2026-10-05-vscode-dsh-layout-boundary.md)：区域骨架、隔离与对等；本提议接手它里面"栈内高度有两个权威"那条张力。
 - `packages/client/ui-layout/DESIGN.md`：这个包的当前设计（§3.2 就是被本提议取代的那一节）。

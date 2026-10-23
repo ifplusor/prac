@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 ---
 
 # Agent Note: vscode-host 的 container context — ViewPaneContainer、view group 与 editor group 的接缝

@@ -5,7 +5,7 @@ status: in-progress
 # Agent Note: vscode-host — 把 VS Code 的 UI 贡献翻译成 prac 的组合资源
 
 > **这是哪件工作**：prac 的 VS Code adaptor（`vscode-host`）。它是 prac UI 的 sub-umbrella，定义 adaptor 的边界、对象、契约、生命周期与 surface ownership。
-> **关系**：UI umbrella 见 [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)；CRD 机制见 [2026-10-22-ui-crd.md](../proposed/2026-10-22-ui-crd.md)；总集成 umbrella 见 [2026-09-09-vscode-dsh-integration.md](2026-09-09-vscode-dsh-integration.md)；container context 见 [2026-10-22-vscode-container-context.md](../proposed/2026-10-22-vscode-container-context.md)。
+> **关系**：UI umbrella 见 [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)；CRD 机制见 [2026-10-22-ui-crd.md](../in-progress/2026-10-22-ui-crd.md)；总集成 umbrella 见 [2026-09-09-vscode-dsh-integration.md](2026-09-09-vscode-dsh-integration.md)；container context 见 [2026-10-22-vscode-container-context.md](../in-progress/2026-10-22-vscode-container-context.md)。
 >
 > **边界**：本 note 只定义 VS Code adaptor 的 concrete definition / resource、binding、view host；CRD 机制不在本 note。
 > **状态**：已接受为方向（in-progress）。每个 surface 的机制留给自己的 step。
@@ -79,7 +79,7 @@ VS Code 的 UI 模型是 part / container / pane / view / editor group；prac �
 | **group** | `VscodeViewGroupDefinition` | `VscodeViewGroup` | `ViewGroupState` → `ViewGroup` |
 | **view** | `VscodeViewDefinition` | `VscodeView` | `View` + `VscodeViewHost` |
 
-prac core 的 CRD-lite 机制见 [UI resource model](../proposed/2026-10-22-ui-crd.md)：`ViewGroupDefinition` / `ViewDefinition`、`ViewGroupResource` / `ViewResource`、两个 registry / materializer。`vscode-host` 只注册 concrete definition 并产生 concrete CR：`VscodeViewGroupDefinition` / `VscodeViewGroup`、`VscodeViewDefinition` / `VscodeView`。
+prac core 的 CRD-lite 机制见 [UI resource model](../in-progress/2026-10-22-ui-crd.md)：`ViewGroupDefinition` / `ViewDefinition`、`ViewGroupResource` / `ViewResource`、两个 registry / materializer。`vscode-host` 只注册 concrete definition 并产生 concrete CR：`VscodeViewGroupDefinition` / `VscodeViewGroup`、`VscodeViewDefinition` / `VscodeView`。
 
 - `VscodeViewGroupDefinition` / `VscodeViewDefinition` 由 `vscode-host` 注册；
 - `VscodeViewGroup` / `VscodeView` 由 `vscode-host` 产生；
@@ -277,7 +277,7 @@ interface VscodeViewHost {
 
 ### 3.6 生命周期
 
-materialization 的 phase / async / dispose 规则见 [UI resource model](../proposed/2026-10-22-ui-crd.md) §4。这里只列 vscode-host 的顺序：
+materialization 的 phase / async / dispose 规则见 [UI resource model](../in-progress/2026-10-22-ui-crd.md) §4。这里只列 vscode-host 的顺序：
 
 **正常启动**
 
@@ -316,7 +316,7 @@ materialization 的 phase / async / dispose 规则见 [UI resource model](../pro
 | surface | VS Code 侧 | owner | step |
 | --- | --- | --- | --- |
 | part / region | titlebar / banner / activitybar / primarySidebar / secondarySidebar / panel / statusbar；`Layout`/`Grid` | frame 负责布局与 role；adaptor 负责 part 语义 | future part context |
-| view container / view | `ViewContainer` / `ViewPaneContainer` / `ViewPane` / `ViewContainerModel` | adaptor 翻译为 declaration；frame 拥有 group / placement；binding / view host 承接 runtime | [container context](../proposed/2026-10-22-vscode-container-context.md) |
+| view container / view | `ViewContainer` / `ViewPaneContainer` / `ViewPane` / `ViewContainerModel` | adaptor 翻译为 declaration；frame 拥有 group / placement；binding / view host 承接 runtime | [container context](../in-progress/2026-10-22-vscode-container-context.md) |
 | action / menu | `ViewTitle` / `ViewContainerTitle` / `commands` / `keybindings` / `menus` | adaptor 供 action / context；frame 画 bar | future action/menu context |
 | status bar / overlay | status bar item；notifications / quick pick / input / dialog / context view / hover | adaptor 供内容；frame 供 overlay layer；source-managed behavior | future overlay/status context |
 | webview / custom editor | webview view / panel；custom editor | adaptor | future webview/editor context |
@@ -367,7 +367,7 @@ materialization 的 phase / async / dispose 规则见 [UI resource model](../pro
 
 - [view catalogue](2026-10-06-vscode-view-catalogue.md)（in-progress）；
 - [editor host](2026-10-07-editor-host.md)（in-progress）；
-- **container / view**：[container context](../proposed/2026-10-22-vscode-container-context.md) 已开 step；
+- **container / view**：[container context](../in-progress/2026-10-22-vscode-container-context.md) 已开 step；
 - action / menu；
 - status bar / overlay；
 - webview / custom editor；
@@ -380,7 +380,7 @@ frame 侧（stack chrome / grid）不属于这张 note 的 steps，见各自的 
 ## 8. Open questions
 
 - **`IViewsService` external registry**：subclass 还是 patch `ViewsService`；`getActiveViewWithId` / container 级方法在 plain group 下如何返回；`focusedViewContextKey` 谁维护。
-- **container context**：headless `ViewPaneContainer`，还是更小的 context？见 [container context](../proposed/2026-10-22-vscode-container-context.md)。
+- **container context**：headless `ViewPaneContainer`，还是更小的 context？见 [container context](../in-progress/2026-10-22-vscode-container-context.md)。
 - **part context**：frame 的 role（`stage` / `primarySidebar` / `secondarySidebar` / `panel`）与 VS Code 的 part 如何对应；left / center / right / bottom 只是默认物理位置。
 - **action / menu scope**：view-scoped / container-scoped / global 的边界。
 - **overlay**：frame-hosted、source-managed 是否足够；frame-managed `pracOverlay` 何时需要。
@@ -405,13 +405,13 @@ frame 侧（stack chrome / grid）不属于这张 note 的 steps，见各自的 
 
 - [2026-09-09-vscode-dsh-integration.md](2026-09-09-vscode-dsh-integration.md)：总 umbrella。
 - [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)：UI umbrella；view group / placement / G。
-- [2026-10-22-ui-crd.md](../proposed/2026-10-22-ui-crd.md)：UI 的 CRD-lite 机制。
-- [2026-10-22-vscode-container-context.md](../proposed/2026-10-22-vscode-container-context.md)：container context step。
+- [2026-10-22-ui-crd.md](../in-progress/2026-10-22-ui-crd.md)：UI 的 CRD-lite 机制。
+- [2026-10-22-vscode-container-context.md](../in-progress/2026-10-22-vscode-container-context.md)：container context step。
 - [2026-10-05-vscode-dsh-layout-boundary.md](2026-10-05-vscode-dsh-layout-boundary.md)：视图隔离、区域骨架。
 - [2026-10-06-vscode-view-catalogue.md](2026-10-06-vscode-view-catalogue.md)：view catalogue。
 - [2026-10-07-editor-host.md](2026-10-07-editor-host.md)：editor host。
 - [2026-10-17-stack-view-chrome.md](2026-10-17-stack-view-chrome.md)：frame 侧 stack chrome。
-- [2026-10-15-ui-layout-grid.md](../proposed/2026-10-15-ui-layout-grid.md)：frame 侧 grid。
+- [2026-10-15-ui-layout-grid.md](../in-progress/2026-10-15-ui-layout-grid.md)：frame 侧 grid。
 - [docs/architecture.md](../../../docs/architecture.md)：prac 目标架构。
 - [docs/concepts.md](../../../docs/concepts.md)：prac 词表。
 - [docs/vscode.md](../../../docs/vscode.md)：VS Code 自身结构。

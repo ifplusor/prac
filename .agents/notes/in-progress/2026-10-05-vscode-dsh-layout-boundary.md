@@ -192,7 +192,7 @@ VS Code 的布局树比我们的大（primary sidebar 里还有 activity bar、�
 
 ## 开放问题（分成三类）
 
-- **栈内高度有"两个权威"**：视图记录里的 `ViewRecord.size`（人拖的、折叠时记下的）与渲染期分配器**画出来**的值（`allocateStack`）可以不一致——现场见过"布局里存 69、屏幕上画 519"。它是**布局模型的一致性问题**，与"给区域补 `max`/`priority`/`Sizing`"（见 [../proposed/2026-10-15-ui-layout-grid.md](../proposed/2026-10-15-ui-layout-grid.md)）**不是同一件事**。两条候选解法：① 分配结果**写回**视图记录（曾试过，未收敛）；② 把**栈变成树的结构**（栈 = 一个 `column` branch，每条 = 一个叶子 ⇒ 高度只剩树一个权威）——后者是一次模型重构，要单独裁。
+- **栈内高度有"两个权威"**：视图记录里的 `ViewRecord.size`（人拖的、折叠时记下的）与渲染期分配器**画出来**的值（`allocateStack`）可以不一致——现场见过"布局里存 69、屏幕上画 519"。它是**布局模型的一致性问题**，与"给区域补 `max`/`priority`/`Sizing`"（见 [../in-progress/2026-10-15-ui-layout-grid.md](../in-progress/2026-10-15-ui-layout-grid.md)）**不是同一件事**。两条候选解法：① 分配结果**写回**视图记录（曾试过，未收敛）；② 把**栈变成树的结构**（栈 = 一个 `column` branch，每条 = 一个叶子 ⇒ 高度只剩树一个权威）——后者是一次模型重构，要单独裁。
 
 **必须在定契约前知道**：**「还没落地的」那几条**（上面三件已全过，原「还没定的」已裁）。
 
@@ -205,7 +205,7 @@ VS Code 的布局树比我们的大（primary sidebar 里还有 activity bar、�
 
 组件级隔离一律用**隔离**（影子根 / 独立浏览上下文），不用"沙箱"——本仓"沙箱"只指 **agent 运行时的执行沙箱**。`docs/architecture.md` §3.1 已同步。
 
-> **下一步（另立一条 note）**：把布局的状态升级到 VS Code `Grid` 的形状（栈 → 叶子、补 `min`/`max`/`priority`/`Sizing`）——是**另一个工作**，见 [2026-10-15-ui-layout-grid.md](../proposed/2026-10-15-ui-layout-grid.md)。
+> **下一步（另立一条 note）**：把布局的状态升级到 VS Code `Grid` 的形状（栈 → 叶子、补 `min`/`max`/`priority`/`Sizing`）——是**另一个工作**，见 [2026-10-15-ui-layout-grid.md](../in-progress/2026-10-15-ui-layout-grid.md)。
 
 ## Related
 

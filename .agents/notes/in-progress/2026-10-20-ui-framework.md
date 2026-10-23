@@ -5,7 +5,7 @@ status: in-progress
 # Agent Note: UI framework — 把两个生态的 UI 贡献收进一个组合体系
 
 > **这是哪件工作**：prac 的 UI umbrella。目标只有一个：**VS Code 内置 / 扩展贡献的 UI，与 DSH 插件贡献的 UI，进入同一个目录、同一套摆放、同一套生命周期，能一起工作。**
-> **关系**：贡献面与术语见 [docs/ui-surface-map.md](../../../docs/ui-surface-map.md)；CRD 机制见 [2026-10-22-ui-crd.md](../proposed/2026-10-22-ui-crd.md)；VS Code adaptor 见 [2026-10-17-vscode-host-architecture.md](../in-progress/2026-10-17-vscode-host-architecture.md)；stack / grid 行为见 [2026-10-15-ui-layout-stack.md](../resolved/2026-10-15-ui-layout-stack.md) / [2026-10-15-ui-layout-grid.md](2026-10-15-ui-layout-grid.md)。
+> **关系**：贡献面与术语见 [docs/ui-surface-map.md](../../../docs/ui-surface-map.md)；CRD 机制见 [2026-10-22-ui-crd.md](../in-progress/2026-10-22-ui-crd.md)；VS Code adaptor 见 [2026-10-17-vscode-host-architecture.md](../in-progress/2026-10-17-vscode-host-architecture.md)；stack / grid 行为见 [2026-10-15-ui-layout-stack.md](../resolved/2026-10-15-ui-layout-stack.md) / [2026-10-15-ui-layout-grid.md](2026-10-15-ui-layout-grid.md)。
 >
 > **note map**：组合模型 / placement / host → 本 note；CRD 机制 → `2026-10-22-ui-crd.md`；VS Code 的翻译与 binding / view host → `2026-10-17-vscode-host-architecture.md`；container context step → `2026-10-22-vscode-container-context.md`。
 
@@ -129,7 +129,7 @@ view group 的成员
 - **container bar** 在父层 select 上切 container；**group bar** 只属于 select view group；stack container 没有 group bar。
 - **`ViewGroupState`**：每个 group 都有 id / mode / active / order / tombstone；`active` 只属于 select；无名 group 也有 state，但没有 `ContainerRecord`。
 - **group CR**（如 `VscodeViewGroup`）：CR 风格的 group 声明：`apiVersion` + `kind` + `metadata`（id / labels / annotations）+ `spec`（title / icon / role / order / hideIfEmpty 等）。`apiVersion + kind` 在声明时确定、不可变；frame 把它当 opaque 类型，不解析 source 语义。group 由 arrangement / frame 落成 `ViewGroupState`，declaration 不是 record。
-- **Definition（CRD）**：source adapter 注册具体 definition（如 `VscodeViewGroupDefinition` / `VscodeViewDefinition`）；定义 `apiVersion` / `kind` / schema / validation / factory。**Definition = 类型，Declaration / CR = 实例。** CRD 机制见 [2026-10-22-ui-crd.md](../proposed/2026-10-22-ui-crd.md)。
+- **Definition（CRD）**：source adapter 注册具体 definition（如 `VscodeViewGroupDefinition` / `VscodeViewDefinition`）；定义 `apiVersion` / `kind` / schema / validation / factory。**Definition = 类型，Declaration / CR = 实例。** CRD 机制见 [2026-10-22-ui-crd.md](../in-progress/2026-10-22-ui-crd.md)。
 - **view CR**（如 `VscodeView`）：同一套 CR 信封：`apiVersion` + `kind` + `metadata` + `spec`。`spec` 由来源定义（例如 `hostKind` / label / icon / `paneHeader`）；`hostKind` 是 **source-owned**，core 不解析；`prac.view` 承载的就是这个声明。
 - **`ViewGroup`**：运行时对象，1:1 对应 `ViewGroupState`；持有 slots / hosts / `binding?`。source binding 是 runtime-only，不进 state。
 - **`ContainerRecord`**：由 group CR materialize 出来的具名 group 记录，保存 `apiVersion` / `kind` / `metadata` / `spec` / `available` / `tombstone`；由 arrangement 的 view group registry 写入，随 `ViewGroupState` 一起进 frame 的 layout store；来源声明 CR，不拥有 record。成员不存，按 placement 派生。
@@ -288,7 +288,7 @@ adapter 大在：observe → normalize → bind → project → context → host
 
 1. **grid 的 cell / track 身份与持久化**：用 track id 还是索引；加删行列时 anchor 如何重写。  
    现状：cell 用显式 `GridPlacement`（child id 为 key），track 用 `columnWeights` / `rowWeights`，均在现有 `prac-layout/v1` 下持久化；add/remove 的 anchor 重写规则仍需签字。关闭条件：grid step note + 迁移测试。
-2. **G 的 adapter 投影**：虚拟 VS Code container / 窄 `ViewContainerContext` seam / 接受 source container context 失效。关闭条件：Folders 移入 DSH group 的 spike；设计见 [container context step](../proposed/2026-10-22-vscode-container-context.md)。
+2. **G 的 adapter 投影**：虚拟 VS Code container / 窄 `ViewContainerContext` seam / 接受 source container context 失效。关闭条件：Folders 移入 DSH group 的 spike；设计见 [container context step](../in-progress/2026-10-22-vscode-container-context.md)。
 3. **host activation / focus 契约**：`activate(viewId)` 的调用者与顺序；shadow root / iframe 的焦点报告。关闭条件：host step note + focus 测试。
 4. **`ContainerRecord` / group state 生命周期**：命名 / 去名、来源消失、墓碑化。关闭条件：state 模型 + 测试。
 5. **editor group 与 `EditorGroupModel` 的同步算法**：source 端 reorder 如何投影回 select group total order，非 editor view 位置如何保留。  
@@ -318,9 +318,9 @@ adapter 大在：observe → normalize → bind → project → context → host
 | [2026-10-15-ui-layout-stack.md](../resolved/2026-10-15-ui-layout-stack.md) | stack 的行高 / 折叠 / 顺序行为（已实现） |
 | [2026-10-15-ui-layout-grid.md](2026-10-15-ui-layout-grid.md) | split / grid 的 resize 契约 |
 | [2026-10-17-vscode-host-architecture.md](../in-progress/2026-10-17-vscode-host-architecture.md) | VS Code adaptor 的层、对象、契约、surface |
-| [2026-10-22-ui-crd.md](../proposed/2026-10-22-ui-crd.md) | UI 的 CRD-lite 机制 |
+| [2026-10-22-ui-crd.md](../in-progress/2026-10-22-ui-crd.md) | UI 的 CRD-lite 机制 |
 | [2026-10-07-editor-host.md](../in-progress/2026-10-07-editor-host.md) | editor host 的对象与放置 |
-| [2026-10-22-vscode-container-context.md](../proposed/2026-10-22-vscode-container-context.md) | container context step |
+| [2026-10-22-vscode-container-context.md](../in-progress/2026-10-22-vscode-container-context.md) | container context step |
 | [docs/concepts.md](../../../docs/concepts.md) | 词表与体系（旧词表；UI 术语以 ui-surface-map 为准） |
 | [docs/ui-acceptance.md](../../../docs/ui-acceptance.md) | 一条命令的 UI 验收与 gate 清单 |
 | [docs/architecture.md](../../../docs/architecture.md) | 目标架构（frame、能力、工作区） |
