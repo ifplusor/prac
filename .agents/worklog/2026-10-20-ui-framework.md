@@ -351,3 +351,8 @@
 - 删除 `prac.containerActions` slot 与 `ui-vscode-views` 的 ContainerActions 注册；container bar actions 只从 `VscodeGroupBinding` 投影。
 - frame 修正 group 查找（node/child 全路径）；action bar 标记 `data-prac-container-action-bar`。
 - live：verify:containers 全绿；ui-layout 191 / check 0。
+
+### 2026-10-23 — one-command UI acceptance（slice 47，A）
+
+- 新增 `verify:ui`：临时 XDG/HOME rig + dynamic fixture，串行跑 containers/stack/split/resize/persistence/bottom/views/file/tabs/dynamic，失败也清理。
+- 实际运行：10 个 gate 全绿，`UI ACCEPTANCE: all gates passed`。
