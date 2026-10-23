@@ -402,3 +402,8 @@
 
 - recall row 可 drag，写 `text/prac-view`；grid cell drop 解析 landing region 并 place view。
 - 新增 `verify:grid-view` 并纳入 verify:ui；16 阶段全绿。
+
+### 2026-10-23 — recall drag 收起（slice 56）
+
+- recall row dragstart 将面板变为 0.2 透明并 pointer-events:none；dragend 恢复。
+- verify:grid-view 断言 `data-prac-recall-dragging=true`；全量 verify:ui 16 阶段全绿。

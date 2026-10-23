@@ -27,14 +27,26 @@ const target = await page.$eval("[data-prac-grid-cell]", (cell) =>
 );
 if (target === null) throw new Error("no grid cell");
 await page.evaluate(
-  ({ view, target }) => {
+  ({ view }) => {
     const row = document.querySelector(`[data-prac-recall-row="${view}"]`);
-    const cell = document.querySelector(`[data-prac-grid-cell="${target}"]`);
-    if (!(row instanceof HTMLElement) || !(cell instanceof HTMLElement)) return;
+    if (!(row instanceof HTMLElement)) return;
     const transfer = new DataTransfer();
+    globalThis.__pracDragTransfer = transfer;
     row.dispatchEvent(
       new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: transfer }),
     );
+  },
+  { view: VIEW },
+);
+await page.waitForTimeout(100);
+const dragging = await page.$eval("[data-prac-recall]", (panel) =>
+  panel.getAttribute("data-prac-recall-dragging"),
+);
+await page.evaluate(
+  ({ target }) => {
+    const cell = document.querySelector(`[data-prac-grid-cell="${target}"]`);
+    if (!(cell instanceof HTMLElement)) return;
+    const transfer = globalThis.__pracDragTransfer;
     cell.dispatchEvent(
       new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: transfer }),
     );
@@ -42,7 +54,7 @@ await page.evaluate(
       new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }),
     );
   },
-  { view: VIEW, target },
+  { target },
 );
 await page.keyboard.press("Escape");
 await page.waitForTimeout(1200);
@@ -63,9 +75,10 @@ const restored = await page.evaluate((view) => {
 await close();
 report({
   url,
-  facts: { draggable, target, placed, restored },
+  facts: { draggable, dragging, target, placed, restored },
   checks: {
     "the catalogue row is draggable": draggable === "true",
+    "the panel becomes translucent while dragging": dragging === "true",
     "the drop lands in the target cell": placed !== null && placed.region.startsWith(target),
     "the dropped view is visible": placed?.hidden === false,
     "the placement survives a reload": JSON.stringify(placed) === JSON.stringify(restored),

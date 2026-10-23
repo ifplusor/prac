@@ -308,6 +308,8 @@ interface RecallSurfaceProps {
 function RecallSurface({ layout, onFocus }: RecallSurfaceProps): ReactElement | null {
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState(0);
+  /** A catalogue row is being dragged; make the panel translucent so cells are reachable. */
+  const [dragging, setDragging] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   /**
    * The open state, readable from the key listener below.
@@ -435,7 +437,9 @@ function RecallSurface({ layout, onFocus }: RecallSurfaceProps): ReactElement | 
           if (event.dataTransfer === null) return;
           event.dataTransfer.setData("text/prac-view", view.id);
           event.dataTransfer.effectAllowed = "move";
+          setDragging(true);
         },
+        onDragEnd: () => setDragging(false),
         style: {
           display: "flex",
           alignItems: "center",
@@ -581,9 +585,15 @@ function RecallSurface({ layout, onFocus }: RecallSurfaceProps): ReactElement | 
     {
       ref: panelRef,
       "data-prac-recall": "",
+      "data-prac-recall-dragging": dragging ? "true" : "false",
       tabIndex: -1,
       onKeyDown: onPanelKeyDown,
-      style: { ...RECALL_PANEL_STYLE, outline: "none" },
+      style: {
+        ...RECALL_PANEL_STYLE,
+        outline: "none",
+        opacity: dragging ? 0.2 : 1,
+        pointerEvents: dragging ? "none" : undefined,
+      },
     },
     header,
     ...rows,
