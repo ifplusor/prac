@@ -12,17 +12,21 @@
  */
 
 import type { PracLayoutFace, ViewRecord } from "prac-client-ui-frame/client";
+import {
+  DSH_CONVERSATION_VIEW,
+  DSH_RIGHTBAR_VIEW,
+  DSH_SIDEBAR_VIEW,
+} from "prac-client-ui-dsh/client";
 import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 
 /** The mechanism's placement face, named once for this module's signatures. */
 export type PracLayout = PracLayoutFace;
 
-/** DSH's sidebar slot as a view id (see `ui-frame`'s catalogue). */
-export const DSH_SIDEBAR_VIEW = "dsh:sidebar";
-/** DSH's rightbar slot as a view id. */
-export const DSH_RIGHTBAR_VIEW = "dsh:rightbar";
-/** DSH's keyed `main` slot: the conversation is its default key. */
-export const DSH_CONVERSATION_VIEW = "dsh:main:conversation";
+export {
+  DSH_CONVERSATION_VIEW,
+  DSH_RIGHTBAR_VIEW,
+  DSH_SIDEBAR_VIEW,
+} from "prac-client-ui-dsh/client";
 
 /** The mechanism's default regions (`ui-frame`'s default region tree). */
 export const LEFT = "left";
