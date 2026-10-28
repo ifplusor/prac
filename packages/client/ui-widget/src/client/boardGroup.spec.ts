@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import type { FrameView } from "prac-client-ui-frame/client";
+import type { FrameView } from "prac-client-ui-frame/lib";
 
 import { WidgetBoardGroup } from "./boardGroup.js";
 

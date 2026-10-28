@@ -14,7 +14,7 @@ import type {
   ViewGroupPlacement,
   ViewGroupRuntime,
   ViewGroupState,
-} from "prac-client-ui-frame/client";
+} from "prac-client-ui-frame/lib";
 
 import { WidgetBoard } from "./board.js";
 

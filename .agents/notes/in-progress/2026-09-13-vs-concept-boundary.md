@@ -33,7 +33,7 @@ prac 同时使用 DSH、VS Code 和自己的工作台词汇。边界原则只有
 
 1. **包名允许来源词**：`ui-vscode-host` / `ui-vscode-views` / `ui-vscode-editor` / `ui-dsh` 是边界包，包名出现来源是诚实的。
 2. **跨平面契约用共享常量模块 + 构建期内联**，不引入运行期耦合。
-3. **`part` 只做边界词**：对外 `partHost`，机制内部只用 region / surface / window / widget；`ui-layout` / `ui-frame` 内部没有 `part` 类型。
+3. **`part` 只做边界词**：对外 `partHost`，机制内部只用 region / surface / window / widget；`ui-frame` 内部没有 `part` 类型。
 4. **机制不知道来源**：frame 判“是不是一个 widget”按注册表成员，不按 id 前缀。
 5. **通道用 DSH service**：机制 → 编排用 `ctx.provide`；view / widget 声明注入服务。只有补丁侧必须留全局，换进 construction options。
 6. **window 模型是 prac 词，editor group 是 adapter 词**：window group 是 prac 窗口容器；`IEditorGroupView` 是它在 adapter 的 runtime counterpart。window 由 app 打开；widget 是 board 的 placement；EditorWindow 是 VS Code editor application window 的 prac 实现，不再套 `VscodeWindow` / `VscodeHost`。
@@ -58,7 +58,7 @@ prac 同时使用 DSH、VS Code 和自己的工作台词汇。边界原则只有
 - `ui-frame` / `ui-window` / `ui-widget` 源码无 `vscode:` / `dsh:` 分支。
 - frame 只按注册表成员识别 view / widget。
 - `ui-vscode-*` / `ui-dsh` 的 API 不泄漏上游内部类型到核心包。
-- `ui-layout` 迁移期 facade 删除后，没有 `part` 类型进入核心。
+- `ui-frame` 的 `./lib` 不导出 `part` 类型。
 - `prac.view` 只注册 widget；window / board 通过各自注册面。
 
 ## 6. Related

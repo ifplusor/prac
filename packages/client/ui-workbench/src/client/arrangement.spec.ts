@@ -5,7 +5,7 @@ import type {
   RoleBindings,
   ViewInfo,
   ViewRecord,
-} from "prac-client-ui-frame/client";
+} from "prac-client-ui-frame/lib";
 import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 import {
   BOTTOM,
@@ -52,7 +52,7 @@ const stateWith = (views: LayoutState["views"] = {}): LayoutState => ({
 /**
  * A recording stand-in for the mechanism's face.
  *
- * The real face cannot be imported here — `prac-client-ui-frame/client` publishes
+ * The real face cannot be imported here — `prac-client-ui-frame/lib` publishes
  * types only — and it should not be: the policy's contract is *which calls it
  * makes*, so a stub that records them is the honest test double, and every
  * member is written out so a face that grows a method fails to compile here.

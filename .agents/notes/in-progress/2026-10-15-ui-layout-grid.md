@@ -108,7 +108,7 @@ stage 是 `GridNode` + 显式 `GridPlacement`：
 - frame 只认 surface registry，不 import window / widget。
 - window group / board 的 active 是 surface 内部状态。
 - frame chrome 与 window / widget chrome 分层，不互相画。
-- 包归属：`ui-frame`；迁移期由 `ui-layout` facade 转发。
+- 包归属：`ui-frame`（DSH 插件行；`./lib` 提供类型）。
 
 ## 8. Open questions
 

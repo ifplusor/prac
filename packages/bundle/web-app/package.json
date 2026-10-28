@@ -39,7 +39,8 @@
     "react": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plus": "catalog:"
+    "vite-plus": "catalog:",
+    "prac-client-ui-frame": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.5-alpha.1"

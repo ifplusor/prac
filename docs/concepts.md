@@ -145,7 +145,7 @@ ui-vscode-host / ui-vscode-views / ui-vscode-editor
 bundle/web-app  // composition root only
 ```
 
-完整依赖见 10-20 的 Package architecture。`ui-layout` 是迁移期 facade，最终删除。
+完整依赖见 10-20 的 Package architecture。`ui-frame` 是 DSH 插件行，另导出 `./lib` 提供类型。
 
 ## 八、相关
 

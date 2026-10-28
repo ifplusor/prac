@@ -293,7 +293,7 @@ bundle/web-app
 - **bundle 是叶子**：其它包不能 import bundle；bundle 内不出现默认布局、默认 placement、业务 action、DSH / VS Code 映射；只做包选择、启动顺序、provider / 根组件装配；
 - `ui-workbench` 承接 arrangement / recall / 默认落位 / open policy，不是 bundle 的业务逻辑。
 
-`prac-client-ui-layout` 不继续加厚；迁移期保留为薄 facade，转发到新包，消费者迁完后删除。服务面：
+`ui-frame` 是真正的 DSH 插件行：`dsh.client` + `./client` loader artifact，`./lib` 提供类型 / 纯代码；`prac-client-ui-layout` 已删除。服务面：
 
 ```text
 ctx.pracFrame        // geometry / region / dock / panel

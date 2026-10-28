@@ -8,7 +8,7 @@
  * @module prac-client-vscode-host/client/groups
  */
 
-import type { FrameView, FrameViewGroup } from "prac-client-ui-frame/client";
+import type { FrameView, FrameViewGroup } from "prac-client-ui-frame/lib";
 import type { VscodeCatalogueEntry } from "./public.js";
 import type { VscodeGroupRuntime } from "./resources.js";
 import {

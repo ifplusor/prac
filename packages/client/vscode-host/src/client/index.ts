@@ -35,7 +35,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import type {} from "@deepseek-ai/dsh-client-ui-session/client";
 // Type-only, for prac's own Context merge (`ctx.pracFrame`), which is the face that owns
 // the region tree `addGroup` asks about.
-import type {} from "prac-client-ui-frame/client";
+import type {} from "prac-client-ui-frame/lib";
 import { WidgetBoardGroup } from "prac-client-ui-widget/client";
 import { WindowGroupAdapter } from "prac-client-ui-window/client";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";

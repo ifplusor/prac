@@ -15,7 +15,7 @@ import type {
   FrameView,
   FrameViewGroup,
   ViewHost,
-} from "prac-client-ui-frame/client";
+} from "prac-client-ui-frame/lib";
 
 /** The VS Code resource API group. */
 export const VSCODE_API_VERSION = "vscode.prac/v1";

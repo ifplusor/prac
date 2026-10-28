@@ -2,7 +2,7 @@
   "name": "prac-client-ui-frame",
   "version": "0.0.0",
   "private": true,
-  "description": "Frame geometry: Space, split / grid / region, catalogue and editor / board bridges.",
+  "description": "DSH frame plugin: Space, split / grid / region, surfaces, isolation and frame chrome.",
   "files": [
     "dist"
   ],
@@ -14,8 +14,11 @@
       "types": "./dist/index.d.mts",
       "default": "./dist/index.mjs"
     },
+    "./lib": {
+      "types": "./dist/lib.d.mts",
+      "default": "./dist/lib.js"
+    },
     "./client": {
-      "types": "./dist/client.d.mts",
       "default": "./dist/client.js"
     },
     "./package.json": "./package.json"
@@ -38,5 +41,10 @@
     "prac-client-ui-surface": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web"
+    }
   }
 }

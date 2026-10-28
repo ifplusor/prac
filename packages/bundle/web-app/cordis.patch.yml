@@ -10,10 +10,10 @@
   disabled: true
 
 - insert:
-    # The frame mechanism: region tree, sashes, collapse, the view catalogue,
-    # the `prac.view` seat, `ctx.layout` (compat shim) and `ctx.pracLayout`.
-    - id: prac-client-ui-layout
-      name: "prac-client-ui-layout"
+    # The frame mechanism: region tree, sashes, collapse, surfaces and the
+    # `prac.view` seat; provides `ctx.pracFrame` and `ctx.layout` (compat shim).
+    - id: prac-client-ui-frame
+      name: "prac-client-ui-frame"
 
     # The shared VS Code client mechanism: the single VS Code boot (the
     # app may be created only once per page) and the part-host element

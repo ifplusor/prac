@@ -29,7 +29,7 @@ import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "prac-client-vscode-host/client";
-import type { ViewSlotKey } from "prac-client-ui-frame/client";
+import type { ViewSlotKey } from "prac-client-ui-frame/lib";
 
 /** The slot these views are registered into (checked against the mechanism's key). */
 const SLOT: ViewSlotKey = "prac.view";

@@ -1,8 +1,11 @@
 import { defineConfig } from "vite-plus";
 
+import { clientPack } from "../../../scripts/pack-client.ts";
+
 /**
- * `ui-frame` is a library, not a DSH client bundle: the frame package inlines
- * its geometry and the browser never reaches it through the loader.
+ * `ui-frame` has two client outputs:
+ * - `./lib` is the library surface other plugins may import (types / pure code).
+ * - `./client` is the DSH loader artifact for the frame plugin row.
  */
 export default defineConfig({
   pack: [
@@ -13,12 +16,10 @@ export default defineConfig({
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
     },
     {
-      entry: { client: "src/client/index.ts" },
+      entry: { lib: "src/client/lib.ts" },
       format: ["esm"],
       platform: "browser",
       outExtensions: () => ({ js: ".js", dts: ".d.mts" }),
-      // The package is inlined by ui-layout's client bundle; platform words must
-      // stay external here too, or the store/React would be duplicated.
       deps: {
         neverBundle: [
           "react",
@@ -31,5 +32,9 @@ export default defineConfig({
         ],
       },
     },
+    clientPack("prac-client-ui-frame", {
+      entry: "src/client/plugin.ts",
+      external: ["react-dom", "@deepseek-ai/dsh-client-store"],
+    }),
   ],
 });

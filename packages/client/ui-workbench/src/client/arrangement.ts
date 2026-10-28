@@ -11,7 +11,7 @@
  * @module prac-web-app/client/arrangement
  */
 
-import type { PracLayoutFace, ViewRecord } from "prac-client-ui-frame/client";
+import type { PracLayoutFace, ViewRecord } from "prac-client-ui-frame/lib";
 import {
   DSH_CONVERSATION_VIEW,
   DSH_RIGHTBAR_VIEW,
