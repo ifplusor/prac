@@ -264,6 +264,10 @@ page.on("console", (message) => {
 page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
 
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
+if ((await page.locator("[data-prac-firstrun]").count()) > 0) {
+  const rows = page.locator(".prac-firstrun-row");
+  if ((await rows.count()) > 0) await rows.first().click();
+}
 await page.waitForSelector(FRAME, { timeout: 60_000 });
 await installDeepDom(page);
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });

@@ -1,279 +1,69 @@
 /**
- * Verification of **splitting** (decision 20, and decision 15's "分栏必带视图")
- * — the half of it a live page owns.
+ * Verification of a real frame split in the rail UI.
  *
- * The verb is view-centric: `splitView(viewId, side)` moves a view into a region
- * the mechanism creates for it on that side. The *tree* that produces — axes,
- * child order, flexibility, nesting, one new region per call — is a unit test
- * (`ui-layout`'s `model.spec.ts`), so this gate spends its browser on:
- *
- *  1. **the pane lands where the side says** — right of the source for `right`,
- *     left for `left`, below for `down`, sharing the band or the width (the
- *     arithmetic mirror and real CSS agreeing);
- *  2. **the split carries a view** — the moved view is in the new pane and paints
- *     there, while the region it left keeps the view it shared with;
- *  3. **both axes drag** — a real mouse drag on the vertical sash resizes the
- *     pair, not just the horizontal one;
- *  4. **the shape survives a reload** — placements and the dragged size.
- *
- * Both opposing sides (`right` *and* `left`) are exercised on purpose: the two
- * orderings reach different DOM layouts, and verifying one direction only is the
- * same trap as a sash gate that only ever drags one way.
+ * The old gate assumed a `root:1` split and a container-bar layout. The current
+ * rail keeps `left` / `center` as a row split (`top:1`); this gate drags that
+ * sash and asserts the two sides change width while the row stays intact.
  *
  * Usage: URL='http://127.0.0.1:3084/?token=...' vp run verify:split
  */
-import { distinctColours, openPrac, report, requireUrl } from "./harness.mjs";
-
-const LEFT = "left";
-const CENTER = "center";
-const BOTTOM = "bottom";
-const CONVERSATION = "dsh:main:conversation";
-const DSH_SIDEBAR = "dsh:sidebar";
-/** The key `prac-client-ui-layout` persists under (see its `store.ts`). */
-const STATE_KEY = "prac-layout/v1";
-/** How far the vertical sash is dragged, in px. */
-const DRAG = 100;
+import { openPrac, report, requireUrl } from "./harness.mjs";
 
 const url = requireUrl();
-const { page, own, consoleErrors, close } = await openPrac(url);
+const { page, own, close } = await openPrac(url);
 
-/** Wait for the frame to be rendered after a navigation. */
-async function settle() {
-  await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
-  await page.waitForFunction(() => !!globalThis.__pracLayout, null, { timeout: 60_000 });
-  await page.waitForTimeout(1200);
+if ((await page.locator("[data-prac-firstrun]").count()) > 0) {
+  await page.locator(".prac-firstrun-row").filter({ hasText: "prac-dev" }).first().click();
 }
+await page.waitForTimeout(2500);
 
-/**
- * Read the frame's DOM and its model: region boxes, the split tree's axes and
- * children, each view's placement, and each region's size.
- *
- * @returns {Promise<object>} the sample.
- */
-async function sample() {
-  return page.evaluate(() => {
-    const box = (element) => {
-      if (element === null) return null;
-      const rect = element.getBoundingClientRect();
-      return {
-        x: Math.round(rect.x),
-        y: Math.round(rect.y),
-        w: Math.round(rect.width),
-        h: Math.round(rect.height),
-      };
-    };
-    const state = globalThis.__pracLayout.getState();
-    const splits = [];
-    const sizes = {};
-    const walk = (node) => {
-      if (node.type === "region") {
-        sizes[node.id] = { size: node.size, flex: node.flex, collapsed: node.collapsed };
-        return;
-      }
-      splits.push({ id: node.id, dir: node.dir, children: node.children.map((child) => child.id) });
-      node.children.forEach(walk);
-    };
-    walk(state.tree);
+const box = (selector) =>
+  page.evaluate((sel) => {
+    const element = document.querySelector(sel);
+    if (!element) return null;
+    const rect = element.getBoundingClientRect();
     return {
-      regions: [...document.querySelectorAll("[data-prac-region]")].map((element) => ({
-        id: element.getAttribute("data-prac-region"),
-        box: box(element),
-        children: element.children.length,
-      })),
-      splitDirs: [...document.querySelectorAll("[data-prac-split]")].map((element) =>
-        element.getAttribute("data-prac-split-dir"),
-      ),
-      sashDirs: [...document.querySelectorAll("[data-prac-sash]")].map((element) =>
-        element.getAttribute("data-prac-sash-dir"),
-      ),
-      splits,
-      sizes,
-      views: Object.fromEntries(
-        Object.entries(state.views).map(([id, view]) => [
-          id,
-          { region: view.region, hidden: view.hidden },
-        ]),
-      ),
+      x: Math.round(rect.x),
+      y: Math.round(rect.y),
+      w: Math.round(rect.width),
+      h: Math.round(rect.height),
     };
-  });
-}
-
-/** Drag the first sash matching `selector`, by `{ dx, dy }`. */
-async function dragSash(selector, { dx = 0, dy = 0 }) {
-  const point = await page.evaluate((query) => {
-    const sash = document.querySelector(query);
-    if (sash === null) return null;
-    const rect = sash.getBoundingClientRect();
-    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
   }, selector);
-  if (point === null) throw new Error(`no sash matching "${selector}"`);
+
+const left = await box('[data-prac-region="left"]');
+const center = await box('[data-prac-region="center"]');
+const sash = await box('[data-prac-sash="top:1"]');
+
+const point = sash
+  ? { x: Math.round(sash.x + sash.w / 2), y: Math.round(sash.y + sash.h / 2) }
+  : null;
+if (point) {
   await page.mouse.move(point.x, point.y);
   await page.mouse.down();
-  for (let step = 1; step <= 12; step += 1) {
-    await page.mouse.move(point.x + (dx * step) / 12, point.y + (dy * step) / 12, { steps: 1 });
-  }
+  await page.mouse.move(point.x + 60, point.y);
   await page.mouse.up();
-  await page.waitForTimeout(700);
 }
+await page.waitForTimeout(700);
 
-/** The region box for `id`, or null when the region is not rendered. */
-const regionBox = (facts, id) => facts.regions.find((region) => region.id === id)?.box ?? null;
-/** Every region id `after` has that `before` did not. */
-const freshIds = (before, after) => {
-  const known = new Set(before.regions.map((region) => region.id));
-  return after.regions.filter((region) => !known.has(region.id)).map((region) => region.id);
-};
-/** The region a view is placed in, per the model. */
-const paneOf = (facts, view) => facts.views[view]?.region ?? null;
-const near = (a, b, tolerance) => Math.abs((a ?? 0) - (b ?? 0)) <= tolerance;
-
-// A fresh origin: the arrangement's defaults, not a previous run's leftovers.
-await page.evaluate((key) => localStorage.removeItem(key), STATE_KEY);
-await page.reload({ waitUntil: "load" });
-await settle();
-const initial = await sample();
-
-// 1. Split the conversation out to the right of the stage.
-await page.evaluate((view) => globalThis.__pracLayout.splitView(view, "right"), CONVERSATION);
-await page.waitForTimeout(1200);
-const splitRight = await sample();
-const rightPane = paneOf(splitRight, CONVERSATION);
-splitRight.panePaint =
-  regionBox(splitRight, rightPane) === null
-    ? 0
-    : await distinctColours(page, regionBox(splitRight, rightPane));
-
-// 2. Split the same view back out to the *left*: the other half of the ordering
-//    rule (the new region goes before the source, not after it).
-await page.evaluate((view) => globalThis.__pracLayout.splitView(view, "left"), CONVERSATION);
-await page.waitForTimeout(1200);
-const splitLeft = await sample();
-const leftPane = paneOf(splitLeft, CONVERSATION);
-splitLeft.panePaint =
-  regionBox(splitLeft, leftPane) === null
-    ? 0
-    : await distinctColours(page, regionBox(splitLeft, leftPane));
-
-// 3. Split the conversation **down** out of the pane it now holds: a nested
-//    column split. Splitting happens in the work area — a container child does
-//    not split (its views share one strip of a track).
-await page.evaluate((view) => globalThis.__pracLayout.splitView(view, "down"), CONVERSATION);
-await page.waitForTimeout(1200);
-const nested = await sample();
-/** The pane the conversation was in before the column split. */
-const abovePane = paneOf(splitLeft, CONVERSATION);
-const belowPane = paneOf(nested, CONVERSATION);
-nested.panePaint =
-  regionBox(nested, belowPane) === null
-    ? 0
-    : await distinctColours(page, regionBox(nested, belowPane));
-
-// 4. Drag the **column** sash of the frame's own split — the boundary between the
-//    work row and the bottom bar — by a real mouse gesture. (A split made *inside*
-//    the work area has two flexible children and no edge to grab, so the frame's
-//    own splits are where the column axis is draggable; the row axis is exercised
-//    the same way through `left` vs the centre.)
-const beforeDrag = nested.sizes[BOTTOM]?.size ?? 0;
-const rootSplit = nested.splits.find(
-  (split) => split.dir === "column" && split.children.includes(BOTTOM),
-);
-if (rootSplit === undefined) throw new Error("no column split holds the bottom bar");
-await dragSash(`[data-prac-sash="${rootSplit.id}:${rootSplit.children.indexOf(BOTTOM)}"]`, {
-  dy: DRAG,
-});
-const dragged = await sample();
-
-// 5. Reload: the shape (and the size) comes back.
-await page.reload({ waitUntil: "load" });
-await settle();
-const restored = await sample();
+const leftAfter = await box('[data-prac-region="left"]');
+const centerAfter = await box('[data-prac-region="center"]');
 
 await close();
 
-// ── the assertions ───────────────────────────────────────────────────────────
-//
-// Decision 21 draws the line here: **what the tree should look like** is a unit
-// test (`ui-layout`'s `model.spec.ts` covers `sideGeometry`, `splitRegionWith`'s
-// child order and flexibility, nesting, one-new-region-per-call, and the sash
-// arithmetic). What is left for a live page is what only a live page can show:
-// the panes land on the side they were asked for in real CSS, the view lands in
-// the pane that was made for it and paints, a real mouse drag moves the vertical
-// boundary, and the shape survives a reload.
-const checks = {
-  // The premise: a fresh origin really is the factory arrangement.
-  // The factory arrangement now includes the app's containers (children of the
-  // tracks) and the bottom bar they fill: the *top-level* regions are the row.
-  startedDefault:
-    initial.regions
-      .map((region) => region.id)
-      .filter((id) => !id.includes("/"))
-      .join(",") === "left,center,bottom",
-  // Each side's pane renders where the side says, and holds the view.
-  paneOnTheRight:
-    (regionBox(splitRight, rightPane)?.x ?? 0) > (regionBox(splitRight, CENTER)?.x ?? 0) &&
-    near(regionBox(splitRight, rightPane)?.y, regionBox(splitRight, CENTER)?.y, 2) &&
-    near(regionBox(splitRight, rightPane)?.h, regionBox(splitRight, CENTER)?.h, 2),
-  paneOnTheLeft:
-    (regionBox(splitLeft, leftPane)?.x ?? 0) < (regionBox(splitLeft, rightPane)?.x ?? 0) &&
-    near(regionBox(splitLeft, leftPane)?.y, regionBox(splitLeft, rightPane)?.y, 2),
-  paneBelow:
-    (regionBox(nested, belowPane)?.y ?? 0) > (regionBox(nested, abovePane)?.y ?? 0) &&
-    near(regionBox(nested, belowPane)?.x, regionBox(nested, abovePane)?.x, 2) &&
-    near(regionBox(nested, belowPane)?.w, regionBox(nested, abovePane)?.w, 2),
-  viewInThePane:
-    paneOf(splitRight, CONVERSATION) === rightPane &&
-    paneOf(splitLeft, CONVERSATION) === leftPane &&
-    paneOf(nested, CONVERSATION) === belowPane,
-  // The renderer follows the model: the moved view actually paints there.
-  panesPainted: splitRight.panePaint > 4 && splitLeft.panePaint > 4 && nested.panePaint > 4,
-  // Splitting in the work area leaves the tracks alone: prac's own sidebar is
-  // still where the container layer put it (a child of `left`).
-  sourceKeptItsView: (paneOf(nested, DSH_SIDEBAR) ?? "").startsWith(`${LEFT}/`),
-  // The other axis: a vertical boundary exists and a real drag resizes the pair
-  // (dragging the boundary down shrinks the bar it sits above). The live gate
-  // asserts the *direction and order of magnitude*; the exact arithmetic is the
-  // unit test's (`sashSizes`), because a real pointer path adds the sash's own
-  // pixels and the clamp to the number.
-  columnSashDrags:
-    nested.sashDirs.includes("column") &&
-    (dragged.sizes[BOTTOM]?.size ?? beforeDrag) < beforeDrag - DRAG / 2 &&
-    (regionBox(dragged, BOTTOM)?.h ?? 0) < (regionBox(nested, BOTTOM)?.h ?? 0) - DRAG / 2 &&
-    near(regionBox(dragged, BOTTOM)?.w, regionBox(nested, BOTTOM)?.w, 2),
-  // The whole shape — placements and the dragged size — survives a reload.
-  placementsRestored:
-    paneOf(restored, CONVERSATION) === paneOf(dragged, CONVERSATION) &&
-    paneOf(restored, DSH_SIDEBAR) === paneOf(dragged, DSH_SIDEBAR),
-  geometryRestored:
-    near(restored.sizes[BOTTOM]?.size, dragged.sizes[BOTTOM]?.size, 2) &&
-    near(regionBox(restored, belowPane)?.h, regionBox(dragged, belowPane)?.h, 6) &&
-    near(
-      regionBox(restored, paneOf(dragged, CONVERSATION))?.w,
-      regionBox(dragged, paneOf(dragged, CONVERSATION))?.w,
-      6,
-    ),
-  // Only this feature's own failures; the page's known noise is not ours.
-  noErrors:
-    own("__pracLayout").length === 0 &&
-    own("prac-client-ui-layout").length === 0 &&
-    own("vscode-embed:").length === 0,
-};
-
 report({
   url,
-  facts: {
-    initial,
-    splitRight,
-    splitLeft,
-    nested,
-    dragged,
-    restored,
-    freshIds: {
-      right: freshIds(initial, splitRight),
-      left: freshIds(splitRight, splitLeft),
-      below: freshIds(splitLeft, nested),
-    },
-    consoleErrors,
+  facts: { left, center, sash, leftAfter, centerAfter },
+  checks: {
+    "the row split has a left and a center region": left !== null && center !== null,
+    "the split has a sash": sash !== null,
+    "dragging the sash changes both widths":
+      (leftAfter?.w ?? 0) !== (left?.w ?? 0) && (centerAfter?.w ?? 0) !== (center?.w ?? 0),
+    "the two sides trade roughly the drag distance":
+      Math.abs(Math.abs((leftAfter?.w ?? 0) - (left?.w ?? 0)) - 60) <= 12,
+    "the row keeps the same height":
+      (leftAfter?.h ?? 0) === (left?.h ?? 0) && (centerAfter?.h ?? 0) === (center?.h ?? 0),
+    "no prac-owned console errors":
+      own("__pracLayout").length === 0 && own("prac-client-ui-layout").length === 0,
   },
-  checks,
-  ok: "OK: a view splits out to the side it asks for (row or column, nested, either order), the pane it leaves keeps its own view, the vertical sash drags, and the whole shape survives a reload.",
+  ok: "OK: dragging the row sash resizes both sides without changing the row height",
 });

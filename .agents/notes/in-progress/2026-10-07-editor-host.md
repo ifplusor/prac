@@ -2,82 +2,123 @@
 status: in-progress
 ---
 
-# Agent Note: prac 自己的编辑器宿主 —— 把"工作台的编辑器面板"做成等价物
+# Agent Note: editor window host — window group 的 editor runtime 与 per-window pane host
+
+> 上位模型：[2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)。VS Code adaptor：[2026-10-17-vscode-host-architecture.md](2026-10-17-vscode-host-architecture.md)。隔离：[2026-10-05-vscode-dsh-layout-boundary.md](2026-10-05-vscode-dsh-layout-boundary.md)。
+
+## Summary
+
+- **window group ↔ `IEditorGroupView`**：一个 window group 一个 editor group；editor group 是 adapter 内部 runtime，不是 prac UI 层。
+- **window ↔ editor input**：application window（editor / chat / diff / terminal）与 widget window 都是 editor input；`EditorWindow` 是 VS Code editor application window 的 prac 实现。
+- `EditorGroupModel` 持有该组 windows（editor input）的顺序与 active；frame 拥有 window group / window order / active，group 是投影。
+- `EditorPanes` 是 group 级 active-pane manager；按 window 模型拆成 `EditorWindowModel`（数据）+ per-window `EditorPaneHost`（runtime）。
+- pane active-only：inactive window 卸载 pane DOM，保留 input / model / view state；由具体 window content 控制挂载 / 卸载。
+- breadcrumbs 属于 editor window / pane；actions 在 window group tab strip 右端，由 frame 渲染 adapter 提供的 action model。
 
 ## Problem
 
-编辑器那一半现在有**两个世界**：
+当前实现把 editor group 放在 region 上，并让 group 拥有 title / tabs / breadcrumbs / actions：
 
-- **离屏的编辑器部件**（`embeddedWorkbench.ts` 的 `createDetachedPart("workbench.parts.editor")`）：挂在 `document.body`、`left:-100000px`，只为让编辑器服务活着。app 每打开一个文件，**在那里面**生成一个真正的编辑器面板。
-- **prac 视图里的控件**：`mountFileInto()` 自己 `new` 一个 `CodeEditorWidget`，拿同一份文本模型渲染。
+- frame 有 active window，editor group 有 active editor，混合 window group（chat + editor）时两套状态分离；
+- group tab strip 与 window group tab strip 重复；
+- group 生命周期绑 region：空 group 删除 region、group rehome、region prune 都是下游补丁；
+- 上游 editor CSS 以 `.part.editor > .content > .editor-group-container` 为祖先，prac group 直接挂 `.monaco-workbench`，规则不匹配。
 
-同一份模型上因此挂着两个控件（实测：可见的 `[285,21,890,734]`、离屏的 `[-100000,0,800,543]`，两者第一行都是同一个文件）。后果是**服务说的那块面不是人看的那块**：转到符号/定义、格式化、重命名这些**动作**落在离屏那份上（实测：可见编辑器停在 1–41 行，离屏那份跳到 605–636 行），挂在 `EditorInput`/`EditorPane` 上的贡献（面包屑 / peek / diff / 热退出）从来没上过屏。离屏部件本身还是债：一个没人看得见的子系统持有"开着哪些文件、哪个是活动编辑器"的状态，必须和 prac 的显示手工保持一致。
+`IEditorGroupView` 不能去掉：`EditorPanes` 需要真实 group，`EditorInput` / `EditorPane` 贡献（breadcrumbs、peek、diff、text actions）依赖它。问题不是“要不要 group”，而是 **group 放在哪一层、它能拥有什么**。
 
-## Proposal
+## 1. 对象
 
-**在 prac 里做"编辑器面板 / 编辑器组"的等价物，并把它接到编辑器服务**；**不留离屏部件**（James 2026-10-07：「它会成为沉重的债务」），也**不用上游的 `EditorPart` 或 `EditorGroupView`**（James 2026-10-07：部件无法与 DSH 的视图结合；组是个只装编辑器的封闭世界，装不下 prac 视图）。要点：
+```text
+WindowGroup（prac / frame）
+  ↔ IEditorGroupView（adapter runtime）
 
-1. **组是 prac 自己的对象，家在 prac 的区域里**。容器是区域的宿主，所以**同一个区域既能放 prac 视图（DSH 的、侧栏/面板的）也能放编辑器面板**——这正是不用上游组的原因，也是这条路成立的关键。
-2. **上游那半照借**（省掉重写）：
-   - `EditorGroupModel` —— 谁开着、顺序、活动、preview / pinned / sticky 的语义；
-   - `EditorPanes` —— 面板的创建 / 生命周期 / DOM 搬运（实测它只向组要 `windowId` 与 `openEditor`，所以能装在**我们自己的**组对象上）；
-   - 面板类 —— `TextFileEditor` / `AbstractTextCodeEditor` 那套编辑体验（注册成 prac 自己的 editor id，由 `IEditorResolverService` 按工作区文件 glob 解析到它）。
-3. **我们要写的**：`IEditorGroupView`（= `IEditorGroup`，51 个成员，其中绝大多数是对 `EditorGroupModel` 的转发）+ 宿主三接口的最小集（`IEditorGroupsService` 15 / `IEditorPart` 8 + `IEditorGroupsView` 18 / `IEditorPartsView` 10）。需要真行为的十余个：组注册与查表、活动组与激活事件、加/删组、`partOptions`、可见性、layout 事件、上下文键的 `bind`。
-4. **多组 + 分栏 = prac 的区域树**：一个载文件的区域 = 一个组（`center` 是默认那个），拆区域 = 新组（与"分栏是区域的性质"一致）；只放侧栏 / 面板的区域没有组。
-5. **目录与落位**：`listOpenFiles()` 照旧读编辑器服务的打开集合；文件在哪个区域 = 它在哪个组，"把文件搬去另一个区域" = 编辑器在组之间搬（`moveEditors`）。**文件不再由 frame 给每个文件一个宿主**——那是组的活；prac 的 tab 条仍然描述这个区域里的视图顺序。
-6. **一个文件可以同时住在多个区域**（VS Code 的 Split Editor 语义）：所以**身份是"放置"，不是文件**。能力按 `(文件, 组)` 报条目（`placement / resource / group / region / active / dirty / preview`），同一个文件在两处就是两条；prac 侧为每条建自己的视图，落位由条目给的 `region` 决定。三条由此确立的边界：
-   - **视图 id 的键是"放置令牌"**（`vscode:file:<placement>:<resource>`）。令牌由宿主在文件第一次出现在某个组时发放，**组随视图搬家时令牌不变**（下面第 ② 条），所以"移动"不会让消费者的名字变成陈旧的。用组做键会在每次移动时改名（实测：`splitView` 之后视图 id 从 `p0` 变成 `p2`，浮层与门都握着已经不存在的名字）；用区域做键则给不出 id——区域是挂载时才知道的，而 id 必须在挂载之前就有。令牌只在一种情况下重发：**编辑器被搬进一个已经有组的区域**（第 ③ 条）——上游的 `moveEditor` 先在目标组打开、再在源组关闭，而那前一半与"Split Editor 的复制"**是同一个事件**，宿主无从分辨，于是按新放置发放。代价是被移动的视图在新区域里是一个新 tab（追加在末尾，与 VS Code 移动编辑器一致），所以**消费者必须每次从目录重新读 id，不能缓存**。
-   - **宿主的三条落位规则**（挂载时 frame 渲染的那个区域的元素给出 region）：① 放置的组已经在这个区域 ⇒ 只把组的元素搬进视图宿主（tab 切换、重渲染）；② 放置的组只装这一个文件、目标区域还没有组 ⇒ **组**随视图搬，编辑器连 pane 一起保留；③ 否则 ⇒ **编辑器**搬（上游 `moveEditor`，目标区域的组接手），留下来的视图各自保住自己的面。三种都只是"同一条令牌换了组"。
-   - **一次 `focusin` 只代表"组正在显示的那个文件"**。打开编辑器会让 pane 拿到焦点，而 frame 还没换掉前一个视图宿主时，这个事件是从**旧宿主**里冒出来的；把它读成"人在这块区域工作"会把 app 的活动编辑器拽回刚刚让出中间的文件（实测：重开后新文件的视图没有面）。所以 `focusFile` 只在组的活动编辑器就是该放置的文件时才动作。
-   - **目录事件按"放置"报**（`令牌 + 资源 + 组 + 区域` 的集合），**不是**每次编辑器变化都报：把"活动/脏"这类变化也接进目录，会让 arrangement 进入"活动编辑器"的对账回路——实测约 30 万次同步/秒，直到页面 OOM。
-   - **注意力只在"有新文件出现"时把注意力拉回编辑器**；放置变化（一个视图换区域）不拉，否则人刚把编辑器停到轨道，下一秒就被拉回中间（实测：焦点门的整个停放阶段失败）。修正后停放阶段通过。
-   - **放置权在工作台/组，注意力只管前后**。工作台说"这个文件的编辑器住在区域 X"，而 arrangement 的注意力模型说"当前文件占中间、另一个停到轨道"——一个文件一个视图时两者不冲突（arrangement 搬视图、编辑器跟着搬），多个放置之下必须收敛为：**文件住哪个区域由组决定；注意力只决定哪个区域在前**（落位用 `placeQuietly`，只有"当前放置"才前置）。
-   编辑器在组间的搬/复制（工作台的 move/copy、Split Editor）就是"条目多一条/少一条"，视图跟着来去。
-7. **`findGroup` 的位置语义**：FIRST / LAST / NEXT / PREVIOUS 是**顺序型**（组列表的两端与相邻），照上游 `editorPart.ts:385-412` 实现；LEFT / RIGHT / UP / DOWN 是**方向型**，要 prac 区域树的几何，只属于 frame，宿主同步答不出来 ⇒ 不答（调用方于是走 `addGroup`）。`addGroup` 反过来要"创建一个区域"，是 host → app 的请求 + 区域 id 由宿主指定，属未落地的一步。
+EditorWindow（prac window；VS Code editor application window 实现）
+  ├─ breadcrumbs（可选）
+  └─ EditorPaneHost / EditorPane
+```
 
-## Alternatives（放弃了什么）
+- **window group** 拥有 window 集合、tab strip、active window；
+- **editor group** 持有 `EditorGroupModel`，是 window 集合在 editor runtime 里的投影；没有 UI chrome；
+- **EditorWindow** 本身就是 VS Code editor application window 的 prac 实现，负责 breadcrumbs、pane、内部 workbench context；不套 `VscodeWindow` / `VscodeHost`；
+- **EditorPaneHost** 是 EditorWindow 内部的 pane runtime，不是 group 的 `EditorPanes`；
+- widget window 的内容是 widget board，由 `ui-widget` 提供；它同样以 EditorWindow / editor input 形态进入 window group。
 
-- **保留离屏部件**（今日形态）：James 否决——它是第二个世界，且会一直是债。
-- **把上游 `EditorPart` 挂进 `center`**：否决——**部件无法与 DSH 的视图结合**（当初把文件做成视图、把部件挪去离屏，正是为了绕开它）。
-- **复用上游 `EditorGroupView`（一个区域一个组）**：否决——**组是只装编辑器的封闭世界，装不下 prac 视图**；区域的容器必须是 prac 的。
-- **给离屏部件真实布局，再把组/面板的 DOM 搬进 prac 视图**：实测四种做法全失败（单组搬 control 被隐藏；每文件一组 + `openEditor(描述符, group)` 只有第一次成功且开成两份；`addGroup` + `moveEditors` 搬移返回 false；`SIDE_GROUP` 让 `openEditor` 返回 undefined）——根因是离屏部件是"单格网格"。即便修好，它仍是第二个世界。
-- **prac 从零实现面板与模型**：不必——`EditorGroupModel` 与 `EditorPanes` 都以组对象为界，可以照借。
+## 2. 权威
 
-## Open questions
+- frame 拥有 window group、window、顺序、active window、tab strip；
+- adapter 的 `activeEditor` / `activeEditorPane` 是 active window 的投影，不是第二权威；
+- **editor group 不进入 UI DOM**：没有 title、tabs、breadcrumbs、actions；只保留 `EditorPanes` 需要的最小 pane 容器；
+- 非 editor window 没有 breadcrumbs；pane 自己提供 breadcrumbs 时（例如自定义 pane），`EditorWindow` 不重复渲染，需要 `providesBreadcrumbs` capability；
+- 不做 `focusin` 反向驱动 active；active 变化由 frame / 显式命令发起。
 
-- **组头**（tab 条 + 面包屑）：tab 归 prac（区域的 tab 条已有，见 umbrella §3.5 区域与编辑器），**面包屑挂在组头上**——是先让 prac 的 tab 条只做 tab、把组头其余部分搬进来，还是另行处理，单独裁一次。
-- **未支持清单的表达**：放在启动日志、一条活体门，还是两者都要。
-- **组与区域同生共死，所以"移除一个组"要能移除一个区域**：prac 能建区域（`createRegionBeside`），现在也能删（`removeRegion`，它的逆）——frame 删节点、分裂只剩一个孩子时并回幸存者；区域子树里的 view 记录随之丢弃；通道两端（`GroupRegionChannel`、`vscode-embed` 接口）都带这个方法，`PracEditorHost.removeGroup` 调用它。**最后一个区域永不删**（总得有东西占住屏幕）。触发点是上游的 `closeEmptyGroups`（关掉一个组里最后一个编辑器就关掉该组，默认开）——`PracEditorGroup` 是自己的 `IEditorGroupView`，不继承上游那段，所以要自己接：在公开的 `closeEditor`/`closeEditors` 出口按"组空了 + 设置没关 + 还有别的组"移除自己。没有这套能力时，空组会留在屏幕上（只剩一条没有 `×` 的占位 tab）**并占住活动组**，于是 `Open to the Side` 从活动编辑器解析不到资源、静默什么都不做。
-- **右键的选中/焦点语义对齐上游**：普通右键、以及 macOS 的 `⌃+左键`，都**只移动焦点、不改选中**（上游 `listWidget` 的 `onViewPointer` 就是如此：`setFocus` 一定发生，`setSelection` 只在非右键、非修饰键时发生）。菜单握着 DOM 焦点期间，被点中的行绘制 `list.inactiveFocusOutline`（细描边）、原选中行绘制 `list.inactiveSelectionBackground`（淡填充）——所以"点的那行没高亮、旧行高亮没消失"是上游的观感，不是缺陷。**prac 不在这里加"右键即选中"的偏离**；要更强的观感由主题（`workbench.colorCustomizations` 的这两个键）决定。
-- **栈内条目的高度按条目记住，语义照 `SplitView`**：一个区域里堆叠的视图默认**等分**高度 ✓；每条**底边 5px** 是它的缩放手柄 ✓，**只有下面还有条目**的条目才有手柄 ✓（最后一条的底边就是栈自己的边 ✓）。手柄**不新增任何 DOM**（监听挂在条目自身、**捕获阶段** —— 按在视图自己的 DOM 上，工作台的树可以 `stopPropagation` ✓；提示用 `::after` 伪元素并给 `z-index` ✓）。尺寸记在 view 记录上（`ViewRecord.size` ✓，随布局持久化 ✓）。
-- **拖动 = `SplitView.resize` 的规则**：边界能走多远由**所有上方与所有下方条目各自的余量之和**决定 ✓（`minDelta/maxDelta` ✓），先 `clamp` 再动 ✓；**上方（含被拖那条，最近优先）吃 `+delta`**、**下方吃 `−delta`** ✓ —— 所以**一次拖动会改多条的高度** ✓（这是上游语义，不是 bug ✓）；下方给不出空间时 `clamp` 让拖动**不动** ✓（栈满了就是拖不动 ✓）。运行时把这段规整收在纯函数里（`redistributeOnDrag` ✓），可单测 ✓。
-- **折叠 = 视图隐藏**：折叠后的条目只占**固定标题高** ✓（`HEADER_HEIGHT`），其尺寸仍留在记录里 ✓；**它上面那条的边界依旧可拖** ✓（上游隐藏视图保留缓存尺寸、sash 仍在 ✓）。渲染时的分配（`allocateStack` ✓）用**实测到的区域高度**把各条装进去 ✓（不用 frame 的陈旧尺寸表 ✓），下界 48px ✓，余量优先给**从未设过尺寸**的条目 ✓，全都有尺寸时按折叠位置**朝底部**分配 ✓。
-- **折叠让出的空间「朝栈底走」**：一条折叠时，它让出的空间从**最后一条往前**逐条发（`SplitView.distributeEmptySpace` ✓ `splitview.ts:1333-1355`；隐藏的视图在那里上限为 0 ⇒ 拿不到 ✓，prac 的折叠条目同此 ✓），每条能拿多少拿多少、发不完继续往前 ✓；prac 的条目不声明上限 ✓ ⇒ 通常由**最下面那条**全部收下 ✓。**上面的条目永不动** ✓ —— 拖动时"上面的 item 会变"正是先前把余量发给"没设过尺寸"的条目（位置无关 ✗）造成的 ✓。
-- **拖动到极限会「连续折叠」，顺序自下而上**：被拖条目只从**它下方**的条目取空间 ✓（**上面的条目永不被吃** ✓ —— 这条是手感的关键），下方未折叠的余量耗尽时，**折下一条** ✓（然后下一条 ✓），于是「拖动一次」就能把 file view → open editors → timeline 依次折起 ✓；折叠的条目是**标题**，不参与余量、也不会被拖动写尺寸 ✓（折叠记住的高度因此留得住 ✓）。被折叠的条目**只由它的折叠开关打开** ✓。
-- **拖到极限即折叠（snap），但折叠不会被拖开**：把邻条挤过"它下界的一半"⇒**折叠它** ✓；把被拖那条自己拖到一半以下 ⇒ 折叠它 ✓；被折叠的条目**只由它的折叠开关打开** ✓（人按的明确动作），指针怎么回退都不自动展 ✗。折叠时记住的是**拖动开始**那一刻的高度 ✓（上游把拖动开始时捕获的尺寸交给 `setVisible` ✓ `splitview.ts:946`），所以展开回到拖动前的高度 ✓。理由：上游的 `IView.snap` 是逐视图 opt-in 且**默认 false**（`splitview.ts:78-84`），而今天的工作台里**没有任何视图打开它** ⇒ 上游在用的手感就是"拖动不会把折起来的视图打开" ✓；`reset`（双击复位）那条路径也是看见隐藏的 snap 视图就直接返回 ✓（`:1193-1199`）。
-- **本处不设 prac 特有偏离**：不做"下方枯竭时向上去借空间" ✗，也不把折叠后的视图做成不可拖 ✗。
+## 3. Pane
 
-- **身份改造之后的三件事已定**（tab / 脏标记 / 关闭，"按放置"这一句裁决落在关闭上）：
-  - **tab**：按放置（一个放置一个 `vscode:file:<placement>:<resource>` view，tab 由它所在的区域渲染）。
-  - **脏标记**：按**模型**（资源）。VS Code 的脏是 `ITextFileEditorModel` 的属性，两个放置共享同一个模型 ⇒ 两个 tab 显示同一个脏点；按放置算会是假信息。
-  - **关闭**：按**放置**。`close(placement, resource)` 一直接到 capability 上（`embeddedWorkbench` 在 `findEditors(uri)` 的结果里只取 `groupId === placement` 的那一个实例），tab 的 × 用 `host.filePlacement(view)` 报名。在飞行中的护栏也改成按放置（`closingFiles` 用 `placementKey`），只有"这个资源的每个放置都在关闭"才拦住 `activate`（`isClosingEverywhere`）——文件还在另一个区域里开着时，激活它是正当的。上游语义一致：关一个组不动另一个组。
-  - **"当前文件"**：是"最前区域里处于 `activeEditor` 的那个**放置**"（区域最前由 prac 的 front 决定，组内 active 由 `EditorGroupModel` 决定）；`web-app` 现有的 `currentFile` 重挑就是它在用。
-- **零延迟的 down+up 会让工作台的确认框重问一次 —— 已定性为合成输入的产物，不是产品缺陷**（`exp144`–`exp148` 量清）：按住 30ms 再抬起就正常（`mouseup` 目标就是 Cancel 按钮、对话框关闭并保持关闭）；而**零延迟**那一次的 `mouseup` 目标落在编辑器上。期间没有任何东西移动或改序 —— 对话框与按钮的盒不变（`exp144` `moved:false`）、覆盖层与 center 的 DOM 顺序与 z-index 不变（`exp148`：`stageFirst`、层 `z-index:20`）、prac 的 layout 无变化、也没有 `focusin`（`exp146`）—— 所以既不是重排/重定位，也不是 attention 被浮层焦点驱动。`elementFromPoint` 在所有时刻都返回影子树**宿主**（无 class 的 DIV），用它判断"点在谁身上"本身就是错的。⇒ 门继续按人的节奏按（120ms），这条不再追。
-- **`addGroup` 的通道（已通）**：在 prac，组就是区域，所以"加一个组"是**问 frame 要一个新区域**。face 的 `createRegionBeside(regionId, side)` 用 `splitRegionWith` 做纯树编辑（**不移动任何 view**），同步返回新区域 id；`PracEditorHost.addGroup` 拿它 + `ensureGroup(newRegion, newRegion)` 把新组绑到那个区域上。通道两端：workbench 面 `setGroupRegionFactory(factory)`（模块级持有 —— host 走 DI，没有应用回调的缝），应用侧在 `vscode-host` 安装 `(region, side) => ctx.pracLayout.createRegionBeside(region, side)`；`vscode-embed` 的接口会先把 factory 存下、等工作台面 publish 时补交（应用先于工作台面启动）。**实测**：单个组时 `workbench.action.splitEditorToNextGroup` 从"什么都不做"变成开出 `p1@region-2`。**仍未做**：方向型 `findGroup`（LEFT/RIGHT/UP/DOWN）需要一个区域树几何查找（`regionInDirection`），同样经这条通道回答。
-- **浮层可交互，但门的"瞬时点击"不行**（2026-10-12 量清）：应用自己的浮层（快选、菜单、通知、模态）**是能点的** —— 转到符号的行用"按下 → 停 120ms → 抬起"能选中并让编辑器滚到目标行，脏文件关不掉的确认框同理（Cancel / Don't Save 都生效）。而 Playwright 默认的**零延迟** down+up 不给按钮 `click`（实测：对话框按下即消失、抬起落在编辑器上，随后对话框被重新问一次）。⇒ 这是**门的输入**问题，不是产品缺陷：门要按人的节奏按（已写进 `verify-close` 与 `verify-editor` 的注释）。此前一轮把 `document.elementFromPoint` 的结果读成"穿透到 body"是误判——它对影子树内容返回的是**宿主**，而"点不动"的真因是 DSH 那条 Preview Notice 的全屏 mask + `#root` 的 `inert`（见下一条）。
-- ~~本仓库类型检查的 DSH 版本与运行的 DSH 不是同一个~~ **已定**：prac dev 的 DSH 锚点是一个 worktree（`../../deepseek-harness/dsh-prac-dev`），catalog 精确 pin 它的发布版本，`pnpm check` 里的逐字节比较与发布点的 `satisfies ILayout` 是两道防线 —— 见 `2026-10-12-dsh-anchor.md`。（这一条原本是「侦察结果」第 4 条那个 `panelInfo` 漂移的成因。）
+```text
+EditorWindow
+  ├─ breadcrumbs（除非 pane 自己提供）
+  └─ EditorPaneHost
+       └─ EditorPane
+```
 
-## 上游契约给这个类画出的边界
+- `EditorWindowModel` 是数据：input、pane descriptor、view state、active；
+- `EditorPaneHost` 是 runtime：descriptor 选择、pane 实例/容器、`setInput` / `clearInput`、layout、focus、dispose、trust / progress；
+- inactive editor window：移除 pane DOM，保留 model / input / view state；
+- 切 active window：旧 window 卸载 pane，新 window 挂载 pane；group 的 active editor 跟着 frame 的 active window；
+- 具体 window content（text / diff / chat）决定 mount / unmount / focus / layout；
+- 上游 `EditorPanes` 是 group 级 active-pane manager：只有一个 `_activeEditorPane`，切换时 `clearInput`、`setVisible(false)`、移除 pane container；不活跃 input 不保留 pane DOM。把它映射到 window 模型时拆成数据（`EditorWindowModel`）和 runtime（per-window `EditorPaneHost`）。
 
-1. **`EditorGroupModel` 能独立构造**（`instantiationService.createInstance(EditorGroupModel, undefined)`）——不需要组视图，模型这块底座可以单借。
-2. **`EditorPanes` 与组的进度指示器要一个"组的作用域"**，跟 `EditorGroupView` 建的那样：`ProgressBar` + scoped `IContextKeyService` + **组级的 `IEditorProgressService`**（`EditorProgressIndicator(progressBar, group)`，**不是**全局单例）⇒ 嵌入式服务图里这层 scope 由 prac 建。
-3. **面板会反过来向组要素成员**：`EditorPanes` 的源码只用到 `windowId` / `openEditor`，但跑起来**面板自己**（以及进度指示器）会调 `isEmpty` / `isPinned` / `onDidModelChange`（`textDiffEditor.ts`、`progressIndicator.ts`）⇒ 用一个"假组"喂 `EditorPanes` 是**死路**，**必须有一个真的 `IEditorGroupView`**。分工由此定死：模型能转发的转发给 `EditorGroupModel`，其余是自己的行为；第一批成员覆盖"能开一个文件并画出来"——`windowId` / `element` / `container` / `openEditor` / `closeEditor` / `isEmpty` / `isPinned` / `contains` / `activeEditor` / `activeEditorPane` / `onDidModelChange` / `onDidActiveEditorChange` / `layout` / `setVisible` / `focus`，其余按最小实现并进"未支持"清单。
-4. **手抄的上游契约会静默漂移**：上游插件读 face 上不存在的成员时，整个外壳起不来，而唯一的报错是一句 `Cannot read properties of undefined`；本仓库的类型检查对着**已发布**的 `0.1.5-rc.1`、app 跑的是 checkout ⇒ 两个 `ILayout` 不是同一个类型，`satisfies` 也写不成 ⇒ **这类契约要自己加守卫**（见 Open questions）。
-5. **宿主 shell 的 modal 面会把整页 `inert`**：它渲染在自己的 body root 里并把 `#root` 标成 `inert` ⇒ 界面既不能点也不能聚焦。它不是任何门的题目，而"确认"是一次**持久的宿主设置**（属于人的 onboarding）⇒ 门在跑时把那层 modal root 藏掉并清掉 `inert`（两族门共用的脚本），**不代替人点确认**。
+## 4. Chrome
 
-## 判据（怎么算成立）
+- window group tab strip 由 frame 画；tab 是 window；
+- **actions 在 window group tab strip 右端**；adapter 把 active editor input 的 `MenuId.EditorTitle` 解析成 resolved action model（command / toggle / submenu / enabled / group / order / icon / tooltip / overflow），frame 渲染并回调；
+- editor window 的 breadcrumbs 在 pane / window chrome 内；不属于 group tab strip；
+- 非 editor window 没有 breadcrumbs；
+- overlay / toast / command palette 走 frame float layer。
 
-1. **编辑器动作落在可见的那块面上**：转到符号 / 定义（以及任何编辑动作）动的必须是 prac 展示的那份。**已锁，两个手势**：`vendor:verify-editor` 先在**转到符号**的快选里按下符号行（可见面的渲染行从 `// top-<token>` 变成 `// filler 182…`），再用**文件内查找**把它带回文件头（渲染行变回 `// top-<token>`），两次都断言宿主元素与区域不变。
-2. **Outline / Timeline 与上游一致**（同一份模型、同一个面板）。**两条都锁了**：`vendor:verify-outline`（符号、跟随下一个文件、跟随取得焦点的区域、排在面板内）与 `vendor:verify-timeline`（面板是上游的、条目来自 `ITimelineService`、行里是当前文件的名字、换文件就换行、面板仍在自己区域内）。Timeline 的条目由一条**只给门用**的 provider 提供（这个嵌入不带 timeline 源；空面板与坏面板分不出来），经 `__vscodeEmbed.face.enableTimelineProbe()` 打开。
-3. **DOM 里不存在离屏部件**（`[data-vscode-embed-detached]` 消失），app 的打开路径（树点击 / 快速打开 / `openFile`）照常。**已锁**：`vendor:verify-editor` 断言 `[data-vscode-embed-detached]` 与 `[data-vscode-embed-part-host]` 计数为 0，同一文件的编辑面**恰好一个**。
-4. **门全绿**：vendor `editor / file / views / outline / focus / tabs / close / layout / view` + prac `stack / split / containers / bottom / persistence`。过期的 `vendor:verify-regions`（断言"离屏部件存在"）**退役**：它的第 1 条并入 `verify-editor`，第 2–3 条（view host 落在区域内、pane 不越宽）并入 `verify-view`。
+## 5. 生命周期与身份
+
+- group 生命周期跟 **window group**：window group 创建 / 关闭时创建 / 关闭；
+- 最后一个 editor window 关闭不等于 group 关闭；空 group 合法；
+- 不再由空 group 触发 `removeRegion`，不再有 region prune / group rehome；
+- frame 的 window id / view id 是稳定身份；
+- 打开文件 = 在目标 window group 创建 / 聚焦 editor window；
+- split = frame 的 window group split；move = window 在 window group 之间移动；
+- 上游 `moveEditor` 只作为 adapter 内部实现细节，不是 prac 的窗口操作。
+
+## 6. 隔离
+
+- window 是外层 containment / stacking / theme / focus 边界；
+- 混排 VS Code + DSH 的 window 保留 per-widget root / source-scoped 子树；window root 只做外层 containment；
+- `EditorPane` 内部的 webview / iframe 自己的 browsing context；
+- 交叉 window 的 overlay 走 frame float layer。
+
+## 7. Decisions
+
+- window group ↔ editor group；editor group 是 adapter runtime，不是 prac UI。
+- 所有 stage window 都是 editor input / EditorWindow；application window 与 widget window 只是内容不同。
+- EditorWindow 是 VS Code editor application window 的 prac 实现，不套 `VscodeWindow` / `VscodeHost`。
+- `EditorPanes` 拆为 `EditorWindowModel` + per-window `EditorPaneHost`；pane active-only，inactive 卸载 DOM。
+- frame 拥有 window order / active / tab strip；group 是投影；不做 focusin 反向驱动。
+- breadcrumbs 属于 editor window；actions 在 window group tab strip 右端，frame 渲染 action model。
+- group 生命周期跟 window group，不跟 region；空 group 合法。
+- window 外层隔离；混排保留 per-widget root。
+
+## 8. Open questions
+
+- `EditorPaneHost` 从 `EditorPanes` 抽取 / 改写，还是先复用 group 级 `EditorPanes` 过渡。
+- action model 的 exact 字段与更新：command / toggle / submenu / dynamic `when`；overflow / keyboard / tooltip。
+- extension `tabGroups` API 如何映射 / 隔离。
+- 非 editor window（chat / note）的 `EditorPane` 如何实现 `setInput` / focus / scroll / breadcrumbs capability。
+- application window 内是否允许 widget board slot（MVP 不允许）。
+- 同源 window / board 合并 shadow root 的迁移条件。
+
+## 9. Validation
+
+1. **编辑器动作落在可见面上**：转到符号 / 定义 / 查找动的是 active editor window 的 pane。
+2. **Outline / Timeline 跟随 active editor window**：切 window 后符号跟着换。
+3. **DOM 里没有离屏 editor part**，同一文件的可见编辑面恰好一个。
+4. **window 切换**：inactive window 的 pane DOM 被移除，active window 挂载自己的 pane；breadcrumbs 跟随 active editor。
+5. **actions**：在 window group tab strip 右端，跟随 active editor；不与 breadcrumbs 抢行。
+6. **生命周期**：window group 关闭才关闭 group；关闭最后一个 editor 不删除 window group / region。
+7. **隔离**：混排 window 的 `:host` / `.monaco-workbench` / overlay / focus 不互相穿透。
+8. **门**：editor / file / views / outline / focus / tabs / close / layout / view，加上 window group / window / breadcrumbs / actions 的新断言。

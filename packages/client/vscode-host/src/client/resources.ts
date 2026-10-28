@@ -12,16 +12,10 @@
 import type {
   GroupBinding,
   MoveIntent,
-  ViewDefinition,
-  ViewGroupDefinition,
-  ViewGroupResource,
   FrameView,
   FrameViewGroup,
-  ViewGroupRuntime,
   ViewHost,
-  ViewResource,
-  ViewRuntime,
-} from "prac-client-ui-layout/client";
+} from "prac-client-ui-frame/client";
 
 /** The VS Code resource API group. */
 export const VSCODE_API_VERSION = "vscode.prac/v1";
@@ -39,8 +33,11 @@ export interface VscodeViewGroupSpec extends Readonly<Record<string, unknown>> {
   readonly hideIfEmpty?: boolean;
 }
 
-/** A concrete VS Code view-group resource. */
-export interface VscodeViewGroup extends ViewGroupResource {
+/** A concrete VS Code view-group declaration. */
+export interface VscodeViewGroup {
+  readonly apiVersion?: string;
+  readonly kind?: string;
+  readonly metadata: { readonly id: string };
   readonly spec: VscodeViewGroupSpec;
 }
 
@@ -57,8 +54,11 @@ export interface VscodeViewSpec extends Readonly<Record<string, unknown>> {
   readonly paneHeader?: string;
 }
 
-/** A concrete VS Code view resource. */
-export interface VscodeView extends ViewResource {
+/** A concrete VS Code view declaration. */
+export interface VscodeView {
+  readonly apiVersion?: string;
+  readonly kind?: string;
+  readonly metadata: { readonly id: string };
   readonly spec: VscodeViewSpec;
 }
 
@@ -202,8 +202,8 @@ function stripViewPrefix(id: string): string {
   return id.startsWith("vscode:view:") ? id.slice("vscode:view:".length) : id;
 }
 
-/** `ViewGroupDefinition` for `vscode.prac/v1 ViewGroup`. */
-export class VscodeViewGroupDefinition implements ViewGroupDefinition {
+/** Typed factory for VS Code view groups. */
+export class VscodeViewGroupDefinition {
   readonly apiVersion = VSCODE_API_VERSION;
   readonly kind = "ViewGroup";
 
@@ -218,7 +218,7 @@ export class VscodeViewGroupDefinition implements ViewGroupDefinition {
     return spec as unknown as VscodeViewGroupSpec;
   }
 
-  materialize(decl: ViewGroupResource): ViewGroupRuntime {
+  materialize(decl: VscodeViewGroup): VscodeGroupRuntime {
     const spec = this.validate(decl.spec);
     return this.options.createGroup(
       decl.metadata.id,
@@ -227,15 +227,14 @@ export class VscodeViewGroupDefinition implements ViewGroupDefinition {
     );
   }
 
-  bindingFactory(decl: ViewGroupResource): GroupBinding | undefined {
-    const group = decl as unknown as VscodeViewGroup;
-    const spec = this.validate(group.spec);
-    return this.options.createBinding?.(spec, group.metadata.id);
+  bindingFactory(decl: VscodeViewGroup): GroupBinding | undefined {
+    const spec = this.validate(decl.spec);
+    return this.options.createBinding?.(spec, decl.metadata.id);
   }
 }
 
-/** `ViewDefinition` for `vscode.prac/v1 View`. */
-export class VscodeViewDefinition implements ViewDefinition {
+/** Typed factory for VS Code widgets. */
+export class VscodeViewDefinition {
   readonly apiVersion = VSCODE_API_VERSION;
   readonly kind = "View";
 
@@ -249,13 +248,12 @@ export class VscodeViewDefinition implements ViewDefinition {
     return spec as unknown as VscodeViewSpec;
   }
 
-  materialize(decl: ViewResource): ViewRuntime {
+  materialize(decl: VscodeView): FrameView {
     return this.options.createView(decl.metadata.id);
   }
 
-  hostFactory(decl: ViewResource, options?: { readonly move?: MoveIntent }): ViewHost {
-    const view = decl as unknown as VscodeView;
-    return new VscodeViewHost(view.metadata.id, this.options.createHost(view, options));
+  hostFactory(decl: VscodeView, options?: { readonly move?: MoveIntent }): ViewHost {
+    return new VscodeViewHost(decl.metadata.id, this.options.createHost(decl, options));
   }
 }
 

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "vp run -r build",
-    "test": "vp run -r test --passWithNoTests",
+    "test": "vp run -r test",
     "check": "vp check . && node scripts/dsh-types.mjs --compare",
     "dsh-types": "node scripts/dsh-types.mjs",
     "verify:stack": "node tests/gates/verify-stack.mjs",
@@ -22,7 +22,8 @@
     "verify:grid-merge": "node tests/gates/verify-grid-merge.mjs",
     "verify:grid-view": "node tests/gates/verify-grid-view.mjs",
     "verify:grid-tab": "node tests/gates/verify-grid-tab.mjs",
-    "verify:grid-free": "node tests/gates/verify-grid-free-resize.mjs"
+    "verify:grid-free": "node tests/gates/verify-grid-free-resize.mjs",
+    "verify:packages": "node scripts/verify-ui-packages.mjs"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

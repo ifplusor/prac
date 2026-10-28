@@ -2,7 +2,7 @@
   "name": "prac-client-ui-layout",
   "version": "0.0.0",
   "private": true,
-  "description": "prac's layout mechanism: a generic multi-region frame where every view can be placed in any region. Owns the frame, region tree, sashes, collapse, the view catalogue, the `prac.view` seat, `ctx.pracLayout` and the borrowed `ctx.layout` compat shim — and no concrete view name or default placement.",
+  "description": "prac's React frame and plugin body; geometry and runtime contracts live in prac-client-ui-frame.",
   "files": [
     "dist"
   ],
@@ -23,7 +23,7 @@
   "scripts": {
     "build": "vp pack",
     "check": "vp check",
-    "test": "vp test run"
+    "test": "vp test run --passWithNoTests"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
@@ -35,6 +35,8 @@
     "@deepseek-ai/dsh-client-ui-theme": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "prac-client-ui-frame": "workspace:*",
+    "prac-client-ui-surface": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

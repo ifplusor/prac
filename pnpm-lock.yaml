@@ -205,9 +205,12 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 18.3.31
-      prac-client-ui-layout:
+      prac-client-ui-changed-files:
         specifier: workspace:*
-        version: link:../../client/ui-layout
+        version: link:../../client/ui-changed-files
+      prac-client-ui-workbench:
+        specifier: workspace:*
+        version: link:../../client/ui-workbench
       prac-client-vscode-host:
         specifier: workspace:*
         version: link:../../client/vscode-host
@@ -223,6 +226,54 @@ importers:
       vite-plus:
         specifier: 'catalog:'
         version: 1.0.0(@types/node@24.13.3)(@vitest/ui@5.0.1)(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@5.0.10)
+
+  packages/client/ui-changed-files:
+    devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 18.3.31
+      react:
+        specifier: 'catalog:'
+        version: 18.3.1
+
+  packages/client/ui-frame:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: 'catalog:'
+        version: 4.0.5-alpha.1
+      '@deepseek-ai/dsh-client-store':
+        specifier: 'catalog:'
+        version: 0.2.1-alpha.2(@deepseek-ai/cordis@4.0.5-alpha.1)
+      '@deepseek-ai/dsh-client-ui-layout':
+        specifier: 'catalog:'
+        version: 0.2.1-alpha.2(@deepseek-ai/cordis@4.0.5-alpha.1)
+      '@deepseek-ai/dsh-client-ui-renderer':
+        specifier: 'catalog:'
+        version: 0.2.1-alpha.2(@deepseek-ai/cordis@4.0.5-alpha.1)
+      '@deepseek-ai/dsh-client-ui-session':
+        specifier: 'catalog:'
+        version: 0.2.1-alpha.2(@deepseek-ai/cordis@4.0.5-alpha.1)
+      '@deepseek-ai/dsh-client-ui-slots':
+        specifier: 'catalog:'
+        version: 0.2.1-alpha.2(@deepseek-ai/cordis@4.0.5-alpha.1)
+      '@deepseek-ai/dsh-client-ui-theme':
+        specifier: 'catalog:'
+        version: 0.2.1-alpha.2(@deepseek-ai/cordis@4.0.5-alpha.1)
+      '@types/react':
+        specifier: 'catalog:'
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 18.3.7(@types/react@18.3.31)
+      prac-client-ui-surface:
+        specifier: workspace:*
+        version: link:../ui-surface
+      react:
+        specifier: 'catalog:'
+        version: 18.3.1
+      react-dom:
+        specifier: 'catalog:'
+        version: 18.3.1(react@18.3.1)
 
   packages/client/ui-layout:
     devDependencies:
@@ -253,12 +304,20 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 18.3.7(@types/react@18.3.31)
+      prac-client-ui-frame:
+        specifier: workspace:*
+        version: link:../ui-frame
+      prac-client-ui-surface:
+        specifier: workspace:*
+        version: link:../ui-surface
       react:
         specifier: 'catalog:'
         version: 18.3.1
       react-dom:
         specifier: 'catalog:'
         version: 18.3.1(react@18.3.1)
+
+  packages/client/ui-surface: {}
 
   packages/client/ui-vscode-editor:
     devDependencies:
@@ -274,9 +333,9 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 18.3.31
-      prac-client-ui-layout:
+      prac-client-ui-frame:
         specifier: workspace:*
-        version: link:../ui-layout
+        version: link:../ui-frame
       prac-client-vscode-host:
         specifier: workspace:*
         version: link:../vscode-host
@@ -298,9 +357,48 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 18.3.31
-      prac-client-ui-layout:
+      prac-client-ui-frame:
         specifier: workspace:*
-        version: link:../ui-layout
+        version: link:../ui-frame
+      prac-client-vscode-host:
+        specifier: workspace:*
+        version: link:../vscode-host
+      react:
+        specifier: 'catalog:'
+        version: 18.3.1
+
+  packages/client/ui-widget:
+    devDependencies:
+      prac-client-ui-frame:
+        specifier: workspace:*
+        version: link:../ui-frame
+
+  packages/client/ui-window:
+    devDependencies:
+      prac-client-ui-frame:
+        specifier: workspace:*
+        version: link:../ui-frame
+
+  packages/client/ui-workbench:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: 'catalog:'
+        version: 4.0.5-alpha.1
+      '@deepseek-ai/dsh-client-ui-renderer':
+        specifier: 'catalog:'
+        version: 0.2.1-alpha.2(@deepseek-ai/cordis@4.0.5-alpha.1)
+      '@deepseek-ai/dsh-client-ui-slots':
+        specifier: 'catalog:'
+        version: 0.2.1-alpha.2(@deepseek-ai/cordis@4.0.5-alpha.1)
+      '@types/react':
+        specifier: 'catalog:'
+        version: 18.3.31
+      prac-client-ui-changed-files:
+        specifier: workspace:*
+        version: link:../ui-changed-files
+      prac-client-ui-frame:
+        specifier: workspace:*
+        version: link:../ui-frame
       prac-client-vscode-host:
         specifier: workspace:*
         version: link:../vscode-host
@@ -337,9 +435,15 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 18.3.31
-      prac-client-ui-layout:
+      prac-client-ui-frame:
         specifier: workspace:*
-        version: link:../ui-layout
+        version: link:../ui-frame
+      prac-client-ui-widget:
+        specifier: workspace:*
+        version: link:../ui-widget
+      prac-client-ui-window:
+        specifier: workspace:*
+        version: link:../ui-window
       prac-vscode:
         specifier: workspace:*
         version: link:../../../vendor/vscode

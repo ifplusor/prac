@@ -1,7 +1,7 @@
 {
   "name": "prac-web-app",
   "version": "0.0.0",
-  "description": "The prac bundle: its cordis.patch.yml is the composition (frame mechanism + VS Code side), and its client half is the arrangement — the default views and their placements, the role binding, the attention strip and the keybindings.",
+  "description": "The prac bundle: its cordis.patch.yml is the composition (frame mechanism + VS Code side), and its client half is the arrangement — the default views and their placements, the role binding, the window groups and the keybindings.",
   "license": "MIT",
   "files": [
     "dist",
@@ -23,7 +23,7 @@
   "scripts": {
     "build": "vp pack",
     "dev": "vp pack --watch",
-    "test": "vp test",
+    "test": "vp test --passWithNoTests",
     "check": "vp check"
   },
   "devDependencies": {
@@ -33,7 +33,8 @@
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
-    "prac-client-ui-layout": "workspace:*",
+    "prac-client-ui-changed-files": "workspace:*",
+    "prac-client-ui-workbench": "workspace:*",
     "prac-client-vscode-host": "workspace:*",
     "react": "catalog:",
     "typescript": "catalog:",

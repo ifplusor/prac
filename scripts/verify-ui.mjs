@@ -36,7 +36,7 @@ const gates = [
   ["resize", "tests/gates/verify-resize.mjs"],
   ["persistence", "tests/gates/verify-persistence.mjs"],
   ["bottom", "tests/gates/verify-bottom.mjs"],
-  ["views", "vendor/vscode/scripts/verify-views.mjs"],
+  ["views", "tests/gates/verify-views.mjs"],
   ["file", "vendor/vscode/scripts/verify-file.mjs"],
   ["editor:group", "vendor/vscode/scripts/verify-group.mjs"],
   ["editor:close", "vendor/vscode/scripts/verify-close.mjs"],

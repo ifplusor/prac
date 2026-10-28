@@ -91,6 +91,12 @@ export async function openPrac(url, options = {}) {
   await installShellModalAccommodation(page);
   await page.goto(url, { waitUntil: "load", timeout: 60_000 });
   await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
+  // A fresh rig has no workspace; the project picker would make every click hit
+  // the overlay instead of the frame. Pick the fixture project when present.
+  if ((await page.locator("[data-prac-firstrun]").count()) > 0) {
+    const rows = page.locator(".prac-firstrun-row");
+    if ((await rows.count()) > 0) await rows.first().click();
+  }
   await page.waitForFunction(() => !!globalThis.__pracLayout, null, { timeout: 60_000 });
   return {
     browser,

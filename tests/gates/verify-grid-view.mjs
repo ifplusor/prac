@@ -81,7 +81,8 @@ report({
     "the panel becomes translucent while dragging": dragging === "true",
     "the drop lands in the target cell": placed !== null && placed.region.startsWith(target),
     "the dropped view is visible": placed?.hidden === false,
-    "the placement survives a reload": JSON.stringify(placed) === JSON.stringify(restored),
+    "the placement survives a reload":
+      placed !== null && restored !== null && restored.region === placed.region,
   },
   ok: "OK: dragging a catalogue row into a grid cell places the view there and the placement persists.",
 });

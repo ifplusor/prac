@@ -52,6 +52,10 @@ const state = async () =>
   }, FILE.uri);
 
 await page.goto(url, { waitUntil: "load" });
+if ((await page.locator("[data-prac-firstrun]").count()) > 0) {
+  const rows = page.locator(".prac-firstrun-row");
+  if ((await rows.count()) > 0) await rows.first().click();
+}
 await installDeepDom(page);
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 90_000 });
 await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), FILE.uri);

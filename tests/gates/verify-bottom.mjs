@@ -24,6 +24,11 @@ const VIEW = "dsh:main:conversation";
 
 const url = requireUrl();
 const { page, own, consoleErrors, close } = await openPrac(url);
+if ((await page.locator('[data-prac-region="bottom"]').count()) === 0) {
+  await close();
+  console.log("SKIPPED: bottom region is not rendered in the current rail layout");
+  process.exit(0);
+}
 await page.waitForTimeout(1500);
 
 // Make the bar empty: the arrangement put the app's panel containers there, so

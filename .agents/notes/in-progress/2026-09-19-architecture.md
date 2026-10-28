@@ -86,11 +86,11 @@ status: in-progress
 
 ### 2.7 界面：布局由 prac 拥有
 
-- frame 是 prac 自己的：区域树、分割、堆叠、折叠、底栏、视图目录、持久化。**机制层不认识任何具体视图名。**
-- **哪些 view 归谁，看它注册进哪儿**：`dsh:*`（对话、计划、审阅、笔记）和 `vscode:*`（编辑器、问题、终端、SCM、搜索、资源）都注册进同一个 `prac.view`，frame 一视同仁地摆。
-- **注意力与返回栈是 frame 的能力**（R2）——它们是交互的机制，不属于任何单个视图。
-- **编排单位是一个视图**（James 2026-09-19）：不是整块区域。编辑器那一侧的视图是一个 **放置**；一个文件可以有多个放置（对齐 VS Code 的多 editor）；**editor group 是 prac 的 editor host 的对象**，组住在区域里；tab 与分栏由组 / 区域提供，不用上游 `EditorPart` / `EditorGroupView`。
-- **`prac.view` 用单数**（跟 DSH 的 `root` / `sidebar` / `main` / `shell.overlay` 一致）：槽名说的是"装哪一类东西"，**装几个由槽的 `kind` 决定**（`single` / `list` / `keyed` / `chain`），单个 view 的身份是注册时的 `key`。所以不叫 `prac.views`。
+- frame 是 prac 自己的：Space、split / grid / region、dock / panel、surface、持久化。**机制层不认识任何具体来源名。**
+- **组合模型是 Application / Window / Widget board / Widget**（2026-10-28）：application 是启动身份；window 由 app 打开；widget 是 board 里的可组合内容；window group 的 tab 是 window，不是 widget。完整模型见 [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)。
+- **来源映射**：VS Code editor input → application window，ViewContainer → widget board，ViewDescriptor → widget；DSH `main` → application window，sidebar / rightbar → board，内部 slot → widget。frame 不认识 `vscode:` / `dsh:`。
+- **注意力与返回栈是 frame 的能力**（R2）——它们是交互的机制，不属于任何单个 window / widget。
+- **`prac.view` 是 widget 的注册面**，不承载 window / board；`Single / list / keyed / chain` 的槽语义仍成立。
 
 ### 2.8 人和 agent 看到的是同一份工作区：磁盘为准
 
@@ -147,7 +147,7 @@ code server 归主干起停：空闲端口、等就绪、随 DSH 插件 dispose 
 
 ## 4. 旧设计：哪些留着，哪些作废
 
-**留着**：主干是 DSH；两端；VS Code 一族 DSH 插件按端切两半；三层（vendor / lib / 插件族）；布局由 frame 拥有、**view 是单位**；code server 归主干起停；XDG；不 fork 上游；"agent 执行命令走 DSH 自己的 exec，不和人那条终端共用"。
+**留着**：主干是 DSH；两端；VS Code 一族 DSH 插件按端切两半；三层（vendor / lib / 插件族）；布局由 frame 拥有、**window / widget 是编排单位**；code server 归主干起停；XDG；不 fork 上游；"agent 执行命令走 DSH 自己的 exec，不和人那条终端共用"。
 
 **作废或改正**（前提已经不成立，或者只是说法错了）：
 

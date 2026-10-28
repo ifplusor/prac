@@ -29,7 +29,7 @@ import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "prac-client-vscode-host/client";
-import type { ViewSlotKey } from "prac-client-ui-layout/client";
+import type { ViewSlotKey } from "prac-client-ui-frame/client";
 
 /** The slot these views are registered into (checked against the mechanism's key). */
 const SLOT: ViewSlotKey = "prac.view";
@@ -37,7 +37,7 @@ const SLOT: ViewSlotKey = "prac.view";
 /**
  * Declare one view per entry of the app's view catalogue, and keep it in sync.
  *
- * The slot is declared by `prac-client-ui-layout`'s frame, so injecting waits for
+ * The slot is declared by `ui-frame`'s frame, so injecting waits for
  * that declaration (either client plugin may activate first). Each entry is a
  * registration of its own — the frame's catalogue reads the registry, so a view
  * appearing or going away is exactly a registration appearing or going away.

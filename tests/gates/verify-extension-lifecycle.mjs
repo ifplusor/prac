@@ -37,9 +37,7 @@ async function waitFor(predicate) {
 }
 
 async function activateView() {
-  await page.click(
-    '[data-prac-container-bar="left"] [data-prac-container="left/container:workbench.view.explorer"]',
-  );
+  await page.click('[data-prac-activity="left"] [data-prac-rail-item="workbench.view.explorer"]');
   await page.evaluate((view) => globalThis.__pracLayout.setFront(view), VIEW);
   await page.waitForTimeout(1200);
 }

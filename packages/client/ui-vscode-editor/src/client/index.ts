@@ -29,7 +29,7 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "prac-client-vscode-host/client";
-import type { PracLayoutFace, ViewSlotKey } from "prac-client-ui-layout/client";
+import type { PracLayoutFace, ViewSlotKey } from "prac-client-ui-frame/client";
 
 /** The slot these views are registered into (checked against the mechanism's key). */
 const SLOT: ViewSlotKey = "prac.view";
@@ -37,7 +37,7 @@ const SLOT: ViewSlotKey = "prac.view";
 /**
  * Declare one view entry per open file, and keep that set in sync with the app.
  *
- * The slot is declared by `prac-client-ui-layout`'s frame, so injecting waits for
+ * The slot is declared by `ui-frame`'s frame, so injecting waits for
  * that declaration (either client plugin may activate first). Each entry is a
  * registration of its own — the mechanism's view catalogue reads the registry, so
  * a file appearing or closing is exactly a registration appearing or going away.
@@ -158,13 +158,15 @@ export function apply(ctx: Context): void {
             dispose();
             registered.delete(view);
           }
-          for (const { view } of entries) {
+          for (const { view, title } of entries) {
             if (registered.has(view)) continue;
             // The component renders an empty host until the app has mounted the
             // file, then fills it — the bridge's direction, one level up. The
             // app's editor brings its own pane header, so the frame overlays its
-            // fold/drag control instead of drawing a second row header.
-            const options = { name: SLOT, id: view, paneHeader: true };
+            // fold/drag control instead of drawing a second row header. The label
+            // is the catalogue's file title; without it the frame falls back to
+            // the view id's last colon segment (the raw resource).
+            const options = { name: SLOT, id: view, label: title, paneHeader: true };
             registered.set(
               view,
               slots.register(options, () => host.hostFor(view)() ?? null),

@@ -21,28 +21,52 @@ workspace: the CLI resolves that profile from the user home even when
 
 ## Gates
 
-| gate                 | proves                                                               |
-| -------------------- | -------------------------------------------------------------------- |
-| `containers`         | container bars, one shown container per track, views mount and paint |
-| `stack`              | stack rows, headers, overlay sash, fold, reorder                     |
-| `split`              | side-directed splits, nested split, sash, reload geometry            |
-| `grid`               | dragging a cell swaps placements and the swap persists               |
-| `grid:resize`        | dragging a cell's resize handle changes its span and persists        |
-| `grid:merge`         | Shift-drag merges adjacent cells; `⧉` unmerges and restores spans    |
-| `grid:view`          | a recall-catalogue row drags into a grid cell; placement persists    |
-| `grid:tab`           | a mounted tab drags into another grid cell; placement persists       |
-| `grid:free`          | dragging a track boundary changes column weights in pixels           |
-| `resize`             | track resize, distribution, floors, centre priority                  |
-| `persistence`        | versioned layout state reloads; stale regions are pruned             |
-| `bottom`             | empty bottom bar, filled span, collapse/expand                       |
-| `views`              | recall catalogue, hide/show, move, split, pixels                     |
-| `file`               | editor surface, tab activation, second group, close/reopen           |
-| `editor:group`       | split editor group, focus sides, empty group removal                 |
-| `editor:close`       | dirty-close dialog, Cancel and Don't Save                            |
-| `tabs`               | tab order, activation, frame→`EditorGroupModel` reorder              |
-| `dynamic`            | a contributed view enters/leaves the catalogue without reload        |
-| `lifecycle:absent`   | removing the extension removes catalogue/frame/host                  |
-| `lifecycle:restored` | restoring the extension rebuilds catalogue/frame/host                |
+| gate                 | proves                                                                    |
+| -------------------- | ------------------------------------------------------------------------- |
+| `containers`         | dock rail lists the borrowed tools, switches them, and mounts their views |
+| `stack`              | Explorer stack rows, header fold / unfold, bodies                         |
+| `split`              | left / center row split; dragging its sash resizes both sides             |
+| `grid`               | dragging a cell swaps placements and the swap persists                    |
+| `grid:resize`        | dragging a cell's resize handle changes its span and persists             |
+| `grid:merge`         | skipped when the current rail layout has no merge / unmerge UI            |
+| `grid:view`          | a recall-catalogue row drags into a grid cell; placement persists         |
+| `grid:tab`           | a mounted tab drags into another grid cell; placement persists            |
+| `grid:free`          | dragging a track boundary changes column weights in pixels                |
+| `resize`             | track resize, distribution, floors, centre priority                       |
+| `persistence`        | versioned layout state reloads; stale regions are pruned                  |
+| `bottom`             | skipped when the current rail layout has no bottom region                 |
+| `views`              | recall surface: open, catalogue, hide/show, Escape                        |
+| `file`               | editor surface, tab activation, second group, close/reopen                |
+| `editor:group`       | split editor group, focus sides, empty group removal                      |
+| `editor:close`       | dirty-close dialog, Cancel and Don't Save                                 |
+| `tabs`               | tab order, activation, frame→`EditorGroupModel` reorder                   |
+| `dynamic`            | a contributed view enters/leaves the catalogue without reload             |
+| `lifecycle:absent`   | removing the extension removes catalogue/frame/host                       |
+| `lifecycle:restored` | restoring the extension rebuilds catalogue/frame/host                     |
+
+## Static gates
+
+```bash
+pnpm verify:packages
+```
+
+`verify:packages` checks the planned UI package graph (`ui-surface` / `ui-frame` /
+`ui-window` / `ui-widget` / `ui-workbench` / adapters) and the bundle-is-a-leaf
+rule. Target packages that have not been split out yet are reported as skipped,
+not failed. Current implementation-era gate names (`containers`, `editor:group`)
+remain until the split lands.
+
+## Planned live gates
+
+These are not in `pnpm verify:ui` yet:
+
+| gate              | proves                                            |
+| ----------------- | ------------------------------------------------- |
+| `window:tab`      | window group tab is a window; widget is not a tab |
+| `window:active`   | active window per group; active widget per board  |
+| `widget:move`     | widget moves across boards; source unchanged      |
+| `widget:window`   | stage board is carried by a widget window         |
+| `isolation:mixed` | VS Code + DSH mixed window keeps per-widget roots |
 
 ## Running one gate
 

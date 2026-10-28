@@ -2,116 +2,99 @@
 status: in-progress
 ---
 
-# Agent Note: stack 视图的标题归属
+# Agent Note: stack / widget header 的标题归属
+
+> 组合模型：[2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)。frame / chrome：[2026-10-15-ui-layout-grid.md](2026-10-15-ui-layout-grid.md)。隔离：[2026-10-05-vscode-dsh-layout-boundary.md](2026-10-05-vscode-dsh-layout-boundary.md)。
+
+## Summary
+
+- stack / widget board 的行头由 **prac** 画：title / icon / twisty / fold / drag / sash / action slot；
+- VS Code 的 pane header 不再作为行头：`vscode:*` widget 的 `.title` / `.icon` / `.twisty` 隐藏，只保留 `.actions` 的动作；
+- `dsh:*` widget 使用同一个 prac 行头；
+- 折叠权威是 frame 的 `entry.collapsed`；
+- 行高以 VS Code 的 22px 视觉为准；
+- 动作槽由 widget 自持：VS Code 用 `.actions`，DSH 用 `prac.viewActions`；frame 不做统一 action bar。
 
 ## Problem
 
-Stack 的一行出现**两条标题**：
+Stack 的一行出现两条标题：
 
-- prac 的 stack 行头：`WORKBENCH.EXPLORER.FILEVIEW`、`WORKBENCH.EXPLORER.OPENEDITORSVIEW` 这类**原始 id**；
-- 视图内部的 VS Code pane header：`PRAC-DEV`、`OPEN EDITORS`、`PROBE WEBVIEW`——这才是视图标题，也是文件树的 root。
+- prac 行头显示 raw id（`WORKBENCH.EXPLORER.FILEVIEW`）；
+- VS Code pane header 显示真正的标题（`PRAC-DEV`、`OPEN EDITORS`）。
 
-容器栏的 `Explorer` 是容器选择，不是重复；`PRAC-DEV` 是 VS Code 的 pane header，也不是多余。**多余的是 prac 给一个已经自带 pane header 的视图又加了一条行头**。同时，行头 label 取的是 id 而不是视图标题，是独立可见的 bug。
+同时，折叠 / 拖拽 / sash 归 frame，但 pane header 自己也有 twisty / actions，形成两套 chrome。
 
-## 边界
+## 1. 归属
 
-- “视图标题归谁”是**视图 chrome 的归属**，不是布局几何；sash、折叠手柄、拖拽落点是布局 chrome。
-- 视图内部自带的 chrome（VS Code pane header、动作菜单）属于视图；框架不应为了统一而复制一套，也不应无声丢掉动作。
-- 容器栏、sash、折叠/拖拽是框架 chrome，保留。
+| chrome | 归谁 |
+|---|---|
+| stack / widget 行头、title、icon、twisty、fold、drag、sash | **prac / `ui-widget` board** |
+| widget 内部内容区 | widget / source |
+| VS Code pane header 的 title / icon / twisty | **隐藏** |
+| VS Code `.actions`（`view/title` 扩展动作） | 保留在 action slot |
+| DSH `prac.viewActions` | 保留在 action slot |
+| 单 widget bare 时的 pane header | 按 bare 规则保留 |
 
-## Options
+## 2. 决策
 
-### A. prac 行头唯一
+采用 **prac 行头唯一**：
 
-在 stack 中隐藏 VS Code pane header；prac 行头显示视图标题，并把 pane header 的动作收进一个紧凑的 `...` 菜单。
+- 视觉 / 行为对齐 VS Code pane header，但 chrome 实现归 prac；
+- 内嵌 VS Code pane header 整体隐藏，不只隐藏标题文字；
+- `dsh:*` 与 `vscode:*` 共用同一行头；
+- 折叠 / 重排 / sash 全部在 prac 行头；
+- `entry.collapsed` 是折叠权威；
+- 行高 22px；`STACK_HEADER_HEIGHT = 22`；
+- 动作槽由 widget 自持，frame 只提供 slot 位置；
+- 标题优先取视图自己的 pane 标题；catalogue title 只是回退；
+- 顶部 container bar 不是 VS Code activity bar + side bar，是另一件工作。
 
-- 优点：所有行一个样式；行高固定 20；不跨隔离边界；DSH/VS Code 一致。
-- 代价：动作菜单要另做一套（`MenuId.ViewTitle`、浮层锚点、可发现性）；等于把视图自己的标题/动作搬到框架，重复了视图 chrome。
+## 3. 实现状态
 
-### B. VS Code pane header 唯一（推荐）
+- label 修正：`prac.view` 注册携带 `VscodeCatalogueEntry.title`；layout 的视图目录暴露 label；未知 id 才回退 raw id；
+- `vscode:*` 行头：frame 画 title / twisty / fold / drag；pane `.title` / `.icon` / `.twisty` 隐藏，`.actions` 保留；
+- 折叠：frame 的 `entry.collapsed` 权威；pane twisty 隐藏；
+- 拖拽：pane header 标题区加 frame 拖拽落点，避开右侧 actions；重排走 `moveEntry`；
+- 动作：VS Code `.actions` 与 DSH `prac.viewActions` 各自渲染；frame 不统一 action bar；
+- 22px 行高与 container label / group-binding actions 已落地；
+- 视觉边界：动作条可以完全不同源；frame 的 title / twisty / icon 不承诺与 VS Code 像素级一致。
 
-`vscode:*` 视图在 stack 中**不画 prac 标题**，保留它自己的 pane header 作为行头；prac 只加：
+## 4. 待接
 
-- stack 折叠手柄（与 `setEntryFolded` 同步，或用一个不覆盖 pane header 的框架 overlay）；
-- 标题区的拖拽重排（避开 pane header 右侧动作）；
-- 行边界的 sash。
+- view icon：frame 的 shadow 里没有 codicon font-face；需要 view-owned icon descriptor（自包含 SVG 或 icon style/font），暂不做；
+- mixed stack 的 DSH / VS Code 行头基线、padding、chevron 对齐；
+- 折叠行的 `showActions`（WhenExpanded）；
+- 动作 slot 宽度 / overflow；toggle / submenu；
+- 插件生态测试：VS Code `view/title` 与 DSH `prac.viewActions` 各一条 live 贡献；
+- 单 widget bare ↔ stack 切换时 pane header 显隐是否造成布局跳动。
 
-`dsh:*` 这类没有 pane header 的视图继续用 prac 行头；单视图 bare 时保留 pane header。
+## 5. Decisions
 
-- 优点：一视图一标题；动作原地保留；与 VS Code 的 view pane 同形；符合“视图内部是视图自己的”。
-- 代价：折叠状态要在 pane 的 collapse 与 stack 的 `entry.collapsed` 之间桥接；拖拽要跨影根定位标题区；混合栈里 VS Code 行头与 DSH 行头的高度/样式要对齐。
+- prac 行头唯一；VS Code pane header 整体隐藏。
+- 标题来自视图自己的标题；catalogue title 回退。
+- `entry.collapsed` 权威；折叠 / 拖拽 / sash 归 frame。
+- 动作槽 widget 自持；frame 不统一 action bar。
+- 行高 22px；`vscode:*` 与 `dsh:*` 共用行头。
+- 顶部 container bar 另做，不混入本 note。
 
-### C. 过渡：先隐藏一条标题
+## 6. Open questions
 
-先保留 pane header 和动作，把 `vscode:*` 行的 prac 标题隐藏（只留折叠/拖拽条）；或反过来只隐藏 pane header 的标题文字。
+- mixed stack 行头的最终视觉对齐。
+- view icon 的跨 shadow 传递。
+- 动作 slot 的统一适配器是否在后续引入。
+- bare / stack 切换的 pane header 显隐策略。
 
-- 优点：最快消除重复标题，动作不丢。
-- 代价：仍是两条横条/两个折叠 chevron；只是暂时不重复文字；不是终态。
+## 7. Validation
 
-## Decision
+- 一行只有一个标题；没有 raw id。
+- pane header 的 `.actions` 可见、可执行；DSH 动作可见、可执行。
+- 折叠 / 展开与 `entry.collapsed` 同步；拖拽重排只改 placement。
+- 22px 行高与 container label 对齐。
+- `verify:stack` / `containers` / `persistence` / `resize` / `split` / `bottom` 回归。
+- 混排 stack 的 CSS / focus / overlay 不互相穿透。
 
-选 **A**（已裁；B 已被用户收回）。理由：
+## 8. Related
 
-1. 视觉/行为对齐 VS Code，但 chrome 实现归 prac；不把 VS Code 的 pane header 直接搬进行里；
-2. `dsh:*` 与 `vscode:*` 共用同一行头，DSH 视图不需要另起一套；
-3. 动作由视图的动作模型重新呈现，必要时用 DSH 的槽位/face 接；
-4. 折叠/重排/sash 都在 prac 行头，`entry.collapsed` 一个权威。
-
-B（保留 pane header）已被用户收回：它把 VS Code chrome 当成行头，违背“prac 重新实现”的原则。C 只作为分步落地时的中间状态。
-
-## 上位原则（用户裁）
-
-**视觉与行为对齐 VS Code；chrome 由 prac 重新实现，必要时用 DSH 的槽位/face 接动作；不无脑使用 VS Code chrome。**
-
-- 一份 stack 行头由 prac 画：视觉/行为按 VS Code pane header（约 22px、图标、标题、twisty、动作、hover、键盘）。
-- 内嵌 VS Code pane header **整体隐藏**，只留内容；不是保留它的标题区、再补 frame 控件。
-- 动作由 `vscode-host`/`ui-vscode-views` 暴露的动作模型重新呈现（内联 + overflow）；不复制整套 VS Code menu，不依赖它的 DOM。
-- 折叠/拖拽/sash 都归 prac 行头；`entry.collapsed` 权威；`dsh:*` 与 `vscode:*` 共用同一行头。
-- 行高以 VS Code 的视觉 22px 为准；`dsh:*` 行头和混合栈向它对齐。
-- 更外层：顶部 `sidebar / Explorer / Search / Source Control / conversation` container bar 不是 VS Code 的 activity bar + side bar，是后续独立决定。
-
-## 实施顺序（A）
-
-1. **label 修正（独立、无论选哪个都做）**：`prac.view` 注册携带 `VscodeCatalogueEntry.title`；layout 的视图目录暴露 label；`viewLabel` 用它，未知 id 才回退。消除 `WORKBENCH...` 原始 id。
-2. **停止给 `vscode:*` 行画 prac 标题**：`entryHeader` 只给没有 pane header 的视图；pane header 保留；单视图 bare 不变。
-3. **折叠同步**：pane header 的 collapse 与 `entry.collapsed` 二选一作为权威，另一边只读；行折叠高度与 pane header 高度对齐（`HEADER_HEIGHT` / CSS）。
-4. **拖拽**：在 pane header 标题区加框架拖拽落点，避开动作按钮；重排仍走 `moveEntry`。
-5. **门**：`verify:stack` 加“一行只有一个标题”“pane header 可见/动作可见”“折叠同步”“重排”；`verify:containers` / `outline` / `timeline` 回归；截图对比 Explorer。
-
-## A 的目标形态
-
-- `prac.view` 增加 `headless`（视图不自带 chrome）与 `actions`（视图的动作模型/face）描述；`ui-vscode-views`/`vscode-host` 隐藏自己的 pane header 并提供动作。
-- prac 行头统一画：图标（已接线，字形待接）、标题、twisty、动作、hover、键盘；22px；`dsh:*` 与 `vscode:*` 一致。标题来自视图目录/title（不是 raw id）。
-- 折叠/重排/sash 全部在 prac 行头；点击/键盘折叠，拖动超过阈值重排。
-- **A 第一版（已落地）**：展开的 VS Code 行由 frame 画 title/twisty/fold/drag；pane 的 `.title`/`.icon`/`.twisty` 隐藏，`.actions` 保留；`verify:stack` / `containers` / `persistence` / `resize` / `split` / `bottom` 六门 live 全绿。
-- **标题来源（已定）**：视图自己的 pane 标题优先；`ui-vscode-views` 挂载后观察 `.pane-header .title` 并重新注册 `prac.view` label，catalogue title 只作回退。fileView 因此显示 `prac-dev` 而不是 `Folders`。
-- **待接**：view icon 的字形（已接线，但 codicon 字体在隔离 shadow 里，frame 光 DOM 画不出）；mixed stack 的最终对齐；DSH 其余视图动作的注册与测试（`prac.viewActions` 已声明并在 DSH 行头 / tab strip 渲染，对话动作已接入）。22px 行高与 container label / group-binding actions 已落地；顶部 container bar 与 VS Code activity bar 的差距仍是另一件工作。
-- **视觉边界**：动作条可以完全用视图自己的（VS Code `.actions` / `ActionBar`、DSH 自己的 action bar），但 frame 的 title/twisty/icon 是 prac 实现，不承诺与 VS Code pane header 像素级一致。要完全一致只能整条保留 pane header（B）或逐项移植它的字体/间距/hover/背景/主题，后者不作为目标。
-- 动作槽采用**视图自持**（A 的第一版）：
-  - frame 行头只保留 title/icon/twisty/fold/drag/sash + 右侧一个 action slot。
-  - VS Code 视图：pane 的 title/icon/twisty 隐藏，`.actions`（VS Code ActionBar / `view/title` 扩展动作）保留在 action slot 的位置；扩展生态原样。
-  - DSH 视图：在同一个 slot 里渲染自己的 action bar / DSH 命令动作；DSH 插件生态原样。
-  - frame 不做统一动作模型、不做统一 action bar；两个生态各自渲染自己的动作。
-  - **可选/后续**：如果多个视图确实需要一致的 action bar，再在 slot 之上加 `PracViewAction` 适配器；不在本次 A 里预建。
-
-## Open questions
-
-
-
-- ~~折叠权威取 pane 的 collapse 还是 stack 的 `entry.collapsed`？~~ 已落地：frame 的 `entry.collapsed` 是权威；pane header 的 twisty 隐藏、标题区不接指针，只放行动作。
-- pane header 的视觉高度约 22px；`STACK_HEADER_HEIGHT = 22` 已用于 stack 行 / 折叠行，selector bar 与 tab strip 仍是 `HEADER_HEIGHT = 20`。混合栈里两类行头的基线 / 间距还要再对齐一次。
-- 顶部 container bar 与 VS Code activity bar + side bar 的差距：独立工作，不在本次 A 里做。
-- 动作桥的边界：`ViewPane` 是否已创建/所在 container 是否 active；折叠行的 `showActions`（WhenExpanded）；toggle/submenu 动作；动作条宽度与 overflow；`dsh:*` 视图的动作 slot 空值。
-- 插件生态：VS Code 侧 `view/title` 的 `when`/`enablement`、submenu、Toggle、ThemeIcon、扩展命令、动态菜单变更；DSH 侧 `ctx.shortcuts` / `ctx.commandUi` 的命令与动作上下文。两侧各需要一条测试贡献（VS Code test extension + DSH test plugin），验证同一 action slot 下 live 出现并可执行。
-- 动作槽的布局：slot 的最大宽度/overflow；pane `.actions` 与 frame 标题的 22px 对齐；折叠行的 `showActions`；DSH action bar 的视觉；是否需要在后续引入统一动作模型。
-- **view icon**：frame 的行头在 frame shadow 里，没有视图 shadow 的 codicon font-face；`className` 能传，glyph 画不出。需要 view-owned icon descriptor（自包含 SVG，或 view 提供的 icon style/font）；暂不做。
-- **DSH action slot**：`prac.viewActions` 已声明并在 DSH 行头 / tab strip 渲染；对话动作已接入；其余 DSH 视图动作的注册与测试仍待接。
-- ~~拖拽落点跨影根时，标题区的命中如何避开右侧动作按钮？~~ 已落地：`entryOverlay` 在光 DOM 上，标题区到右侧 120px 为止；动作区由 `.actions` 接指针；行顶 `SASH_SIZE` 留给 sash。
-- 混合栈里 `dsh:*` 的 prac 行头与 VS Code 的 pane header 如何视觉对齐（高度、padding、折叠 chevron）？
-- 单视图 bare 与两视图 stack 之间的切换，pane header 的显隐是否会造成一次布局跳动？
-
-## Related
-
-- [stack 的行为定义](../resolved/2026-10-15-ui-layout-stack.md)：已签收的 A3（每条有标题条）在 A 下仍成立——标题条由 prac 行头画，视图自己的 pane header 隐藏。
-- [视图的隔离与对等](../in-progress/2026-10-05-vscode-dsh-layout-boundary.md)：视图内部 chrome 与框架 chrome 的边界。
-- `packages/client/ui-layout/DESIGN.md`：stack 行头、Sash、隔离。
+- [2026-10-15-ui-layout-grid.md](2026-10-15-ui-layout-grid.md)：frame chrome / stack 几何。
+- [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)：widget board / actions。
+- [2026-10-05-vscode-dsh-layout-boundary.md](2026-10-05-vscode-dsh-layout-boundary.md)：隔离。

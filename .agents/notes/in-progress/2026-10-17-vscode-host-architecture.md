@@ -2,416 +2,156 @@
 status: in-progress
 ---
 
-# Agent Note: vscode-host — 把 VS Code 的 UI 贡献翻译成 prac 的组合资源
+# Agent Note: vscode-host — 把 VS Code 的 UI 贡献翻译成 prac 的资源
 
-> **这是哪件工作**：prac 的 VS Code adaptor（`vscode-host`）。它是 prac UI 的 sub-umbrella，定义 adaptor 的边界、对象、契约、生命周期与 surface ownership。
-> **关系**：UI umbrella 见 [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)；CRD 机制见 [2026-10-22-ui-crd.md](../in-progress/2026-10-22-ui-crd.md)；总集成 umbrella 见 [2026-09-09-vscode-dsh-integration.md](2026-09-09-vscode-dsh-integration.md)；container context 见 [2026-10-22-vscode-container-context.md](../in-progress/2026-10-22-vscode-container-context.md)。
->
-> **边界**：本 note 只定义 VS Code adaptor 的 concrete definition / resource、binding、view host；CRD 机制不在本 note。
-> **状态**：已接受为方向（in-progress）。每个 surface 的机制留给自己的 step。
+> 组合模型：[2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)。editor window：[2026-10-07-editor-host.md](2026-10-07-editor-host.md)。widget registration：10-20 §1.5。隔离：[2026-10-05-vscode-dsh-layout-boundary.md](2026-10-05-vscode-dsh-layout-boundary.md)。
 
 ## Summary
 
-`vscode-host` 不拥有 prac 的 view group，也不根据 group 内容推断 group 类型。
+`vscode-host` 是 prac 与嵌入的 VS Code workbench 之间的 adaptor。目标包名是 `ui-vscode-host`；当前实现包名是 `vscode-host`。它做三件事：
 
-它做三件事：
+1. **翻译** VS Code 的 editor / view container / view 为 prac 的 application / window / widget board / widget；
+2. **提供 runtime**：bridge、catalogue、face、ViewPane / EditorPane host、commands / actions / overlay；
+3. **注册查找**：让 `IViewsService` / `IEditorService` 找到 prac 管理的 view / editor。
 
-1. **翻译** VS Code 的 container / view 为 prac 的 CR 风格声明：
-   - `VscodeViewGroupDefinition` / `VscodeViewGroup`
-   - `VscodeViewDefinition` / `VscodeView`
-2. **提供 VS Code runtime**：
-   - `VscodeGroupBinding` 只挂到 `vscode.prac/v1` 的 `Container` / `Editor` 声明；
-   - `VscodeViewHost` 为每个 VS Code view 提供 `ViewPane` / `EditorPane` host。
-3. **注册运行时查找**：
-   - `PracViewsService` 通过 external view registry 让 `IViewsService` 找到 prac 管理的 view；
-   - external registry 由 `VscodeViewHost` 注册 / 注销。
+它**不拥有** prac 的 frame、window、widget 布局、active 或 placement。
 
-frame 仍然拥有 `ViewGroupState` / `ViewGroup`、placement、active、order、container bar / group bar。
-
-## Motivation
-
-VS Code 的 UI 模型是 part / container / pane / view / editor group；prac 的模型是 region / `ViewGroup` / `View` / placement。
-
-如果 adaptor 直接把 `ViewPane` 挂进 frame：
-
-- container 的 view 集合、可见性、顺序、collapse、title / menu 没有统一 owner；
-- `ViewPane` 仍按来源注册关系查 container，G 无法成立；
-- group 的 binding 只能从 group 内容猜，导致“vscode-host 处理 group 内容”的错位；
-- container bar / group bar 可能有两套 owner。
-
-因此 adaptor 的职责是：
-
-> **把 VS Code 声明翻译成 prac 可消费的资源；把 VS Code runtime 接到这些资源上。**
-
-不是：
-
-> 拿到一个 prac group，再决定它应该怎么处置。
-
-## 1. 边界
+## 边界
 
 | 层 | 负责 | 不负责 |
-| --- | --- | --- |
-| **frame / ui-layout** | 布局拓扑、`ViewGroupState` / `ViewGroup`、placement、active、order、stack / fold / sash、container bar / group bar | VS Code 的 part / container / pane / view 语义 |
-| **vscode-host（adaptor）** | VS Code 的 view / editor / container / action / overlay / webview 语义；declaration；catalogue；face；binding；view host；生命周期 | prac 的布局、group state、成员关系 |
-| **vendor/vscode-embed** | boot、资产、宿主元素、命令面、bridge | 政策：哪个 workspace、哪些 view、怎么摆 |
+|---|---|---|
+| **frame / ui-frame** | Space、region、surface、dock / panel、window group / board 的布局 | VS Code 的 part / container / pane / editor 语义 |
+| **ui-window** | window、window group、tab strip、active window | VS Code 的 editor input / ViewPane |
+| **ui-widget** | widget、board、`prac.view` / `prac.viewActions` | VS Code 的 container / view 生命周期 |
+| **vscode-host（adaptor）** | VS Code 的 editor / container / view / action / overlay / webview 语义；catalogue；binding；host；生命周期 | prac 的 layout / window / widget placement |
+| **vendor/vscode-embed** | boot、资产、宿主元素、命令面、bridge | 政策：哪些 view、怎么摆 |
 | **vendor/vscode** | 上游 workbench（pin + patch + overlay） | prac 的词与政策 |
-| **DSH** | shell、运行时、槽、服务、session | VS Code 的 UI |
-| **consumers** | `ui-vscode-views` / `ui-vscode-editor` / arrangement | adaptor 内部 |
 
-关键句：
+关键句：**frame 不认识 VS Code；adaptor 不拥有 frame / window / widget。**
 
-> **frame 不认识 VS Code；adaptor 不拥有 group runtime，也不拥有 group 成员。**
-> adaptor 声明 `VscodeViewGroup` / `VscodeView`；frame 决定 group / placement；binding 和 view host 只承接 VS Code runtime。
+## 1. 映射
 
-### 1.1 core workbench 与 extension
+| VS Code | prac |
+|---|---|
+| editor input（文件 / diff / custom editor / webview） | **application window**（editor app） |
+| `ViewContainer`（Explorer / SCM / GitLens / Run / Problems / Output / Terminal） | **widget board**（panel / dock）或 **widget window**（stage） |
+| `ViewDescriptor`（Folders / Timeline / Outline / Changes…） | **widget**，带默认 board hint |
+| 单 view container | **一个 widget 的 board** |
+| editor group | window group 的 adapter runtime（`IEditorGroupView`） |
+| 菜单 / 命令 / action | resolved action model |
+| webview / custom editor | `EditorPane`（`WebviewEditor`）；受 webview secure-context 约束 |
+| integrated browser | Electron `BrowserEditor`；web workbench 不可用 |
+| activity bar / status bar / 全局 UI | frame chrome / overlay，不是 window / widget |
 
-- **core workbench** 是 adaptor 内部的 host / engine：workbench 服务、`IViewsService`、`IEditorGroupsService`、`IContextViewService`、overlay。
-- **built-in / external extension** 是 contributor：只用 `vscode.*` 与 `contributes`；没有 DOM，没有内部服务，不能新增 part。
-- adaptor 在 ownership / capability 上区分 core 与 extension；
-- 在 catalogue / declaration / `prac.view` / action 上不区分：core view 与 extension view 走同一套契约。
+VS Code 的 `View` / `ViewContainer` / editor input 是**来源对象**；prac 的 window / board / widget 是**组合对象**。adaptor 只做翻译。
 
-## 2. Guide-level design
+## 2. 资源
 
-### 2.1 两类资源
+### 2.1 catalogue
 
-| 资源 | CRD（source-specific） | CR（source-specific） | materialize |
-| --- | --- | --- | --- |
-| **group** | `VscodeViewGroupDefinition` | `VscodeViewGroup` | `ViewGroupState` → `ViewGroup` |
-| **view** | `VscodeViewDefinition` | `VscodeView` | `View` + `VscodeViewHost` |
+`PracVscodeFace.catalogue()` 输出：
 
-prac core 的 CRD-lite 机制见 [UI resource model](../in-progress/2026-10-22-ui-crd.md)：`ViewGroupDefinition` / `ViewDefinition`、`ViewGroupResource` / `ViewResource`、两个 registry / materializer。`vscode-host` 只注册 concrete definition 并产生 concrete CR：`VscodeViewGroupDefinition` / `VscodeViewGroup`、`VscodeViewDefinition` / `VscodeView`。
+- `source: "file"` → application window（editor input）；
+- `source: "view"` → widget + 默认 board hint；
+- `location` 只是默认 placement；
+- `containerId` / `containerTitle` 是默认 board hint，不是成员所有权。
 
-- `VscodeViewGroupDefinition` / `VscodeViewDefinition` 由 `vscode-host` 注册；
-- `VscodeViewGroup` / `VscodeView` 由 `vscode-host` 产生；
-- frame / arrangement 只认 core 的 `ViewGroupDefinition` / `ViewDefinition`、`ViewGroupResource` / `ViewResource`，不认 `vscode`；
-- 只有 view / view group 是 CR；action / overlay / part / host 不 CRD 化。
+frame / `ui-workbench` 决定 placement；`containerId` 不能把 widget 拉回来源 container。
 
-### 2.2 group
+VS Code 把 container 里的 view 分三层：`all`（注册集）、`active`（`when` 成立集）、`visible`（`active` 且用户没隐藏）。prac 只注册 **`active`**：`when` 一变就进出 catalogue；不搬 `visible`，否则 VS Code 的显隐会成为第二个“在屏上”的真相源。`hideIfEmpty` 由 board / workbench 决定，不由 catalogue 执行。
 
-```text
-VscodeViewGroupDefinition（CRD）
-  apiVersion / kind / schema / validation / bindingFactory
-        ↓
-VscodeViewGroup（CR）
-  apiVersion / kind / metadata / spec
-        ↓
-ViewGroupState（prac 数据）
-  id / mode / active / order / tombstone / placement
-        ↓
-ViewGroup（frame 运行时）
-  slots / hosts / binding?
-```
+### 2.2 widget registration
 
-- `VscodeViewGroupDefinition` 由 `vscode-host` 注册；
-- `VscodeViewGroup` 由 `vscode-host` 产生；
-- `ViewGroupState` 由 arrangement / frame materialize；
-- `ContainerRecord` 由 arrangement 的 view group registry 写入，随 `ViewGroupState` 进 frame 的 layout store；source 不写 record；
-- source 卸载时 record 可 tombstone，不自动删除。
+没有通用 CRD。VS Code 的贡献直接翻译成 typed descriptor：
 
-**group kind 决定 binding**：
+- `ViewDescriptor` → `WidgetDefinition`（id / source / hostKind / title / icon / defaultBoard / multiplicity / actions）；
+- `ViewContainer` → widget board + `BoardBinding`；
+- adaptor 注册 `WidgetHostFactory`，按 `hostKind` 创建 `ViewPane` / `EditorPane` / React host；
+- `VscodeViewGroupDefinition` / `VscodeViewDefinition` 是当前实现期的工厂名，目标改为 `VscodeBoardBindingFactory` / `VscodeWidgetHostFactory`；
+- Application / Window / Board 是组合层，不由 descriptor materialize。
 
-| kind | group mode | binding |
-| --- | --- | --- |
-| `vscode.prac/v1 ViewGroup` + `spec.groupKind = container` | `stack` | `ContainerBinding` |
-| `vscode.prac/v1 ViewGroup` + `spec.groupKind = editor` | `select` | `EditorGroupBinding` |
-| plain group | `stack` / `select` | none |
+### 2.3 binding
 
-- binding 不跟 view 走，跟 declaration 走；
-- view 移出 container 后，原 container group 的 binding 仍在；
-- plain group 可以放 VS Code view，但没有 group binding，由 `VscodeViewHost` 用 unbound context 挂载。
+`BoardBinding` 由 board 的 `groupKind` 选择，不由资源 `apiVersion + kind` 决定：
 
-### 2.3 view
+- `groupKind = container` → `ContainerBinding`：board context、widget 集合 / visibility / order / collapse、board title / actions、context keys、focus、drag / drop；
+- `groupKind = editor` → `EditorGroupBinding`：window group 的 editor runtime（`EditorGroupModel`、active 投影）；
+- 不从 board 内容推断；
+- binding 只提供 context / actions / host 入口，不拥有 widget 实例，也不决定 widget placement；
+- actions 由独立 action host 提供，挂在 frame 的 window group tab strip 右端；
+- binding 不拥有 UI chrome。
 
-```text
-VscodeViewDefinition（CRD）
-  apiVersion / kind / schema / validation / hostFactory
-        ↓
-VscodeView（CR）
-  apiVersion / kind / metadata / spec
-        ↓
-View（prac runtime）
-  ViewHost（react / view-pane / editor-pane / slot / opaque）
-```
+board lifecycle：board 创建 → binding 挂到内容组；widget mount → `VscodeViewHost` 注册 external view；widget release → 注销 view，widget definition / placement 由 `ui-widget` 保留；source 卸载但 board 还有别家 widget 时 board 保留；board 关闭 → binding / view hosts dispose。custom editor / webview 仍是 `WebviewEditor` pane，受 secure-context 约束；integrated browser 是 Electron-only，web workbench 不支持。
 
-- `kind` 是 view 类型；
-- `hostKind` 是 source-owned 的 spec 字段，core 不解析；core 只认 `ViewHost` 接口；
-- 两者不混；
-- `prac.view` 承载的是 view CR；`vscode-host` 的具体实现是 `VscodeView`；
-- `containerId` 只是默认落位 hint，不是成员关系；
-- view 是否存在由 source catalogue 决定，placement 由 frame 决定。
-
-### 2.4 runtime 对象
-
-#### consumer 面
+## 3. Runtime 对象
 
 | 对象 | 作用 |
-| --- | --- |
-| `PracVscodeFace` | catalogue / `hostFor` / `focusView` / `runCommand` / file placement / capabilities |
-| `VscodeCatalogueEntry` | catalogue 一行：`view` / `appId` / `title` / `source` / `role` / `containerId` / `containerTitle`（`role` 和 `containerId` 只是默认提示） |
-| `ViewGroupDefinition` / `ViewDefinition` | core 的类别 CRD 接口 |
-| `ViewGroupResource` / `ViewResource` | core 的类别 CR 信封 |
-| `VscodeViewGroupDefinition` / `VscodeViewDefinition` | `vscode-host` 注册的 CRD |
-| `VscodeViewGroup` / `VscodeView` | `vscode-host` 产生的 CR |
-| `prac.view` | `View` CR（vscode 具体为 `VscodeView`） |
+|---|---|
+| `VscodeEmbedHandle` | boot / view / file / placements / views / floatHost / group-cell channel |
+| `WorkbenchFace` | mount / focus / release / capabilities；不承载 part mount |
+| `EmbeddedWorkbench` | workbench 本体：服务、view / editor runtime、overlay |
+| `PracEditorHost` | adaptor 侧 editor runtime：`IEditorGroupsService` / `EditorGroupModel`；一个 window group 一个 editor group |
+| `EditorWindowModel` / `EditorPaneHost` | per editor window 的数据与 pane runtime |
+| `EditorWindow` | editor application window 实现（`ui-vscode-editor`）：breadcrumbs + pane + workbench context |
+| `EditorActionModel` | active editor / window group 的 resolved action 描述；frame 渲染 |
+| `VscodeGroupBinding` | board / window group 的内部内容组 context / actions |
+| `VscodeViewHost` | 每个 VS Code view 的 runtime host：mount / release `ViewPane` / `EditorPane`；注册 / 注销 `IViewsService` |
+| `PracViewsService` | `IViewsService` 的 external registry |
+| `ViewPane` / `ViewPaneContainer` | 上游 widget / board runtime |
+| `ui-vscode-views` | widget board + widget adaptor |
+| `ui-vscode-editor` | application window adaptor |
 
-#### adaptor / workbench
+## 4. Actions / overlay
 
-| 对象 | 作用 | 不知道 |
-| --- | --- | --- |
-| `VscodeEmbedHandle` | boot / `view` / `file` / `placements` / `views` / `floatHost` / group-cell channel | frame 的 layout |
-| `WorkbenchFace` | workbench 对 embedder 的内部面：mount / focus / release / capabilities；不承载 part mount | consumers |
-| `EmbeddedWorkbench` | workbench 本体：服务、view / editor runtime、overlay | frame |
-| `PracEditorHost` | adaptor 侧 editor runtime 服务：`IEditorGroupsService`、`EditorGroupModel`、editor panes | prac editor group 类型 |
-| `VscodeGroupBinding` | `ViewGroup.binding?`：匹配 `vscode.prac/v1 ViewGroup` 的 `spec.groupKind = container / editor`；提供 group-level context / actions；不拥有 view host | group state / placement |
-| `VscodeViewHost` | 每个 VS Code view 的 runtime host：mount / release `ViewPane` / `EditorPane`；注册 / 注销 `IViewsService`；有 group binding 时用其 context，否则 unbound | group state / placement |
-| `PracViewsService` | `IViewsService` 的 subclass / patch：external view registry；其余方法 delegate | group state / placement |
-| `ViewPane` / `ViewPaneContainer` | 上游 view / container runtime；`ViewPaneContainer` 只是 `ContainerBinding` 内部实现 | frame / prac 成员 |
+- extension 通过 `contributes.commands` / `contributes.menus` 贡献 action；
+- adaptor 用 menu service 解析 `MenuId.EditorTitle` / `view/title` 等，应用 `when` / context；
+- 输出 resolved action model：id / label / icon / group / order / enabled / checked / submenu / keybinding / tooltip；
+- frame 渲染 window group tab strip 的 actions；widget header actions 由 board/widget 渲染；
+- 菜单 / 命令面板 / hover / 通知由 workbench 服务创建，走 frame float layer；
+- view 内部的补全 / hover / webview overlay 留在 window / widget 内。
 
-#### frame 契约
-
-| 对象 | 作用 |
-| --- | --- |
-| `PracLayoutFace` | 布局拓扑、view group、placement、grid cell、尺寸 |
-| `ViewGroupState` / `ViewGroup` | group 的数据 / 运行时；binding 是 runtime-only 字段 |
-| `ContainerRecord` | 具名 group 的 materialized record；registry 写，layout store 持久化 |
-
-## 3. Reference-level
-
-### 3.1 声明契约
-
-```ts
-interface VscodeViewGroupDefinition implements ViewGroupDefinition {
-  bindingFactory(spec: VscodeViewGroupSpec): ContainerBinding | EditorGroupBinding;
-}
-
-interface VscodeViewGroup extends ViewGroupResource {}
-
-interface VscodeViewDefinition implements ViewDefinition {
-  hostFactory(decl: VscodeView, options?: { move?: MoveIntent }): VscodeViewHost;
-}
-
-interface VscodeView extends ViewResource {}
-```
-
-- `Definition = 类型 / CRD`；
-- `Declaration = 实例 / CR`；
-- `VscodeViewGroup.spec.groupKind` 决定 `bindingFactory`；
-- `VscodeView.spec.hostKind`（source-owned）决定 `hostFactory`；core 不解析；
-- 没有 `source` 作为独立字段；`apiVersion` 已经表达来源；
-- kind 改变 = 新 CR / 迁移，不是改字段。
-
-### 3.2 group binding
-
-`ViewGroup.binding?` 只由 declaration 的 `apiVersion + kind + spec.groupKind` 决定：
-
-| declaration | binding |
-| --- | --- |
-| `vscode.prac/v1 ViewGroup` + `spec.groupKind = container` | `ContainerBinding` |
-| `vscode.prac/v1 ViewGroup` + `spec.groupKind = editor` | `EditorGroupBinding` |
-| 其它 / plain | none |
-
-不根据 group 里的 view 推断。
-
-- `ContainerBinding`：container context、view collection / visibility / order / collapse、container actions；
-- `EditorGroupBinding`：`EditorGroupModel`、editor group context、editor actions；
-- frame 拥有 group 的 mode / active / order / bar；
-- binding 只提供 group-level runtime / action / context。
-
-### 3.3 view host
-
-`VscodeViewHost` 是 per-view：
-
-```ts
-interface VscodeViewHost {
-  mount(element: HTMLElement): void;
-  release(): void;
-  focus(): void;
-  focusable: boolean;
-  readonly viewId: string;
-}
-```
-
-- mount：创建 `ViewPane` / `EditorPane`，注册 external view；
-- release：注销 external view，dispose；
-- frame 可以通过 `PracVscodeFace.mountView` / `releaseView` 直接驱动 `VscodeViewHost`，不必经过 React 组件；app 未 publish 时由 embed 记录元素、publish 后挂载；
-- 没有 group binding 时，使用 unbound context；
-- `IViewsService` 的 external registry 由 host 维护，不由 group binding 维护。
-
-移动默认是：
-
-```text
-1. 在目标 group 创建新的 VscodeViewHost
-2. mount 成功
-3. 释放源 host
-4. 失败则保留源 host
-```
-
-`hostFactory(decl, { move: MoveIntent })` 的 `move` 只是 hint；`vscode-host` 可以：
-
-- `view-pane` 重建；
-- editor 用 model + viewState / `moveEditor` 优化；
-- webview 默认 reload；
-- 不承诺所有 view 都保留内部状态。
-
-### 3.4 frame 契约
-
-- `PracLayoutFace` 的 placement 目标是 `viewGroupId`；
-- group / cell channel 创建 **grid cell / select view group**，不是只建 region；
-- container bar / group bar 由 frame 画；
-- adaptor 提供 action / context，不画第二套 bar；
-- `PracLayoutFace` 不暴露 VS Code part / container 语义。
-
-### 3.5 状态归属
-
-| 状态 | 谁拥有 | 持久化 |
-| --- | --- | --- |
-| workspace / session | DSH | — |
-| layout topology / view group / placement / active / order | frame | 是 |
-| `ContainerRecord` / metadata | arrangement registry | 是（layout store） |
-| `VscodeViewGroupDefinition` / `VscodeViewDefinition` | adaptor | 否（source 重建） |
-| `VscodeViewGroup` / `VscodeView` | adaptor / consumers | 否（source 重建） |
-| `VscodeGroupBinding` / `VscodeViewHost` | adaptor | 否 |
-| `IViewsService` external registry | adaptor | 否（runtime） |
-| view existence / availability | source catalogue | 否 |
-| overlay / focus / attention | frame / arrangement | 否 |
-
-### 3.6 生命周期
-
-materialization 的 phase / async / dispose 规则见 [UI resource model](../in-progress/2026-10-22-ui-crd.md) §4。这里只列 vscode-host 的顺序：
-
-**正常启动**
-
-1. frame 恢复 layout / group state；
-2. `vscode-host` 注册 `VscodeViewGroupDefinition` / `VscodeViewDefinition`；
-3. `vscode-host` 产生 `VscodeViewGroup` / `VscodeView`；
-4. arrangement materialize `ViewGroupState` / `ViewGroup`；未 ready 的 resource 保持 waiting；
-5. 对 `vscode.prac/v1 ViewGroup` 的 `spec.groupKind = container / editor` 创建 `VscodeGroupBinding`；binding 失败不阻塞 group；
-6. frame 挂载 view 时，`VscodeViewHost` mount / 注册 external registry；host 失败不阻塞 frame。
-
-**recovery / reload**
-
-- declaration / definition 不持久化，由 source 重建；
-- layout / `ContainerRecord` 从 layout store 恢复；
-- binding 按 declaration 的 `apiVersion + kind + spec.groupKind` 重建；
-- 不根据 group 内容推断，也不依赖 attach 顺序。
-
-**动态安装 / 卸载**
-
-- 安装：新 definition / declaration；arrangement 落位；binding / view host 随声明创建；
-- 卸载：declaration 消失，binding / view host 释放；layout placement 可 tombstone；
-- reload：同 recovery；旧 runtime 不保留。
-
-### 3.7 失败与顺序
-
-- 没有 workspace：不 boot；
-- catalogue 为空：consumer 等 `pracVscode`，不缓存空目录；
-- workbench 未启动：不创建半成品 pane；
-- declaration 无效：诊断，不 materialize；
-- view 已注册但未落位：host 不渲染；
-- source 卸载：只移除自己的 view，不删别家 group；`releaseOwner` 释放该 source 的 binding / host；
-- code server / workbench 失败：adaptor 报错，frame 不接管启动。
-
-## 4. Surface ownership
-
-| surface | VS Code 侧 | owner | step |
-| --- | --- | --- | --- |
-| part / region | titlebar / banner / activitybar / primarySidebar / secondarySidebar / panel / statusbar；`Layout`/`Grid` | frame 负责布局与 role；adaptor 负责 part 语义 | future part context |
-| view container / view | `ViewContainer` / `ViewPaneContainer` / `ViewPane` / `ViewContainerModel` | adaptor 翻译为 declaration；frame 拥有 group / placement；binding / view host 承接 runtime | [container context](../in-progress/2026-10-22-vscode-container-context.md) |
-| action / menu | `ViewTitle` / `ViewContainerTitle` / `commands` / `keybindings` / `menus` | adaptor 供 action / context；frame 画 bar | future action/menu context |
-| status bar / overlay | status bar item；notifications / quick pick / input / dialog / context view / hover | adaptor 供内容；frame 供 overlay layer；source-managed behavior | future overlay/status context |
-| webview / custom editor | webview view / panel；custom editor | adaptor | future webview/editor context |
-| editor content UI | decorations / hover / CodeLens / Inlay Hints / semantic tokens | adaptor（editor chain） | future editor content context |
-| 专用视图 | SCM / comments / timeline / tests / debug / task / terminal / notebook / chat | adaptor；多数是 view + action，部分需要 controller | future specialized views |
-| 主题 / 设置 / walkthrough | themes / icon themes / configuration / walkthroughs | adaptor + frame 的主题/设置面 | future themes/settings |
-
-### 4.1 container / view surface
-
-当前事实：
-
-- `tryMountView` 直接创建 `ViewPane`，没有 group binding；
-- `PracViewsService` 让 mounted pane 可按 id 解析；`Collapse Folders` 已验证；
-- view 集合 / 可见性 / 顺序 / size / container title / menu / `viewsWelcome` 仍缺；
-- `ViewTitle` / `ViewItemContext` 的 action 可挂在 view 上。
-
-目标：
-
-- group 由 frame 拥有；
-- `vscode.prac/v1 ViewGroup` 且 `spec.groupKind = container / editor` 才有 binding；
-- `VscodeViewHost` 负责每个 VS Code view 的 mount / release；
-- `IViewsService` 的 external registry 由 view host 注册；
-- G：view 移出原 container 后，原 container actions / context keys 不跟随；view actions / welcome 跟随；
-- frame 画 container bar / group bar；adaptor 供 action / context；
-- `paneHeader` 是 view 自报的呈现事实，不是 source marker。
-
-## 5. Drawbacks
-
-- **container 语义不随 view 走**：`ViewPane` 仍会按来源注册关系查 container，G 需要覆盖 / 抑制；
-- **webview / iframe reload**：host 重挂会换 browsing context；
-- **editor 跨 group 不是纯 host 搬运**：可能 `moveEditor`，activation 必须显式；
-- **`IViewsService` 需要 patch / subclass**：external view registry 不是上游原生能力；
-- **declaration 不持久化**：source 不在时只能 tombstone placement，不能恢复 view；
-- **group kind 不可变**：kind 变化要走新 declaration / migration。
-
-## 6. Non-goals
+## 5. 约束
 
 - 不采用 VS Code 的顶层布局；
-- 不做完整 part / pane composite；
 - 不把 frame 的 stack / grid 塞进 adaptor；
 - 不让 frame 认识 VS Code 的 part / container / pane / editor group；
 - 不把 container 的 owner 放回 frame；
 - 不暴露 part host，也不把整块 VS Code part 当兜底；
 - 不按 core / extension 分 view 渲染路径；
-- 不把 core workbench 当普通 extension 重建。
+- 不把 core workbench 当普通 extension 重建；
+- webview / iframe 的 secure-context / HTTPS / 通配域约束不由 adaptor 绕过；
+- 集成浏览器在 web workbench 不可用，不能假装存在。
 
-## 7. Steps
+## 6. Decisions
 
-- [view catalogue](2026-10-06-vscode-view-catalogue.md)（in-progress）；
-- [editor host](2026-10-07-editor-host.md)（in-progress）；
-- **container / view**：[container context](../in-progress/2026-10-22-vscode-container-context.md) 已开 step；
-- action / menu；
-- status bar / overlay；
-- webview / custom editor；
-- editor content UI；
-- 专用视图；
-- themes / settings / walkthroughs。
+- `vscode-host` 是 adaptor，不是 frame / window / widget 的 owner。
+- editor input → application window；ViewContainer → widget board；View → widget。
+- editor group ↔ window group 的 adapter runtime；不拥有 UI chrome。
+- 没有通用 CRD；widget 用 typed descriptor / host factory，binding 是 board / group context，不是 UI chrome。
+- actions 由 adaptor 解析成 resolved model，frame 渲染。
+- webview / integrated browser 的可用性按 web / Electron 分别说明。
+- 包划分见 10-20：`ui-vscode-host` / `ui-vscode-views` / `ui-vscode-editor`。
 
-frame 侧（stack chrome / grid）不属于这张 note 的 steps，见各自的 note。
+## 7. Open questions
 
-## 8. Open questions
+- `tabGroups` API 如何映射 / 隔离。
+- `ViewContainer` 的 visibility / focus / collapse 与 board active widget 的边界。
+- foreign widget 移入 VS Code board、再移出的状态保留规则。
+- webview 的 secure-context 部署约束如何暴露给用户。
+- custom editor / webview editor 的 action model 是否与 text editor 一致。
 
-- **`IViewsService` external registry**：subclass 还是 patch `ViewsService`；`getActiveViewWithId` / container 级方法在 plain group 下如何返回；`focusedViewContextKey` 谁维护。
-- **container context**：已裁为 [D（混合 host 的 container binding）](../in-progress/2026-10-22-vscode-container-context.md)；剩余的是 external registry / G / focus 的实现问题，见该 note。
-- **part context**：frame 的 role（`stage` / `primarySidebar` / `secondarySidebar` / `panel`）与 VS Code 的 part 如何对应；left / center / right / bottom 只是默认物理位置。
-- **action / menu scope**：view-scoped / container-scoped / global 的边界。
-- **overlay**：frame-hosted、source-managed 是否足够；frame-managed `pracOverlay` 何时需要。
-- **webview / custom editor**：是否共用同一个 host 契约。
-- **editor content UI**：属于 editor host 还是独立 context。
-- **boot**：`pracVscode` service 与 workspace / code server 的生命周期顺序。
-- **catalogue**：catalogue 是唯一入口，还是允许 consumer 直接问 `IViewDescriptorService` / `IEditorService`。
+## 8. Validation
 
-## 9. Validation
+- editor input 打开为 application window；ViewContainer 打开为 board / widget window；ViewDescriptor 成为 widget。
+- Timeline 从 Explorer board 移到 right sidebar board / stage widget window；source 不变。
+- 单 view container 是一个 widget 的 board。
+- actions 在 window group tab strip 右端，跟随 active editor，不与 breadcrumbs 抢行。
+- ViewPane / EditorPane 的 lifecycle 与 upstream 一致；webview secure-context 失败可见。
+- frame 没有 VS Code 分支；adaptor 没有 frame / window / widget placement 逻辑。
+- 包依赖 gate：`ui-vscode-host` 不 import `ui-frame` / `ui-window` / `ui-widget` 的布局实现；adapters 只翻译。
 
-- **声明翻译**：VS Code container / view → `VscodeViewGroup` / `VscodeView`；`kind` / `spec.groupKind` 在声明时确定；
-- **binding 不跟 view**：Folders 移出 Explorer 后，Explorer group 的 ContainerBinding 仍在；目标 plain group 没有 binding；
-- **view host / move**：移动后的 Folders 仍由 `VscodeViewHost` 挂载，`IViewsService.getViewWithId` 可找到；默认目标先建、源后释放；`MoveIntent` 只作优化 hint；
-- **G**：原 container actions / context keys 不跟随；view actions / welcome 跟随；
-- **group mode**：Explorer 多 view 同时可见；editor group 是 select；
-- **recovery**：reload 后 definition / declaration 重建，binding 按 declaration 重建，不根据 group 内容推断；
-- **动态安装 / 卸载**：declaration 增减，binding / view host 同步；
-- **overlay**：VS Code float host 与 DSH overlay 同层按 order 共存；
-- **frame 无 source 分支**：不 import / eval source bundle，不按 `vscode:` 前缀分派。
+## 9. Related
 
-## Related
-
-- [2026-09-09-vscode-dsh-integration.md](2026-09-09-vscode-dsh-integration.md)：总 umbrella。
-- [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)：UI umbrella；view group / placement / G。
-- [2026-10-22-ui-crd.md](../in-progress/2026-10-22-ui-crd.md)：UI 的 CRD-lite 机制。
-- [2026-10-22-vscode-container-context.md](../in-progress/2026-10-22-vscode-container-context.md)：container context step。
-- [2026-10-05-vscode-dsh-layout-boundary.md](2026-10-05-vscode-dsh-layout-boundary.md)：视图隔离、区域骨架。
-- [2026-10-06-vscode-view-catalogue.md](2026-10-06-vscode-view-catalogue.md)：view catalogue。
-- [2026-10-07-editor-host.md](2026-10-07-editor-host.md)：editor host。
-- [2026-10-17-stack-view-chrome.md](2026-10-17-stack-view-chrome.md)：frame 侧 stack chrome。
-- [2026-10-15-ui-layout-grid.md](../in-progress/2026-10-15-ui-layout-grid.md)：frame 侧 grid。
-- [docs/architecture.md](../../../docs/architecture.md)：prac 目标架构。
-- [docs/concepts.md](../../../docs/concepts.md)：prac 词表。
-- [docs/vscode.md](../../../docs/vscode.md)：VS Code 自身结构。
+- [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)：组合模型 / package architecture。
+- [2026-10-07-editor-host.md](2026-10-07-editor-host.md)：editor application window。
+- [2026-10-05-vscode-dsh-layout-boundary.md](2026-10-05-vscode-dsh-layout-boundary.md)：隔离。

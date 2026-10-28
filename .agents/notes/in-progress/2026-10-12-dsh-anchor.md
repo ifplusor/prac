@@ -4,6 +4,8 @@ status: in-progress
 
 # prac dev 的 DSH 锚点：一个 worktree、一条 pin、一条比较门
 
+> **Package architecture migration（2026-10-28）**：本 note 的 `ui-layout` / `web-app` / `vscode-host` 是实现期名字。目标划分见 [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md) 的 Package architecture：几何 → `ui-frame`；surface / isolation → `ui-surface`；application / window → `ui-application` / `ui-window`；board / widget → `ui-widget`；默认工作台 / arrangement → `ui-workbench`；VS Code adaptor → `ui-vscode-host` / `ui-vscode-views` / `ui-vscode-editor`；DSH → `ui-dsh`；`bundle/web-app` 只做 composition root。
+
 ## Problem
 
 prac 的类型检查用 npm 上发布的 DSH 包，而 app 跑的是某个 checkout。两者一旦不是同一份，上游给缝加成员时**我们不会红**：实测 `@deepseek-ai/dsh-client-ui-sidebar-right` 激活时读 `layout.panelInfo`，prac 手抄的 `LayoutFace` 没有发布它，整个外壳因此不激活（12 个条目不激活，唯一报错是 `getSnapshot` of undefined）。那次漂移是活的 rig 抓到的，不是编译器。
@@ -21,7 +23,7 @@ prac 的类型检查用 npm 上发布的 DSH 包，而 app 跑的是某个 check
 
 由此得到 prac 的规矩：
 
-- **键由拥有者声明**。prac 现在就是**帧的所有者**（它 publish `ctx.layout`、自己做 `root` 注册），所以 `sidebar` / `main` / `rightbar` / `shell.overlay` 与 `prac.view` 一起写在 prac 的 `ui-layout` 里 —— 不再由 `web-app` 去 import DSH 的 `ui-layout` 借那四个键。
+- **键由拥有者声明**。prac 现在就是**帧的所有者**（它 publish `ctx.layout`、自己做 `root` 注册），所以 `sidebar` / `main` / `rightbar` / `shell.overlay` 与 `prac.view` 一起写在 prac 的槽声明里（当前 `ui-layout`，目标 `ui-frame` / `ui-widget`）—— 不再由 `web-app` 去 import DSH 的 `ui-layout` 借那四个键。
 - **消费者只取拥有者的声明，不做比较**：`import type {} from "@deepseek-ai/dsh-client-ui-renderer/client"` 把 `Context.slots` 带进 program；不再写 `const slots: SlotRegistry = ctx.slots` 或 `ctx.layout satisfies ILayout` 这类**跨 record 断言**（augmented `Context` 成员与直接 import 在 `nodenext` 下是两条 module record，比较不可能成立）。
 - **消费者读的是构建出的 `dist/client.d.mts`**：改了声明必须 `vp run -r build` 才生效 —— 本仓库的 client 半以 DSH 的 loader 契约打包，`./client` 的 `types` 指向 `dist/client.d.mts`。这一点曾让"声明已经写了、消费者却看不见"看起来像打包器丢了 ambient 声明。
 

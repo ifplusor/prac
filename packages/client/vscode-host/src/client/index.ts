@@ -35,7 +35,9 @@ import type { Context } from "@deepseek-ai/cordis";
 import type {} from "@deepseek-ai/dsh-client-ui-session/client";
 // Type-only, for prac's own Context merge (`ctx.pracLayout`), which is the face that owns
 // the region tree `addGroup` asks about.
-import type {} from "prac-client-ui-layout/client";
+import type {} from "prac-client-ui-frame/client";
+import { WidgetBoardGroup } from "prac-client-ui-widget/client";
+import { WindowGroupAdapter } from "prac-client-ui-window/client";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { ILayout } from "@deepseek-ai/dsh-client-ui-layout/client";
@@ -43,6 +45,7 @@ import { createVscodeEmbed } from "prac-vscode-embed/client";
 import { EXTENSIONS_GALLERY } from "prac-vscode";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "./public.js";
 import { createVscodeResourceDefinitions } from "./adapter.js";
+import { regionHoldsOtherWindow } from "./editor-group.js";
 import { VscodeGroupHost, editorGroupId } from "./groups.js";
 import type { VscodeGroupRuntime } from "./resources.js";
 export * from "./resources.js";
@@ -52,6 +55,16 @@ export * from "./groups.js";
 
 /** Same-origin prefix the host half serves the app bundle under. */
 const VSCODE_ROUTE = "/prac-vscode";
+
+/**
+ * The view-id prefix for one open file.
+ *
+ * The *placement* is the unit — a file in one of the app's editor groups (VS Code's
+ * split editor makes the same file two of them) — so the id carries both halves:
+ * `vscode:file:<placement>:<resource>`. The token is what tells two views of one file
+ * apart, and the resource is what a consumer recognises the file by.
+ */
+const FILE_VIEW_PREFIX = "vscode:file:";
 
 /**
  * The frame's whole-surface overlay slot: where the app's own root is mounted.
@@ -111,6 +124,12 @@ function viewLocation(location: string): VscodeCatalogueEntry["location"] {
  */
 function activeWorkspace(ctx: Context): WorkspaceLaunch | undefined {
   try {
+    // A workspace switch is a page-level connection choice (the code server is
+    // long-running; the browser page is the side that opens a folder). The
+    // switcher sets this parameter and reloads, so the new boot opens the
+    // chosen folder instead of whatever the previous session happened to own.
+    const requested = new URLSearchParams(window.location.search).get("workspace");
+    if (requested !== null && requested !== "") return { path: requested };
     const items = ctx.workspaces.list.getSnapshot().items;
     // Navigation left the session *list* in the shell this repository runs; the current
     // session's identity is published by the session adapter.
@@ -154,7 +173,14 @@ export function apply(ctx: Context): void {
   embed.setGroupRegionChannel({
     createRegionBeside: (region, side) => ctx.pracLayout.createRegionBeside(region, side),
     regionInDirection: (region, side) => ctx.pracLayout.regionInDirection(region, side),
-    removeRegion: (region) => ctx.pracLayout.removeRegion(region),
+    removeRegion: (region) => {
+      // An empty *editor* group does not mean an empty *window* group. The
+      // conversation (and any other app's window) keeps the group alive; the
+      // editor has no authority to close a region it does not own alone.
+      const views = ctx.pracLayout.getState().views;
+      if (regionHoldsOtherWindow(views, region, (id) => id.startsWith(FILE_VIEW_PREFIX))) return;
+      ctx.pracLayout.removeRegion(region);
+    },
   });
 
   /** Boot the app for the active workspace; true once it is running. */
@@ -176,16 +202,6 @@ export function apply(ctx: Context): void {
   // what makes `inject: ["pracVscode"]` keep a consumer pending until this lands.
   // This is the same seam the embed bridge crosses, one level up: the consumers
   // declare views, the mechanism owns the singleton boot and the catalogue.
-  /**
-   * The view-id prefix for one open file.
-   *
-   * The *placement* is the unit — a file in one of the app's editor groups (VS Code's
-   * split editor makes the same file two of them) — so the id carries both halves:
-   * `vscode:file:<placement>:<resource>`. The token is what tells two views of one file
-   * apart, and the resource is what a consumer recognises the file by.
-   */
-  const FILE_VIEW_PREFIX = "vscode:file:";
-
   /** The view id for one placement. */
   const fileViewId = (placement: string, resource: string): string =>
     `${FILE_VIEW_PREFIX}${placement}:${resource}`;
@@ -315,8 +331,10 @@ export function apply(ctx: Context): void {
   };
   const resources = createVscodeResourceDefinitions({
     face,
-    createGroup: (id, mode) =>
-      ctx.pracLayout.createViewGroup(id, mode) as unknown as VscodeGroupRuntime,
+    createGroup: (id, mode, label) =>
+      mode === "stack"
+        ? (new WidgetBoardGroup(id, label) as unknown as VscodeGroupRuntime)
+        : (new WindowGroupAdapter(id, label) as unknown as VscodeGroupRuntime),
     createView: (id) => ctx.pracLayout.createView(id),
   });
   const groupHost = new VscodeGroupHost({
@@ -421,7 +439,7 @@ export function apply(ctx: Context): void {
   // without it `shell.overlay` is not a key of `SlotMap`, so the registration
   // below would not type-check against the frame's declaration.
   ctx.layout satisfies ILayout;
-  const slots: SlotRegistry = ctx.slots;
+  const slots = ctx.slots as unknown as SlotRegistry;
   ctx.effect(
     () =>
       slots.inject(OVERLAY, () =>

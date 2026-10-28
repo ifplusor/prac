@@ -1,206 +1,155 @@
 # prac 的概念
 
 > 这份是**词表与体系**：prac 用哪些词、每个词指什么、哪些**不是**。它是现在时的参考。
-> 设计在 [architecture.md](architecture.md)；取舍的推导与依据在 [.agents/notes/](../.agents/notes/)。
+> 设计在 [architecture.md](architecture.md)；完整组合模型见 [2026-10-20-ui-framework.md](../.agents/notes/in-progress/2026-10-20-ui-framework.md)。
 
 ## 一句话
 
-> prac 只有两个名词：**视图**与**区域**。视图是唯一可显示的东西；区域是唯一的排布单位。视图从哪来由**来源**决定，而**机制不认识来源**。
+> prac 的 UI 由 **Application / Window / Widget board / Widget** 四类对象组成；frame 拥有 Space、布局、surface、window group / board 与 chrome；来源拥有内容；机制不认识来源。
 
-## 一、视图
-
-**唯一可显示的东西**：有身份（id）、有内容（一个挂载）、有一组属性。
-
-属性分两组——**持久化按「放置」分，不按「视图种类」分**：
-
-| 组       | 属性                               | 进持久化吗                                  |
-| -------- | ---------------------------------- | ------------------------------------------- |
-| **排布** | 在哪个区域、顺序、折叠、尺寸、选中 | 放在**基础层**的区域里 ⇒ **进**             |
-| **呈现** | 在屏、锚点、层序                   | 放在**悬浮层**里 ⇒ **不进**（那是"这一次"） |
-
-- **寿命**（常驻 / 一次交互）是**属性**，不是类别。
-- **每个视图有一个隔离盒子**：边界由框架保证、不由视图选择；形态（影子根 / 独立浏览上下文）由框架按内容选，结果记进视图身份。
-
-## 二、区域
-
-**唯一的排布单位**。它装**孩子**；孩子可以是**视图**，也可以是**区域**（区域因此可嵌套）。
-
-| 维度                     | 取值                                                          |
-| ------------------------ | ------------------------------------------------------------- |
-| **模式**（孩子怎么显示） | **顺序**（依次）· **选择**（选一）· **分区**（并排）          |
-| **位置**                 | **基础层** · **悬浮层**（悬浮层是顶层的区域，不是另一种东西） |
-| **名字**                 | 可选；借来的组名就落在这里                                    |
-
-**装饰**（sash、拖拽落点提示、焦点环）**不是视图、也不是区域**——是框架画给自己的，随框架状态来去。
-
-## 三、一条链
-
-```
-来源（两个上游服务：编辑器里打开的文件 / 视图注册表）
-   │  机制读成一份清单
-   ▼
-来源目录（每条：prac 的视图 id、上游 id、来源、位置、容器）
-   │  消费者注册
-   ▼
-视图注册表（prac.view）—— frame 的唯一输入
-   │  编排决定
-   ▼
-放置与分组（区域树：谁在哪个区域、谁与谁选一）
-   │  frame 渲染
-   ▼
-隔离盒子 ＋ 模式 ＋ 装饰
-```
-
-**三条不变量**：
-
-1. **frame 不认识来源**：它只见视图注册表的成员。
-2. **容器不越过编排**：机制只报"这个视图属于哪个容器"，是**编排**把它落成"具名 view group（默认 stack）"。
-3. **只有视图是"东西"**：区域是排布，装饰不是视图。
-
-来源词只停在**来源目录 / 编排**这一侧：
-
-- `prac.view` 只带 `id` / `label` / `icon` / `paneHeader`；不带 source / containerId / location；`paneHeader` 是视图自报的呈现事实（它自带 pane header），不是来源标记；
-- `containerId` / `location` / 来源类型只进编排；
-- frame 不读来源目录，也不按来源前缀做渲染决策；
-
-## 四、词表
-
-### prac 自己的词
-
-| 词                     | 定义                                             |
-| ---------------------- | ------------------------------------------------ |
-| **视图**               | 唯一可显示的东西                                 |
-| **区域**               | 唯一的排布单位：装孩子、有模式、有位置、可有名字 |
-| **顺序 / 选择 / 分区** | 区域**孩子**的三种显示方式                       |
-| **基础层 / 悬浮层**    | 区域的两个位置                                   |
-| **名字**               | 区域的可选标签（借来的组名落在这里）             |
-| **装饰**               | sash / 拖拽落点提示 / 焦点环——不是视图           |
-| **隔离盒子**           | 每个视图的边界（框架保证）                       |
-| **来源目录**           | 机制把两份上游服务读成的一份清单                 |
-| **消费者**             | 把来源目录注册成视图的包                         |
-| **编排**               | 决定默认落位、分组与角色的一层                   |
-| **注意力 / 返回栈**    | 交互：谁在中心、怎么回去                         |
-
-### 借来的词（一律带来源）
-
-| 词                      | 谁的                                                 | 在 prac 里是什么                                                                             |
-| ----------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| **容器**                | VS Code 的分组（Explorer / Search…）                 | 由**编排**落成"**具名 view group**（默认 stack）"；机制只报 `containerId` / `containerTitle` |
-| **location**            | 上游的位置词（`sidebar` / `panel` / `auxiliarybar`） | **默认落位**的提示，不是区域 id                                                              |
-| **part**                | 上游的粗粒度区域                                     | 可选的高级形态，**不是单位**                                                                 |
-| **face**                | DSH：一边发布给对面的那组方法                        | 契约词                                                                                       |
-| **槽 / `kind` / `key`** | DSH：视图注册进哪里                                  | 讲机制时用；`prac.view` 就是其中一个槽                                                       |
-| **挂载（mount）**       | 把内容放进一个盒子                                   | 来源的落地动作                                                                               |
-
-### 已退役
-
-**座位（seat）**、隐喻用法的**面**。
-
-## 五、这次合并了什么、拆分了什么
-
-**合并**（同一个东西不该有两个名字）：
-
-- **区域 / 子区域 / 悬浮层 → 区域**：它们本来就是一个东西的嵌套与两个位置。
-- **分区 / 选择 / 顺序 → 区域的属性（模式）**：不是三种区域。
-- **frame 的"视图目录" / `prac.view` 注册表 → 视图注册表**：本来就是同一件事。
-
-**拆分**（一个名字不该指两个东西）：
-
-- **"目录" → 视图注册表（frame 的输入）** 与 **来源目录（机制的报告）**。
-- **"组" → 拆掉**：区域里那批视图说"区域"就够；"组"只留给借来的**容器**。
-- **视图的属性 → 排布 / 呈现**：一组进持久化，一组不进。
-
-## 六、上游的东西落到哪里
-
-**一条判据**：上游的东西只有三种去处——**是视图**（注册进来）、**是排布**（落成区域 / 模式 / 名字）、**都不是**（不继承，或留待另立）。没有第四种。
-
-### DSH
-
-| DSH 的东西                                          | 落在 prac 的哪一格                                                                                                              |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| 插件（loader 的一行）                               | **注册者**——谁声明视图；不构成 prac 的概念                                                                                      |
-| 槽（`root` / `sidebar` / `main` / `shell.overlay`） | `prac.view` 是 prac 自己声明的一个槽；DSH 自带的槽（`dsh:sidebar` / `dsh:main:*` / `dsh:rightbar`）**也是视图**——frame 一视同仁 |
-| 槽的 `kind` / `key`                                 | 注册的**形状**与身份（机制词，不是 prac 的模型）                                                                                |
-| `shell.overlay`                                     | **悬浮层**那个区域的内容槽                                                                                                      |
-| DSH 的视图（对话 / 计划 / 审阅 / 笔记）             | **视图**（来源：DSH 的槽）                                                                                                      |
-| 插件生命周期（注册 / 注销）                         | 视图**在不在注册表**                                                                                                            |
-| `client-store` / `persist`                          | 持久化的**实现**，不是概念                                                                                                      |
-
-### VS Code
-
-| VS Code 的东西                                    | 落在 prac 的哪一格                                                                                                       |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **容器**（Explorer / Search…）                    | 借来的**分组** → 由编排落成"**具名 view group（默认 stack）**"                                                           |
-| **pane composite**                                | **选择区域**（prac 的区域）；不是新对象                                                                                  |
-| **ViewContainer**                                 | **容器**（借词）→ 具名 view group                                                                                        |
-| **ViewPane**                                      | **视图**                                                                                                                 |
-| **PaneView**                                      | **没有 prac 对象**；container 内部的 stack 由 view group 的 `stack` mode 承担                                            |
-| **视图**（tree / webview / welcome）              | **视图**（来源：视图注册表）                                                                                             |
-| **位置**（`sidebar` / `panel` / `auxiliarybar`）  | `location`：**默认落位提示**（→ `left` / `bottom` / `right`）                                                            |
-| 打开的文件 / 编辑器                               | **视图**（一个文件可以有多个放置；每个放置是一个视图；来源：编辑器服务）                                                 |
-| **editor group / tab 条**                         | **prac 的 editor host 的对象**：组住在区域里；tab 是组 / 区域的；分栏是区域；不继承上游 `EditorPart` / `EditorGroupView` |
-| **Grid / 顶层布局**                               | **不复制**；editor group 通过 region channel 接 frame                                                                    |
-| **activity bar**                                  | 职责是"在容器之间选一" → 由**选择模式 + 名字**承担；**图标条不继承**                                                     |
-| **部件**（editor / sidebar / panel / statusbar…） | 可选的高级形态，**不是单位**                                                                                             |
-| **webview**                                       | 一种**隔离形态**（独立浏览上下文）                                                                                       |
-| **命令面板 / 通知 / 右键菜单**                    | **视图**，放在**悬浮层**                                                                                                 |
-| **悬停 / 补全 / peek / 局部菜单**                 | 视图**盒内**的内容（自闭环）                                                                                             |
-| `when`                                            | 视图**在不在注册表**（机制只在它成立时报出这条）                                                                         |
-| `visible`（用户的显隐）                           | **不搬**：在不在屏是 prac 的排布状态                                                                                     |
-| **状态栏 / 装饰 / 进度 / 面包屑**                 | **不是视图**（prac 暂无对应物；要用时按"只做显示"另立）                                                                  |
-| **扩展（extension）**                             | 内容的提供者；不构成 prac 的概念                                                                                         |
-
-## 七、容器：区域的孩子可以是区域
-
-**区域的模式作用于孩子，孩子可以是视图或区域**：
-
-| 孩子是   | 顺序（依次）           | 选择（选一） | 分区（并排） |
-| -------- | ---------------------- | ------------ | ------------ |
-| **视图** | 依次排开（各自可折叠） | 只显示一个   | ——           |
-| **区域** | ——                     | 只显示一个   | 各占一块     |
-
-**容器不是新的布局节点**：它是**一个具名 view group**，父层 select 在兄弟 container 之间"**选一**"。于是
-
-- `primarySidebar` 是一个"**选择**"区域，孩子是 Explorer / Search / SCM / Run 各一个具名 view group，每个 group 默认按 `stack` 装自己的视图；
-- **activity bar 的图标条不继承**——切换的载体是**区域头部的容器条**（像 tab 条，但切的是容器）；
-- **单个视图**（没有真容器）= 父层 select 下只装一个 view 的 group，与上游"给它生成一个容器"同构。
-- **container 的内部默认是 `stack`**：Explorer / Search / SCM 各是一个具名 view group，内部用 stack mode 装自己的视图。
-- **选择不嵌套**：选择区域的孩子不能是另一个选择区域；container 是具名 view group（内容根），内部只能是 `stack` 或分区，不能是第二层选择。
-- 来源如果真的有"组里再组"：优先**扁平化**成一级具名 view group；子组也可以留在借用件自己的盒子里，由 adaptor 管，不进 prac 区域树。
-
-## 八、区域之间的偏序
-
-区域树不是一条全序，它有三种关系：
-
-| 关系     | 出现在                 | 性质                   |
-| -------- | ---------------------- | ---------------------- |
-| **包含** | 父区域 → 子区域 / 视图 | 偏序（祖先先于后代）   |
-| **先于** | 顺序 / 分区的兄弟      | 全序（同级）           |
-| **备选** | 选择的兄弟             | 不是序；是"选一"的集合 |
-
-- **顺序**：兄弟之间有全序；视图依次排列，可折叠。
-- **分区**：兄弟之间沿轴有全序；各占一块。
-- **选择**：兄弟之间只有 bar 的顺序（显示顺序），没有内容上的先后；`active` 选一个，其他是备选。
-- **包含**：区域装孩子；这是唯一的偏序骨架。
-
-可见内容按模式递归求值：
+## 一、对象
 
 ```text
-visible(region):
-  顺序   → concat(visible(child) for child in children if not folded)
-  分区   → concat(visible(child) for child in children)
-  选择   → visible(activeChild)
+Application（启动身份）
+Window（app 打开的实例）
+Widget board（布局面）
+Widget（可组合内容）
+
+Application --opens(1..N)--> Window
+Window --hosts(0..1)--> Widget board
+Dock / Panel --hosts(0..N)--> Widget board
+Widget board --places(0..N)--> Widget
+Window group --contains--> Window
 ```
 
-所以：
+| 对象             | 是什么                                                                                   | 不是                                |
+| ---------------- | ---------------------------------------------------------------------------------------- | ----------------------------------- |
+| **Application**  | 启动身份；定义 window kind / single-multi / 默认 placement / 默认 composition / launcher | 不是内容容器；不直接进 window group |
+| **Window**       | app 打开的实例；有 placement / lifecycle / active                                        | 不是 tab；不是 widget               |
+| **Widget board** | 摆放 widget 的布局面                                                                     | 不是 app；不是 window；不是 region  |
+| **Widget**       | 可组合内容                                                                               | 不是 window；不直接进 window group  |
+| **Window group** | windows 的容器；tab strip 的 tab 是 window                                               | 不是 editor group；不是 board       |
+| **Space**        | 命名的 stage 布局                                                                        | 不是 project folder                 |
 
-- 顺序 / 分区：所有孩子都可见（受折叠/尺寸影响）；
-- 选择：只有 active 分支可见；
-- 可见内容是对可见叶子的一次线性化，但树本身仍是偏序。
+### Window 两种
 
-### 选择只有一级
+| kind                   | 内容              | 例子                                                        |
+| ---------------------- | ----------------- | ----------------------------------------------------------- |
+| **application window** | app-owned 内容    | editor（一个文件）、chat、diff、terminal、browser、settings |
+| **widget window**      | 一个 widget board | stage 上的 Explorer board、单 Timeline board                |
 
-- 选择区域的 `active` 是一个 childId，**不是路径**；
-- 选择区域的孩子不能是选择区域；
-- container 是 select 区域下的具名 view group，内部是 stack/分区，不是第二层选择；
-- 如果将来真的需要嵌套选择，再引入 `activePath`，并同时补每级 bar、breadcrumb、焦点路径与持久化迁移；现在不做。
+- 所有 stage window 都是 editor input / `EditorWindow` 形态；
+- application window 与 widget window 只是内容不同；
+- widget window 由 board host app 打开；board composition 可改，window identity 不变。
+
+### 关系约束
+
+- window 可以没有 board（application window）；
+- board 可以没有 window（panel / dock）；
+- widget 可以没有 board（未放置）；
+- window group 只包含 window；
+- window owner（appId）与 widget source 是两件事；
+- widget 在兼容 board 之间移动；placement 改、source 不变；
+- 默认 move-only；copy 需要显式能力。
+
+## 二、布局
+
+```text
+Space
+  split / grid / region
+       └─ surface
+            ├─ window group（stage cell）
+            └─ widget board（panel / dock）
+```
+
+- **split / grid / region** 是几何节点；region 是叶子盒子；
+- **surface** 是 region 的内容根：
+  - stage cell → window group；
+  - panel / dock → widget board；
+  - opaque host → 外部内容；
+- **placement 有两条边**：
+  - window → window group；
+  - widget → widget board；
+- **active 有两级**：
+  - window group 的 active window；
+  - board 的 active widget；
+- **widget window** 是 window，内容是 board，不是 region。
+
+## 三、Chrome / isolation
+
+- window group tab strip / actions → frame + `ui-window`；
+- widget header / actions → board / `ui-widget`；
+- breadcrumbs → editor application window；不是 group tab strip；
+- overlay：
+  - 应用级 workbench overlay → frame float layer；
+  - widget 内部 overlay → widget-local；
+- window 是外层 containment / stacking / theme / focus 边界；
+- 混排 VS Code + DSH 保留 per-widget root / source-scoped 子树；
+- webview / iframe 自己的 browsing context。
+
+## 四、来源
+
+| 来源                                                          | prac                                                  |
+| ------------------------------------------------------------- | ----------------------------------------------------- |
+| VS Code editor input（文件 / diff / custom editor / webview） | application window                                    |
+| VS Code `ViewContainer`                                       | widget board / widget window                          |
+| VS Code `ViewDescriptor`                                      | widget                                                |
+| VS Code editor group                                          | window group 的 adapter runtime（`IEditorGroupView`） |
+| VS Code 菜单 / 命令                                           | action model                                          |
+| DSH `main` keyed entry                                        | application window                                    |
+| DSH `sidebar` / `rightbar`                                    | widget board                                          |
+| DSH 内部 slot                                                 | widget / section                                      |
+| DSH `shell.overlay`                                           | frame overlay                                         |
+
+- frame 不认识 `vscode:` / `dsh:`；
+- adaptor 只翻译，不拥有 frame / window / widget 的 layout / active / placement；
+- `prac.view` 是 widget 注册面；window / board 有各自注册面。
+
+## 五、术语
+
+| canonical              | 不要用                         | 说明                                                          |
+| ---------------------- | ------------------------------ | ------------------------------------------------------------- |
+| **application**        | app instance / container       | 启动身份；window 由 app 打开                                  |
+| **window**             | tab / view                     | app 的实例；application window 或 widget window               |
+| **window group**       | editor group / view group      | windows 的容器                                                |
+| **widget board**       | container / view group / panel | 摆放 widget 的布局面                                          |
+| **widget**             | view / tab                     | 可组合内容；在 board 里                                       |
+| **placement**          | membership                     | window→group；widget→board                                    |
+| **surface**            | region content                 | region 的内容根                                               |
+| **application window** | editor view / editor group     | editor / chat / diff / terminal 的 window                     |
+| **widget window**      | container window               | 承载 board 的 window                                          |
+| **editor group**       | prac window group              | `IEditorGroupView`，adapter runtime                           |
+| **editor window**      | separate window type           | editor application window 的简称                              |
+| **catalogue**          | registry                       | 合并后的 widget / window 目录                                 |
+| **source adapter**     | —                              | 把来源投影成 application / window / widget / action / overlay |
+
+## 六、已退役
+
+- **view group / container record**：board 的内部内容组 / 早期名字；不是独立对象；
+- **seat**：没有独立对象；
+- **region tree 直接以 view 为 child**：region 的 child 是 surface，不是 view；
+- **editor group 作为 prac UI 类型**：只是 adapter runtime；
+- **“view 是唯一单位”**：window 是编排单位，widget 是内容单元。
+
+## 七、包
+
+```text
+ui-surface
+ui-frame
+ui-application
+ui-window
+ui-widget
+ui-workbench
+ui-dsh
+ui-vscode-host / ui-vscode-views / ui-vscode-editor
+bundle/web-app  // composition root only
+```
+
+完整依赖见 10-20 的 Package architecture。`ui-layout` 是迁移期 facade，最终删除。
+
+## 八、相关
+
+- [architecture.md](architecture.md)：目标架构。
+- [ui-surface-map.md](ui-surface-map.md)：来源 → 对象映射。
+- [ui-acceptance.md](ui-acceptance.md)：UI 验收。
+- [2026-10-20-ui-framework.md](../.agents/notes/in-progress/2026-10-20-ui-framework.md)：组合模型 / package architecture。

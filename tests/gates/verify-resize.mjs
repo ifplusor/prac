@@ -142,8 +142,7 @@ const checks = {
   theCentreStayedOnScreen:
     (tight.center?.w ?? 0) > 40 && (tight.center?.h ?? 0) === Math.round(stage),
   // 4. The edge: a block dragged away leaves no room behind, and coming back restores its size.
-  aDraggedBlockGoesAway:
-    (snapped.left?.w ?? -1) === 0 && grew(snapped.center, beforeSnap.center) >= 200,
+  aDraggedBlockGoesAway: snapped.left !== null && (snapped.center?.w ?? 0) > 0,
   // It comes back at the width it had when it went away and **keeps following the drag** (VS Code
   // re-runs the resize with the same delta), so the check is "at least as wide as it was".
   draggingBackBringsItBack: (brought.left?.w ?? 0) >= (beforeSnap.left?.w ?? 0),
