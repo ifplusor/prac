@@ -2,7 +2,7 @@
   "name": "prac-client-ui-workbench",
   "version": "0.0.0",
   "private": true,
-  "description": "Default workbench policy: default placements, catalogue reconciliation and recall.",
+  "description": "DSH workbench plugin: default arrangement, title bar, recall and first-run.",
   "files": [
     "dist"
   ],
@@ -15,7 +15,6 @@
       "default": "./dist/index.mjs"
     },
     "./client": {
-      "types": "./dist/client.d.mts",
       "default": "./dist/client.js"
     },
     "./package.json": "./package.json"
@@ -35,5 +34,10 @@
     "prac-client-ui-frame": "workspace:*",
     "prac-client-vscode-host": "workspace:*",
     "react": "catalog:"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web"
+    }
   }
 }

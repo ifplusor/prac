@@ -38,12 +38,9 @@
     - id: prac-host-vscode
       name: "prac-host-vscode"
 
-    # The arrangement. DSH scans client halves from *loader rows*, so the
-    # arrangement needs a row even though its host half does nothing: without
-    # it, `exports["./client"]` is never served and nothing places a view.
-    # `id` stays `prac-web-app` so the profile can address the row.
-    - id: prac-web-app
-      name: "prac-web-app"
+    # The arrangement / default workbench policy.
+    - id: prac-client-ui-workbench
+      name: "prac-client-ui-workbench"
 
     # The language-service seam (`ctx.lsp`) and the tool that exposes it to the
     # agent. No DSH bundle ships either one, so an outside provider has nothing

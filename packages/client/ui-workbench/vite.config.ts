@@ -1,6 +1,8 @@
 import { defineConfig } from "vite-plus";
 
-/** `ui-workbench` is a library; the bundle composes it. */
+import { clientPack } from "../../../scripts/pack-client.ts";
+
+/** `ui-workbench` is a DSH plugin: library code is internal, `./client` is the loader artifact. */
 export default defineConfig({
   pack: [
     {
@@ -9,12 +11,9 @@ export default defineConfig({
       platform: "node",
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
     },
-    {
-      entry: { client: "src/client/index.ts" },
-      format: ["esm"],
-      platform: "browser",
-      outExtensions: () => ({ js: ".js", dts: ".d.mts" }),
-      deps: { neverBundle: ["react"] },
-    },
+    clientPack("prac-client-ui-workbench", {
+      entry: "src/client/plugin.ts",
+      external: ["react-dom"],
+    }),
   ],
 });

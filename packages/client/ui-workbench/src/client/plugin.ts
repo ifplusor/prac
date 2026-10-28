@@ -970,7 +970,7 @@ body[data-ds-dark-theme] .prac-cf-foot{background:var(--dsw-static-neutral-850);
 `;
 
 /** The cordis plugin name used by loader diagnostics. */
-export const name = "prac-web-app";
+export const name = "prac-client-ui-workbench";
 
 /**
  * The DSH services this plugin needs: the slot registry (the strip's slot) and
