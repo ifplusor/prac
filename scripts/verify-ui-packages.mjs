@@ -2,10 +2,8 @@
 /**
  * Static dependency gate for the planned UI package split.
  *
- * The target packages do not exist until the ui-layout split lands. This gate
- * therefore checks only packages that are present; missing targets are reported
- * as "not split yet", not as failures. It also enforces the bundle-is-a-leaf
- * rule for the current bundle.
+ * Every client package is a DSH plugin (or a bundle). The gate checks that each
+ * plugin stays within its service boundary and that the bundle stays a leaf.
  */
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -18,53 +16,25 @@ const bundleDir = join(root, "packages/bundle");
 
 /** @type {Record<string, Rule>} */
 const RULES = {
-  "prac-client-ui-surface": {
-    forbidden: [
-      "prac-client-ui-frame",
-      "prac-client-ui-window",
-      "prac-client-ui-widget",
-      "prac-client-ui-workbench",
-      "prac-client-ui-dsh",
-      "prac-client-ui-vscode-host",
-      "prac-client-ui-vscode-views",
-      "prac-client-ui-vscode-editor",
-      "prac-web-app",
-    ],
-    why: "surface is the lowest contract layer",
-  },
   "prac-client-ui-frame": {
     forbidden: [
       "prac-client-ui-window",
       "prac-client-ui-widget",
       "prac-client-ui-workbench",
       "prac-client-ui-dsh",
-      "prac-client-ui-vscode-host",
+      "prac-client-vscode-host",
       "prac-client-ui-vscode-views",
       "prac-client-ui-vscode-editor",
       "prac-web-app",
     ],
     why: "frame only knows the surface registry",
   },
-  "prac-client-ui-application": {
-    forbidden: [
-      "prac-client-ui-frame",
-      "prac-client-ui-window",
-      "prac-client-ui-widget",
-      "prac-client-ui-workbench",
-      "prac-client-ui-dsh",
-      "prac-client-ui-vscode-host",
-      "prac-client-ui-vscode-views",
-      "prac-client-ui-vscode-editor",
-      "prac-web-app",
-    ],
-    why: "application is a leaf registry domain",
-  },
   "prac-client-ui-window": {
     forbidden: [
       "prac-client-ui-widget",
       "prac-client-ui-workbench",
       "prac-client-ui-dsh",
-      "prac-client-ui-vscode-host",
+      "prac-client-vscode-host",
       "prac-client-ui-vscode-views",
       "prac-client-ui-vscode-editor",
       "prac-web-app",
@@ -76,7 +46,7 @@ const RULES = {
       "prac-client-ui-window",
       "prac-client-ui-workbench",
       "prac-client-ui-dsh",
-      "prac-client-ui-vscode-host",
+      "prac-client-vscode-host",
       "prac-client-ui-vscode-views",
       "prac-client-ui-vscode-editor",
       "prac-web-app",
@@ -91,7 +61,11 @@ const RULES = {
     forbidden: ["prac-web-app"],
     why: "bundle is a composition root and must stay a leaf",
   },
-  "prac-client-ui-vscode-host": {
+  "prac-client-ui-changed-files": {
+    forbidden: ["prac-web-app"],
+    why: "bundle is a composition root and must stay a leaf",
+  },
+  "prac-client-vscode-host": {
     forbidden: ["prac-web-app"],
     why: "bundle is a composition root and must stay a leaf",
   },
