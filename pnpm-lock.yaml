@@ -208,15 +208,33 @@ importers:
       prac-client-ui-changed-files:
         specifier: workspace:*
         version: link:../../client/ui-changed-files
+      prac-client-ui-dsh:
+        specifier: workspace:*
+        version: link:../../client/ui-dsh
       prac-client-ui-frame:
         specifier: workspace:*
         version: link:../../client/ui-frame
+      prac-client-ui-vscode-editor:
+        specifier: workspace:*
+        version: link:../../client/ui-vscode-editor
+      prac-client-ui-vscode-views:
+        specifier: workspace:*
+        version: link:../../client/ui-vscode-views
+      prac-client-ui-widget:
+        specifier: workspace:*
+        version: link:../../client/ui-widget
+      prac-client-ui-window:
+        specifier: workspace:*
+        version: link:../../client/ui-window
       prac-client-ui-workbench:
         specifier: workspace:*
         version: link:../../client/ui-workbench
       prac-client-vscode-host:
         specifier: workspace:*
         version: link:../../client/vscode-host
+      prac-host-vscode:
+        specifier: workspace:*
+        version: link:../../host/vscode
       react:
         specifier: 'catalog:'
         version: 18.3.1
