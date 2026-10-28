@@ -52,7 +52,7 @@ import {
   type SplitNode,
   type StyleObject,
 } from "./contract.js";
-import { mountIsolated, releaseIsolated } from "prac-client-ui-surface/client";
+import { mountIsolated, releaseIsolated } from "./isolation.js";
 import {
   entrySashState,
   type EntrySashState,

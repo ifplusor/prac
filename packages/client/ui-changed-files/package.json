@@ -14,8 +14,11 @@
       "types": "./dist/index.d.mts",
       "default": "./dist/index.mjs"
     },
+    "./lib": {
+      "types": "./dist/lib.d.mts",
+      "default": "./dist/lib.js"
+    },
     "./client": {
-      "types": "./dist/client.d.mts",
       "default": "./dist/client.js"
     },
     "./package.json": "./package.json"
@@ -25,7 +28,15 @@
     "check": "vp check"
   },
   "devDependencies": {
+    "@deepseek-ai/cordis": "catalog:",
+    "@deepseek-ai/dsh-client-ui-slots": "catalog:",
     "@types/react": "catalog:",
+    "prac-client-vscode-host": "workspace:*",
     "react": "catalog:"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web"
+    }
   }
 }

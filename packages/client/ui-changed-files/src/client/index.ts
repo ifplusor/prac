@@ -5,3 +5,4 @@
  */
 
 export * from "./changed-files.js";
+export * from "./service.js";

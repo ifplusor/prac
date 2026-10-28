@@ -253,11 +253,9 @@ prac 的 UI 不再集中在一个 `ui-layout` 包里。参照 DSH 的机制 / fe
 
 | 包 | 职责 | 依赖 |
 |---|---|---|
-| `ui-surface` | surface / host 契约、surface registry、isolation | DSH renderer / slots |
-| `ui-frame` | Space、split / grid / region、dock / panel、sash、resize、frame chrome、`ctx.layout` compat | `ui-surface` |
-| `ui-application` | application definition / registry / launcher | `ui-surface` |
-| `ui-window` | window、window group、window placement、active、tab strip、window actions、editor application window host | `ui-frame`、`ui-application`、`ui-surface` |
-| `ui-widget` | widget、board、widget placement、`prac.view` / `prac.viewActions`、widget host / chrome | `ui-frame`、`ui-surface` |
+| `ui-frame` | Space、split / grid / region、dock / panel、sash、resize、surface / isolation、frame chrome、`ctx.layout` compat | DSH renderer / slots |
+| `ui-window` | window、window group、window placement、active、tab strip、window actions、editor application window host | `ui-frame` |
+| `ui-widget` | widget、board、widget placement、`prac.view` / `prac.viewActions`、widget host / chrome | `ui-frame` |
 | `ui-workbench` | 默认 Space / window / board 放置、arrangement、recall、持久化 defaults、open policy | 核心 + adapters |
 | `ui-dsh` | DSH slot → application window / widget board / widget / action | 核心、DSH slots |
 | `ui-vscode-host` | VS Code embed bridge / face / catalogue | 核心 |
@@ -269,13 +267,11 @@ prac 的 UI 不再集中在一个 `ui-layout` 包里。参照 DSH 的机制 / fe
 依赖方向：
 
 ```text
-ui-surface
+ui-frame
    ↑
-ui-frame          ui-application
-   ↑                  ↑
-ui-window ────────────┘
-   ↑
-ui-widget
+ui-window     ui-widget
+   ↑             ↑
+ui-dsh / ui-vscode-* / feature
 
 ui-dsh / ui-vscode-* / feature
    ↑
@@ -342,7 +338,7 @@ ctx.layout           // DSH compat shim（放 ui-frame）
 7. `EditorPaneHost` 从 `EditorPanes` 抽取还是过渡复用。
 8. extension `tabGroups` API 如何映射 / 隔离。
 9. 同源 window / board 合并 shadow root 的迁移条件。
-10. 包名、surface 依赖、`ui-application` 是否独立。
+10. 插件包名与 `./lib` / `./client` 双入口的稳定性。
 11. persistence schema 迁移与 service facade。
 12. DSH 内部 slot 作为 widget 的可移动性边界。
 

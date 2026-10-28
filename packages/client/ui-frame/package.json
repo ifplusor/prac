@@ -38,7 +38,6 @@
     "@deepseek-ai/dsh-client-ui-theme": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "prac-client-ui-surface": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

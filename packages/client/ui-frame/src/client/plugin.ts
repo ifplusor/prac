@@ -54,7 +54,7 @@
 
 import type { Context } from "@deepseek-ai/cordis";
 import type { ThemeSnapshot } from "@deepseek-ai/dsh-client-ui-theme/client";
-import type { PracLayoutFace, PracSpacesFace, SpaceInfo } from "./contract.js";
+import type { PracLayoutFace, PracSpacesFace } from "./contract.js";
 import { createFrame, ensureStyles } from "./frame.js";
 import { createServices } from "./services.js";
 import { createStore, createSwitchingStore, STATE_KEY } from "./store.js";
@@ -70,7 +70,7 @@ declare global {
    */
   var __pracLayout: PracLayoutFace | undefined;
 }
-import { VIEW_SLOT, readDeclaredViewIds, type RegionInfo, type ViewInfo } from "./catalogue.js";
+import { VIEW_SLOT, readDeclaredViewIds } from "./catalogue.js";
 
 /**
  * Install the mechanism: declare the frame's slots, publish the faces, keep the

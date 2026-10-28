@@ -1,6 +1,8 @@
 import { defineConfig } from "vite-plus";
 
-/** `ui-dsh` is a library; the workbench composes it. */
+import { clientPack } from "../../../scripts/pack-client.ts";
+
+/** `ui-dsh` is a DSH plugin; `./lib` exposes the pure slot helpers. */
 export default defineConfig({
   pack: [
     {
@@ -10,10 +12,11 @@ export default defineConfig({
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
     },
     {
-      entry: { client: "src/client/index.ts" },
+      entry: { lib: "src/client/index.ts" },
       format: ["esm"],
       platform: "browser",
       outExtensions: () => ({ js: ".js", dts: ".d.mts" }),
     },
+    clientPack("prac-client-ui-dsh", { entry: "src/client/plugin.ts" }),
   ],
 });

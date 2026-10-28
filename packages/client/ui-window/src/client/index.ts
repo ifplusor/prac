@@ -6,3 +6,4 @@
 
 export * from "./window.js";
 export * from "./windowGroupAdapter.js";
+export * from "./service.js";

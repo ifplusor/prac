@@ -20,3 +20,5 @@ export * from "./viewGroup.js";
 export * from "./frameGroups.js";
 export * from "./frameBridge.js";
 export * from "./public.js";
+export * from "./surface.js";
+export * from "./isolation.js";

@@ -7,3 +7,4 @@
 export * from "./widget.js";
 export * from "./board.js";
 export * from "./boardGroup.js";
+export * from "./service.js";

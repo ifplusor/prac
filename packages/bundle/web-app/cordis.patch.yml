@@ -15,6 +15,18 @@
     - id: prac-client-ui-frame
       name: "prac-client-ui-frame"
 
+    # The window plugin: window groups, tab strip / active and the window service.
+    - id: prac-client-ui-window
+      name: "prac-client-ui-window"
+
+    # The widget plugin: widget boards / placement and the widget service.
+    - id: prac-client-ui-widget
+      name: "prac-client-ui-widget"
+
+    # DSH slot vocabulary / keyed-main helpers.
+    - id: prac-client-ui-dsh
+      name: "prac-client-ui-dsh"
+
     # The shared VS Code client mechanism: the single VS Code boot (the
     # app may be created only once per page) and the part-host element
     # factory. It declares no seat, so it composes with either seat alone — a
@@ -37,6 +49,10 @@
     # so it has no loader entry and cannot appear here.
     - id: prac-host-vscode
       name: "prac-host-vscode"
+
+    # The changed-files turn-tail card.
+    - id: prac-client-ui-changed-files
+      name: "prac-client-ui-changed-files"
 
     # The arrangement / default workbench policy.
     - id: prac-client-ui-workbench

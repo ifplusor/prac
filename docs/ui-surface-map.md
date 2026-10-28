@@ -96,9 +96,7 @@ Space
 
 | 包                 | 职责                                              |
 | ------------------ | ------------------------------------------------- |
-| `ui-surface`       | surface / host / isolation                        |
 | `ui-frame`         | Space / split / grid / region / dock / panel      |
-| `ui-application`   | application registry / launcher                   |
 | `ui-window`        | window / window group / tab strip / active        |
 | `ui-widget`        | widget / board / `prac.view` / `prac.viewActions` |
 | `ui-workbench`     | 默认放置 / arrangement / recall                   |

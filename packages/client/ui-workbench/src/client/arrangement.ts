@@ -12,21 +12,13 @@
  */
 
 import type { PracLayoutFace, ViewRecord } from "prac-client-ui-frame/lib";
-import {
-  DSH_CONVERSATION_VIEW,
-  DSH_RIGHTBAR_VIEW,
-  DSH_SIDEBAR_VIEW,
-} from "prac-client-ui-dsh/client";
+import { DSH_CONVERSATION_VIEW, DSH_RIGHTBAR_VIEW, DSH_SIDEBAR_VIEW } from "prac-client-ui-dsh/lib";
 import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 
 /** The mechanism's placement face, named once for this module's signatures. */
 export type PracLayout = PracLayoutFace;
 
-export {
-  DSH_CONVERSATION_VIEW,
-  DSH_RIGHTBAR_VIEW,
-  DSH_SIDEBAR_VIEW,
-} from "prac-client-ui-dsh/client";
+export { DSH_CONVERSATION_VIEW, DSH_RIGHTBAR_VIEW, DSH_SIDEBAR_VIEW } from "prac-client-ui-dsh/lib";
 
 /** The mechanism's default regions (`ui-frame`'s default region tree). */
 export const LEFT = "left";

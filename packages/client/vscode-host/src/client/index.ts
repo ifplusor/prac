@@ -36,8 +36,8 @@ import type {} from "@deepseek-ai/dsh-client-ui-session/client";
 // Type-only, for prac's own Context merge (`ctx.pracFrame`), which is the face that owns
 // the region tree `addGroup` asks about.
 import type {} from "prac-client-ui-frame/lib";
-import { WidgetBoardGroup } from "prac-client-ui-widget/client";
-import { WindowGroupAdapter } from "prac-client-ui-window/client";
+import type { PracWidgetsFace } from "prac-client-ui-widget/lib";
+import type { PracWindowsFace } from "prac-client-ui-window/lib";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { ILayout } from "@deepseek-ai/dsh-client-ui-layout/client";
@@ -329,12 +329,16 @@ export function apply(ctx: Context): void {
       },
     },
   };
+  const services = ctx as unknown as {
+    pracWidgets: PracWidgetsFace;
+    pracWindows: PracWindowsFace;
+  };
   const resources = createVscodeResourceDefinitions({
     face,
     createGroup: (id, mode, label) =>
       mode === "stack"
-        ? (new WidgetBoardGroup(id, label) as unknown as VscodeGroupRuntime)
-        : (new WindowGroupAdapter(id, label) as unknown as VscodeGroupRuntime),
+        ? (services.pracWidgets.createBoardGroup(id, label) as unknown as VscodeGroupRuntime)
+        : (services.pracWindows.createGroup(id, label) as unknown as VscodeGroupRuntime),
     createView: (id) => ctx.pracFrame.createView(id),
   });
   const groupHost = new VscodeGroupHost({
@@ -471,4 +475,13 @@ export const name = "prac-client-vscode-host";
  * consumer packages. It does register into the frame's floating layer, which is
  * where the app's own root is mounted.
  */
-export const inject = ["workspaces", "sessions", "uiSession", "slots", "layout", "pracFrame"];
+export const inject = [
+  "workspaces",
+  "sessions",
+  "uiSession",
+  "slots",
+  "layout",
+  "pracFrame",
+  "pracWindows",
+  "pracWidgets",
+];

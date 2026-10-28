@@ -5,3 +5,4 @@
  */
 
 export * from "./dsh.js";
+export * from "./service.js";

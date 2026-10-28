@@ -1,8 +1,8 @@
 import { defineConfig } from "vite-plus";
 
-/**
- * `ui-window` is a library, not a DSH client bundle.
- */
+import { clientPack } from "../../../scripts/pack-client.ts";
+
+/** `ui-window` is a DSH plugin; `./lib` exposes its types / model. */
 export default defineConfig({
   pack: [
     {
@@ -12,10 +12,12 @@ export default defineConfig({
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
     },
     {
-      entry: { client: "src/client/index.ts" },
+      entry: { lib: "src/client/index.ts" },
       format: ["esm"],
       platform: "browser",
       outExtensions: () => ({ js: ".js", dts: ".d.mts" }),
+      deps: { neverBundle: ["react"] },
     },
+    clientPack("prac-client-ui-window", { entry: "src/client/plugin.ts" }),
   ],
 });

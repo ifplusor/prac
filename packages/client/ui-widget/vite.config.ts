@@ -1,9 +1,8 @@
 import { defineConfig } from "vite-plus";
 
-/**
- * `ui-widget` is a library, not a DSH client bundle: the frame / adapters
- * inline it and the browser never reaches it through the loader.
- */
+import { clientPack } from "../../../scripts/pack-client.ts";
+
+/** `ui-widget` is a DSH plugin; `./lib` exposes its types / model. */
 export default defineConfig({
   pack: [
     {
@@ -13,10 +12,12 @@ export default defineConfig({
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
     },
     {
-      entry: { client: "src/client/index.ts" },
+      entry: { lib: "src/client/index.ts" },
       format: ["esm"],
       platform: "browser",
       outExtensions: () => ({ js: ".js", dts: ".d.mts" }),
+      deps: { neverBundle: ["react"] },
     },
+    clientPack("prac-client-ui-widget", { entry: "src/client/plugin.ts" }),
   ],
 });

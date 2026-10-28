@@ -1,6 +1,8 @@
 import { defineConfig } from "vite-plus";
 
-/** `ui-changed-files` is a library; the workbench bundle composes it. */
+import { clientPack } from "../../../scripts/pack-client.ts";
+
+/** `ui-changed-files` is a DSH plugin; `./lib` is its component library. */
 export default defineConfig({
   pack: [
     {
@@ -10,11 +12,12 @@ export default defineConfig({
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
     },
     {
-      entry: { client: "src/client/index.ts" },
+      entry: { lib: "src/client/index.ts" },
       format: ["esm"],
       platform: "browser",
       outExtensions: () => ({ js: ".js", dts: ".d.mts" }),
       deps: { neverBundle: ["react"] },
     },
+    clientPack("prac-client-ui-changed-files", { entry: "src/client/plugin.ts" }),
   ],
 });

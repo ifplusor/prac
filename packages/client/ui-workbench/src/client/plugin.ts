@@ -29,7 +29,6 @@
  */
 
 import { createElement, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { PracChangedFiles, type ChangedFilesInjected } from "prac-client-ui-changed-files/client";
 import { PracFirstRun, PRAC_FIRST_RUN_CSS } from "./first-run.js";
 import {
   PracRail,
@@ -73,9 +72,6 @@ import {
  * inference) while still checking that DSH declares this key.
  */
 const OVERLAY = "shell.overlay" satisfies keyof SlotMap;
-
-/** The DSH turn-tail seat the changed-files card claims. */
-const CHANGED_FILES_SLOT = "conversation.chat.turnTail" as keyof SlotMap;
 
 const RECALL_PANEL_STYLE = {
   position: "absolute",
@@ -528,12 +524,6 @@ export function apply(ctx: Context): void {
   // The DSH changed-files card opens the review tab; prac replaces it with the
   // turn-scoped diff card below. Hide the DSH card by its stable marker, not by
   // a hashed CSS class.
-  const changedFilesStyle = document.createElement("style");
-  changedFilesStyle.dataset.prac = "changed-files";
-  changedFilesStyle.textContent = CHANGED_FILES_CSS;
-  document.head.append(changedFilesStyle);
-  ctx.effect(() => () => changedFilesStyle.remove(), "prac-web-app: changed-files styles");
-
   // The shell chrome: title bar, vertical activity rail, hidden DSH sidebar,
   // and bottom panel. The DSH sidebar's rows are shown by the title bar's
   // switchers; the left rail is the VS Code container bar.
@@ -880,37 +870,6 @@ export function apply(ctx: Context): void {
         createElement(PracRail, { face: rightRail, side: "right" }),
       ),
     );
-
-    // The turn-tail card. Its summary is the Host's existing changes summary;
-    // its diff action is the turn-scoped text route plus the VSCode face. The
-    // chat slot's types come from the DSH chat package, which this bundle does
-    // not import; keep the cast at this one boundary.
-    const injectChangedFiles = scope.slots.inject.bind(scope.slots) as unknown as (
-      name: string,
-      callback: () => unknown,
-    ) => void;
-    const registerChangedFiles = scope.slots.register.bind(scope.slots) as unknown as (
-      options: {
-        name: string;
-        id: string;
-        order?: number;
-        inject: () => ChangedFilesInjected;
-      },
-      component: unknown,
-    ) => unknown;
-    injectChangedFiles(CHANGED_FILES_SLOT, () =>
-      registerChangedFiles(
-        {
-          name: CHANGED_FILES_SLOT,
-          id: "prac-changed-files",
-          order: 20,
-          inject: (): ChangedFilesInjected => ({
-            openTurnDiff: (args) => vscode.runCommand("prac.openTurnDiff", args),
-          }),
-        },
-        PracChangedFiles,
-      ),
-    );
   });
 
   /**
@@ -944,30 +903,6 @@ export function apply(ctx: Context): void {
   // Cmd/Ctrl+Alt is deliberately awkward to type, so it cannot bite while
   // writing in the editor or the composer.
 }
-
-/** Card styling plus the DSH card's marker. The tokens are DSH's; no second theme. */
-const CHANGED_FILES_CSS = `
-[data-changed-files]{display:none!important}
-.prac-changed-files{margin-top:4px;overflow:hidden;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-lg);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);}
-.prac-cf-head{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--dsw-static-neutral-50);border-bottom:1px solid var(--dsw-alias-border-l2);font-size:12px;}
-body[data-ds-dark-theme] .prac-cf-head{background:var(--dsw-static-neutral-850);}
-.prac-cf-icon{display:grid;place-items:center;width:18px;height:18px;border-radius:5px;background:var(--dsw-alias-bg-layer-2);font-weight:700;font-size:10px;color:var(--dsw-alias-label-secondary);}
-.prac-cf-title{font-weight:600;}
-.prac-cf-total{margin-left:auto;display:inline-flex;gap:6px;font-family:var(--ds-font-family-code);font-size:10px;color:var(--dsw-alias-label-tertiary);}
-.prac-cf-add{color:var(--dsw-alias-state-success-primary);}
-.prac-cf-del{color:var(--dsw-alias-state-error-primary);}
-.prac-cf-list{display:flex;flex-direction:column;}
-.prac-cf-row{display:flex;align-items:center;gap:10px;width:100%;min-width:0;padding:7px 10px;border:0;border-top:1px solid var(--dsw-alias-border-l2);background:transparent;color:inherit;font-family:var(--ds-font-family-code);font-size:11px;text-align:left;cursor:pointer;}
-.prac-cf-row:first-child{border-top:0;}
-.prac-cf-row:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);}
-.prac-cf-row:disabled{cursor:default;opacity:.6;}
-.prac-cf-path{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary);}
-.prac-cf-stat{flex:0 0 auto;font-size:10px;color:var(--dsw-alias-label-tertiary);white-space:nowrap;}
-.prac-cf-foot{display:flex;gap:8px;padding:5px 10px;background:var(--dsw-static-neutral-50);color:var(--dsw-alias-label-tertiary);font-size:10px;}
-body[data-ds-dark-theme] .prac-cf-foot{background:var(--dsw-static-neutral-850);}
-.prac-cf-turn{font-family:var(--ds-font-family-code);}
-.prac-cf-note{margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-`;
 
 /** The cordis plugin name used by loader diagnostics. */
 export const name = "prac-client-ui-workbench";

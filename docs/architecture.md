@@ -147,9 +147,7 @@ Space
 **包**：
 
 ```text
-ui-surface
 ui-frame
-ui-application
 ui-window
 ui-widget
 ui-workbench
