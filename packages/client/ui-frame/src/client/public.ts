@@ -40,8 +40,7 @@ export type {
   ViewRuntime,
 } from "./contracts.js";
 export type { FrameView, View } from "./view.js";
-export type { ViewGroup, ViewGroupMode, ViewGroupPlacement, ViewGroupState } from "./viewGroup.js";
-export type { MoveViewRequest } from "./move.js";
+export type { ViewGroupMode, ViewGroupPlacement, ViewGroupState } from "./viewGroup.js";
 
 export type { ViewGroupLayoutBridge } from "./frameBridge.js";
 

@@ -15,7 +15,7 @@
  *
  * It has no region rendering and no sash mechanics: the frame, the region tree
  * and the drag/collapse behaviour are `ui-frame`'s. Every placement goes
- * through `ctx.pracLayout`; every view is rendered by the mechanism, including the
+ * through `ctx.pracFrame`; every view is rendered by the mechanism, including the
  * file views the editor package (`prac-client-ui-vscode-editor`) registers through
  * the `prac.view` slot.
  *
@@ -519,7 +519,7 @@ export function apply(ctx: Context): void {
   // deliberately not re-imported for comparison — a slot table's keys come from the package
   // that *owns* them (the mechanism declares the `root` children it registers, including
   // `shell.overlay` below), so this file needs no DSH slot/layout types of its own.
-  const layout = ctx.pracLayout as unknown as PracLayout;
+  const layout = ctx.pracFrame as unknown as PracLayout;
   const slots = ctx.slots;
   // The title bar's Layout menu is built by the catalogue inject (it needs the app's containers);
   // the title bar itself only renders what this answers when the menu opens.
@@ -974,7 +974,7 @@ export const name = "prac-web-app";
 
 /**
  * The DSH services this plugin needs: the slot registry (the strip's slot) and
- * the mechanism's placement face. `pracLayout` is a hard dependency — every
+ * the mechanism's placement face. `pracFrame` is a hard dependency — every
  * placement goes through it.
  */
-export const inject = ["slots", "layout", "pracLayout"];
+export const inject = ["slots", "layout", "pracFrame"];

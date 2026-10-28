@@ -9,7 +9,7 @@
  *   `ui-workspace`, `ui-sidebar` and `ui-sidebar-right` call. Every method is a
  *   pure translation into prac's region model, never into a fixed column. It can
  *   be deleted when prac stops reusing those plugins.
- * - `pracLayout` — prac's placement face, what the arrangement (and the recall
+ * - `pracFrame` — prac's placement face, what the arrangement (and the recall
  *   surface) drives: the view catalogue, placement, collapse, splits, widths.
  * - `panelInfo` — the root hook (`usePanelInfo`) projecting the active main
  *   panel, which the document title and any panel-aware component read.
@@ -86,7 +86,7 @@ export interface LayoutServices {
   /** DSH's layout face (the compat shim). */
   readonly layout: LayoutFace;
   /** prac's placement face. */
-  readonly pracLayout: PracLayoutFace;
+  readonly pracFrame: PracLayoutFace;
   /** The `panelInfo` root hook's observable. */
   readonly panelInfo: HostObservable<PanelInfo>;
   /** The frame's view-group owner. */
@@ -242,7 +242,7 @@ export function createServices(
     },
   };
 
-  const pracLayout: PracLayoutFace = {
+  const pracFrame: PracLayoutFace = {
     getState: store.get,
     subscribe: store.subscribe,
     /** The union of the slot registry's views and each one's placement. */
@@ -545,5 +545,5 @@ export function createServices(
     },
   };
 
-  return { layout, pracLayout, panelInfo, viewGroups };
+  return { layout, pracFrame, panelInfo, viewGroups };
 }

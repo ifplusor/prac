@@ -4,7 +4,7 @@ import type { LayoutState } from "./contract.js";
 import type { LayoutStore } from "./store.js";
 import type { GroupActionBinding } from "./contracts.js";
 import { View } from "./view.js";
-import { ViewGroup } from "./viewGroup.js";
+import { TestGroup } from "./testGroup.js";
 import { ViewGroupHost } from "./frameGroups.js";
 
 function memoryStore(): LayoutStore {
@@ -35,7 +35,7 @@ describe("ViewGroupHost", () => {
   it("registers one group in one region and projects its views", () => {
     const store = memoryStore();
     const host = new ViewGroupHost(store);
-    const group = new ViewGroup("g1");
+    const group = new TestGroup("g1");
     group.add(new View("v1"));
 
     const frameGroup = host.register(group, "left");
@@ -47,17 +47,17 @@ describe("ViewGroupHost", () => {
 
   it("rejects duplicate groups and regions", () => {
     const host = new ViewGroupHost(memoryStore());
-    host.register(new ViewGroup("g1"), "left");
+    host.register(new TestGroup("g1"), "left");
 
-    expect(() => host.register(new ViewGroup("g1"), "right")).toThrow(/already registered/);
-    expect(() => host.register(new ViewGroup("g2"), "left")).toThrow(/already hosts/);
-    expect(() => host.register(new ViewGroup("g3"), "missing")).toThrow(/unknown region/);
+    expect(() => host.register(new TestGroup("g1"), "right")).toThrow(/already registered/);
+    expect(() => host.register(new TestGroup("g2"), "left")).toThrow(/already hosts/);
+    expect(() => host.register(new TestGroup("g3"), "missing")).toThrow(/unknown region/);
   });
 
   it("projects group bar items with label and active view", () => {
     const store = memoryStore();
     const host = new ViewGroupHost(store);
-    const group = new ViewGroup("g1", "select", "Explorer");
+    const group = new TestGroup("g1", "select", "Explorer");
     group.add(new View("v1"));
     host.register(group, "left");
 
@@ -69,7 +69,7 @@ describe("ViewGroupHost", () => {
   it("projects binding actions into the bar item", () => {
     const store = memoryStore();
     const host = new ViewGroupHost(store);
-    const group = new ViewGroup("g1", "select", "Explorer");
+    const group = new TestGroup("g1", "select", "Explorer");
     const runAction = vi.fn();
     const binding: GroupActionBinding = {
       dispose: () => {},
@@ -88,7 +88,7 @@ describe("ViewGroupHost", () => {
   it("writes a frame reorder back into the group", () => {
     const store = memoryStore();
     const host = new ViewGroupHost(store);
-    const group = new ViewGroup("g1", "stack");
+    const group = new TestGroup("g1", "stack");
     group.add(new View("v1"));
     group.add(new View("v2"));
     host.register(group, "left");
@@ -108,10 +108,10 @@ describe("ViewGroupHost", () => {
   it("can register a fresh group after the old one leaves", () => {
     const store = memoryStore();
     const host = new ViewGroupHost(store);
-    host.register(new ViewGroup("g1"), "left");
+    host.register(new TestGroup("g1"), "left");
     host.unregister("g1");
 
-    const next = new ViewGroup("g1");
+    const next = new TestGroup("g1");
     next.add(new View("v2"));
     host.register(next, "left");
 
@@ -122,7 +122,7 @@ describe("ViewGroupHost", () => {
   it("unregisters without disposing the group", () => {
     const store = memoryStore();
     const host = new ViewGroupHost(store);
-    const group = new ViewGroup("g1");
+    const group = new TestGroup("g1");
     group.add(new View("v1"));
     host.register(group, "left");
 

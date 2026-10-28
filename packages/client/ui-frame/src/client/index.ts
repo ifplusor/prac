@@ -39,7 +39,7 @@
  *    mechanism never hard-codes which view plays a role.
  *
  * It keeps the contracts the rest of DSH registers against: the four region slot
- * declarations plus the `prac.view` slot, `ctx.layout`, `ctx.pracLayout`, the
+ * declarations plus the `prac.view` slot, `ctx.layout`, `ctx.pracFrame`, the
  * `panelInfo` root hook, theme presentation and the document title.
  *
  * This file is the plugin body as an ordinary ESM module (`name`, `inject`,
@@ -78,7 +78,6 @@ export * from "./catalogue.js";
 export * from "./model.js";
 export * from "./store.js";
 export * from "./switching.js";
-export * from "./move.js";
 export * from "./view.js";
 export * from "./viewGroup.js";
 export * from "./frameGroups.js";
@@ -195,7 +194,7 @@ export function apply(ctx: Context): void {
       return () => spaceListeners.delete(listener);
     },
   };
-  const { layout, pracLayout, panelInfo, viewGroups } = createServices(ctx, store, closeListeners);
+  const { layout, pracFrame, panelInfo, viewGroups } = createServices(ctx, store, closeListeners);
 
   ctx.effect(() => {
     // A view may already have registered (activation order is not ours to
@@ -239,7 +238,7 @@ export function apply(ctx: Context): void {
     // two `ILayout`s are different types. Aligning that consumption is what makes the
     // guard possible — see the note in `2026-10-07-editor-host.md`.
     const disposeLayout = ctx.provide("layout", layout);
-    const disposePracLayout = ctx.provide("pracLayout", pracLayout);
+    const disposePracFrame = ctx.provide("pracFrame", pracFrame);
     const disposePracSpaces = ctx.provide("pracSpaces", pracSpaces);
     // The catalogue's live sources. `listViews()` reads the registry on every
     // call, so a later registration is already visible; these subscriptions
@@ -259,13 +258,13 @@ export function apply(ctx: Context): void {
     // only registered bundle ids, so a driver script cannot reach the
     // Cordis context. Publishing the face is the minimal honest door —
     // removal is scoped to the instance we published.
-    globalThis.__pracLayout = pracLayout;
+    globalThis.__pracLayout = pracFrame;
     return () => {
-      if (globalThis.__pracLayout === pracLayout) delete globalThis.__pracLayout;
+      if (globalThis.__pracLayout === pracFrame) delete globalThis.__pracLayout;
       stopSlot();
       offMain();
       disposePracSpaces();
-      disposePracLayout();
+      disposePracFrame();
       disposeLayout();
       disposePanelInfo();
       viewGroups.dispose();

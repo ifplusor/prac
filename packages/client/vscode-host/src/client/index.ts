@@ -33,7 +33,7 @@ import type { Context } from "@deepseek-ai/cordis";
 // Type-only: loads the `ctx.uiSession` augmentation without emitting a runtime import
 // (a value import here would inline DSH's session client into this bundle).
 import type {} from "@deepseek-ai/dsh-client-ui-session/client";
-// Type-only, for prac's own Context merge (`ctx.pracLayout`), which is the face that owns
+// Type-only, for prac's own Context merge (`ctx.pracFrame`), which is the face that owns
 // the region tree `addGroup` asks about.
 import type {} from "prac-client-ui-frame/client";
 import { WidgetBoardGroup } from "prac-client-ui-widget/client";
@@ -171,15 +171,15 @@ export function apply(ctx: Context): void {
   // The workbench's `addGroup` needs prac's region tree: a group is a region, so the frame
   // makes the region (synchronously) and the host binds the group to the id it returns.
   embed.setGroupRegionChannel({
-    createRegionBeside: (region, side) => ctx.pracLayout.createRegionBeside(region, side),
-    regionInDirection: (region, side) => ctx.pracLayout.regionInDirection(region, side),
+    createRegionBeside: (region, side) => ctx.pracFrame.createRegionBeside(region, side),
+    regionInDirection: (region, side) => ctx.pracFrame.regionInDirection(region, side),
     removeRegion: (region) => {
       // An empty *editor* group does not mean an empty *window* group. The
       // conversation (and any other app's window) keeps the group alive; the
       // editor has no authority to close a region it does not own alone.
-      const views = ctx.pracLayout.getState().views;
+      const views = ctx.pracFrame.getState().views;
       if (regionHoldsOtherWindow(views, region, (id) => id.startsWith(FILE_VIEW_PREFIX))) return;
-      ctx.pracLayout.removeRegion(region);
+      ctx.pracFrame.removeRegion(region);
     },
   });
 
@@ -335,10 +335,10 @@ export function apply(ctx: Context): void {
       mode === "stack"
         ? (new WidgetBoardGroup(id, label) as unknown as VscodeGroupRuntime)
         : (new WindowGroupAdapter(id, label) as unknown as VscodeGroupRuntime),
-    createView: (id) => ctx.pracLayout.createView(id),
+    createView: (id) => ctx.pracFrame.createView(id),
   });
   const groupHost = new VscodeGroupHost({
-    layout: ctx.pracLayout,
+    layout: ctx.pracFrame,
     definition: resources.groups,
     viewDefinition: resources.views,
     filePlacement: (viewId) => face.filePlacement(viewId),
@@ -363,7 +363,7 @@ export function apply(ctx: Context): void {
       string,
       { order: number; file: { placement: string; resource: string } }[]
     >();
-    for (const view of ctx.pracLayout.listViews()) {
+    for (const view of ctx.pracFrame.listViews()) {
       if (view.region === null || view.hidden || !view.id.startsWith("vscode:file:")) continue;
       const file = face.filePlacement(view.id);
       if (file === undefined) continue;
@@ -386,7 +386,7 @@ export function apply(ctx: Context): void {
   const syncGroups = (): void => {
     groupHost.sync(
       face.catalogue(),
-      ctx.pracLayout.listRegions().map((region) => region.id),
+      ctx.pracFrame.listRegions().map((region) => region.id),
     );
     syncFrameEditorOrder();
   };
@@ -394,7 +394,7 @@ export function apply(ctx: Context): void {
   ctx.effect(() => {
     syncGroups();
     const off = face.onDidChangeCatalogue(syncGroups);
-    const stopLayout = ctx.pracLayout.subscribe(syncGroups);
+    const stopLayout = ctx.pracFrame.subscribe(syncGroups);
     return () => {
       stopLayout();
       off();
@@ -471,4 +471,4 @@ export const name = "prac-client-vscode-host";
  * consumer packages. It does register into the frame's floating layer, which is
  * where the app's own root is mounted.
  */
-export const inject = ["workspaces", "sessions", "uiSession", "slots", "layout", "pracLayout"];
+export const inject = ["workspaces", "sessions", "uiSession", "slots", "layout", "pracFrame"];

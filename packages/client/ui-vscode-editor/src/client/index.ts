@@ -51,7 +51,7 @@ export function apply(ctx: Context): void {
   const slots: SlotRegistry = ctx.slots;
   // The type-only import and the ambient merge can come through different
   // declaration copies (vscode-host bundles its own), so cast at the boundary.
-  const layout: PracLayoutFace = ctx.pracLayout as unknown as PracLayoutFace;
+  const layout: PracLayoutFace = ctx.pracFrame as unknown as PracLayoutFace;
   /** The catalogue entries this package declares views for: the open files. */
   const fileEntries = (): readonly VscodeCatalogueEntry[] =>
     host.catalogue().filter((entry) => entry.source === "file");
@@ -189,4 +189,4 @@ export function apply(ctx: Context): void {
 export const name = "prac-client-ui-vscode-editor";
 
 /** The DSH services this plugin needs: the slot, the mechanism, and the app face. */
-export const inject = ["slots", "pracVscode", "pracLayout"];
+export const inject = ["slots", "pracVscode", "pracFrame"];

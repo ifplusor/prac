@@ -3,7 +3,7 @@ import { defaultTree, place } from "./model.js";
 import type { LayoutState } from "./contract.js";
 import type { LayoutStore } from "./store.js";
 import { View } from "./view.js";
-import { ViewGroup } from "./viewGroup.js";
+import { TestGroup } from "./testGroup.js";
 import { ViewGroupLayoutBridge } from "./frameBridge.js";
 
 function memoryStore(): LayoutStore {
@@ -28,7 +28,7 @@ function memoryStore(): LayoutStore {
 describe("ViewGroupLayoutBridge", () => {
   it("projects membership, order and active", () => {
     const store = memoryStore();
-    const group = new ViewGroup("g1", "select");
+    const group = new TestGroup("g1", "select");
     group.add(new View("v1"));
     group.add(new View("v2"));
     const bridge = new ViewGroupLayoutBridge(group, store, "left");
@@ -50,7 +50,7 @@ describe("ViewGroupLayoutBridge", () => {
   it("moves an existing placement instead of creating a second record", () => {
     const store = memoryStore();
     store.update((state) => place(state, "v1", "right"));
-    const group = new ViewGroup("g1");
+    const group = new TestGroup("g1");
     group.add(new View("v1"));
     new ViewGroupLayoutBridge(group, store, "left");
 
@@ -60,7 +60,7 @@ describe("ViewGroupLayoutBridge", () => {
 
   it("does not unhide a view when the group changes", () => {
     const store = memoryStore();
-    const group = new ViewGroup("g1");
+    const group = new TestGroup("g1");
     group.add(new View("v1"));
     const bridge = new ViewGroupLayoutBridge(group, store, "left");
     store.update((state) => ({
@@ -76,7 +76,7 @@ describe("ViewGroupLayoutBridge", () => {
 
   it("removes views that leave the group and on dispose", () => {
     const store = memoryStore();
-    const group = new ViewGroup("g1");
+    const group = new TestGroup("g1");
     group.add(new View("v1"));
     const bridge = new ViewGroupLayoutBridge(group, store, "left");
 

@@ -50,8 +50,8 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
 
 declare module "@deepseek-ai/cordis" {
   interface Context {
-    /** The mechanism's placement face, for other prac plugins (the arrangement). */
-    pracLayout: PracLayoutFace;
+    /** The frame's placement face. */
+    pracFrame: PracLayoutFace;
     /** The Space registry: named layouts over the same project folder. */
     pracSpaces: PracSpacesFace;
   }
@@ -538,7 +538,7 @@ export interface RoleBindings {
 }
 
 /**
- * prac's own face (`ctx.pracLayout`): the placement model itself.
+ * prac's own face (`ctx.pracFrame`): the placement model itself.
  *
  * This is what makes "any view in any region" a capability rather than a layout
  * we happen to have hard-coded.
