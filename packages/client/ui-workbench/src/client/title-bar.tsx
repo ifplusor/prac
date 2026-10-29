@@ -86,6 +86,10 @@ export interface PracTitleFace {
   layoutActions(): readonly PracLayoutAction[];
   /** The Space registry: named layouts over the same project folder. */
   spaces: PracSpacesFace;
+  /** Whether the bottom panel is collapsed. */
+  bottomCollapsed(): boolean;
+  /** Collapse / expand the bottom panel. */
+  toggleBottom(): void;
 }
 
 interface PracTitleBarProps {
@@ -121,6 +125,7 @@ export function PracTitleBar({ face }: PracTitleBarProps): ReactElement {
   );
   const current = adapter.key ?? selected;
   const [menu, setMenu] = useState<"workspace" | "session" | "layout" | "space" | null>(null);
+  const [bottomOpen, setBottomOpen] = useState(() => !face.bottomCollapsed());
   const [spacesState, setSpacesState] = useState(() => ({
     list: face.spaces.list(),
     active: face.spaces.active(),
@@ -243,6 +248,20 @@ export function PracTitleBar({ face }: PracTitleBarProps): ReactElement {
       spacesState.list.find((space) => space.id === spacesState.active)?.name ?? "Space 1",
     ),
     createElement("div", { className: "prac-title-spacer" }),
+    createElement(
+      "button",
+      {
+        type: "button",
+        className: "prac-title-action",
+        title: bottomOpen ? "Hide bottom panel" : "Show bottom panel",
+        "data-prac-bottom-toggle": bottomOpen ? "open" : "closed",
+        onClick: () => {
+          face.toggleBottom();
+          setBottomOpen((open) => !open);
+        },
+      },
+      "\u25a4",
+    ),
     createElement(
       "button",
       {

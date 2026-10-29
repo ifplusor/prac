@@ -577,6 +577,14 @@ export function apply(ctx: Context): void {
       startSession: (workspaceId) => titleServices.uiWorkspace.startSession(workspaceId),
       layoutActions: () => layoutMenu(),
       spaces: titleServices.pracSpaces,
+      bottomCollapsed: () => {
+        const node = layout.getState().tree?.children?.find((child) => child.id === "bottom");
+        return node?.type !== "region" || node.collapsed === true;
+      },
+      toggleBottom: () => {
+        const node = layout.getState().tree?.children?.find((child) => child.id === "bottom");
+        layout.setCollapsed("bottom", !(node?.type === "region" && node.collapsed === true));
+      },
     };
     const inject = titleServices.slots.inject.bind(titleServices.slots) as unknown as (
       name: string,
@@ -694,6 +702,12 @@ export function apply(ctx: Context): void {
       // centre, or beside the file's other placement.
       placeCatalogue(layout, catalogue, placeContainerView);
       syncContainerBoards(catalogue);
+      if (layout.activeContainer("bottom") === null) {
+        const terminal = layout
+          .regionChildren("bottom")
+          .find((child) => child.id.endsWith("container:terminal"));
+        if (terminal !== undefined) layout.selectContainer("bottom", terminal.id);
+      }
       // Files the app no longer has open are **forgotten**: their record is what the
       // frame persists, a placement is named by the host (so the next open mints a fresh
       // name), and a record left behind would both render a tab for a file nobody has open

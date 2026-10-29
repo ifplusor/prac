@@ -239,7 +239,7 @@ describe("arrange", () => {
     expect(shapes(calls.slice(2))).toEqual([
       ["setRegionSelector", LEFT, "rail"],
       ["setRegionSelector", RIGHT, "rail"],
-      ["setRegionSelector", BOTTOM, "none"],
+      ["setRegionSelector", BOTTOM, "title"],
       ["place", DSH_SIDEBAR_VIEW, LEFT],
       ["place", DSH_CONVERSATION_VIEW, CENTER],
       ["place", "dsh:rightbar", RIGHT],
@@ -262,7 +262,7 @@ describe("arrange", () => {
     expect(shapes(calls.slice(2))).toEqual([
       ["setRegionSelector", LEFT, "rail"],
       ["setRegionSelector", RIGHT, "rail"],
-      ["setRegionSelector", BOTTOM, "none"],
+      ["setRegionSelector", BOTTOM, "title"],
       ["place", "dsh:rightbar", RIGHT],
       ["hide", "dsh:rightbar"],
       ["hide", DSH_SIDEBAR_VIEW],
@@ -281,7 +281,7 @@ describe("arrange", () => {
     expect(shapes(calls.slice(2))).toEqual([
       ["setRegionSelector", LEFT, "rail"],
       ["setRegionSelector", RIGHT, "rail"],
-      ["setRegionSelector", BOTTOM, "none"],
+      ["setRegionSelector", BOTTOM, "title"],
       ["place", DSH_SIDEBAR_VIEW, LEFT],
       ["hide", DSH_SIDEBAR_VIEW],
       ["place", "vscode:view:workbench.view.explorer", LEFT],

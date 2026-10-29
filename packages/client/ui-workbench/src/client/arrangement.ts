@@ -366,7 +366,7 @@ export function arrange(layout: PracLayout): void {
   // it has no selector either. Both are state, not CSS: a hidden strip still costs its height.
   layout.setRegionSelector(LEFT, "rail");
   layout.setRegionSelector(RIGHT, "rail");
-  layout.setRegionSelector(BOTTOM, "none");
+  layout.setRegionSelector(BOTTOM, "title");
   const known = layout.getState().views;
   for (const entry of DEFAULT_PLACEMENTS) {
     if (known[entry.view] !== undefined) continue;

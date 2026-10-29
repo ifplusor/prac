@@ -93,6 +93,8 @@ async function sample() {
         ),
         // The view inside the bar, to prove the region is not an empty shell.
         viewHosts: [...document.querySelectorAll(`[data-prac-region="${bottom}"] *`)].length,
+        tabs: [...document.querySelectorAll(`[data-prac-container-bar="${bottom}"] button`)].length,
+        toggle: document.querySelector("[data-prac-bottom-toggle]") !== null,
       };
     },
     { bottom: BOTTOM, stage: CENTER },
