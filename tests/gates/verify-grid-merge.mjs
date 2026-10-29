@@ -24,45 +24,16 @@ const cells = () =>
       ),
     })),
   );
-if ((await page.locator("[data-prac-grid-unmerge]").count()) === 0) {
-  await close();
-  console.log("SKIPPED: grid merge / unmerge UI is not present in the current rail layout");
-  process.exit(0);
-}
 const before = await cells();
 const source = before[0]?.id;
 const target = before[1]?.id;
 if (source === undefined || target === undefined)
   throw new Error("the split produced fewer than two cells");
 
-await page.evaluate(
-  ({ source, target }) => {
-    const handle = document.querySelector(`[data-prac-grid-handle="${source}"]`);
-    const cell = document.querySelector(`[data-prac-grid-cell="${target}"]`);
-    if (!(handle instanceof HTMLElement) || !(cell instanceof HTMLElement)) return;
-    const transfer = new DataTransfer();
-    handle.dispatchEvent(
-      new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: transfer }),
-    );
-    cell.dispatchEvent(
-      new DragEvent("dragover", {
-        bubbles: true,
-        cancelable: true,
-        dataTransfer: transfer,
-        shiftKey: true,
-      }),
-    );
-    cell.dispatchEvent(
-      new DragEvent("drop", {
-        bubbles: true,
-        cancelable: true,
-        dataTransfer: transfer,
-        shiftKey: true,
-      }),
-    );
-  },
-  { source, target },
-);
+await page
+  .locator("[data-prac-grid-merge]")
+  .first()
+  .evaluate((element) => element.click());
 await page.waitForTimeout(1500);
 const merged = await cells();
 

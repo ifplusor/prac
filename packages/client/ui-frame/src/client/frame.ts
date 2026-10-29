@@ -1857,7 +1857,17 @@ export function createFrame(
             // with one cell it becomes a flex item with no `flex` of its own, and the
             // cell then takes half the stage even though the grid says one column
             // (measured after closing a split editor: `center` 636px of a 1272px stage).
-            if (cells.length <= 1) return renderNode(child, dir);
+            if (cells.length <= 1) {
+              return createElement(
+                "div",
+                {
+                  key: child.id,
+                  "data-prac-grid-cell": child.id,
+                  style: { display: "contents" },
+                },
+                renderNode(child, dir),
+              );
+            }
             const placement = node.placements?.[child.id] ?? {
               row: Math.floor(index / shape.columns),
               column: index % shape.columns,
@@ -1943,6 +1953,42 @@ export function createFrame(
                       "aria-label": "Move grid cell",
                     },
                     "⠿",
+                  )
+                : null,
+              canDrag && cells.length > 1
+                ? createElement(
+                    "button",
+                    {
+                      type: "button",
+                      "data-prac-grid-merge": child.id,
+                      title: "Merge this grid cell with the next one",
+                      onClick: () =>
+                        store.update((current) => {
+                          const other = node.children.find(
+                            (candidate) => candidate.id !== child.id,
+                          );
+                          if (other === undefined) return current;
+                          const tree = mergeGridCells(current.tree, node.id, child.id, other.id);
+                          return tree === current.tree ? current : { ...current, tree };
+                        }),
+                      style: {
+                        position: "absolute",
+                        left: 2,
+                        bottom: 2,
+                        zIndex: 2,
+                        width: 12,
+                        height: 12,
+                        padding: 0,
+                        border: "1px solid rgba(127,127,127,0.55)",
+                        borderRadius: 2,
+                        background: "rgba(127,127,127,0.25)",
+                        color: "inherit",
+                        cursor: "pointer",
+                        opacity: 0.45,
+                      },
+                      "aria-label": "Merge grid cell",
+                    },
+                    "⊞",
                   )
                 : null,
               child.type === "split" && child.id.startsWith("merge:")
