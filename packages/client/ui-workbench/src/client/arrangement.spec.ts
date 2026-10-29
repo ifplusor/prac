@@ -253,8 +253,7 @@ describe("arrange", () => {
 
   it("fills gaps only: a view the restored state already knows keeps its placement", () => {
     // A previous session moved the conversation into the bottom bar and the DSH
-    // sidebar to the right. Re-asserting the defaults would undo both; the bottom view is
-    // hidden instead, because the shell keeps that track off screen (see `hideOffScreen`).
+    // sidebar to the right. Re-asserting the defaults would undo both.
     const { face, calls } = recordingFace({
       [DSH_CONVERSATION_VIEW]: { region: "bottom", order: -2, hidden: false },
       [DSH_SIDEBAR_VIEW]: { region: RIGHT, order: -1, hidden: false },
@@ -268,7 +267,6 @@ describe("arrange", () => {
       ["hide", "dsh:rightbar"],
       ["hide", DSH_SIDEBAR_VIEW],
       ["place", "vscode:view:workbench.view.explorer", LEFT],
-      ["hide", DSH_CONVERSATION_VIEW],
     ]);
   });
 
@@ -288,20 +286,6 @@ describe("arrange", () => {
       ["hide", DSH_SIDEBAR_VIEW],
       ["place", "vscode:view:workbench.view.explorer", LEFT],
     ]);
-  });
-
-  it("hides a view a restored state left in the off-screen track", () => {
-    // The shell draws no bottom panel. A view merely painted over still claims the track in the
-    // allocation, so it is hidden: that is what removes the region from the layout.
-    const { face, calls } = recordingFace({
-      "vscode:view:workbench.panel.output": {
-        region: "bottom/container:panel",
-        order: 0,
-        hidden: false,
-      },
-    });
-    arrange(face);
-    expect(shapes(calls)).toContainEqual(["hide", "vscode:view:workbench.panel.output"]);
   });
 });
 
@@ -486,15 +470,13 @@ describe("placeCatalogue", () => {
     ]);
   });
 
-  it("hides what the app places in the shell's off-screen track", () => {
-    // `panel` maps to `bottom`, which the shell does not draw. Placing the view there and hiding it
-    // is what keeps the track out of the allocation instead of leaving a strip nobody can see.
+  it("places the app's panel views in the bottom track", () => {
+    // `panel` maps to `bottom`, which is a visible track again: placing the view there is enough.
     const { face, calls } = recordingFace();
     placeCatalogue(face, [entry({ location: "panel", containerId: "c.panel" })]);
     expect(shapes(calls)).toEqual([
       ["setRegionChildren", BOTTOM, [{ id: "bottom/container:c.panel", label: "Explorer" }]],
       ["placeQuietly", "vscode:view:workbench.explorer.fileView", "bottom/container:c.panel"],
-      ["hide", "vscode:view:workbench.explorer.fileView"],
     ]);
   });
 });

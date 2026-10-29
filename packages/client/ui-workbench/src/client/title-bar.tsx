@@ -519,7 +519,6 @@ export const PRAC_SHELL_CSS = `
    Keep the page's two-finger horizontal swipe from leaving prac. */
 html,body{overscroll-behavior:none}
 [data-prac-focus-strip]{display:none!important}
-[data-prac-region="bottom"]{display:none!important}
 [data-prac-container="left/dsh:sidebar"]{display:none!important}
 [data-prac-region="left/dsh:sidebar"]{display:none!important}
 [data-prac-frame]{padding-top:38px!important;padding-right:48px!important;box-sizing:border-box}

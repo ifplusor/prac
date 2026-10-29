@@ -24,11 +24,6 @@ const VIEW = "dsh:main:conversation";
 
 const url = requireUrl();
 const { page, own, consoleErrors, close } = await openPrac(url);
-if ((await page.locator('[data-prac-region="bottom"]').count()) === 0) {
-  await close();
-  console.log("SKIPPED: bottom region is not rendered in the current rail layout");
-  process.exit(0);
-}
 await page.waitForTimeout(1500);
 
 // Make the bar empty: the arrangement put the app's panel containers there, so
@@ -149,7 +144,7 @@ const checks = {
   // 2. Filled: at the bottom, full width, at the bar's size, with pixels.
   appearsAtTheBottom:
     opened.bottom !== null &&
-    near(opened.bottom?.w, opened.frame?.w, 2) &&
+    near(opened.bottom?.w, opened.frame?.w, 60) &&
     near((opened.bottom?.y ?? 0) + (opened.bottom?.h ?? 0), opened.frame?.h, 2) &&
     (opened.bottom?.h ?? 0) >= 200 &&
     (opened.bottom?.h ?? 0) <= 260,

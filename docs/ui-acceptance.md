@@ -28,13 +28,13 @@ workspace: the CLI resolves that profile from the user home even when
 | `split`              | left / center row split; dragging its sash resizes both sides             |
 | `grid`               | dragging a cell swaps placements and the swap persists                    |
 | `grid:resize`        | dragging a cell's resize handle changes its span and persists             |
-| `grid:merge`         | skipped when the current rail layout has no merge / unmerge UI            |
+| `grid:merge`         | grid merge / unmerge controls and persistence                             |
 | `grid:view`          | a recall-catalogue row drags into a grid cell; placement persists         |
 | `grid:tab`           | a mounted tab drags into another grid cell; placement persists            |
 | `grid:free`          | dragging a track boundary changes column weights in pixels                |
 | `resize`             | track resize, distribution, floors, centre priority                       |
 | `persistence`        | versioned layout state reloads; stale regions are pruned                  |
-| `bottom`             | skipped when the current rail layout has no bottom region                 |
+| `bottom`             | bottom bar appears when filled, takes room, and returns it on collapse    |
 | `views`              | recall surface: open, catalogue, hide/show, Escape                        |
 | `file`               | editor surface, tab activation, second group, close/reopen                |
 | `editor:group`       | split editor group, focus sides, empty group removal                      |

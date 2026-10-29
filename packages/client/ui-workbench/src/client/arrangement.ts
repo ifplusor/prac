@@ -226,26 +226,6 @@ export function placeCatalogue(
     }
   }
   placeFileEntries(layout, entries);
-  hideOffScreen(layout);
-}
-
-/**
- * Whether the shell keeps a region off screen.
- *
- * The shell draws no bottom panel (the design's `bottom` track is hidden), but a view that is merely
- * painted over still **claims its track**: the allocation gives `bottom` its declared 240px and the
- * regions above draw 240px shorter, which reads as a blank strip under the sidebar. Hiding the
- * **views** instead removes the region from the allocation through the model's own presence rule,
- * and keeps them placeable (the recall surface can still bring one up).
- */
-const offScreen = (region: string | null): boolean =>
-  region === BOTTOM || (region !== null && region.startsWith(`${BOTTOM}/`));
-
-/** Hide every view the shell keeps off screen; idempotent. */
-function hideOffScreen(layout: PracLayout): void {
-  for (const record of layout.listViews()) {
-    if (record.hidden !== true && offScreen(record.region)) layout.hide(record.id);
-  }
 }
 
 /**
@@ -401,7 +381,4 @@ export function arrange(layout: PracLayout): void {
   if (known["vscode:view:workbench.view.explorer"] === undefined) {
     layout.place("vscode:view:workbench.view.explorer", "left");
   }
-  // A state written before the shell stopped drawing the bottom panel still has panel views placed
-  // there: hiding them is what retires the track they claimed (see `hideOffScreen`).
-  hideOffScreen(layout);
 }
