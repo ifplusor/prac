@@ -19,6 +19,7 @@ import type {
 import type { LayoutStore } from "./store.js";
 import { ViewGroupLayoutBridge } from "./frameBridge.js";
 import type { ViewGroupPlacement, ViewGroupState } from "./viewGroup.js";
+import type { Surface } from "./surface.js";
 
 /** The structural group shape the frame consumes. */
 export interface FrameViewGroup extends ViewGroupRuntime {
@@ -46,6 +47,8 @@ export interface FrameGroup {
   readonly group: FrameViewGroup;
   readonly regionId: string;
   readonly bridge: ViewGroupLayoutBridge;
+  /** The surface that owns this group, when registered through the registry. */
+  readonly surface?: Surface;
 }
 
 /** Owns the group → region bindings for one frame store. */
@@ -59,7 +62,7 @@ export class ViewGroupHost {
   }
 
   /** Register a group in an existing region. */
-  register(group: FrameViewGroup, regionId: string): FrameGroup {
+  register(group: FrameViewGroup, regionId: string, surface?: Surface): FrameGroup {
     if (this.#groups.has(group.id)) throw new Error(`view group already registered: ${group.id}`);
     if (this.#regions.has(regionId)) {
       throw new Error(`region already hosts a view group: ${regionId}`);
@@ -68,10 +71,20 @@ export class ViewGroupHost {
       throw new Error(`unknown region: ${regionId}`);
     }
     const bridge = new ViewGroupLayoutBridge(group, this.store, regionId);
-    const frameGroup: FrameGroup = { group, regionId, bridge };
+    const frameGroup: FrameGroup = {
+      group,
+      regionId,
+      bridge,
+      ...(surface === undefined ? {} : { surface }),
+    };
     this.#groups.set(group.id, frameGroup);
     this.#regions.set(regionId, group.id);
     return frameGroup;
+  }
+
+  /** Register a surface's group in a region. */
+  registerSurface(surface: Surface, regionId: string): FrameGroup {
+    return this.register(surface.group, regionId, surface);
   }
 
   /** One group bar item: the group hosted in a region and which member is active. */

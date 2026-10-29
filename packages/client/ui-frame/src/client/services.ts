@@ -25,7 +25,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { MainPanelId, PanelInfo } from "@deepseek-ai/dsh-client-ui-layout/client";
 import type { HostObservable } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import { DSH_CONVERSATION_KEY, DSH_MAIN_PREFIX, catalogueViewIds } from "./catalogue.js";
-import { SurfaceRegistry } from "./surface.js";
+import { SurfaceRegistry, type Surface } from "./surface.js";
 import {
   CENTER_REGION,
   type LayoutFace,
@@ -355,6 +355,9 @@ export function createServices(
     },
     registerViewGroup(group: FrameViewGroup, regionId: string): FrameGroup {
       return viewGroups.register(group, regionId);
+    },
+    registerSurface(surface: Surface, regionId: string): FrameGroup {
+      return viewGroups.registerSurface(surface, regionId);
     },
     unregisterViewGroup(groupId: string): void {
       viewGroups.unregister(groupId);

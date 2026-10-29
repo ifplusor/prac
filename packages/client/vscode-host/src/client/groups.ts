@@ -8,7 +8,7 @@
  * @module prac-client-vscode-host/client/groups
  */
 
-import type { FrameView, FrameViewGroup } from "prac-client-ui-frame/lib";
+import type { FrameView, FrameViewGroup, Surface } from "prac-client-ui-frame/lib";
 import type { VscodeCatalogueEntry } from "./public.js";
 import type { VscodeGroupRuntime } from "./resources.js";
 import {
@@ -22,6 +22,7 @@ import {
 /** The frame operations the group host needs. */
 export interface VscodeGroupLayout {
   registerViewGroup(group: FrameViewGroup, regionId: string): unknown;
+  registerSurface?(surface: Surface, regionId: string): unknown;
   unregisterViewGroup(groupId: string): void;
 }
 
@@ -56,8 +57,13 @@ export class VscodeGroupHost {
     const group = this.options.definition.materialize(resource) as unknown as VscodeGroupRuntime;
     const binding = this.options.definition.bindingFactory?.(resource);
     if (binding !== undefined) group.setBinding(binding);
+    const surface = group as unknown as Surface;
     try {
-      this.options.layout.registerViewGroup(group, regionId);
+      if (this.options.layout.registerSurface !== undefined && surface.group !== undefined) {
+        this.options.layout.registerSurface(surface, regionId);
+      } else {
+        this.options.layout.registerViewGroup(group, regionId);
+      }
     } catch (cause) {
       group.dispose();
       throw cause;

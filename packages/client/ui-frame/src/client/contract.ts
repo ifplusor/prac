@@ -11,6 +11,7 @@
 
 import type { RegionInfo, ViewInfo } from "./catalogue.js";
 import type { FrameGroup, FrameViewGroup } from "./frameGroups.js";
+import type { Surface } from "./surface.js";
 import type { FrameView } from "./view.js";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
 
@@ -685,6 +686,7 @@ export interface PracLayoutFace {
    */
   createView(id: string): FrameView;
   registerViewGroup(group: FrameViewGroup, regionId: string): FrameGroup;
+  registerSurface(surface: Surface, regionId: string): FrameGroup;
   /**
    * Remove a view group's frame projection.
    *
