@@ -13,20 +13,20 @@ describe("SurfaceRegistry", () => {
   it("creates a surface only after its kind is registered", () => {
     const registry = new SurfaceRegistry();
     expect(registry.has("window-group")).toBe(false);
-    expect(() => registry.create("window-group", { regionId: "stage" })).toThrow(
+    expect(() => registry.create("window-group", { nodeId: "stage" })).toThrow(
       "surface kind not registered",
     );
 
     const registration = registry.register("window-group", {
-      create: ({ regionId }) => {
+      create: ({ nodeId }) => {
         const created = surface("window-group");
-        expect(regionId).toBe("stage");
+        expect(nodeId).toBe("stage");
         return created;
       },
     });
 
     expect(registry.has("window-group")).toBe(true);
-    expect(registry.create("window-group", { regionId: "stage" }).group.id).toBe(
+    expect(registry.create("window-group", { nodeId: "stage" }).group.id).toBe(
       "window-group-group",
     );
     registration.dispose();
