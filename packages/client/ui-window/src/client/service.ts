@@ -26,7 +26,7 @@ export function apply(ctx: Context): void {
   ctx.provide("pracWindows", face);
   ctx.effect(() => {
     const registration = ctx.pracSurfaces.register("window-group", {
-      create: ({ regionId }) => new WindowGroupAdapter(regionId),
+      create: ({ nodeId }) => new WindowGroupAdapter(nodeId),
     });
     return () => registration.dispose();
   });

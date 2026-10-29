@@ -301,6 +301,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 18.3.7(@types/react@18.3.31)
+      prac-ui-kit:
+        specifier: workspace:*
+        version: link:../../lib/ui-kit
       react:
         specifier: 'catalog:'
         version: 18.3.1
@@ -478,6 +481,8 @@ importers:
       vite-plus:
         specifier: 'catalog:'
         version: 1.0.0(@types/node@24.13.3)(@vitest/ui@5.0.1)(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@5.0.10)
+
+  packages/lib/ui-kit: {}
 
   vendor/vscode:
     devDependencies:

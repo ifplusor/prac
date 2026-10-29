@@ -8,36 +8,25 @@
  * @module prac-client-ui-frame/client/surface
  */
 
+import type {
+  Surface as KitSurface,
+  SurfaceCreateOptions as KitSurfaceCreateOptions,
+  SurfaceFactory as KitSurfaceFactory,
+  SurfaceKind as KitSurfaceKind,
+} from "prac-ui-kit";
 import type { FrameViewGroup } from "./frameGroups.js";
 
-/** The two surface kinds the frame knows. */
-export type SurfaceKind = "window-group" | "widget-board";
+/** Product-defined surface kinds used by the frame. */
+export type SurfaceKind = KitSurfaceKind;
 
 /** One mounted surface with its frame group. */
-export interface Surface {
-  readonly kind: SurfaceKind;
-  readonly group: FrameViewGroup;
-  /** The region DOM root this surface currently owns. */
-  readonly element?: HTMLElement;
-  /** Attach the region's content root. */
-  attach?(element: HTMLElement): void;
-  /** Detach the region's content root. */
-  detach?(element: HTMLElement): void;
-  dispose(): void;
-}
+export type Surface = KitSurface<FrameViewGroup>;
 
 /** Creates one surface for a region. */
-export interface SurfaceFactory {
-  create(options: SurfaceCreateOptions): Surface;
-}
+export type SurfaceFactory = KitSurfaceFactory<FrameViewGroup>;
 
 /** Placement / host input supplied by the frame. */
-export interface SurfaceCreateOptions {
-  /** Stable id of the region this surface fills. */
-  readonly regionId: string;
-  /** Element the surface may mount into; model adapters may ignore it. */
-  readonly element?: HTMLElement;
-}
+export type SurfaceCreateOptions = KitSurfaceCreateOptions;
 
 /** Registry of surface factories, keyed by kind. */
 export class SurfaceRegistry {

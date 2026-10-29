@@ -29,7 +29,7 @@ export function apply(ctx: Context): void {
   ctx.provide("pracWidgets", face);
   ctx.effect(() => {
     const registration = ctx.pracSurfaces.register("widget-board", {
-      create: ({ regionId }) => new WidgetBoardGroup(regionId),
+      create: ({ nodeId }) => new WidgetBoardGroup(nodeId),
     });
     return () => registration.dispose();
   });
