@@ -355,6 +355,9 @@ importers:
       prac-client-vscode-host:
         specifier: workspace:*
         version: link:../vscode-host
+      prac-ui-kit:
+        specifier: workspace:*
+        version: link:../../lib/ui-kit
       react:
         specifier: 'catalog:'
         version: 18.3.1
@@ -445,6 +448,9 @@ importers:
       prac-client-ui-window:
         specifier: workspace:*
         version: link:../ui-window
+      prac-ui-kit:
+        specifier: workspace:*
+        version: link:../../lib/ui-kit
       prac-vscode:
         specifier: workspace:*
         version: link:../../../vendor/vscode

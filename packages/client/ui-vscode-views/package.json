@@ -30,6 +30,7 @@
     "@types/react": "catalog:",
     "prac-client-ui-frame": "workspace:*",
     "prac-client-vscode-host": "workspace:*",
+    "prac-ui-kit": "workspace:*",
     "react": "catalog:"
   },
   "peerDependencies": {

@@ -12,10 +12,10 @@
 import type {
   GroupBinding,
   MoveIntent,
-  FrameView,
-  FrameViewGroup,
+  View as FrameView,
+  ViewGroup as FrameViewGroup,
   ViewHost,
-} from "prac-client-ui-frame/lib";
+} from "prac-ui-kit";
 
 /** The VS Code resource API group. */
 export const VSCODE_API_VERSION = "vscode.prac/v1";

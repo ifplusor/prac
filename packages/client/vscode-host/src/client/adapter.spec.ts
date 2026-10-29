@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import type { FrameView } from "prac-client-ui-frame/lib";
+import type { View as FrameView } from "prac-ui-kit";
 import { createVscodeResourceDefinitions } from "./adapter.js";
 import {
   VscodeGroupBinding,

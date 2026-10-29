@@ -332,7 +332,7 @@ export function apply(ctx: Context): void {
     face,
     createGroup: (id, mode, _label) =>
       ctx.pracSurfaces.create(mode === "stack" ? "widget-board" : "window-group", {
-        regionId: id,
+        nodeId: id,
       }).group as unknown as VscodeGroupRuntime,
     createView: (id) => ctx.pracFrame.createView(id),
   });

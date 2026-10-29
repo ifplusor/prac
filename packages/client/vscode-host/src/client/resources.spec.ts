@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import type { FrameView, ViewHost } from "prac-client-ui-frame/lib";
+import type { View as FrameView, ViewHost } from "prac-ui-kit";
 import {
   VscodeViewDefinition,
   VscodeViewGroupDefinition,
