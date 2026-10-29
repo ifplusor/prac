@@ -636,7 +636,7 @@ export function apply(ctx: Context): void {
     if (board === undefined) return false;
     try {
       board.add(viewStub(view));
-      return layout.getState().views[view] !== undefined;
+      return true;
     } catch {
       return false;
     }

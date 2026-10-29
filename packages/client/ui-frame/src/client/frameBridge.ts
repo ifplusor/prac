@@ -8,7 +8,7 @@
  * @module prac-client-ui-frame/client/frameBridge
  */
 
-import { ensureStackShape, findNode, placeQuietly, removeView } from "./model.js";
+import { ensureStackShape, placeQuietly, removeView } from "./model.js";
 import type { LayoutStore } from "./store.js";
 import type { FrameViewGroup } from "./frameGroups.js";
 
@@ -64,11 +64,12 @@ export class ViewGroupLayoutBridge {
     for (const viewId of current) this.#known.add(viewId);
   }
 
-  /** A split's row region for one view; a region is its own target. */
-  #targetFor(viewId: string): string | undefined {
-    if (findNode(this.store.get().tree, this.regionId)?.type !== "split") return this.regionId;
-    const entry = `${this.regionId}/stack/${viewId}`;
-    return findNode(this.store.get().tree, entry)?.type === "region" ? entry : undefined;
+  /**
+   * A placement always addresses the registered node. `placeQuietly` already
+   * routes a split id to its existing row and creates a row when there is none.
+   */
+  #targetFor(_viewId: string): string {
+    return this.regionId;
   }
 
   /** Remove this bridge's placements and stop listening. */
