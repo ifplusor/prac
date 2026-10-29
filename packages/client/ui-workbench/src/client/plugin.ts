@@ -42,6 +42,7 @@ import {
 import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
+import type { PracDshFace } from "prac-client-ui-dsh/lib";
 // Type-only, for its declarations: `ui-renderer` owns `Context.slots` (its `SlotRegistry`),
 // and naming the plugin whose service this file drives is what puts that member — and the
 // registration surface hanging off it — in this program. The slot *keys* are declared by
@@ -54,7 +55,6 @@ import type { LayoutState, Side } from "prac-client-ui-frame/lib";
 import type {} from "prac-client-vscode-host/client";
 import {
   CENTER,
-  DSH_CONVERSATION_VIEW,
   LEFT,
   RIGHT,
   arrange,
@@ -516,6 +516,8 @@ export function apply(ctx: Context): void {
   // that *owns* them (the mechanism declares the `root` children it registers, including
   // `shell.overlay` below), so this file needs no DSH slot/layout types of its own.
   const layout = ctx.pracFrame as unknown as PracLayout;
+  const dsh = ctx as unknown as { pracDsh: PracDshFace };
+  const conversation = dsh.pracDsh.conversation;
   const slots = ctx.slots;
   // The title bar's Layout menu is built by the catalogue inject (it needs the app's containers);
   // the title bar itself only renders what this answers when the menu opens.
@@ -632,7 +634,7 @@ export function apply(ctx: Context): void {
           // Gated on that event deliberately — a frame that merely boots with no
           // file open must not overrule an arrangement the user persisted.
           restoreCentre(layout);
-          layout.show(DSH_CONVERSATION_VIEW);
+          layout.show(conversation);
         }
         return;
       }
@@ -736,8 +738,8 @@ export function apply(ctx: Context): void {
     const rightRail: PracRailFace = {
       items: (): PracRailItem[] => {
         const items: PracRailItem[] = [];
-        const conversation = layout.getState().views[DSH_CONVERSATION_VIEW];
-        const region = conversation?.region ?? null;
+        const chatView = layout.getState().views[conversation];
+        const region = chatView?.region ?? null;
         const inDock = region === RIGHT || (region !== null && region.startsWith(`${RIGHT}/`));
         const maximized = region === CENTER || (region !== null && region.startsWith(`${CENTER}/`));
         // The agent is a tool window like the others, but it is always in the rail: its home is the
@@ -751,8 +753,7 @@ export function apply(ctx: Context): void {
         });
         for (const item of dockItems(RIGHT)) {
           // A child named after the conversation is the same tool window, already listed.
-          if (item.id === `${RIGHT}/${DSH_CONVERSATION_VIEW}` || item.id === DSH_CONVERSATION_VIEW)
-            continue;
+          if (item.id === `${RIGHT}/${conversation}` || item.id === conversation) continue;
           items.push(item);
         }
         return items;
@@ -763,12 +764,12 @@ export function apply(ctx: Context): void {
           // Showing it must not drag it out of the editor area: maximize is a placement the app
           // chooses (no file → editor area), not something a rail click undoes. When it is docked,
           // select its child (a sibling tool window may be the visible one) and reveal the dock.
-          const region = layout.getState().views[DSH_CONVERSATION_VIEW]?.region ?? null;
+          const region = layout.getState().views[conversation]?.region ?? null;
           if (region === RIGHT || (region !== null && region.startsWith(`${RIGHT}/`))) {
             if (region !== RIGHT) layout.selectContainer(RIGHT, region);
             layout.setCollapsed(RIGHT, false);
           }
-          layout.show(DSH_CONVERSATION_VIEW);
+          layout.show(conversation);
           return;
         }
         layout.setCollapsed(RIGHT, false);
@@ -789,15 +790,15 @@ export function apply(ctx: Context): void {
       const targetChild = `${target}/container:${containerId}`;
       // A direct view in the target (chat parked in the right dock) must get a child of its own
       // before the region becomes a selector, or the new child would hide it.
-      const chat = layout.getState().views[DSH_CONVERSATION_VIEW];
-      const chatChild = `${RIGHT}/${DSH_CONVERSATION_VIEW}`;
+      const chat = layout.getState().views[conversation];
+      const chatChild = `${RIGHT}/${conversation}`;
       if (
         target === RIGHT &&
         chat?.region === RIGHT &&
         !layout.regionChildren(RIGHT).some((child) => child.id === chatChild)
       ) {
         layout.setRegionChildren(RIGHT, [{ id: chatChild, label: "Chat" }]);
-        layout.place(DSH_CONVERSATION_VIEW, chatChild);
+        layout.place(conversation, chatChild);
       }
       const existing = layout.regionChildren(target).filter((child) => child.id !== targetChild);
       layout.setRegionChildren(target, [...existing, { id: targetChild, label }]);
@@ -833,7 +834,7 @@ export function apply(ctx: Context): void {
         });
       }
       for (const child of layout.regionChildren(RIGHT)) {
-        if (child.id === `${RIGHT}/${DSH_CONVERSATION_VIEW}`) continue;
+        if (child.id === `${RIGHT}/${conversation}`) continue;
         const containerId = /\/container:(.+)$/.exec(child.id)?.[1];
         if (containerId === undefined) continue;
         actions.push({
@@ -886,8 +887,8 @@ export function apply(ctx: Context): void {
   // own may float in (registering into `root` would shadow the whole frame).
   // The conversation's action, in the frame's per-view header slot.
   slots.inject("prac.viewActions", () =>
-    slots.register({ name: "prac.viewActions", key: DSH_CONVERSATION_VIEW }, () =>
-      createElement(ConversationAction, { onShow: () => layout.show(DSH_CONVERSATION_VIEW) }),
+    slots.register({ name: "prac.viewActions", key: conversation }, () =>
+      createElement(ConversationAction, { onShow: () => layout.show(conversation) }),
     ),
   );
 
@@ -912,4 +913,4 @@ export const name = "prac-client-ui-workbench";
  * the mechanism's placement face. `pracFrame` is a hard dependency — every
  * placement goes through it.
  */
-export const inject = ["slots", "layout", "pracFrame"];
+export const inject = ["slots", "layout", "pracFrame", "pracDsh"];
