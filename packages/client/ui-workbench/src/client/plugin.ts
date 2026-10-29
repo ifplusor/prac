@@ -616,6 +616,31 @@ export function apply(ctx: Context): void {
     }) as unknown as FrameView;
   const widgets = ctx as unknown as { pracWidgets: PracWidgetsFace };
   const containerBoards = new Map<string, ReturnType<PracWidgetsFace["createBoardGroup"]>>();
+  const ensureContainerBoard = (
+    region: string,
+    label: string,
+  ): ReturnType<PracWidgetsFace["createBoardGroup"]> | undefined => {
+    const existing = containerBoards.get(region);
+    if (existing !== undefined) return existing;
+    try {
+      const board = widgets.pracWidgets.createBoardGroup(region, label);
+      layout.registerSurface(board, region);
+      containerBoards.set(region, board);
+      return board;
+    } catch {
+      return undefined;
+    }
+  };
+  const placeContainerView = (view: string, region: string, label: string): boolean => {
+    const board = ensureContainerBoard(region, label);
+    if (board === undefined) return false;
+    try {
+      board.add(viewStub(view));
+      return layout.getState().views[view] !== undefined;
+    } catch {
+      return false;
+    }
+  };
   const syncContainerBoards = (entries: readonly VscodeCatalogueEntry[]): void => {
     const wanted = new Map(containerBoardTargets(entries).map((target) => [target.region, target]));
     for (const [region, board] of containerBoards) {
@@ -625,17 +650,8 @@ export function apply(ctx: Context): void {
       containerBoards.delete(region);
     }
     for (const target of wanted.values()) {
-      let board = containerBoards.get(target.region);
-      if (board === undefined) {
-        try {
-          board = widgets.pracWidgets.createBoardGroup(target.region, target.label);
-          layout.registerSurface(board, target.region);
-          containerBoards.set(target.region, board);
-        } catch {
-          board?.dispose();
-          continue;
-        }
-      }
+      const board = ensureContainerBoard(target.region, target.label);
+      if (board === undefined) continue;
       for (const view of target.views) {
         if (board.view(view) !== undefined) continue;
         try {
@@ -643,6 +659,12 @@ export function apply(ctx: Context): void {
         } catch {
           // The frame may not have materialized the row yet; the next layout pass retries.
         }
+      }
+      // Re-project after the frame may have converted the container region to a split.
+      try {
+        board.reorder([...board.state.order]);
+      } catch {
+        // A disposed board is removed on the next pass.
       }
     }
   };
@@ -670,7 +692,7 @@ export function apply(ctx: Context): void {
       // placed (or excluded) are left where they are. A file placement's default is
       // the region the app reports, or — when the app has not shown it yet — the
       // centre, or beside the file's other placement.
-      placeCatalogue(layout, catalogue);
+      placeCatalogue(layout, catalogue, placeContainerView);
       syncContainerBoards(catalogue);
       // Files the app no longer has open are **forgotten**: their record is what the
       // frame persists, a placement is named by the host (so the next open mints a fresh

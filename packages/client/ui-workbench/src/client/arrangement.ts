@@ -160,7 +160,11 @@ const VIEW_DEFAULTS: Readonly<Record<string, { size?: number; folded?: boolean }
   "vscode:view:timeline": { folded: true },
 };
 
-export function placeCatalogue(layout: PracLayout, entries: readonly VscodeCatalogueEntry[]): void {
+export function placeCatalogue(
+  layout: PracLayout,
+  entries: readonly VscodeCatalogueEntry[],
+  placeContainerView?: (view: string, region: string, label: string) => boolean,
+): void {
   const groups = new Map<string, Map<string, { label: string; views: string[] }>>();
   for (const entry of entries) {
     if (entry.source !== "view") continue;
@@ -211,7 +215,9 @@ export function placeCatalogue(layout: PracLayout, entries: readonly VscodeCatal
     for (const [key, bucket] of byKey) {
       for (const view of bucket.views) {
         if (known[view] !== undefined) continue;
-        layout.placeQuietly(view, childRegionId(region, key));
+        const child = childRegionId(region, key);
+        const handled = placeContainerView?.(view, child, bucket.label) === true;
+        if (!handled) layout.placeQuietly(view, child);
         // What this view declares about its height — the layout only reads it (see `VIEW_DEFAULTS`).
         const declared = VIEW_DEFAULTS[view];
         if (declared?.size !== undefined) layout.setViewSize(view, declared.size);

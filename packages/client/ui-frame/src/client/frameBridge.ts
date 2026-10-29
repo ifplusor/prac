@@ -17,14 +17,12 @@ export class ViewGroupLayoutBridge {
   readonly #known = new Set<string>();
   readonly #stop: () => void;
   #disposed = false;
-  readonly #split: boolean;
 
   constructor(
     private readonly group: FrameViewGroup,
     private readonly store: LayoutStore,
     readonly regionId: string,
   ) {
-    this.#split = findNode(store.get().tree, regionId)?.type === "split";
     this.#stop = group.onDidChange(() => this.sync());
     this.sync();
   }
@@ -68,7 +66,7 @@ export class ViewGroupLayoutBridge {
 
   /** A split's row region for one view; a region is its own target. */
   #targetFor(viewId: string): string | undefined {
-    if (!this.#split) return this.regionId;
+    if (findNode(this.store.get().tree, this.regionId)?.type !== "split") return this.regionId;
     const entry = `${this.regionId}/stack/${viewId}`;
     return findNode(this.store.get().tree, entry)?.type === "region" ? entry : undefined;
   }
