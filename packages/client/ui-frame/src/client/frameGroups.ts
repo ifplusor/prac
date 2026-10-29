@@ -44,11 +44,12 @@ export interface GroupBarItem {
 
 /** One registered group and its frame region. */
 export interface FrameGroup {
+  /** The surface registered for this region. */
+  readonly surface: Surface;
+  /** Convenience view of `surface.group`. */
   readonly group: FrameViewGroup;
   readonly regionId: string;
   readonly bridge: ViewGroupLayoutBridge;
-  /** The surface that owns this group, when registered through the registry. */
-  readonly surface?: Surface;
 }
 
 /** Owns the group → region bindings for one frame store. */
@@ -71,11 +72,18 @@ export class ViewGroupHost {
       throw new Error(`unknown region: ${regionId}`);
     }
     const bridge = new ViewGroupLayoutBridge(group, this.store, regionId);
-    const frameGroup: FrameGroup = {
+    const owningSurface: Surface = surface ?? {
+      kind: group.state.mode === "select" ? "window-group" : "widget-board",
       group,
+      dispose: () => group.dispose(),
+    };
+    const frameGroup: FrameGroup = {
+      surface: owningSurface,
+      get group() {
+        return owningSurface.group;
+      },
       regionId,
       bridge,
-      ...(surface === undefined ? {} : { surface }),
     };
     this.#groups.set(group.id, frameGroup);
     this.#regions.set(regionId, group.id);
