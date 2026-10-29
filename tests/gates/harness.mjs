@@ -95,7 +95,17 @@ export async function openPrac(url, options = {}) {
   // the overlay instead of the frame. Pick the fixture project when present.
   if ((await page.locator("[data-prac-firstrun]").count()) > 0) {
     const rows = page.locator(".prac-firstrun-row");
-    if ((await rows.count()) > 0) await rows.first().click();
+    if ((await rows.count()) > 0) {
+      await rows.first().click();
+    } else {
+      // A brand-new profile has no recent projects; open the repo explicitly.
+      const input = page.locator(".prac-firstrun-input");
+      if ((await input.count()) > 0) {
+        await input.fill(process.cwd());
+        await page.locator(".prac-firstrun-button").click();
+      }
+    }
+    await page.waitForTimeout(1000);
   }
   await page.waitForFunction(() => !!globalThis.__pracLayout, null, { timeout: 60_000 });
   return {

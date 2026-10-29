@@ -58,7 +58,15 @@ page.on("pageerror", (error) => consoleErrors.push(String(error)));
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
 if ((await page.locator("[data-prac-firstrun]").count()) > 0) {
   const rows = page.locator(".prac-firstrun-row");
-  if ((await rows.count()) > 0) await rows.first().click();
+  if ((await rows.count()) > 0) {
+    await rows.first().click();
+  } else {
+    const input = page.locator(".prac-firstrun-input");
+    if ((await input.count()) > 0) {
+      await input.fill(process.cwd());
+      await page.locator(".prac-firstrun-button").click();
+    }
+  }
 }
 await installDeepDom(page);
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face && !!globalThis.__deep, null, {

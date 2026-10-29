@@ -8,7 +8,7 @@
  * resolves it from the user home, not from the temporary XDG tree).
  */
 import { spawn } from "node:child_process";
-import { cp, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,6 +20,8 @@ const port = Number(process.env.PRAC_TEST_PORT ?? 3184);
 const temp = await mkdtemp(join(tmpdir(), "prac-ui-"));
 const dataHome = join(temp, "data");
 const home = join(temp, "home");
+const dshHome = join(temp, "dsh");
+const profileDir = join(dshHome, "profiles", "prac-dev");
 const extensions = join(dataHome, "prac/code-server/extensions");
 const target = join(extensions, "prac.gate-dynamic-1.0.0");
 const fixture = join(repo, "tests/fixtures/dynamic-extension");
@@ -69,6 +71,7 @@ async function startRig() {
     env: {
       ...process.env,
       HOME: home,
+      DSH_HOME: dshHome,
       XDG_DATA_HOME: dataHome,
       pnpm_config_store_dir: process.env.pnpm_config_store_dir ?? "/Volumes/Dev/.pnpm-store",
     },
@@ -134,6 +137,35 @@ async function runGate(name, script, extra = {}) {
 
 await mkdir(extensions, { recursive: true });
 await mkdir(home, { recursive: true });
+await mkdir(profileDir, { recursive: true });
+await writeFile(
+  join(profileDir, "package.json"),
+  JSON.stringify(
+    {
+      name: "dsh-profile-prac-dev",
+      private: true,
+      dependencies: {},
+      dsh: {
+        profile: {
+          bundles: ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "prac-web-app"],
+        },
+      },
+    },
+    undefined,
+    2,
+  ) + "\n",
+);
+const linked = await run(process.execPath, [
+  join(repo, "scripts/link-profile.mjs"),
+  "--profile",
+  "prac-dev",
+  "--home",
+  dshHome,
+]);
+if (linked.code !== 0) {
+  process.stderr.write(linked.stdout + linked.stderr);
+  throw new Error("could not link the local plugins into the throwaway profile");
+}
 await cp(fixture, target, { recursive: true });
 fixtureInstalled = true;
 

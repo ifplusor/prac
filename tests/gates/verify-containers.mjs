@@ -15,9 +15,6 @@ const url = requireUrl();
 const { page, own, close } = await openPrac(url);
 
 // A fresh profile may show the first-run project picker; the rail is behind it.
-if ((await page.locator("[data-prac-firstrun]").count()) > 0) {
-  await page.locator(".prac-firstrun-row").filter({ hasText: "prac-dev" }).first().click();
-}
 await page.waitForTimeout(2500);
 
 const read = () =>

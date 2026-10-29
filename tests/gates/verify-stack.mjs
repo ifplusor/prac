@@ -13,9 +13,6 @@ import { openPrac, report, requireUrl } from "./harness.mjs";
 const url = requireUrl();
 const { page, own, close } = await openPrac(url);
 
-if ((await page.locator("[data-prac-firstrun]").count()) > 0) {
-  await page.locator(".prac-firstrun-row").filter({ hasText: "prac-dev" }).first().click();
-}
 await page.waitForTimeout(2500);
 
 const sample = () =>
