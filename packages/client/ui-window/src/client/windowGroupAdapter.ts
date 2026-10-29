@@ -9,16 +9,19 @@
 
 import type {
   FrameView,
+  FrameViewGroup,
   GroupBinding,
   ViewGroupPlacement,
   ViewGroupRuntime,
   ViewGroupState,
+  Surface,
 } from "prac-client-ui-frame/lib";
 
 import { WindowGroup } from "./window.js";
 
 /** A window-group-backed frame group (select mode). */
-export class WindowGroupAdapter implements ViewGroupRuntime {
+export class WindowGroupAdapter implements ViewGroupRuntime, Surface {
+  readonly kind = "window-group" as const;
   readonly #group: WindowGroup;
   readonly #views = new Map<string, FrameView>();
   #binding: GroupBinding | undefined;
@@ -28,6 +31,10 @@ export class WindowGroupAdapter implements ViewGroupRuntime {
     readonly label?: string,
   ) {
     this.#group = new WindowGroup(id);
+  }
+
+  get group(): FrameViewGroup {
+    return this as unknown as FrameViewGroup;
   }
 
   get state(): ViewGroupState {

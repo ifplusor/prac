@@ -27,9 +27,15 @@ export function apply(ctx: Context): void {
     createBoardGroup: (id, label) => new WidgetBoardGroup(id, label),
   };
   ctx.provide("pracWidgets", face);
+  ctx.effect(() => {
+    const registration = ctx.pracSurfaces.register("widget-board", {
+      create: ({ regionId }) => new WidgetBoardGroup(regionId),
+    });
+    return () => registration.dispose();
+  });
 }
 
 /** Cordis plugin name. */
 export const name = "prac-client-ui-widget";
 /** The widget plugin needs the frame's placement face. */
-export const inject = ["pracFrame"];
+export const inject = ["pracFrame", "pracSurfaces"];

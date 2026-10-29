@@ -182,7 +182,11 @@ export function apply(ctx: Context): void {
       return () => spaceListeners.delete(listener);
     },
   };
-  const { layout, pracFrame, panelInfo, viewGroups } = createServices(ctx, store, closeListeners);
+  const { layout, pracFrame, panelInfo, viewGroups, surfaces } = createServices(
+    ctx,
+    store,
+    closeListeners,
+  );
 
   ctx.effect(() => {
     // A view may already have registered (activation order is not ours to
@@ -227,6 +231,7 @@ export function apply(ctx: Context): void {
     // guard possible — see the note in `2026-10-07-editor-host.md`.
     const disposeLayout = ctx.provide("layout", layout);
     const disposePracFrame = ctx.provide("pracFrame", pracFrame);
+    const disposePracSurfaces = ctx.provide("pracSurfaces", surfaces);
     const disposePracSpaces = ctx.provide("pracSpaces", pracSpaces);
     // The catalogue's live sources. `listViews()` reads the registry on every
     // call, so a later registration is already visible; these subscriptions
@@ -252,6 +257,7 @@ export function apply(ctx: Context): void {
       stopSlot();
       offMain();
       disposePracSpaces();
+      disposePracSurfaces();
       disposePracFrame();
       disposeLayout();
       disposePanelInfo();

@@ -10,16 +10,19 @@
 
 import type {
   FrameView,
+  FrameViewGroup,
   GroupBinding,
   ViewGroupPlacement,
   ViewGroupRuntime,
   ViewGroupState,
+  Surface,
 } from "prac-client-ui-frame/lib";
 
 import { WidgetBoard } from "./board.js";
 
 /** A board-backed frame group (stack mode). */
-export class WidgetBoardGroup implements ViewGroupRuntime {
+export class WidgetBoardGroup implements ViewGroupRuntime, Surface {
+  readonly kind = "widget-board" as const;
   readonly #board: WidgetBoard;
   readonly #views = new Map<string, FrameView>();
 
@@ -31,6 +34,10 @@ export class WidgetBoardGroup implements ViewGroupRuntime {
   }
 
   /** Data-side snapshot in the frame's vocabulary. */
+  get group(): FrameViewGroup {
+    return this as unknown as FrameViewGroup;
+  }
+
   get state(): ViewGroupState {
     return {
       id: this.id,

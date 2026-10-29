@@ -36,8 +36,7 @@ import type {} from "@deepseek-ai/dsh-client-ui-session/client";
 // Type-only, for prac's own Context merge (`ctx.pracFrame`), which is the face that owns
 // the region tree `addGroup` asks about.
 import type {} from "prac-client-ui-frame/lib";
-import type { PracWidgetsFace } from "prac-client-ui-widget/lib";
-import type { PracWindowsFace } from "prac-client-ui-window/lib";
+import type {} from "prac-client-ui-frame/lib";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { ILayout } from "@deepseek-ai/dsh-client-ui-layout/client";
@@ -329,16 +328,12 @@ export function apply(ctx: Context): void {
       },
     },
   };
-  const services = ctx as unknown as {
-    pracWidgets: PracWidgetsFace;
-    pracWindows: PracWindowsFace;
-  };
   const resources = createVscodeResourceDefinitions({
     face,
-    createGroup: (id, mode, label) =>
-      mode === "stack"
-        ? (services.pracWidgets.createBoardGroup(id, label) as unknown as VscodeGroupRuntime)
-        : (services.pracWindows.createGroup(id, label) as unknown as VscodeGroupRuntime),
+    createGroup: (id, mode, _label) =>
+      ctx.pracSurfaces.create(mode === "stack" ? "widget-board" : "window-group", {
+        regionId: id,
+      }).group as unknown as VscodeGroupRuntime,
     createView: (id) => ctx.pracFrame.createView(id),
   });
   const groupHost = new VscodeGroupHost({
@@ -482,6 +477,5 @@ export const inject = [
   "slots",
   "layout",
   "pracFrame",
-  "pracWindows",
-  "pracWidgets",
+  "pracSurfaces",
 ];

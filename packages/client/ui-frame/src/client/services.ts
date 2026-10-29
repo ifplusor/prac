@@ -25,6 +25,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { MainPanelId, PanelInfo } from "@deepseek-ai/dsh-client-ui-layout/client";
 import type { HostObservable } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import { DSH_CONVERSATION_KEY, DSH_MAIN_PREFIX, catalogueViewIds } from "./catalogue.js";
+import { SurfaceRegistry } from "./surface.js";
 import {
   CENTER_REGION,
   type LayoutFace,
@@ -91,6 +92,8 @@ export interface LayoutServices {
   readonly panelInfo: HostObservable<PanelInfo>;
   /** The frame's view-group owner. */
   readonly viewGroups: ViewGroupHost;
+  /** Surface factories registered by window / widget plugins. */
+  readonly surfaces: SurfaceRegistry;
 }
 
 /**
@@ -113,6 +116,7 @@ export function createServices(
   // (a stack that falls back to one row melts, an empty leftover holds no space), so the normaliser
   // runs on the way out of each change rather than only on placements.
   const viewGroups = new ViewGroupHost(store);
+  const surfaces = new SurfaceRegistry();
   const write = store.update.bind(store);
   store.update = (change: Parameters<typeof store.update>[0]) =>
     write((state: LayoutState) => ensureStackShape(change(state)));
@@ -545,5 +549,5 @@ export function createServices(
     },
   };
 
-  return { layout, pracFrame, panelInfo, viewGroups };
+  return { layout, pracFrame, panelInfo, viewGroups, surfaces };
 }
