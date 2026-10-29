@@ -253,7 +253,8 @@ prac 的 UI 不再集中在一个 `ui-layout` 包里。参照 DSH 的机制 / fe
 
 | 包 | 职责 | 依赖 |
 |---|---|---|
-| `ui-frame` | Space、split / grid / region、dock / panel、sash、resize、surface / isolation、frame chrome、`ctx.layout` compat | DSH renderer / slots |
+| `prac-ui-kit` | 纯 geometry / solver / surface / binding / snapshot kernel；无 DSH、React、DOM 宿主 | 无 |
+| `ui-frame` | Space、split / grid / region、dock / panel、sash、resize、surface / isolation、frame chrome、`ctx.layout` compat | `prac-ui-kit`、DSH renderer / slots |
 | `ui-window` | window、window group、window placement、active、tab strip、window actions、editor application window host | `ui-frame` |
 | `ui-widget` | widget、board、widget placement、`prac.view` / `prac.viewActions`、widget host / chrome | `ui-frame` |
 | `ui-workbench` | 默认 Space / window / board 放置、arrangement、recall、持久化 defaults、open policy | 核心 + adapters |
@@ -267,6 +268,8 @@ prac 的 UI 不再集中在一个 `ui-layout` 包里。参照 DSH 的机制 / fe
 依赖方向：
 
 ```text
+prac-ui-kit
+   ↑
 ui-frame
    ↑
 ui-window     ui-widget

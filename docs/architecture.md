@@ -147,6 +147,7 @@ Space
 **包**：
 
 ```text
+prac-ui-kit        // pure library (packages/lib/ui-kit)
 ui-frame
 ui-window
 ui-widget
@@ -156,7 +157,7 @@ ui-vscode-host / ui-vscode-views / ui-vscode-editor
 bundle/web-app  // composition root only
 ```
 
-`ui-frame` 只认 surface registry；`ui-window` / `ui-widget` 不互相 import；adapters 只做来源翻译；bundle 是叶子，无业务逻辑。`ui-frame` 是 DSH 插件行，另导出 `./lib` 供类型使用。
+`prac-ui-kit` 只提供 geometry / surface / binding，不依赖 DSH；`ui-frame` 只认 surface registry；`ui-window` / `ui-widget` 不互相 import；adapters 只做来源翻译；bundle 是叶子，无业务逻辑。`ui-frame` 是 DSH 插件行，另导出 `./lib` 供类型使用。
 
 ### 3.3 状态住在哪
 
