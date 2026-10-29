@@ -53,7 +53,6 @@ Space
 完整划分见 10-20 的 Package architecture：
 
 ```text
-ui-surface
 ui-frame
 ui-application
 ui-window

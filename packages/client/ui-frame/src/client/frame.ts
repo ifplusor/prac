@@ -920,9 +920,9 @@ const FRAME_STYLES = `
 
 /** Inject the frame's stylesheet once. */
 export function ensureStyles(): void {
-  if (document.getElementById("prac-client-ui-layout-styles")) return;
+  if (document.getElementById("prac-client-ui-frame-styles")) return;
   const style = document.createElement("style");
-  style.id = "prac-client-ui-layout-styles";
+  style.id = "prac-client-ui-frame-styles";
   style.textContent = FRAME_STYLES;
   document.head.append(style);
 }

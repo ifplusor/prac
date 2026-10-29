@@ -50,9 +50,8 @@ workspace: the CLI resolves that profile from the user home even when
 pnpm verify:packages
 ```
 
-`verify:packages` checks the planned UI package graph (`ui-surface` / `ui-frame` /
-`ui-window` / `ui-widget` / `ui-workbench` / adapters) and the bundle-is-a-leaf
-rule. Target packages that have not been split out yet are reported as skipped,
+`verify:packages` checks the DSH plugin package graph (`ui-frame` / `ui-window` /
+`ui-widget` / `ui-workbench` / `ui-dsh` / adapters) and the bundle-is-a-leaf rule. Target packages that have not been split out yet are reported as skipped,
 not failed. Current implementation-era gate names (`containers`, `editor:group`)
 remain until the split lands.
 
