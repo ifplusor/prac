@@ -9,14 +9,14 @@
  */
 
 import type {
-  FrameView,
-  FrameViewGroup,
+  View as FrameView,
+  ViewGroup as FrameViewGroup,
   GroupBinding,
+  Surface,
   ViewGroupPlacement,
   ViewGroupRuntime,
   ViewGroupState,
-  Surface,
-} from "prac-client-ui-frame/lib";
+} from "prac-ui-kit";
 
 import { WidgetBoard } from "./board.js";
 

@@ -9,16 +9,10 @@
  * @module prac-client-ui-frame/client/view
  */
 
-import type { MoveIntent, ViewHost, ViewRuntime } from "./contracts.js";
+import type { View as KitView, ViewHost, MoveIntent } from "prac-ui-kit";
 
 /** The structural view shape the frame consumes. */
-export interface FrameView extends ViewRuntime {
-  readonly id: string;
-  readonly host: ViewHost | undefined;
-  mount(host: ViewHost, element: HTMLElement): void;
-  release(): void;
-  focus(): void;
-}
+export type FrameView = KitView;
 
 /** A materialized view runtime. */
 export class View implements FrameView {

@@ -5,6 +5,7 @@
  */
 
 import type { Context } from "@deepseek-ai/cordis";
+import type { SurfaceRegistry, ViewGroup } from "prac-ui-kit";
 import { WidgetBoardGroup } from "./boardGroup.js";
 import { WidgetRegistry } from "./widget.js";
 
@@ -22,13 +23,14 @@ declare module "@deepseek-ai/cordis" {
 
 /** Install the widget service. */
 export function apply(ctx: Context): void {
+  const surfaces = ctx as unknown as { pracSurfaces: SurfaceRegistry<ViewGroup> };
   const face: PracWidgetsFace = {
     registry: new WidgetRegistry(),
     createBoardGroup: (id, label) => new WidgetBoardGroup(id, label),
   };
   ctx.provide("pracWidgets", face);
   ctx.effect(() => {
-    const registration = ctx.pracSurfaces.register("widget-board", {
+    const registration = surfaces.pracSurfaces.register("widget-board", {
       create: ({ nodeId }) => new WidgetBoardGroup(nodeId),
     });
     return () => registration.dispose();

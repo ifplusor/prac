@@ -364,18 +364,18 @@ importers:
       '@deepseek-ai/cordis':
         specifier: 'catalog:'
         version: 4.0.5-alpha.1
-      prac-client-ui-frame:
+      prac-ui-kit:
         specifier: workspace:*
-        version: link:../ui-frame
+        version: link:../../lib/ui-kit
 
   packages/client/ui-window:
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 'catalog:'
         version: 4.0.5-alpha.1
-      prac-client-ui-frame:
+      prac-ui-kit:
         specifier: workspace:*
-        version: link:../ui-frame
+        version: link:../../lib/ui-kit
 
   packages/client/ui-workbench:
     devDependencies:

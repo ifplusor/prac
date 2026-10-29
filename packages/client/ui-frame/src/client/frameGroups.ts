@@ -10,27 +10,13 @@
  */
 
 import { findRegion } from "./model.js";
-import type {
-  GroupAction,
-  GroupActionBinding,
-  GroupBinding,
-  ViewGroupRuntime,
-} from "./contracts.js";
+import type { GroupAction, GroupActionBinding, ViewGroup } from "prac-ui-kit";
 import type { LayoutStore } from "./store.js";
 import { ViewGroupLayoutBridge } from "./frameBridge.js";
-import type { ViewGroupPlacement, ViewGroupState } from "./viewGroup.js";
 import type { Surface } from "./surface.js";
 
 /** The structural group shape the frame consumes. */
-export interface FrameViewGroup extends ViewGroupRuntime {
-  readonly id: string;
-  readonly state: ViewGroupState;
-  readonly binding?: GroupBinding;
-  readonly placements: readonly ViewGroupPlacement[];
-  onDidChange(listener: () => void): () => void;
-  reorder(order: readonly string[]): void;
-  setBinding?(binding: GroupBinding | undefined): void;
-}
+export type FrameViewGroup = ViewGroup;
 
 /** One bar entry projected from a hosted group. */
 export interface GroupBarItem {
