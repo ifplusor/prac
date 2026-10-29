@@ -13,6 +13,8 @@ import { WidgetRegistry } from "./widget.js";
 export interface PracWidgetsFace {
   readonly registry: WidgetRegistry;
   createBoardGroup(id: string, label?: string): WidgetBoardGroup;
+  /** Boards currently created by this service, for diagnostics / gates. */
+  boards(): readonly WidgetBoardGroup[];
 }
 
 declare module "@deepseek-ai/cordis" {
@@ -24,11 +26,21 @@ declare module "@deepseek-ai/cordis" {
 /** Install the widget service. */
 export function apply(ctx: Context): void {
   const surfaces = ctx as unknown as { pracSurfaces: SurfaceRegistry<ViewGroup> };
+  const boards = new Set<WidgetBoardGroup>();
   const face: PracWidgetsFace = {
     registry: new WidgetRegistry(),
-    createBoardGroup: (id, label) => new WidgetBoardGroup(id, label),
+    createBoardGroup: (id, label) => {
+      const board = new WidgetBoardGroup(id, label);
+      boards.add(board);
+      return board;
+    },
+    boards: () => [...boards],
   };
   ctx.provide("pracWidgets", face);
+  globalThis.__pracWidgets = face;
+  ctx.effect(() => () => {
+    if (globalThis.__pracWidgets === face) delete globalThis.__pracWidgets;
+  });
   ctx.effect(() => {
     const registration = surfaces.pracSurfaces.register("widget-board", {
       create: ({ nodeId }) => new WidgetBoardGroup(nodeId),
@@ -41,3 +53,7 @@ export function apply(ctx: Context): void {
 export const name = "prac-client-ui-widget";
 /** The widget plugin needs the frame's placement face. */
 export const inject = ["pracFrame", "pracSurfaces"];
+
+declare global {
+  var __pracWidgets: PracWidgetsFace | undefined;
+}

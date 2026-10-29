@@ -42,6 +42,11 @@ const read = () =>
         id: entry.getAttribute("data-prac-stack-entry"),
         height: Math.round(entry.getBoundingClientRect().height),
       })),
+      widgetBoards: (globalThis.__pracWidgets?.boards?.() ?? []).map((board) => ({
+        id: board.id,
+        active: board.state.active,
+        order: board.state.order,
+      })),
       surfaces: [...document.querySelectorAll("[data-prac-surface]")].map((element) => ({
         region: element.getAttribute("data-prac-region"),
         split: element.getAttribute("data-prac-split"),
@@ -95,6 +100,12 @@ report({
     "rail containers own widget-board surfaces":
       initial.surfaces.some((surface) => surface.kind === "widget-board") &&
       explorer.surfaces.some((surface) => surface.kind === "widget-board"),
+    "the Explorer board owns its widgets": explorer.widgetBoards.some(
+      (board) =>
+        board.id === "left/container:workbench.view.explorer" &&
+        board.order.includes("vscode:view:outline") &&
+        board.order.includes("vscode:view:timeline"),
+    ),
     "the borrowed surfaces are registered": [
       "vscode:view:workbench.explorer.fileView",
       "vscode:view:workbench.view.search",
