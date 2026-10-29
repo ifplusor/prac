@@ -14,7 +14,7 @@ import type { FrameGroup, FrameViewGroup } from "./frameGroups.js";
 import type { Surface } from "./surface.js";
 import type { FrameView } from "./view.js";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
-import type { Box, LayoutNode, RegionChild, RegionNode, RegionSelector, Side } from "prac-ui-kit";
+import type { Box, LayoutNode, RegionChild, RegionSelector, Side } from "prac-ui-kit";
 export type {
   Box,
   Dir,

@@ -11,6 +11,7 @@
  */
 import { describe, expect, it } from "vite-plus/test";
 import type { LayoutState } from "./contract.js";
+import { STACK_HEADER_HEIGHT } from "./model.js";
 import {
   allocateStack,
   altDragTarget,
@@ -253,11 +254,12 @@ describe("allocateStack (C1/C5/C6/C8: the stack shares, one row at a time)", () 
   });
 
   it("leaves a folded row's header out of the proportional share", () => {
-    const sizes = allocateStack(rows([{ size: 200 }, { size: 400 }, { size: 300 }]), 700, [
-      false,
-      false,
-      true,
-    ]);
+    const sizes = allocateStack(
+      rows([{ size: 200 }, { size: 400 }, { size: 300 }]),
+      700,
+      [false, false, true],
+      STACK_HEADER_HEIGHT,
+    );
     // 678/600 of the two open rows, plus the 22px folded header.
     expect(sizes[0]).toBeCloseTo((678 * 200) / 600);
     expect(sizes[1]).toBeCloseTo((678 * 400) / 600);
@@ -268,7 +270,12 @@ describe("allocateStack (C1/C5/C6/C8: the stack shares, one row at a time)", () 
     // The drag seeds the rows with their drawn heights; in that state the proportional pass is the
     // identity and must not move anything (the elastic bounce came from re-fitting stale claims).
     expect(
-      allocateStack(rows([{ size: 120 }, { size: 298 }, { size: 300 }]), 440, [false, false, true]),
+      allocateStack(
+        rows([{ size: 120 }, { size: 298 }, { size: 300 }]),
+        440,
+        [false, false, true],
+        STACK_HEADER_HEIGHT,
+      ),
     ).toEqual([120, 298, 22]);
   });
 });
