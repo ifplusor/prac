@@ -403,6 +403,9 @@ importers:
       prac-client-ui-frame:
         specifier: workspace:*
         version: link:../ui-frame
+      prac-client-ui-widget:
+        specifier: workspace:*
+        version: link:../ui-widget
       prac-client-vscode-host:
         specifier: workspace:*
         version: link:../vscode-host

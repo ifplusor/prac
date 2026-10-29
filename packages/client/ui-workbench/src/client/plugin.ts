@@ -49,15 +49,17 @@ import type { PracDshFace } from "prac-client-ui-dsh/lib";
 // whichever package owns them (the mechanism declares the `root` children it registers,
 // including `shell.overlay`), so nothing here re-imports a key's owner for comparison.
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
-import type { LayoutState, Side } from "prac-client-ui-frame/lib";
+import type { FrameView, LayoutState, Side } from "prac-client-ui-frame/lib";
+import type { PracWidgetsFace } from "prac-client-ui-widget/lib";
 // Types only, for its `Context` merge (`ctx.pracVscode`): the arrangement follows
 // the app's open-file set, and naming the face puts that service in this program.
-import type {} from "prac-client-vscode-host/client";
+import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 import {
   CENTER,
   LEFT,
   RIGHT,
   arrange,
+  containerBoardTargets,
   openFileInto,
   placeCatalogue,
   restoreCentre,
@@ -604,6 +606,57 @@ export function apply(ctx: Context): void {
   // arrangement follows the app's catalogue instead of a fixed editor view: file
   // entries drive the active window and the centre, view entries are placed by their own
   // location (with the arrangement's exclusions).
+  const viewStub = (id: string): FrameView =>
+    ({
+      id,
+      host: undefined,
+      mount: () => undefined,
+      release: () => undefined,
+      focus: () => undefined,
+    }) as unknown as FrameView;
+  const widgets = ctx as unknown as { pracWidgets: PracWidgetsFace };
+  const containerBoards = new Map<string, ReturnType<PracWidgetsFace["createBoardGroup"]>>();
+  const syncContainerBoards = (entries: readonly VscodeCatalogueEntry[]): void => {
+    const wanted = new Map(containerBoardTargets(entries).map((target) => [target.region, target]));
+    for (const [region, board] of containerBoards) {
+      if (wanted.has(region)) continue;
+      layout.unregisterViewGroup(board.id);
+      board.dispose();
+      containerBoards.delete(region);
+    }
+    for (const target of wanted.values()) {
+      let board = containerBoards.get(target.region);
+      if (board === undefined) {
+        try {
+          board = widgets.pracWidgets.createBoardGroup(target.region, target.label);
+          layout.registerSurface(board, target.region);
+          containerBoards.set(target.region, board);
+        } catch {
+          board?.dispose();
+          continue;
+        }
+      }
+      for (const view of target.views) {
+        if (board.view(view) !== undefined) continue;
+        try {
+          board.add(viewStub(view));
+        } catch {
+          // The frame may not have materialized the row yet; the next layout pass retries.
+        }
+      }
+    }
+  };
+  ctx.effect(
+    () => () => {
+      for (const board of containerBoards.values()) {
+        layout.unregisterViewGroup(board.id);
+        board.dispose();
+      }
+      containerBoards.clear();
+    },
+    "prac-workbench: container boards",
+  );
+
   ctx.inject(["pracVscode"], (scope) => {
     const vscode = scope.pracVscode;
     const sync = (): void => {
@@ -618,6 +671,7 @@ export function apply(ctx: Context): void {
       // the region the app reports, or — when the app has not shown it yet — the
       // centre, or beside the file's other placement.
       placeCatalogue(layout, catalogue);
+      syncContainerBoards(catalogue);
       // Files the app no longer has open are **forgotten**: their record is what the
       // frame persists, a placement is named by the host (so the next open mints a fresh
       // name), and a record left behind would both render a tab for a file nobody has open
@@ -913,4 +967,4 @@ export const name = "prac-client-ui-workbench";
  * the mechanism's placement face. `pracFrame` is a hard dependency — every
  * placement goes through it.
  */
-export const inject = ["slots", "layout", "pracFrame", "pracDsh"];
+export const inject = ["slots", "layout", "pracFrame", "pracDsh", "pracWidgets"];

@@ -44,6 +44,7 @@ const read = () =>
       })),
       surfaces: [...document.querySelectorAll("[data-prac-surface]")].map((element) => ({
         region: element.getAttribute("data-prac-region"),
+        split: element.getAttribute("data-prac-split"),
         kind: element.getAttribute("data-prac-surface"),
       })),
     };
@@ -91,6 +92,9 @@ report({
       "vscode:view:outline",
       "vscode:view:timeline",
     ].every((id) => explorer.stack.some((row) => row.id === id && row.height > 0)),
+    "rail containers own widget-board surfaces":
+      initial.surfaces.some((surface) => surface.kind === "widget-board") &&
+      explorer.surfaces.some((surface) => surface.kind === "widget-board"),
     "the borrowed surfaces are registered": [
       "vscode:view:workbench.explorer.fileView",
       "vscode:view:workbench.view.search",

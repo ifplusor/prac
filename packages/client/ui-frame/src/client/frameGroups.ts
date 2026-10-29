@@ -9,7 +9,7 @@
  * @module prac-client-ui-frame/client/frameGroups
  */
 
-import { findRegion } from "./model.js";
+import { findNode } from "./model.js";
 import type { GroupAction, GroupActionBinding, ViewGroup } from "prac-ui-kit";
 import type { LayoutStore } from "./store.js";
 import { ViewGroupLayoutBridge } from "./frameBridge.js";
@@ -54,7 +54,8 @@ export class ViewGroupHost {
     if (this.#regions.has(regionId)) {
       throw new Error(`region already hosts a view group: ${regionId}`);
     }
-    if (findRegion(this.store.get().tree, regionId) === null) {
+    const node = findNode(this.store.get().tree, regionId);
+    if (node === null || (node.type !== "region" && surface?.kind !== "widget-board")) {
       throw new Error(`unknown region: ${regionId}`);
     }
     const bridge = new ViewGroupLayoutBridge(group, this.store, regionId);

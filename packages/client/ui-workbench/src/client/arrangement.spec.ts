@@ -146,6 +146,7 @@ function recordingFace(views: LayoutState["views"] = {}): {
       throw new Error("not used by this test double");
     }) as PracLayoutFace["registerViewGroup"],
     unregisterViewGroup: () => {},
+    registerSurface: () => ({}) as never,
   } satisfies PracLayoutFace;
   return { face, calls, children };
 }

@@ -1689,7 +1689,7 @@ export function createFrame(
           ...(sources.viewGroups?.surfaceFor(node.id) === undefined
             ? {}
             : { "data-prac-surface": sources.viewGroups.surfaceFor(node.id)?.kind }),
-          ref: (element: HTMLDivElement | null) => {
+          ref: (element: HTMLDivElement | null): void => {
             if (element === null) return;
             sources.viewGroups?.surfaceFor(node.id)?.attach?.(element);
           },
@@ -2194,6 +2194,13 @@ export function createFrame(
           key: node.id,
           "data-prac-split": node.id,
           "data-prac-split-dir": node.dir,
+          ...(sources.viewGroups?.surfaceFor(node.id) === undefined
+            ? {}
+            : { "data-prac-surface": sources.viewGroups.surfaceFor(node.id)?.kind }),
+          ref: (element: HTMLDivElement | null): void => {
+            if (element === null) return;
+            sources.viewGroups?.surfaceFor(node.id)?.attach?.(element);
+          },
           style: splitStyle(node),
         },
         parts,

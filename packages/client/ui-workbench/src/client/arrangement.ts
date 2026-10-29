@@ -95,6 +95,33 @@ const entryKey = (entry: VscodeCatalogueEntry): string =>
 /** The region id of one container child. */
 const childRegionId = (region: string, key: string): string => `${region}/${key}`;
 
+/** One container board target: the geometry node, its label and member views. */
+export interface ContainerBoardTarget {
+  readonly region: string;
+  readonly label: string;
+  readonly views: readonly string[];
+}
+
+/** The container boards the app catalogue implies. */
+export function containerBoardTargets(
+  entries: readonly VscodeCatalogueEntry[],
+): readonly ContainerBoardTarget[] {
+  const groups = new Map<string, { label: string; views: string[] }>();
+  for (const entry of entries) {
+    if (entry.source !== "view") continue;
+    if (EXCLUDED_VIEWS.has(entry.appId)) continue;
+    const region = childRegionId(LOCATION_REGION[entry.location], entryKey(entry));
+    const bucket = groups.get(region) ?? { label: entry.containerTitle ?? entry.title, views: [] };
+    bucket.views.push(entry.view);
+    groups.set(region, bucket);
+  }
+  return [...groups].map(([region, bucket]) => ({
+    region,
+    label: bucket.label,
+    views: bucket.views,
+  }));
+}
+
 /** The region id prefix that marks the children this function owns. */
 const containerChildPrefix = (region: string): string => `${region}/container:`;
 

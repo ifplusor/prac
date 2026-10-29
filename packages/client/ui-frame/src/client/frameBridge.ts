@@ -8,7 +8,7 @@
  * @module prac-client-ui-frame/client/frameBridge
  */
 
-import { ensureStackShape, placeQuietly, removeView } from "./model.js";
+import { ensureStackShape, findNode, placeQuietly, removeView } from "./model.js";
 import type { LayoutStore } from "./store.js";
 import type { FrameViewGroup } from "./frameGroups.js";
 
@@ -17,12 +17,14 @@ export class ViewGroupLayoutBridge {
   readonly #known = new Set<string>();
   readonly #stop: () => void;
   #disposed = false;
+  readonly #split: boolean;
 
   constructor(
     private readonly group: FrameViewGroup,
     private readonly store: LayoutStore,
     readonly regionId: string,
   ) {
+    this.#split = findNode(store.get().tree, regionId)?.type === "split";
     this.#stop = group.onDidChange(() => this.sync());
     this.sync();
   }
@@ -41,7 +43,9 @@ export class ViewGroupLayoutBridge {
         // A person may have hidden this view through the frame's chrome. Group
         // membership is not a reason to bring it back; only an explicit show is.
         if (next.views[placement.viewId]?.hidden === true) continue;
-        next = placeQuietly(next, placement.viewId, this.regionId);
+        const target = this.#targetFor(placement.viewId);
+        if (target === undefined) continue;
+        next = placeQuietly(next, placement.viewId, target);
       }
       const frontId =
         placements.find((placement) => placement.active)?.viewId ??
@@ -60,6 +64,13 @@ export class ViewGroupLayoutBridge {
     });
     this.#known.clear();
     for (const viewId of current) this.#known.add(viewId);
+  }
+
+  /** A split's row region for one view; a region is its own target. */
+  #targetFor(viewId: string): string | undefined {
+    if (!this.#split) return this.regionId;
+    const entry = `${this.regionId}/stack/${viewId}`;
+    return findNode(this.store.get().tree, entry)?.type === "region" ? entry : undefined;
   }
 
   /** Remove this bridge's placements and stop listening. */
