@@ -29,6 +29,24 @@ import {
   type ViewRecord,
 } from "./contract.js";
 import { allocateContent, allocateStack, isStackSplit, nodeBasis } from "prac-ui-kit";
+import {
+  findNode,
+  findRegion,
+  findSplit,
+  firstRegionId,
+  replaceNode,
+  updateRegion,
+} from "prac-ui-kit";
+export {
+  findNode,
+  findRegion,
+  findSplit,
+  firstRegionId,
+  freshNodeId,
+  replaceNode,
+  subtreeMin,
+  updateRegion,
+} from "prac-ui-kit";
 export { allocateContent, allocateStack, isStackSplit, nodeBasis } from "prac-ui-kit";
 export type { Basis } from "prac-ui-kit";
 
@@ -174,54 +192,6 @@ export function defaultTree(): SplitNode {
 // ── tree helpers (all pure) ───────────────────────────────────────────
 
 /**
- * Depth-first region lookup.
- *
- * @param node - subtree root.
- * @param id - region id to find.
- * @returns the region node, or null.
- */
-export function findRegion(node: LayoutNode, id: string): RegionNode | null {
-  if (node.type === "region" && node.id === id) return node;
-  for (const child of childNodes(node)) {
-    const found = findRegion(child, id);
-    if (found) return found;
-  }
-  return null;
-}
-
-/**
- * Depth-first split lookup.
- *
- * @param node - subtree root.
- * @param id - split id to find.
- * @returns the split node, or null.
- */
-export function findSplit(node: LayoutNode, id: string): SplitNode | null {
-  if (node.type === "split" && node.id === id) return node;
-  // A split may live **under a region** (the container layer): a stack takes a container child's
-  // place, and a selectable region's children are where that split is. The search has to go through
-  // both kinds of node, the same way `findParentSplit` does.
-  for (const child of childNodes(node)) {
-    const found = findSplit(child, id);
-    if (found) return found;
-  }
-  return null;
-}
-
-/**
- * The first region id in tree order: the mechanism's generic home for a view
- * nothing has placed yet (never a per-view default).
- *
- * @param node - subtree root.
- * @returns the first region id.
- */
-export function firstRegionId(node: LayoutNode): string {
-  const children = childNodes(node);
-  if (node.type === "region" && children.length === 0) return node.id;
-  return firstRegionId(children[0]);
-}
-
-/**
  * The first region inside a **window group cell** (the first cell of the first
  * grid), or undefined when the tree has no grid.
  *
@@ -265,47 +235,6 @@ export function regionInfos(node: LayoutNode): RegionInfo[] {
     { id: node.id, collapsed: node.collapsed ?? false },
     ...(node.children ?? []).flatMap((child) => regionInfos(child)),
   ];
-}
-
-/**
- * Return a new tree with the node whose id matches replaced.
- *
- * @param node - subtree root.
- * @param id - node id to replace.
- * @param replacer - produces the replacement node.
- */
-export function replaceNode(
-  node: LayoutNode,
-  id: string,
-  replacer: (node: LayoutNode) => LayoutNode,
-): LayoutNode {
-  if (node.id === id) return replacer(node);
-  if (node.type === "region" && node.children === undefined) return node;
-  let changed = false;
-  const children = childNodes(node).map((child) => {
-    const next = replaceNode(child, id, replacer);
-    if (next !== child) changed = true;
-    return next;
-  });
-  if (!changed) return node;
-  return node.type === "split"
-    ? { ...node, children }
-    : { ...node, children: children as readonly RegionNode[] };
-}
-
-/**
- * Return a new tree with one region's record replaced by `updater`.
- *
- * @param tree - the tree to update.
- * @param id - region id.
- * @param updater - pure region updater.
- */
-export function updateRegion(
-  tree: LayoutNode,
-  id: string,
-  updater: (node: RegionNode) => RegionNode,
-): LayoutNode {
-  return replaceNode(tree, id, (node) => (node.type === "region" ? updater(node) : node));
 }
 
 /**
@@ -534,22 +463,6 @@ export function setRegionSelector(
  * @param tree - the tree to update.
  * @param id - the region to reveal.
  */
-/**
- * The node with this id, wherever it is — a region **or** a split.
- *
- * @param node - the subtree to search.
- * @param id - the id to look for.
- * @returns the node, or null when it is not in the tree.
- */
-export function findNode(node: LayoutNode, id: string): LayoutNode | null {
-  if (node.id === id) return node;
-  for (const child of node.children ?? []) {
-    const hit = findNode(child, id);
-    if (hit !== null) return hit;
-  }
-  return null;
-}
-
 export function revealRegion(tree: LayoutNode, id: string): LayoutNode {
   const walk = (node: LayoutNode): LayoutNode => {
     if (node.type === "split") {
@@ -633,42 +546,6 @@ export function place(state: LayoutState, viewId: string, regionId: string): Lay
   const landing = next.views[viewId]?.region ?? regionId;
   const tree = revealRegion(next.tree, landing);
   return ensureStackShape(tree === next.tree ? next : { ...next, tree });
-}
-
-/**
- * A node id the tree does not already use.
- *
- * The frame **persists its tree** across page loads, while the counter that names new
- * regions and splits starts over each load — so a split made after a reload can mint the
- * very id a restored node already has. Two nodes with one id are two regions as far as the
- * frame is concerned (it keys a region by its id), and the views placed in that region are
- * mounted in **both** copies: measured, one file's second placement had two hosts, one of
- * them empty, and the file's view was mounted twice.
- *
- * @param tree - the tree the new node will join.
- * @param kind - the id's prefix (`region`, `split`).
- * @param next - the counter to advance for each candidate.
- * @returns an id no node in the tree carries.
- */
-export function freshNodeId(tree: LayoutNode, kind: string, next: () => number): string {
-  let id = `${kind}-${next()}`;
-  while (nodeWithId(tree, id) !== null) id = `${kind}-${next()}`;
-  return id;
-}
-
-/**
- * The node carrying an id, anywhere in the tree.
- *
- * @param node - the subtree to search.
- * @param id - the id to look for.
- */
-function nodeWithId(node: LayoutNode, id: string): LayoutNode | null {
-  if (node.id === id) return node;
-  for (const child of node.children ?? []) {
-    const found = nodeWithId(child, id);
-    if (found !== null) return found;
-  }
-  return null;
 }
 
 /**
@@ -1275,25 +1152,6 @@ export function sashSizes(
   }
   const upper = Math.max(b.min, budget - a.min);
   return { b: Math.min(Math.max(b.size - delta, b.min), upper) };
-}
-
-/**
- * The smallest extent a subtree can occupy along its split axis: the sum of its
- * regions' minima, so a split's budget can reserve room for children the drag is
- * not touching.
- *
- * @param node - the subtree to measure.
- */
-export function subtreeMin(node: LayoutNode): number {
-  if (node.type === "grid") return Math.max(0, ...node.children.map(subtreeMin));
-  if (node.type === "split")
-    return node.children.reduce((total, child) => total + subtreeMin(child), 0);
-  const children = node.children;
-  if (children !== undefined && children.length > 0) {
-    // One child is shown at a time, so the selector needs the widest child's room.
-    return Math.max(node.min, ...children.map((child) => subtreeMin(child)));
-  }
-  return node.min;
 }
 
 /**
