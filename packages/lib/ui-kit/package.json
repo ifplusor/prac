@@ -8,6 +8,7 @@
     "dist"
   ],
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "exports": {
@@ -27,7 +28,31 @@
       "types": "./dist/binding.d.mts",
       "default": "./dist/binding.mjs"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./allocation": {
+      "types": "./dist/allocation.d.mts",
+      "default": "./dist/allocation.mjs"
+    },
+    "./tree": {
+      "types": "./dist/tree.d.mts",
+      "default": "./dist/tree.mjs"
+    },
+    "./grid": {
+      "types": "./dist/grid.d.mts",
+      "default": "./dist/grid.mjs"
+    },
+    "./view": {
+      "types": "./dist/view.d.mts",
+      "default": "./dist/view.mjs"
+    },
+    "./viewGroup": {
+      "types": "./dist/viewGroup.d.mts",
+      "default": "./dist/viewGroup.mjs"
+    },
+    "./snapshot": {
+      "types": "./dist/snapshot.d.mts",
+      "default": "./dist/snapshot.mjs"
+    }
   },
   "scripts": {
     "build": "vp pack",

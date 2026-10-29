@@ -25,6 +25,6 @@ export interface SurfaceBinder<TGroup = unknown> {
 
 /** Walk every node id in a geometry tree. */
 export function geometryNodeIds(node: GeometryNode): readonly string[] {
-  if (node.kind === "region") return [node.id];
-  return [node.id, ...node.children.flatMap((child) => geometryNodeIds(child))];
+  if (node.type === "region") return [node.id];
+  return [node.id, ...(node.children ?? []).flatMap((child) => geometryNodeIds(child))];
 }

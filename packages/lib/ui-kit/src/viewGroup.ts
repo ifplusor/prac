@@ -7,7 +7,7 @@
  * @module prac-ui-kit/viewGroup
  */
 
-import type { View, ViewHost } from "./view.js";
+import type { View } from "./view.js";
 
 /** How a group presents its member views. */
 export type ViewGroupMode = "stack" | "select";
