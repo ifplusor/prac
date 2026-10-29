@@ -2,10 +2,14 @@
 
 Framework-agnostic geometry, surface and binding kernel for layout-heavy UIs.
 
-`prac-ui-kit` is the reusable core behind prac's UI. It contains no React, no DSH,
-no VS Code and no application-specific window/widget model. A host supplies its
-own renderer and product objects; the kit supplies the layout vocabulary and the
-contracts that let geometry, content and hosting stay independent.
+`prac-ui-kit` is **incubating inside the prac monorepo**. It contains no React,
+no DSH, no VS Code and no application-specific window/widget model. A host
+supplies its own renderer and product objects; the kit supplies the layout
+vocabulary and the contracts that let geometry, content and hosting stay
+independent.
+
+It is deliberately `private` for now. The API is proven by prac's own plugins
+first; publishing is a later decision, not a current promise.
 
 ## Scope
 
@@ -30,12 +34,6 @@ Not in scope:
 - VS Code adapters
 - prac's default arrangement
 - application / window / widget product semantics
-
-## Install
-
-```bash
-pnpm add prac-ui-kit
-```
 
 ## Usage
 
@@ -66,14 +64,15 @@ Any geometry node can carry a surface; a node does not have to be a leaf region.
 ## Package boundaries
 
 ```text
-prac-ui-kit    pure reusable library
+prac-ui-kit    incubating pure library (private)
 prac client    DSH plugins
 prac bundle    composition only
 ```
 
-The kit is published independently. `ui-frame` consumes it as a build-time
-dependency and bundles the runtime into its client artifact; `ui-window` and
-`ui-widget` only consume its contracts.
+`ui-frame` consumes it as a build-time dependency and bundles the runtime into
+its client artifact; `ui-window` and `ui-widget` only consume its contracts.
+
+The package is not released from this repository yet.
 
 ## Development
 

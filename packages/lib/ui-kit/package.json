@@ -1,7 +1,7 @@
 {
   "name": "prac-ui-kit",
   "version": "0.0.0",
-  "private": false,
+  "private": true,
   "description": "Framework-agnostic layout, surface and binding kernel for prac and other UI projects.",
   "license": "MIT",
   "files": [
