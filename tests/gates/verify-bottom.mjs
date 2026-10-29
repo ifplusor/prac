@@ -116,6 +116,14 @@ await page.evaluate(
 await page.waitForTimeout(1500);
 const opened = await sample();
 
+// Ctrl/Cmd+J toggles it without the pointer.
+await page.keyboard.press("Control+J");
+await page.waitForTimeout(800);
+const shortcutClosed = await sample();
+await page.keyboard.press("Control+J");
+await page.waitForTimeout(800);
+const shortcutOpen = await sample();
+
 // Collapse it again: the row takes the room back.
 await page.evaluate((bottom) => globalThis.__pracFrame.setCollapsed(bottom, true), BOTTOM);
 await page.waitForTimeout(800);
@@ -153,6 +161,7 @@ const checks = {
   bottomPainted: opened.distinctColours > 4,
   // 3. The row above gives the room, and gets it back on collapse.
   rowGivesRoom: (opened.stage?.h ?? 0) < (initial.stage?.h ?? 0) - 100,
+  shortcutToggles: (shortcutClosed.bottom?.h ?? 999) <= 2 && (shortcutOpen.bottom?.h ?? 0) >= 200,
   collapseReturnsRoom:
     (collapsed.bottom?.h ?? 0) <= 2 && near(collapsed.stage?.h, initial.stage?.h, 8),
   // Only this feature's own failures; the page's known noise is not ours.
@@ -164,7 +173,7 @@ const checks = {
 
 report({
   url,
-  facts: { emptied, initial, opened, collapsed, consoleErrors },
+  facts: { emptied, initial, opened, shortcutClosed, shortcutOpen, collapsed, consoleErrors },
   checks,
   ok: "OK: the bottom bar is absent while empty, spans the frame when filled, takes its room from the row above, and gives it back when collapsed.",
 });

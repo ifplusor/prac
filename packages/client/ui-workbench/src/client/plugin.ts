@@ -687,6 +687,19 @@ export function apply(ctx: Context): void {
     "prac-workbench: container boards",
   );
 
+  // VS Code's panel shortcut: Ctrl/Cmd+J toggles the bottom track.
+  ctx.effect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+      if (event.key.toLowerCase() !== "j") return;
+      event.preventDefault();
+      const node = layout.getState().tree?.children?.find((child) => child.id === "bottom");
+      layout.setCollapsed("bottom", !(node?.type === "region" && node.collapsed === true));
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, "prac-workbench: bottom shortcut");
+
   ctx.inject(["pracVscode"], (scope) => {
     const vscode = scope.pracVscode;
     const sync = (): void => {
