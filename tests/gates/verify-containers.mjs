@@ -33,7 +33,7 @@ const read = () =>
     return {
       left: rail("left"),
       right: rail("right"),
-      views: globalThis.__pracLayout?.listViews().map((view) => ({
+      views: globalThis.__pracFrame?.listViews().map((view) => ({
         id: view.id,
         region: view.region ?? null,
         hidden: view.hidden === true,
@@ -93,7 +93,7 @@ report({
       "vscode:view:workbench.scm",
     ].every((id) => initial.views.some((view) => view.id === id)),
     "no prac-owned console errors":
-      own("__pracLayout").length === 0 && own("vscode-embed:").length === 0,
+      own("__pracFrame").length === 0 && own("vscode-embed:").length === 0,
   },
   ok: "OK: the dock rail lists the borrowed containers, switches tools, and mounts their views",
 });

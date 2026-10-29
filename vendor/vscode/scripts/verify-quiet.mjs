@@ -42,7 +42,7 @@ page.on("pageerror", (error) => consoleErrors.push(String(error)));
 const instrument = () =>
   page.evaluate(() => {
     globalThis.__quiet = { mirrored: 0, hosts: 0, layout: 0, roots: 0 };
-    globalThis.__pracLayout.subscribe(() => {
+    globalThis.__pracFrame.subscribe(() => {
       globalThis.__quiet.layout += 1;
     });
     const watch = () => {

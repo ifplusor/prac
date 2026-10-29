@@ -19,7 +19,7 @@ const { page, close } = await openPrac(url);
 
 async function settle() {
   await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
-  await page.waitForFunction(() => !!globalThis.__pracLayout, null, { timeout: 60_000 });
+  await page.waitForFunction(() => !!globalThis.__pracFrame, null, { timeout: 60_000 });
   await page.waitForTimeout(1200);
 }
 
@@ -49,7 +49,7 @@ const initial = await sample();
 
 await page.evaluate(
   ({ left, view, width }) => {
-    const layout = globalThis.__pracLayout;
+    const layout = globalThis.__pracFrame;
     layout.setWidth(left, width);
     layout.setViewCollapsed(view, true);
   },

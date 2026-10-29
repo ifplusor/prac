@@ -27,7 +27,7 @@ const catalogue = await page.evaluate(() => ({
   rows: [...document.querySelectorAll("[data-prac-recall-row]")].map((row) =>
     row.getAttribute("data-prac-recall-row"),
   ),
-  views: globalThis.__pracLayout.listViews().map((view) => view.id),
+  views: globalThis.__pracFrame.listViews().map((view) => view.id),
   selected:
     document
       .querySelector("[data-prac-recall-row][data-prac-recall-selected]")
@@ -37,19 +37,19 @@ const catalogue = await page.evaluate(() => ({
 // Hide one row, then show it again through the same surface.
 const target = "vscode:view:outline";
 const before = await page.evaluate(
-  (id) => globalThis.__pracLayout.listViews().find((view) => view.id === id),
+  (id) => globalThis.__pracFrame.listViews().find((view) => view.id === id),
   target,
 );
 await page.click(`[data-prac-recall-toggle="${target}"]`);
 await page.waitForTimeout(500);
 const hidden = await page.evaluate(
-  (id) => globalThis.__pracLayout.listViews().find((view) => view.id === id),
+  (id) => globalThis.__pracFrame.listViews().find((view) => view.id === id),
   target,
 );
 await page.click(`[data-prac-recall-toggle="${target}"]`);
 await page.waitForTimeout(500);
 const restored = await page.evaluate(
-  (id) => globalThis.__pracLayout.listViews().find((view) => view.id === id),
+  (id) => globalThis.__pracFrame.listViews().find((view) => view.id === id),
   target,
 );
 
@@ -74,7 +74,7 @@ report({
     "show restores it": restored?.hidden !== true,
     "Escape closes the surface": closed,
     "no prac-owned console errors":
-      own("__pracLayout").length === 0 && own("prac-client-ui-layout").length === 0,
+      own("__pracFrame").length === 0 && own("prac-client-ui-frame").length === 0,
   },
   ok: "OK: the recall surface opens, lists the catalogue, hides / shows a view, and closes with Escape",
 });

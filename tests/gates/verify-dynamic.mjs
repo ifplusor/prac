@@ -31,7 +31,7 @@ const state = () =>
       catalogue: globalThis.__pracVscodeFace
         ?.catalogue()
         .filter((entry) => entry.view === view || entry.appId === appView),
-      frames: globalThis.__pracLayout?.listViews().filter((entry) => entry.id === view) ?? [],
+      frames: globalThis.__pracFrame?.listViews().filter((entry) => entry.id === view) ?? [],
       hosts: document.querySelectorAll(`[data-vscode-embed-view="${appView}"]`).length,
     }),
     { view: VIEW, appView: APP_VIEW },
@@ -58,7 +58,7 @@ const run = (command) =>
 const before = await state();
 await run("prac.gate.show");
 await waitFor((current) => current.catalogue.length === 1);
-await page.evaluate((view) => globalThis.__pracLayout?.setFront(view), VIEW);
+await page.evaluate((view) => globalThis.__pracFrame?.setFront(view), VIEW);
 await page.evaluate(() =>
   document.querySelector('[data-prac-container="left/container:workbench.view.explorer"]')?.click(),
 );
@@ -89,7 +89,7 @@ report({
     "the host is released": hidden.hosts === 0,
     "the view returns": shownAgain.catalogue.length === 1 && shownAgain.frames.length === 1,
     "no prac-owned console errors":
-      own("__pracLayout").length === 0 && own("vscode-embed:").length === 0,
+      own("__pracFrame").length === 0 && own("vscode-embed:").length === 0,
   },
   ok: "OK: a contributed view enters and leaves the catalogue without a reload; its frame placement follows.",
 });

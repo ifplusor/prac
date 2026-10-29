@@ -227,8 +227,8 @@ await fourth.show();
 // room, so this stack is the five rows these drag checks mean to measure.
 await fourth.page.evaluate(() => {
   for (const view of ["vscode:view:outline", "vscode:view:timeline"]) {
-    globalThis.__pracLayout.setViewCollapsed(view, false);
-    globalThis.__pracLayout.setViewSize(view, 160);
+    globalThis.__pracFrame.setViewCollapsed(view, false);
+    globalThis.__pracFrame.setViewSize(view, 160);
   }
 });
 await fourth.page.waitForTimeout(800);

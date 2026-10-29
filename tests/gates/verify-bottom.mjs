@@ -36,9 +36,7 @@ await page.waitForTimeout(1500);
 // everything it placed — the region and its container children.
 await page.waitForFunction(
   (bottom) =>
-    globalThis.__pracLayout
-      .listViews()
-      .some((view) => (view.region ?? "").startsWith(`${bottom}/`)),
+    globalThis.__pracFrame.listViews().some((view) => (view.region ?? "").startsWith(`${bottom}/`)),
   BOTTOM,
   { timeout: 90_000 },
 );
@@ -58,10 +56,10 @@ await page.waitForFunction(
 async function emptyTheBar() {
   for (let attempt = 0; attempt < 20; attempt++) {
     await page.evaluate((bottom) => {
-      for (const view of globalThis.__pracLayout.listViews()) {
+      for (const view of globalThis.__pracFrame.listViews()) {
         const region = view.region ?? "";
         if (region === bottom || region.startsWith(`${bottom}/`)) {
-          globalThis.__pracLayout.hide(view.id);
+          globalThis.__pracFrame.hide(view.id);
         }
       }
     }, BOTTOM);
@@ -113,8 +111,8 @@ const initial = await sample();
 // Fill the bar: place the view, then open the region.
 await page.evaluate(
   ({ bottom, view }) => {
-    globalThis.__pracLayout.place(view, bottom);
-    globalThis.__pracLayout.setCollapsed(bottom, false);
+    globalThis.__pracFrame.place(view, bottom);
+    globalThis.__pracFrame.setCollapsed(bottom, false);
   },
   { bottom: BOTTOM, view: VIEW },
 );
@@ -122,7 +120,7 @@ await page.waitForTimeout(1500);
 const opened = await sample();
 
 // Collapse it again: the row takes the room back.
-await page.evaluate((bottom) => globalThis.__pracLayout.setCollapsed(bottom, true), BOTTOM);
+await page.evaluate((bottom) => globalThis.__pracFrame.setCollapsed(bottom, true), BOTTOM);
 await page.waitForTimeout(800);
 const collapsed = await sample();
 
@@ -162,8 +160,8 @@ const checks = {
     (collapsed.bottom?.h ?? 0) <= 2 && near(collapsed.stage?.h, initial.stage?.h, 8),
   // Only this feature's own failures; the page's known noise is not ours.
   noErrors:
-    own("__pracLayout").length === 0 &&
-    own("prac-client-ui-layout").length === 0 &&
+    own("__pracFrame").length === 0 &&
+    own("prac-client-ui-frame").length === 0 &&
     own("vscode-embed:").length === 0,
 };
 

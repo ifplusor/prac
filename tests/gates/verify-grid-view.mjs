@@ -13,7 +13,7 @@ await page.evaluate((key) => localStorage.removeItem(key), STATE_KEY);
 await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForTimeout(2500);
-await page.evaluate((view) => globalThis.__pracLayout.splitView(view, "right"), CONVERSATION);
+await page.evaluate((view) => globalThis.__pracFrame.splitView(view, "right"), CONVERSATION);
 await page.waitForTimeout(1200);
 
 await page.keyboard.press("Control+Alt+KeyV");
@@ -60,7 +60,7 @@ await page.keyboard.press("Escape");
 await page.waitForTimeout(1200);
 
 const placed = await page.evaluate((view) => {
-  const record = globalThis.__pracLayout.getState().views[view];
+  const record = globalThis.__pracFrame.getState().views[view];
   return record === undefined ? null : { region: record.region, hidden: record.hidden };
 }, VIEW);
 
@@ -68,7 +68,7 @@ await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForTimeout(2500);
 const restored = await page.evaluate((view) => {
-  const record = globalThis.__pracLayout.getState().views[view];
+  const record = globalThis.__pracFrame.getState().views[view];
   return record === undefined ? null : { region: record.region, hidden: record.hidden };
 }, VIEW);
 

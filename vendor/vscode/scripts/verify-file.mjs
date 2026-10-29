@@ -294,7 +294,7 @@ const activeAfterClick = await page.evaluate(
 // one surface each — VS Code's model, with prac's regions as its grid.
 step("split region");
 await page.evaluate(
-  (resource) => globalThis.__pracLayout.splitView(globalThis.__pracFileView(resource), "right"),
+  (resource) => globalThis.__pracFrame.splitView(globalThis.__pracFileView(resource), "right"),
   uriOf(FILE_A),
 );
 await waitForSurface(uriOf(FILE_A));
@@ -303,7 +303,7 @@ const split = await liveSurfaces();
 // …and moving it back leaves one region, so one group shows it again.
 step("merge region");
 await page.evaluate(
-  (resource) => globalThis.__pracLayout.place(globalThis.__pracFileView(resource), "center"),
+  (resource) => globalThis.__pracFrame.place(globalThis.__pracFileView(resource), "center"),
   uriOf(FILE_A),
 );
 await waitForSurface(uriOf(FILE_A));
@@ -393,7 +393,7 @@ if (activeResource === null) throw new Error("no active editor to exercise the c
 // `activate`. Both halves matter: prac's front view and the app's active editor are
 // two states, and the UI keeps them in step through this action.
 await page.evaluate(
-  (resource) => globalThis.__pracLayout.place(globalThis.__pracFileView(resource), "center"),
+  (resource) => globalThis.__pracFrame.place(globalThis.__pracFileView(resource), "center"),
   activeResource,
 );
 await page.waitForTimeout(1500);
@@ -428,7 +428,7 @@ if (surfaceResource === null) {
       children: element.children.length,
       monaco: element.querySelectorAll(".monaco-editor").length,
     })),
-    records: Object.entries(globalThis.__pracLayout.getState().views)
+    records: Object.entries(globalThis.__pracFrame.getState().views)
       .filter(([id]) => id.startsWith("vscode:file:"))
       .map(([id, view]) => `${id.split("/").pop()}@${view.region}${view.hidden ? "(hidden)" : ""}`),
     open: globalThis.__vscodeEmbed.face.listOpenFiles().map((r) => r.split("/").pop()),
@@ -460,7 +460,7 @@ const capabilityUndone = await capability();
 // which also *releases* that file's surface (the seat unmounts), so the app is the
 // only thing left that knows the file is open.
 await page.evaluate((resource) => {
-  globalThis.__pracLayout.hide(globalThis.__pracFileView(resource));
+  globalThis.__pracFrame.hide(globalThis.__pracFileView(resource));
 }, surfaceResource);
 await page.waitForTimeout(1500);
 const capabilityHidden = await capability();
@@ -522,7 +522,7 @@ const reloaded = await page.evaluate(() => ({
     .map((element) => element.getAttribute("data-prac-tab"))
     .filter((id) => id !== null && id.startsWith("vscode:file:")),
   conversationRegion:
-    globalThis.__pracLayout.getState().views["dsh:main:conversation"]?.region ?? null,
+    globalThis.__pracFrame.getState().views["dsh:main:conversation"]?.region ?? null,
 }));
 
 // The unit of a view is the **placement** — a file in one of the app's editor groups
@@ -540,7 +540,7 @@ await page.waitForTimeout(2000);
 // prac owns the region tree, so a group the workbench makes on its own would have no
 // region until the frame renders a view for it.)
 await page.evaluate(
-  (resource) => globalThis.__pracLayout.splitView(globalThis.__pracFileView(resource), "right"),
+  (resource) => globalThis.__pracFrame.splitView(globalThis.__pracFileView(resource), "right"),
   uriOf(FILE_B),
 );
 await page.waitForTimeout(3000);
@@ -548,7 +548,7 @@ await page.waitForTimeout(3000);
 // group the app's **active** one — which is what decides whose editor the command copies
 // (a split copies the active editor, and the split just made the other group active).
 await page.evaluate(
-  (resource) => globalThis.__pracLayout.place(globalThis.__pracFileView(resource), "center"),
+  (resource) => globalThis.__pracFrame.place(globalThis.__pracFileView(resource), "center"),
   uriOf(FILE_A),
 );
 await waitForSurface(uriOf(FILE_A));

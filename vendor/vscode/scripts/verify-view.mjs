@@ -77,7 +77,7 @@ await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 // nothing selects (the catalogue sync rescues it, but does not choose for the
 // person).
 await page.waitForFunction(
-  () => globalThis.__pracLayout.listViews().some((view) => (view.region ?? "").startsWith("left/")),
+  () => globalThis.__pracFrame.listViews().some((view) => (view.region ?? "").startsWith("left/")),
   null,
   { timeout: 90_000 },
 );
@@ -85,8 +85,8 @@ await page.waitForFunction(
 // side region, which is where a view composed by prac would go.
 await page.evaluate(
   ({ seat }) => {
-    globalThis.__pracLayout.show(seat);
-    globalThis.__pracLayout.place(seat, "left");
+    globalThis.__pracFrame.show(seat);
+    globalThis.__pracFrame.place(seat, "left");
   },
   { seat: SEAT },
 );
@@ -187,7 +187,7 @@ const placed = await sample();
 // (creating it again) — the release/recreate judgement, exercised through the UI.
 await page.evaluate(
   ({ seat }) => {
-    globalThis.__pracLayout.place(seat, "center");
+    globalThis.__pracFrame.place(seat, "center");
   },
   { seat: SEAT },
 );

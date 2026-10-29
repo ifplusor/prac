@@ -179,8 +179,9 @@ const OVERLAY = [
   // checkout had just been cleaned (2026-09-16).
   { from: "overlay/extensionsGallery.ts", to: "src/vs/workbench/browser/extensionsGallery.ts" },
   { from: "overlay/embeddedWorkbench.ts", to: "src/vs/workbench/browser/embeddedWorkbench.ts" },
-  { from: "overlay/pracEditorGroup.ts", to: "src/vs/workbench/browser/pracEditorGroup.ts" },
-  { from: "overlay/pracEditorHost.ts", to: "src/vs/workbench/browser/pracEditorHost.ts" },
+  { from: "overlay/pracWindowGroup.ts", to: "src/vs/workbench/browser/pracWindowGroup.ts" },
+  { from: "overlay/pracWindowGroupHost.ts", to: "src/vs/workbench/browser/pracWindowGroupHost.ts" },
+  { from: "overlay/pracTurnDiff.ts", to: "src/vs/workbench/browser/pracTurnDiff.ts" },
   { from: "overlay/embeddedWebMain.ts", to: "src/vs/workbench/browser/embeddedWebMain.ts" },
 ];
 
@@ -373,6 +374,7 @@ function stampServerCommit() {
 const BUILTIN_EXTENSIONS = [
   "css-language-features/client",
   "css-language-features/server",
+  "markdown-language-features",
   "typescript-language-features",
 ];
 

@@ -13,16 +13,16 @@ await page.evaluate((key) => localStorage.removeItem(key), STATE_KEY);
 await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForTimeout(2500);
-await page.evaluate((view) => globalThis.__pracLayout.splitView(view, "right"), CONVERSATION);
+await page.evaluate((view) => globalThis.__pracFrame.splitView(view, "right"), CONVERSATION);
 await page.waitForTimeout(1200);
 
 const target = await page.evaluate(
   () =>
-    globalThis.__pracLayout
+    globalThis.__pracFrame
       .listRegions()
       .map((region) => region.id)
       .find((id) => id !== "center" && id.startsWith("center/")) ??
-    globalThis.__pracLayout
+    globalThis.__pracFrame
       .listRegions()
       .map((region) => region.id)
       .find((id) => id.startsWith("region-")),
@@ -54,7 +54,7 @@ await page.evaluate(
 );
 await page.waitForTimeout(1200);
 const placed = await page.evaluate((view) => {
-  const record = globalThis.__pracLayout.getState().views[view];
+  const record = globalThis.__pracFrame.getState().views[view];
   return record === undefined ? null : { region: record.region, hidden: record.hidden };
 }, CONVERSATION);
 
@@ -62,7 +62,7 @@ await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForTimeout(2500);
 const restored = await page.evaluate((view) => {
-  const record = globalThis.__pracLayout.getState().views[view];
+  const record = globalThis.__pracFrame.getState().views[view];
   return record === undefined ? null : { region: record.region, hidden: record.hidden };
 }, CONVERSATION);
 

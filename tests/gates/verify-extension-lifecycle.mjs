@@ -22,7 +22,7 @@ const state = () =>
     ({ view }) => ({
       catalogue:
         globalThis.__pracVscodeFace?.catalogue().filter((entry) => entry.view === view) ?? [],
-      frames: globalThis.__pracLayout?.listViews().filter((entry) => entry.id === view) ?? [],
+      frames: globalThis.__pracFrame?.listViews().filter((entry) => entry.id === view) ?? [],
       hosts: document.querySelectorAll(`[data-prac-view-host][data-prac-view-id="${view}"]`).length,
     }),
     { view: VIEW },
@@ -38,7 +38,7 @@ async function waitFor(predicate) {
 
 async function activateView() {
   await page.click('[data-prac-activity="left"] [data-prac-rail-item="workbench.view.explorer"]');
-  await page.evaluate((view) => globalThis.__pracLayout.setFront(view), VIEW);
+  await page.evaluate((view) => globalThis.__pracFrame.setFront(view), VIEW);
   await page.waitForTimeout(1200);
 }
 

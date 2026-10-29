@@ -1,7 +1,7 @@
 /**
  * Verify the recall surface: the frame's view catalogue driven **from the UI**.
  *
- * The mechanism (`prac-client-ui-layout`) can already place/hide/show/split/collapse any
+ * The mechanism (`prac-client-ui-frame`) can already place/hide/show/split/collapse any
  * view, but until this surface existed there was no entry point: the only move a
  * user had was switching attention. This script refuses to trust the DOM for
  * that claim, because a moved or recalled view is exactly where a DOM check lies
@@ -171,7 +171,7 @@ async function sample(page) {
         };
       };
       const host = globalThis.__deep.one(editorHost);
-      const state = globalThis.__pracLayout.getState();
+      const state = globalThis.__pracFrame.getState();
       const sizes = {};
       const walk = (node) => {
         if (node.type === "region") sizes[node.id] = { size: node.size, collapsed: node.collapsed };
@@ -209,7 +209,7 @@ async function sample(page) {
         // conversation a view like any other it moves, so a gate that cares
         // about "the track stayed alive" has to read the placement, not infer it.
         conversationRegion:
-          globalThis.__pracLayout?.getState?.().views?.["dsh:main:conversation"]?.region ?? null,
+          globalThis.__pracFrame?.getState?.().views?.["dsh:main:conversation"]?.region ?? null,
         overlay: box(globalThis.__deep.one("[data-prac-recall]")),
         strip: !!globalThis.__deep.one("[data-prac-focus-strip]"),
         rows: [...globalThis.__deep.all(rowSelector)].map((element) => ({
@@ -232,8 +232,8 @@ async function sample(page) {
           document
             .querySelector("[data-prac-recall-selected]")
             ?.getAttribute("data-prac-recall-row") ?? null,
-        catalogue: globalThis.__pracLayout.listViews(),
-        regionInfos: globalThis.__pracLayout.listRegions(),
+        catalogue: globalThis.__pracFrame.listViews(),
+        regionInfos: globalThis.__pracFrame.listRegions(),
         catalogueVersion: state.catalogueVersion,
         modelSizes: sizes,
         modelViews: state.views,
@@ -297,18 +297,18 @@ await page.waitForTimeout(3000);
 
 const probeReady = await page.evaluate(
   () =>
-    typeof globalThis.__pracLayout?.listViews === "function" &&
-    typeof globalThis.__pracLayout?.listRegions === "function" &&
-    typeof globalThis.__pracLayout?.place === "function" &&
-    typeof globalThis.__pracLayout?.hide === "function" &&
-    typeof globalThis.__pracLayout?.show === "function" &&
-    typeof globalThis.__pracLayout?.splitView === "function",
+    typeof globalThis.__pracFrame?.listViews === "function" &&
+    typeof globalThis.__pracFrame?.listRegions === "function" &&
+    typeof globalThis.__pracFrame?.place === "function" &&
+    typeof globalThis.__pracFrame?.hide === "function" &&
+    typeof globalThis.__pracFrame?.show === "function" &&
+    typeof globalThis.__pracFrame?.splitView === "function",
 );
-if (!probeReady) throw new Error("globalThis.__pracLayout is missing the catalogue/placement face");
+if (!probeReady) throw new Error("globalThis.__pracFrame is missing the catalogue/placement face");
 
 const FILE_VIEW = await page.evaluate(
   (prefix) =>
-    globalThis.__pracLayout
+    globalThis.__pracFrame
       .listViews()
       .map((view) => view.id)
       .find((id) => id.startsWith(prefix)) ?? null,

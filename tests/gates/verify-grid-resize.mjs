@@ -15,7 +15,7 @@ await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForTimeout(2500);
 
-await page.evaluate((view) => globalThis.__pracLayout.splitView(view, "right"), CONVERSATION);
+await page.evaluate((view) => globalThis.__pracFrame.splitView(view, "right"), CONVERSATION);
 await page.waitForTimeout(1500);
 
 const cells = () =>

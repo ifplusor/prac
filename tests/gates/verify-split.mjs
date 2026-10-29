@@ -60,7 +60,7 @@ report({
     "the row keeps the same height":
       (leftAfter?.h ?? 0) === (left?.h ?? 0) && (centerAfter?.h ?? 0) === (center?.h ?? 0),
     "no prac-owned console errors":
-      own("__pracLayout").length === 0 && own("prac-client-ui-layout").length === 0,
+      own("__pracFrame").length === 0 && own("prac-client-ui-frame").length === 0,
   },
   ok: "OK: dragging the row sash resizes both sides without changing the row height",
 });

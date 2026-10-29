@@ -68,7 +68,7 @@ declare global {
    * Published by this module's `apply`; removal is scoped to the instance that
    * published it.
    */
-  var __pracLayout: PracLayoutFace | undefined;
+  var __pracFrame: PracLayoutFace | undefined;
 }
 import { VIEW_SLOT, readDeclaredViewIds } from "./catalogue.js";
 
@@ -251,9 +251,9 @@ export function apply(ctx: Context): void {
     // only registered bundle ids, so a driver script cannot reach the
     // Cordis context. Publishing the face is the minimal honest door —
     // removal is scoped to the instance we published.
-    globalThis.__pracLayout = pracFrame;
+    globalThis.__pracFrame = pracFrame;
     return () => {
-      if (globalThis.__pracLayout === pracFrame) delete globalThis.__pracLayout;
+      if (globalThis.__pracFrame === pracFrame) delete globalThis.__pracFrame;
       stopSlot();
       offMain();
       disposePracSpaces();
