@@ -22,6 +22,7 @@ import { WindowGroup } from "./window.js";
 /** A window-group-backed frame group (select mode). */
 export class WindowGroupAdapter implements ViewGroupRuntime, Surface {
   readonly kind = "window-group" as const;
+  #element: HTMLElement | undefined;
   readonly #group: WindowGroup;
   readonly #views = new Map<string, FrameView>();
   #binding: GroupBinding | undefined;
@@ -35,6 +36,18 @@ export class WindowGroupAdapter implements ViewGroupRuntime, Surface {
 
   get group(): FrameViewGroup {
     return this as unknown as FrameViewGroup;
+  }
+
+  get element(): HTMLElement | undefined {
+    return this.#element;
+  }
+
+  attach(element: HTMLElement): void {
+    this.#element = element;
+  }
+
+  detach(element: HTMLElement): void {
+    if (this.#element === element) this.#element = undefined;
   }
 
   get state(): ViewGroupState {

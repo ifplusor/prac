@@ -23,6 +23,7 @@ import { WidgetBoard } from "./board.js";
 /** A board-backed frame group (stack mode). */
 export class WidgetBoardGroup implements ViewGroupRuntime, Surface {
   readonly kind = "widget-board" as const;
+  #element: HTMLElement | undefined;
   readonly #board: WidgetBoard;
   readonly #views = new Map<string, FrameView>();
 
@@ -36,6 +37,18 @@ export class WidgetBoardGroup implements ViewGroupRuntime, Surface {
   /** Data-side snapshot in the frame's vocabulary. */
   get group(): FrameViewGroup {
     return this as unknown as FrameViewGroup;
+  }
+
+  get element(): HTMLElement | undefined {
+    return this.#element;
+  }
+
+  attach(element: HTMLElement): void {
+    this.#element = element;
+  }
+
+  detach(element: HTMLElement): void {
+    if (this.#element === element) this.#element = undefined;
   }
 
   get state(): ViewGroupState {

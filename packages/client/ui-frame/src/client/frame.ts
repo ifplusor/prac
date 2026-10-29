@@ -1686,6 +1686,13 @@ export function createFrame(
         {
           key: node.id,
           "data-prac-region": node.id,
+          ...(sources.viewGroups?.surfaceFor(node.id) === undefined
+            ? {}
+            : { "data-prac-surface": sources.viewGroups.surfaceFor(node.id)?.kind }),
+          ref: (element: HTMLDivElement | null) => {
+            if (element === null) return;
+            sources.viewGroups?.surfaceFor(node.id)?.attach?.(element);
+          },
           // A stack row is a region too: carry the entry markers so the frame's DOM-based helpers
           // (`readStackRows`, the reorder gesture, the gates) see a row where they expect one.
           ...(node.entry === true

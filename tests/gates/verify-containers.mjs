@@ -42,6 +42,10 @@ const read = () =>
         id: entry.getAttribute("data-prac-stack-entry"),
         height: Math.round(entry.getBoundingClientRect().height),
       })),
+      surfaces: [...document.querySelectorAll("[data-prac-surface]")].map((element) => ({
+        region: element.getAttribute("data-prac-region"),
+        kind: element.getAttribute("data-prac-surface"),
+      })),
     };
   });
 

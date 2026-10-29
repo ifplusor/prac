@@ -137,6 +137,13 @@ export class ViewGroupHost {
     }
   }
 
+  /** The surface registered for a region, if any. */
+  surfaceFor(regionId: string): Surface | undefined {
+    return [...this.#groups.values()].find(
+      (entry) => entry.regionId === regionId || entry.regionId.startsWith(`${regionId}/`),
+    )?.surface;
+  }
+
   /** Look up a registered group. */
   get(groupId: string): FrameGroup | undefined {
     return this.#groups.get(groupId);

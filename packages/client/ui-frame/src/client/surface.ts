@@ -17,6 +17,12 @@ export type SurfaceKind = "window-group" | "widget-board";
 export interface Surface {
   readonly kind: SurfaceKind;
   readonly group: FrameViewGroup;
+  /** The region DOM root this surface currently owns. */
+  readonly element?: HTMLElement;
+  /** Attach the region's content root. */
+  attach?(element: HTMLElement): void;
+  /** Detach the region's content root. */
+  detach?(element: HTMLElement): void;
   dispose(): void;
 }
 
