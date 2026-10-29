@@ -26,15 +26,17 @@ declare module "@deepseek-ai/cordis" {
 /** Install the widget service. */
 export function apply(ctx: Context): void {
   const surfaces = ctx as unknown as { pracSurfaces: SurfaceRegistry<ViewGroup> };
-  const boards = new Set<WidgetBoardGroup>();
+  const boards = new Map<string, WidgetBoardGroup>();
   const face: PracWidgetsFace = {
     registry: new WidgetRegistry(),
     createBoardGroup: (id, label) => {
+      const existing = boards.get(id);
+      if (existing !== undefined && !existing.disposed) return existing;
       const board = new WidgetBoardGroup(id, label);
-      boards.add(board);
+      boards.set(id, board);
       return board;
     },
-    boards: () => [...boards],
+    boards: () => [...boards.values()].filter((board) => !board.disposed),
   };
   ctx.provide("pracWidgets", face);
   globalThis.__pracWidgets = face;

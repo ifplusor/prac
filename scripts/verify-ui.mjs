@@ -27,6 +27,7 @@ const target = join(extensions, "prac.gate-dynamic-1.0.0");
 const fixture = join(repo, "tests/fixtures/dynamic-extension");
 const gates = [
   ["containers", "tests/gates/verify-containers.mjs"],
+  ["board", "tests/gates/verify-board.mjs"],
   ["stack", "tests/gates/verify-stack.mjs"],
   ["split", "tests/gates/verify-split.mjs"],
   ["grid", "tests/gates/verify-grid.mjs"],

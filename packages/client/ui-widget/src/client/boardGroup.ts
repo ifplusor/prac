@@ -24,6 +24,7 @@ import { WidgetBoard } from "./board.js";
 export class WidgetBoardGroup implements ViewGroupRuntime, Surface {
   readonly kind = "widget-board" as const;
   #element: HTMLElement | undefined;
+  #disposed = false;
   readonly #board: WidgetBoard;
   readonly #views = new Map<string, FrameView>();
 
@@ -115,7 +116,13 @@ export class WidgetBoardGroup implements ViewGroupRuntime, Surface {
     return this.#views.get(viewId);
   }
 
+  get disposed(): boolean {
+    return this.#disposed;
+  }
+
   dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
     for (const view of this.#views.values()) view.release();
     this.#views.clear();
     this.#board.dispose();
