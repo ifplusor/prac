@@ -93,8 +93,20 @@ async function sample() {
         ),
         // The view inside the bar, to prove the region is not an empty shell.
         viewHosts: [...document.querySelectorAll(`[data-prac-region="${bottom}"] *`)].length,
-        tabs: [...document.querySelectorAll(`[data-prac-container-bar="${bottom}"] button`)].length,
+        tabs: [...document.querySelectorAll(`[data-prac-container-bar="${bottom}"] button`)].map(
+          (tab) => ({
+            label: (tab.textContent ?? "").trim(),
+            role: tab.getAttribute("role"),
+            selected: tab.getAttribute("aria-selected"),
+          }),
+        ),
+        tablist: document
+          .querySelector(`[data-prac-container-bar="${bottom}"]`)
+          ?.getAttribute("role"),
         toggle: document.querySelector("[data-prac-bottom-toggle]") !== null,
+        togglePressed: document
+          .querySelector("[data-prac-bottom-toggle]")
+          ?.getAttribute("aria-pressed"),
       };
     },
     { bottom: BOTTOM, stage: CENTER },

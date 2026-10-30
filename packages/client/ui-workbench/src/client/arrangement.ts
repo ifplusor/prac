@@ -57,6 +57,19 @@ export const DEFAULT_PLACEMENTS: readonly {
  * place the two vocabularies meet: the mechanism reports the app's word, and the
  * frame knows only region ids.
  */
+/** Human names for VS Code's built-in panel containers. */
+const CONTAINER_LABELS: Readonly<Record<string, string>> = {
+  "workbench.panel.markers": "Problems",
+  "workbench.panel.output": "Output",
+  "workbench.panel.repl": "Debug Console",
+  terminal: "Terminal",
+};
+
+const containerLabel = (entry: VscodeCatalogueEntry): string =>
+  (entry.containerId === undefined ? undefined : CONTAINER_LABELS[entry.containerId]) ??
+  entry.containerTitle ??
+  entry.title;
+
 const LOCATION_REGION: Readonly<Record<VscodeCatalogueEntry["location"], string>> = {
   stage: CENTER,
   sidebar: LEFT,
@@ -111,7 +124,7 @@ export function containerBoardTargets(
     if (entry.source !== "view") continue;
     if (EXCLUDED_VIEWS.has(entry.appId)) continue;
     const region = childRegionId(LOCATION_REGION[entry.location], entryKey(entry));
-    const bucket = groups.get(region) ?? { label: entry.containerTitle ?? entry.title, views: [] };
+    const bucket = groups.get(region) ?? { label: containerLabel(entry), views: [] };
     bucket.views.push(entry.view);
     groups.set(region, bucket);
   }
@@ -172,7 +185,7 @@ export function placeCatalogue(
     const region = LOCATION_REGION[entry.location];
     const byKey = groups.get(region) ?? new Map<string, { label: string; views: string[] }>();
     const key = entryKey(entry);
-    const bucket = byKey.get(key) ?? { label: entry.containerTitle ?? entry.title, views: [] };
+    const bucket = byKey.get(key) ?? { label: containerLabel(entry), views: [] };
     bucket.views.push(entry.view);
     byKey.set(key, bucket);
     groups.set(region, byKey);

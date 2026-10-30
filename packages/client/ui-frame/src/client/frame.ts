@@ -1398,7 +1398,14 @@ export function createFrame(
         [...groups.values()].find((item) => item.regionId.endsWith(`/${childId}`));
       return createElement(
         "div",
-        { key: "containers", "data-prac-container-bar": node.id, style: TAB_STRIP_STYLE },
+        {
+          key: "containers",
+          "data-prac-container-bar": node.id,
+          role: "tablist",
+          "aria-label": node.label ?? ` ${node.id} containers`,
+          "aria-orientation": "horizontal",
+          style: TAB_STRIP_STYLE,
+        },
         (node.children ?? []).map((child) =>
           createElement(
             "button",
@@ -1407,6 +1414,10 @@ export function createFrame(
               type: "button",
               "data-prac-container": child.id,
               "data-prac-container-active": child.id === activeId ? "true" : "false",
+              role: "tab",
+              "aria-selected": child.id === activeId ? "true" : "false",
+              tabIndex: child.id === activeId ? 0 : -1,
+              "aria-label": groupAt(child.id)?.label ?? child.label ?? child.id,
               // An entry whose container has nothing visible is **shown** as empty rather than
               // silently skipped: clicking it still selects it, and the pane says so.
               "data-prac-container-empty": isPresent(state, child) ? "false" : "true",
@@ -1988,7 +1999,7 @@ export function createFrame(
                         cursor: "pointer",
                         opacity: 0.7,
                       },
-                      "aria-label": "Merge grid cell",
+                      "aria-label": `Merge grid cell ${child.id} with its neighbour`,
                     },
                     "⊞",
                   )
@@ -2022,7 +2033,7 @@ export function createFrame(
                         cursor: "pointer",
                         opacity: 0.7,
                       },
-                      "aria-label": "Unmerge grid cell",
+                      "aria-label": `Unmerge grid cell ${child.id}`,
                     },
                     "⧉",
                   )

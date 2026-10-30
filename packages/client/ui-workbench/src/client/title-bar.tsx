@@ -255,6 +255,8 @@ export function PracTitleBar({ face }: PracTitleBarProps): ReactElement {
         className: "prac-title-action",
         title: bottomOpen ? "Hide bottom panel" : "Show bottom panel",
         "data-prac-bottom-toggle": bottomOpen ? "open" : "closed",
+        "aria-pressed": bottomOpen,
+        "aria-label": bottomOpen ? "Hide bottom panel" : "Show bottom panel",
         onClick: () => {
           face.toggleBottom();
           setBottomOpen((open) => !open);
@@ -538,6 +540,7 @@ export const PRAC_SHELL_CSS = `
    Keep the page's two-finger horizontal swipe from leaving prac. */
 html,body{overscroll-behavior:none}
 [data-prac-focus-strip]{display:none!important}
+[data-prac-region="bottom"]{padding-left:48px!important;box-sizing:border-box!important}
 [data-prac-container="left/dsh:sidebar"]{display:none!important}
 [data-prac-region="left/dsh:sidebar"]{display:none!important}
 [data-prac-frame]{padding-top:38px!important;padding-right:48px!important;box-sizing:border-box}
