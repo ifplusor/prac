@@ -35,6 +35,7 @@ import type {
   EmbedBridge,
   FilePlacement,
   PracVscodeAction,
+  PracVscodeActionModel,
   WorkbenchFace,
   ViewCatalogueEntry,
 } from "prac-vscode";
@@ -73,11 +74,15 @@ export interface VscodeEmbedPage {
   error?: string;
   /** The app's workbench face, once its service graph has restored. */
   face?: WorkbenchFace;
+  /** Frame windows requested before the face existed; flushed on publish. */
+  pendingWindows?: Map<string, { title: string; region?: string }>;
+  /** The last active window requested before the face existed. */
+  pendingActiveWindow?: string | null;
   /** The app's region channel, kept until the workbench publishes a face to hand it to. */
   groupRegionChannel?: {
     createRegionBeside(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
-    removeRegion(region: string): void;
     regionInDirection(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+    hasOtherWindows(region: string): boolean;
     removeRegion(region: string): void;
   };
   /** The element hosting each view, by view id, across all consumers. */
@@ -314,8 +319,9 @@ export interface VscodeEmbedHandle {
    */
   setGroupRegionChannel(channel: {
     createRegionBeside(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
-    removeRegion(region: string): void;
     regionInDirection(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+    hasOtherWindows(region: string): boolean;
+    removeRegion(region: string): void;
   }): void;
   /**
    * Subscribe to changes in the placement set.
@@ -326,6 +332,27 @@ export interface VscodeEmbedHandle {
   onDidChangePlacements(listener: () => void): () => void;
   /** The files the app currently has open, as URI strings (placement-blind). */
   openFiles(): string[];
+  /**
+   * Project a frame-owned window into the active group as an empty editor.
+   *
+   * @param id - the frame window / view id.
+   * @param title - its visible title.
+   */
+  mapWindow(id: string, title: string, region?: string): void;
+  /** The frame-owned windows projected so far (diagnostics / gates). */
+  mappedWindows(): readonly string[];
+  /** The frame-owned window currently projected as the active editor. */
+  activeWindow(): string | null;
+  /** Make one frame-owned window the active editor. */
+  activateWindow(id: string): void;
+  /** Remove a frame-owned window's projection. */
+  unmapWindow(id: string): void;
+  /** Project a frame window's position in the active group's editor order. */
+  orderWindow(id: string, index: number): void;
+  /** Project a file view's position through the same window projection. */
+  orderFile(resource: string, index: number): void;
+  /** The active group's editor order, with frame window ids in place. */
+  windowOrder(region?: string): readonly string[];
   /**
    * The views the app currently offers, across every container.
    *
@@ -356,6 +383,22 @@ export interface VscodeEmbedHandle {
    * @param actionId - the action id from {@link containerActions}.
    */
   runAction(containerId: string, actionId: string): void;
+  /**
+   * The active editor window's resolved title actions.
+   *
+   * @param placement - the file placement whose group's actions to read; absent
+   * means the active group.
+   * @returns primary and secondary actions for that window.
+   */
+  editorActions(placement?: string): PracVscodeActionModel;
+  /**
+   * Run one editor-title action by id.
+   *
+   * @param placement - the placement whose group owns the action; absent means
+   * the active group.
+   * @param actionId - the action id from {@link editorActions}.
+   */
+  runEditorAction(placement: string | undefined, actionId: string): void;
   /**
    * The **float layer** component: where the app's own root is mounted.
    *
@@ -552,6 +595,16 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
               deferParts: true,
               publish: (face: WorkbenchFace) => {
                 record.face = face;
+                for (const [id, pending] of record.pendingWindows ?? []) {
+                  face.mapWindow(id, pending.title, pending.region);
+                }
+                record.pendingWindows?.clear();
+                if (record.pendingActiveWindow !== undefined) {
+                  if (record.pendingActiveWindow !== null) {
+                    face.activateWindow(record.pendingActiveWindow);
+                  }
+                  record.pendingActiveWindow = undefined;
+                }
                 // The app may install the region channel before the workbench publishes its
                 // face (it boots asynchronously); hand it over then.
                 if (record.groupRegionChannel !== undefined) {
@@ -833,6 +886,10 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
       record.face?.containerActions(containerId) ?? [],
     runAction: (containerId: string, actionId: string): void =>
       record.face?.runAction(containerId, actionId),
+    editorActions: (placement?: string): PracVscodeActionModel =>
+      record.face?.editorActions(placement) ?? { primary: [], secondary: [] },
+    runEditorAction: (placement: string | undefined, actionId: string): void =>
+      record.face?.runEditorAction(placement, actionId),
     placements: () => record.face?.listPlacements() ?? [],
     enableTimelineProbe: (): void => {
       record.face?.enableTimelineProbe();
@@ -843,6 +900,7 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
         side: "left" | "right" | "up" | "down",
       ): string | undefined;
       regionInDirection(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+      hasOtherWindows(region: string): boolean;
       removeRegion(region: string): void;
     }): void => {
       record.groupRegionChannel = channel;
@@ -857,6 +915,35 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
       };
     },
     openFiles: () => record.face?.listOpenFiles() ?? [],
+    mapWindow: (id: string, title: string, region?: string): void => {
+      if (record.face !== undefined) {
+        record.face.mapWindow(id, title, region);
+      } else {
+        (record.pendingWindows ??= new Map()).set(id, { title, region });
+      }
+    },
+    activateWindow: (id: string): void => {
+      if (record.face !== undefined) record.face.activateWindow(id);
+      else record.pendingActiveWindow = id;
+    },
+    unmapWindow: (id: string): void => {
+      record.pendingWindows?.delete(id);
+      if (record.pendingActiveWindow === id) record.pendingActiveWindow = null;
+      record.face?.unmapWindow(id);
+    },
+    activeWindow: (): string | null => {
+      if (record.face !== undefined) return record.face.activeWindow();
+      return record.pendingActiveWindow ?? null;
+    },
+    orderWindow: (id: string, index: number): void => record.face?.orderWindow(id, index),
+    orderFile: (resource: string, index: number): void => record.face?.orderFile(resource, index),
+    windowOrder: (region?: string): readonly string[] => record.face?.windowOrder(region) ?? [],
+    mappedWindows: (): readonly string[] => [
+      ...new Set([
+        ...(record.face?.mappedWindows() ?? []),
+        ...(record.pendingWindows?.keys() ?? []),
+      ]),
+    ],
     views: () => record.face?.listViews() ?? [],
     onDidChangeViews: (listener: () => void): (() => void) => {
       const detach = record.face?.onDidChangeViews(listener);
