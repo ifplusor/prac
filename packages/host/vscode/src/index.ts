@@ -42,6 +42,7 @@ import {
   type CodeServerHandle,
 } from "prac-vscode-embed";
 import { manageLanguageFeatures } from "./language.js";
+import { registerTurnDiff, type TurnDiffContext } from "./turn-diff.ts";
 
 /** The `globalThis` property the boot page reads the webview endpoint from. */
 export const WEBVIEW_ENDPOINT_GLOBAL = "__pracVscodeWebviewEndpoint";
@@ -348,6 +349,15 @@ export function apply(ctx: Context): void {
     }
 
     manageCodeServer(webCtx);
+  });
+
+  // The changed-files card's turn-scoped diff text. This is a Host capability,
+  // not a VS Code one, but it lives here because this is the bundle's only host
+  // row today; splitting it into `prac-host-turn-diff` is a package move, not a
+  // behavior change. It reads the snapshots DSH already records; it does not
+  // record a second copy.
+  ctx.inject(["workspaceChanges", "connection", "subprocess"], (turnCtx) => {
+    registerTurnDiff(turnCtx as unknown as TurnDiffContext);
   });
 
   // The other half of the VS Code side: the extensions themselves. Injected on

@@ -74,6 +74,7 @@ import { Direction, Grid, ISerializableView, IViewSize } from "../../base/browse
 import { Part } from "./part.js";
 import { ViewPane } from "./parts/views/viewPane.js";
 import { PracEditorHost, setGroupRegionChannel } from "./pracEditorHost.js";
+import { registerPracTurnDiff } from "./pracTurnDiff.js";
 import { ITimelineService } from "../../workbench/contrib/timeline/common/timeline.js";
 import type { GroupRegionChannel } from "./pracEditorHost.js";
 import type { PracEditorGroup } from "./pracEditorGroup.js";
@@ -670,6 +671,13 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     instantiationService.invokeFunction((accessor) => {
       accessor.get(ILifecycleService).phase = LifecyclePhase.Ready;
     });
+
+    // The embedder's turn-scoped diff command. It serves the two in-memory
+    // sides through a read-only file system provider and a DiffEditorInput
+    // subclass with a synthetic resource, so the diff is a normal prac
+    // placement (tab, close, focus, chat move) instead of an invisible editor.
+    this._register(registerPracTurnDiff(instantiationService));
+
     return instantiationService;
   }
 
