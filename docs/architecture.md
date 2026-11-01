@@ -87,7 +87,11 @@ Widget（可组合内容）
 
 Application --opens(1..N)--> Window
 Window --hosts(0..1)--> Widget board
-Dock / Panel --hosts(0..N)--> Widget board
+Dock --rail--> Application（launcher）
+Dock --content--> Sidebar
+Sidebar / Panel --hosts--> Window group
+Window group --contains--> Window（board window）
+Window --content--> Widget board
 Widget board --places(0..N)--> Widget
 Window group --contains--> Window
 ```
@@ -95,10 +99,10 @@ Window group --contains--> Window
 - **application** 是启动身份；window 由 app 打开，没有无主 window；
 - **application window**：editor / chat / terminal / browser / diff 等 app-owned 内容；
 - **widget window**：承载一个 widget board；stage 上的 Explorer / 单 Timeline 是这一种；
-- **widget board**：摆放 widget 的布局面；panel / dock 里直接是 board，stage 上由 widget window 承载；
+- **widget board**：window 的内容；board window 由 window group 承载；stage / sidebar / panel 都是 window group；
 - **widget**：可组合内容；可在兼容 board 之间移动，placement 改、source 不变；
 - **window group**：windows 的容器；tab 是 window，不是 widget；
-- 所有 stage window 都是 editor input / `EditorWindow` 形态；application window 与 widget window 只是内容不同。
+- window 是 frame 权威；每个 stage window 在 adapter 侧有 1:1 `EditorInput` 投影（含 chat / widget）；application window 与 widget window 只是内容不同。
 
 完整对象、映射、package architecture 见 [2026-10-20-ui-framework.md](../.agents/notes/in-progress/2026-10-20-ui-framework.md)。
 
@@ -111,15 +115,17 @@ Space
   split / grid / region
        └─ surface
             ├─ window group（stage cell）
-            └─ widget board（panel / dock）
+            └─ window group（sidebar / panel，内含 board window）
 ```
 
-- **frame** 是 prac 自己的：Space、split / grid / region、dock / panel、sash、resize、collapse、frame chrome、持久化；
+- **frame** 是 prac 自己的：Space、split / grid / region、dock rail、sidebar / panel、sash、resize、collapse、frame chrome、持久化；
 - **几何层不认识 window / widget 的内容**；region 的内容根是 surface；
-- **stage cell** 的 surface 是 window group；**panel / dock** 的 surface 是 widget board；
-- **placement 有两条边**：window → window group；widget → widget board；
+- **stage cell** 的 surface 是 window group；**panel / sidebar** 的 surface 是承载 board window 的 window group；board 是 window content，widget 是 board 里的 view；
+- **placement 有两条边**：window → window group；widget → board root；
 - **active 有两级**：window group 的 active window；board 的 active widget；
 - **isolated surface**：window 是外层 containment / stacking / theme / focus 边界；混排 VS Code + DSH 保留 per-widget root / source-scoped 子树；webview / iframe 自己的 browsing context。
+- **layout roots**：frame 和 board 共用同一个 LayoutEngine，各自有 `LayoutRoot`（frame root 的 item 是 window，board root 的 item 是 widget）；board root 是 window content 的 layout hole，参与 frame 的 hit-test / 拖拽 / split。
+- **跨 root 拖拽**：允许 move widget；split 只在目标 board root 内完成，不在 frame 层把两个 window 的 widget 拼成一个 region。
 
 **来源映射**：
 
@@ -137,7 +143,8 @@ Space
 **adaptor**：
 
 - frame 不认识 `vscode:` / `dsh:`；来源由 `ui-vscode-*` / `ui-dsh` 翻译；
-- `EditorWindow` 是 editor application window 的 prac 实现；`EditorPaneHost` 是 per-window pane runtime；pane active-only，inactive 卸载 DOM；
+- `EditorWindow` 是 window 在 adapter 侧的表示；`PracEditorPaneHost` 是 per-window pane runtime；pane active-only，inactive 卸载 DOM；
+- **frame 拥有 window 的 order / active / region**；`EditorGroupModel` 是 adapter 侧投影，不是第二权威；frame 来源的窗口/文件顺序写走 `PracWindowProjection`，app / editor 命令写记为 external；
 - editor group 是 window group 的 adapter runtime，不拥有 tab strip / breadcrumbs / actions；
 - **actions 在 window group tab strip 右端**：adapter 解析 `MenuId.EditorTitle` 等为 resolved action model，frame 渲染并回调；
 - **breadcrumbs 属于 editor application window / pane**，不属于 group tab strip；
@@ -186,7 +193,7 @@ bundle/web-app  // composition root only
 
 ### 3.4 持久化
 
-**该持久化的**：window 在哪个 window group、window 顺序 / active、widget 在哪个 board、board 的 widget 顺序 / active、region 几何 / 折叠 / 在屏、区域用的模式。**不该持久化的**：区域内的层序、注意力栈、返回栈——前两者是布局的状态，后者是交互过程。两份 key：**per-window**（布局）与 **per-workspace**（展开项）；key 带版本，恢复时不校验形状。**默认放置只填空缺**——否则每次激活都把 window / widget 拖回出厂位。边界：localStorage 是 per-origin，同源两个 tab 共用一份。
+**该持久化的**：window 在哪个 window group、window 顺序 / active、widget 在哪个 board、board 的 widget 顺序 / active、region 几何 / 折叠 / 在屏、区域用的模式。**不该持久化的**：区域内的层序、注意力栈、返回栈——前两者是布局的状态，后者是交互过程。三种 key：**per-window**（frame 布局）、**per-board**（每个 board window 的 widget 顺序 / 行高 / 折叠，按 workspace 分区）与 **per-workspace**（展开项）；key 带版本，恢复时不校验形状。**默认放置只填空缺**——否则每次激活都把 window / widget 拖回出厂位。边界：localStorage 是 per-origin，同源两个 tab 共用一份；layout / Space 的 key 再按 workspace（`?workspace=` 的哈希）分区，不同 project folder 不共享。
 
 ## 4. 能力
 

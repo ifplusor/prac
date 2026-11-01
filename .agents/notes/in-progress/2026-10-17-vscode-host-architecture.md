@@ -20,7 +20,7 @@ status: in-progress
 
 | 层 | 负责 | 不负责 |
 |---|---|---|
-| **frame / ui-frame** | Space、region、surface、dock / panel、window group / board 的布局 | VS Code 的 part / container / pane / editor 语义 |
+| **frame / ui-frame** | Space、region、surface、dock rail、sidebar / panel、window group / board 的布局 | VS Code 的 part / container / pane / editor 语义 |
 | **ui-window** | window、window group、tab strip、active window | VS Code 的 editor input / ViewPane |
 | **ui-widget** | widget、board、`prac.view` / `prac.viewActions` | VS Code 的 container / view 生命周期 |
 | **vscode-host（adaptor）** | VS Code 的 editor / container / view / action / overlay / webview 语义；catalogue；binding；host；生命周期 | prac 的 layout / window / widget placement |
@@ -34,16 +34,18 @@ status: in-progress
 | VS Code | prac |
 |---|---|
 | editor input（文件 / diff / custom editor / webview） | **application window**（editor app） |
-| `ViewContainer`（Explorer / SCM / GitLens / Run / Problems / Output / Terminal） | **widget board**（panel / dock）或 **widget window**（stage） |
+| `ViewContainer`（Explorer / SCM / GitLens / Run / Problems / Output / Terminal） | **widget board window**（sidebar / panel / stage） |
 | `ViewDescriptor`（Folders / Timeline / Outline / Changes…） | **widget**，带默认 board hint |
-| 单 view container | **一个 widget 的 board** |
+| 单 view container | **一个 widget 的 board window** |
 | editor group | window group 的 adapter runtime（`IEditorGroupView`） |
 | 菜单 / 命令 / action | resolved action model |
 | webview / custom editor | `EditorPane`（`WebviewEditor`）；受 webview secure-context 约束 |
 | integrated browser | Electron `BrowserEditor`；web workbench 不可用 |
-| activity bar / status bar / 全局 UI | frame chrome / overlay，不是 window / widget |
+| activity bar / status bar / 全局 UI | frame chrome / dock rail / overlay，不是 window / widget |
 
 VS Code 的 `View` / `ViewContainer` / editor input 是**来源对象**；prac 的 window / board / widget 是**组合对象**。adaptor 只做翻译。
+
+每个 stage window 在 adaptor 侧都有一个 **1:1 `EditorInput` 投影**（editor window 用真实 input；chat / widget window 用自定义 input）；window 仍是 frame 权威，editor group 只是这组投影的 runtime。
 
 ## 2. 资源
 
@@ -90,10 +92,11 @@ board lifecycle：board 创建 → binding 挂到内容组；widget mount → `V
 | `VscodeEmbedHandle` | boot / view / file / placements / views / floatHost / group-cell channel |
 | `WorkbenchFace` | mount / focus / release / capabilities；不承载 part mount |
 | `EmbeddedWorkbench` | workbench 本体：服务、view / editor runtime、overlay |
-| `PracEditorHost` | adaptor 侧 editor runtime：`IEditorGroupsService` / `EditorGroupModel`；一个 window group 一个 editor group |
-| `EditorWindowModel` / `EditorPaneHost` | per editor window 的数据与 pane runtime |
-| `EditorWindow` | editor application window 实现（`ui-vscode-editor`）：breadcrumbs + pane + workbench context |
-| `EditorActionModel` | active editor / window group 的 resolved action 描述；frame 渲染 |
+| `PracWindowGroupHost` | adaptor 侧 editor runtime：`IEditorGroupsService` / `EditorGroupModel`；一个 window group 一个 editor group（当前实现名；旧名 `PracEditorHost`） |
+| `WindowInput`（目标） | 每个 window 的 `EditorInput` 投影；chat / widget 用自定义 input，window id ↔ input 1:1 |
+| `EditorWindowModel` / `EditorPaneHost`（目标） | per-window 的数据与 pane runtime；不使用 group 级 `EditorPanes` |
+| `EditorWindow` | window 在 adaptor 侧的表示（`ui-vscode-editor`）：breadcrumbs（仅 editor content）+ pane + workbench context |
+| `WindowActionModel` | active window 的 resolved action 描述；frame 渲染 |
 | `VscodeGroupBinding` | board / window group 的内部内容组 context / actions |
 | `VscodeViewHost` | 每个 VS Code view 的 runtime host：mount / release `ViewPane` / `EditorPane`；注册 / 注销 `IViewsService` |
 | `PracViewsService` | `IViewsService` 的 external registry |
@@ -106,7 +109,7 @@ board lifecycle：board 创建 → binding 挂到内容组；widget mount → `V
 - extension 通过 `contributes.commands` / `contributes.menus` 贡献 action；
 - adaptor 用 menu service 解析 `MenuId.EditorTitle` / `view/title` 等，应用 `when` / context；
 - 输出 resolved action model：id / label / icon / group / order / enabled / checked / submenu / keybinding / tooltip；
-- frame 渲染 window group tab strip 的 actions；widget header actions 由 board/widget 渲染；
+- frame 渲染 window group tab strip 的 actions（resolved model）；group header 不再画 editor actions；widget header actions 由 board/widget 渲染；
 - 菜单 / 命令面板 / hover / 通知由 workbench 服务创建，走 frame float layer；
 - view 内部的补全 / hover / webview overlay 留在 window / widget 内。
 
@@ -126,6 +129,7 @@ board lifecycle：board 创建 → binding 挂到内容组；widget mount → `V
 
 - `vscode-host` 是 adaptor，不是 frame / window / widget 的 owner。
 - editor input → application window；ViewContainer → widget board；View → widget。
+- 每个 stage window 在 adaptor 侧有 1:1 `EditorInput` 投影（含 chat / widget）；window 是 frame 权威，projection 是派生。
 - editor group ↔ window group 的 adapter runtime；不拥有 UI chrome。
 - 没有通用 CRD；widget 用 typed descriptor / host factory，binding 是 board / group context，不是 UI chrome。
 - actions 由 adaptor 解析成 resolved model，frame 渲染。
@@ -139,13 +143,14 @@ board lifecycle：board 创建 → binding 挂到内容组；widget mount → `V
 - foreign widget 移入 VS Code board、再移出的状态保留规则。
 - webview 的 secure-context 部署约束如何暴露给用户。
 - custom editor / webview editor 的 action model 是否与 text editor 一致。
+- chat / widget window 的自定义 `EditorInput` 的 capabilities / dirty / save / preview / move 语义。
 
 ## 8. Validation
 
-- editor input 打开为 application window；ViewContainer 打开为 board / widget window；ViewDescriptor 成为 widget。
+- editor input 打开为 application window；ViewContainer 打开为 board / widget window；ViewDescriptor 成为 widget；chat / widget window 也有 `EditorInput` 投影。
 - Timeline 从 Explorer board 移到 right sidebar board / stage widget window；source 不变。
 - 单 view container 是一个 widget 的 board。
-- actions 在 window group tab strip 右端，跟随 active editor，不与 breadcrumbs 抢行。
+- actions 在 window group tab strip 右端，跟随 active window，不与 breadcrumbs 抢行；group header 没有 editor actions。
 - ViewPane / EditorPane 的 lifecycle 与 upstream 一致；webview secure-context 失败可见。
 - frame 没有 VS Code 分支；adaptor 没有 frame / window / widget placement 逻辑。
 - 包依赖 gate：`ui-vscode-host` 不 import `ui-frame` / `ui-window` / `ui-widget` 的布局实现；adapters 只翻译。

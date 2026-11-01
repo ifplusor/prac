@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 ---
 
 # UI — user stories（first launch → daily work）
@@ -10,7 +10,8 @@ Persona：James，资深工程师；prac 是真实工作环境；background serv
 
 原则：
 
-- **Space 是 core**：默认一个 Space；其他按需创建（像 macOS Spaces）；同一个 conversation / 文件可以出现在不同 Space。
+- **Space 是 core**：默认一个 Space；其他按需创建（像 macOS Spaces）；同一个 conversation / 文件可以出现在不同 Space。Space 按 project folder 存储（对齐 VS Code 的 workspace storage）。
+- **Space 的 mode 是 tile**：free window 当前不考虑；进入路线图需重新裁决。
 - **background service 侧简单**：只组合 DSH 支持的 conversation / chat / tool calls / status；plan 是 note（note 机制）；review 是 diff / chat；human edit / git / checks 是已有能力；plan mode 不是路径；tool approval 是 ui-approval 内置；不新增 plan application / review application / checkpoint / takeover 对象。
 
 ## Stories
@@ -70,8 +71,8 @@ Persona：James，资深工程师；prac 是真实工作环境；background serv
 - **Trigger**：James 想把一个 task 分到另一个空间。
 - **Steps**：title bar `1 | +` → 新建 Space（初始 1 个 window group）→ 命名 / 摆 window group / 往 window group 里加 windows（file / chat / diff…）→ 切回默认 Space。
 - **UI**：Space switcher；新建；window group 排列；每个 window group 的 windows；同一 conversation / 文件跨 Space；tabs / active window / panel 状态恢复。
-- **S6 的 mode**：默认 Space 是 tile mode；free window 是 later；MVP 只做 tile mode。
-- **Assumes**：默认一个 Space / 一个 window group；按需创建；Space 有 mode（tile 当前，free window later）；window group 是 windows 的容器；editor window = 一个文件。
+- **S6 的 mode**：默认 Space 是 tile mode；free window 当前不考虑（tile mode 是唯一模式）。
+- **Assumes**：默认一个 Space / 一个 window group；按需创建；Space 的 mode 是 tile，free window 当前不考虑；Space 按 project folder 存储；window group 是 windows 的容器；editor window = 一个文件。
 - **Needs**：Space switcher；add；window group 排列；windows；same conversation / files；state。
 
 ### S7 — 第一次失败
@@ -93,7 +94,7 @@ Persona：James，资深工程师；prac 是真实工作环境；background serv
 ### S9 — 第一次切 project folder
 
 - **Trigger**：从 `prac-dev` 切到另一个 project folder。
-- **Steps**：project folder switcher → 文件 / notes / git / conversation / background service / Space 全部换。
+- **Steps**：project folder switcher → 文件 / notes / git / conversation / background service / Space 全部换；Space 按 project folder 存储，切回旧 project folder 时恢复那套 Space。
 - **UI**：title bar；Explorer；conversation；background service；Space 集合。
 - **Assumes**：project folder 是根；作用域；Space 按 project folder 存。
 - **Needs**：project folder 切换；各作用域刷新；旧 Space 恢复。
@@ -117,7 +118,7 @@ Persona：James，资深工程师；prac 是真实工作环境；background serv
 ## 这些故事说明了什么
 
 - **Project folder 是 first-run 的第一个问题**；S0 / S1 / S9 都先问 project folder；没有 project folder，没有工作台。
-- **Space 是主线，但默认一个**：S6 是按需新建 / 切换；不是三个任务模式；Space 有 mode（当前 tile，later free window）；同一个 conversation / 文件跨 Space；切换 / 状态是核心。没有它，chat / review / 人的工作只能挤在一个 stage 上。
+- **Space 是主线，但默认一个**：S6 是按需新建 / 切换；不是三个任务模式；Space 的 mode 是 tile，free window 当前不考虑；同一个 conversation / 文件跨 Space；切换 / 状态是核心。没有它，chat / review / 人的工作只能挤在一个 stage 上。
 - **Window switch 是 stage 内的事**：文件打开 → 当前 window group 新增 / select 一个 editor window（一个文件）；看 chat → select chat window（同一 window group 或另一个 window group）；active window group + active window；不是按「有没有文件」猜；split 才是并排。
 - **background service 侧简单**：S2 / S4 / S7 只需要 plan note（人和 background service 共编）、ui-approval、diff / chat、human edit、git、checks；不需要 plan application / review application / checkpoint / takeover 对象。
 - **人的自由**：S5 的默认 window group / chat 收起；chat application 关闭 / panel / 后台；通知不抢焦点。
@@ -139,7 +140,9 @@ Persona：James，资深工程师；prac 是真实工作环境；background serv
 | 10 | 768 drawer；快捷键 | S11 | Should |
 | 11 | GitLens / VS Code view 在 sidebars / panels | S8 | Should |
 | 12 | Tool approval（ui-approval）；cancel / status（仅 DSH 支持时） | S7 | Should |
-| 13 | 自由 window / 任意 split / application registry | — | Later |
+| 13 | application registry | — | Later |
+
+自由 window / 任意 split 当前不考虑（进入路线图需重新裁决）。
 
 ## Assumptions under test
 
@@ -151,7 +154,7 @@ Persona：James，资深工程师；prac 是真实工作环境；background serv
 | Plan 是 note；review 是 diff / chat | S2 / S4 | 成立；background service 侧不需要 plan application / review application | 是 |
 | Human edit / git revert / checks 是已有能力 | S4 / S7 | 成立 | 是 |
 | Chat 收起 / panel；默认 stage | S5 | 成立 | 是 |
-| 自由 window / application registry / OS-like 窗口管理 | S3–S6 | 有价值，但 later | 否（later） |
+| 自由 window / OS-like 窗口管理 | S3–S6 | free window 当前不考虑；application registry 仍可 later | 否（当前不考虑） |
 | note 机制 / ui-approval 已内置；plan mode 不是路径；cancel / checkpoint 只做支持的 | S7 | 不发明；内置优先 | 部分 |
 
 ## MVP
@@ -160,7 +163,7 @@ Persona：James，资深工程师；prac 是真实工作环境；background serv
 
 **Should**：S5 的 chat 收起 / 后台；S7 的 ui-approval / background service 状态 / cancel（支持时）；S11 的 768 / 快捷键；S8 的 GitLens。
 
-**Later**：自由 window / 任意 split；完整 application registry；OS-like 窗口管理；多窗口。
+**Later**：完整 application registry；多窗口。自由 window / 任意 split / OS-like 窗口管理当前不考虑；进入路线图需重新裁决。
 
 **First slice**：Space 的默认一个 + 按需创建 + active window（文件 → editor；chat → chat）+ S4 的 diff / chat review + S0 的 first-run + S5 的默认 window group。Project folder 基座不动；S2 只做 smoke test。
 
@@ -171,13 +174,12 @@ Persona：James，资深工程师；prac 是真实工作环境；background serv
 3. **Panel 默认**：左侧 Explorer 开、右侧收、bottom 收；auto-hide；快捷键；768 drawer。
 4. **background service 侧**：plan note 的路径 / 生命周期；人和 background service 共编的可见性 / 冲突 / 版本；plan mode 不是路径；tool approval；checks 的呈现；DSH 支持哪些 cancel / status。
 5. **默认 Space / chat 收起**：默认一个；chat application 关闭 / 后台；通知强度。
-6. **Application / widget 模型**：VS Code ViewContainer → widget board、ViewDescriptor → widget、editor input → application window；DSH `main` → application window、sidebar/rightbar → board；pin / default placement；later 的自由 window / application registry。
+6. **Application / widget 模型**：VS Code ViewContainer → widget board、ViewDescriptor → widget、editor input → application window；DSH `main` → application window、sidebar/rightbar → board；pin / default placement；application registry 可以 later；free window 当前不考虑。
 7. **First-run / project folder**：入口；空 project folder；切换过渡。
 8. **Window / window group 管理**：window group 的 tab strip 与 window 内部视觉（GitLens views / terminal tabs / 文件内容）的边界；window 的 label / icon / actions；single-instance 的「只一个」；同一 window 可否跨 window group；launch / focus 的默认 active；preview vs pinned；per-Space tabs / scroll / active window；同一文件多 window；未保存；tab 上限；background service 打开的 file 落在哪个 window group。
 9. **768 / 键盘 / 可访问性**。
-10. **Space mode**：tile / free 的切换；跨 mode 的 window 状态；free 模式的窗口管理；默认 mode；持久化。
 11. **Review 约定**：S4 的 chat review 约定、checks 的呈现、changed files 的默认打开方式。
-12. **Later**：自由 window / application registry / OS-like 窗口管理是否值得做。
+12. **Later**：application registry / OS-like 窗口管理是否值得做（free window 当前不考虑）。
 
 ## Validation
 
@@ -190,7 +192,7 @@ Persona：James，资深工程师；prac 是真实工作环境；background serv
 - **S6：默认一个 + 按需创建 / 切换；同一 conversation / 文件跨 Space；每个 Space 的 window group / active window / panel 状态保留；background service 后台继续。**
 - S5：默认 window group；chat 收起；background service 状态。
 - S3 / S5：editor window 的 breadcrumbs、actions、Outline 在 tab / window 切换后仍指向 active editor；actions 在 window group tab strip 右端，不挤占 breadcrumbs。
-- S3 / S5 / S8：Explorer / SCM / GitLens 是 widget board（panel / dock）或 stage 的 widget window；Timeline / Outline 等 widget 可以在 board 之间移动；widget 不成为 window group 的 tab，tab 仍是 window。
+- S3 / S5 / S8：Explorer / SCM / GitLens 是 widget board（sidebar / panel）或 stage 的 widget window；Timeline / Outline 等 widget 可以在 board 之间移动；widget 不成为 window group 的 tab，tab 仍是 window。
 - S8：GitLens 在 sidebars / panels。
 - S11：768、快捷键、drawer。
 - project folder / card / diff / GitLens 不回退。
@@ -198,6 +200,6 @@ Persona：James，资深工程师；prac 是真实工作环境；background serv
 ## Related
 
 - UI scheme（OS-like Space / Spaces core）：[2026-10-23-ui-scheme.md](2026-10-23-ui-scheme.md)
-- 组合模型：[2026-10-20-ui-framework.md](../in-progress/2026-10-20-ui-framework.md)
+- 组合模型：[2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)
 - 目标形态：[docs/architecture.md](../../../docs/architecture.md)、[docs/philosophy.md](../../../docs/philosophy.md)
 - 验收：[docs/ui-acceptance.md](../../../docs/ui-acceptance.md)

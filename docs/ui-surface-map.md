@@ -7,26 +7,26 @@
 ```text
 Application（启动身份）
 Window（app 打开的实例）
-Widget board（布局面）
+Widget board（window 的一种内容）
 Widget（可组合内容）
 
 Space
   split / grid / region
-    surface: window group（stage）/ widget board（panel / dock）
+    surface: window group（stage）/ widget board window（sidebar / panel）
 ```
 
 - window 由 application 打开，没有无主 window；
-- window 两种：application window（editor / chat / terminal）与 widget window（承载 board）；
+- window 两种：application window（editor / chat / terminal）与 widget board window（承载 board）；
 - window group 的 tab 是 window，不是 widget；
 - widget 在 board 里，不直接进 window group；
-- board 可以没有 window（panel / dock）；window 可以没有 board（application window）。
+- board 本身就是 window；它可以放在 stage / sidebar / panel；window 可以没有 board（application window）。
 
 ## 2. VS Code
 
 | 贡献面                                                                  | 上游形态                                | prac                                                              |
 | ----------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
 | 文件 / diff / custom editor / webview editor                            | editor input                            | **application window**                                            |
-| `viewsContainers`                                                       | `ViewContainer` + `IViewContainerModel` | **widget board**（panel / dock），或 stage 的 **widget window**   |
+| `viewsContainers`                                                       | `ViewContainer` + `IViewContainerModel` | **widget board window**（sidebar / panel / stage）   |
 | `views`（tree / webview view）                                          | `ViewPane` / `WebviewViewPane`          | **widget**，`hostKind = view-pane`                                |
 | `viewsWelcome`                                                          | 空状态内容                              | widget 级空态，留在 widget host                                   |
 | `view/title` / `view/item/context` / `editor/title` / `menus`           | 菜单项引用命令                          | **action model**；window tab strip / widget header / frame chrome |
@@ -35,7 +35,7 @@ Space
 | 通知 / Quick Pick / Dialog / Context View / Hover                       | workbench 浮层服务                      | **frame overlay**（source-managed）                               |
 | completion / 编辑器内 hover / decorations / CodeLens / inlay / comments | widget 自己的 DOM                       | **widget-local**；被盒子裁剪是正确行为                            |
 | settings / keybindings UI / extension details                           | `EditorPane`                            | **application window**（editor placement）                        |
-| activity bar                                                            | 选 container 的部件                     | frame chrome / dock；不是 widget                                  |
+| activity bar                                                            | 选 container 的部件                     | frame chrome / dock rail；不是 widget                                  |
 | themes / icons                                                          | 主题服务                                | frame / widget token；见隔离 note                                 |
 
 **判据**：VS Code 的 UI 至少有 **part / container / view / editor / action / overlay / status item / host-local** 八类。prac 只把 editor input、container、view 映射成组合对象；part / overlay / action / status item 各自归格，不塞进 widget。
@@ -45,7 +45,7 @@ Space
 | 贡献面                                                             | 上游形态               | prac                                              |
 | ------------------------------------------------------------------ | ---------------------- | ------------------------------------------------- |
 | `main` keyed entry（conversation / plugin manager / task manager） | keyed slot             | **application window**                            |
-| `sidebar` / `rightbar`                                             | 单 / keyed 槽          | **widget board**（panel / dock）                  |
+| `sidebar` / `rightbar`                                             | 单 / keyed 槽          | **widget board window**（sidebar / panel）                  |
 | 内部 slot（conversation.* / sidebar.* / settings.* / plugins.*）   | slot entry / React     | **widget / section**，属于对应 app window / board |
 | `shell.overlay` / toast / quota notice                             | 应用级浮层             | **frame overlay**                                 |
 | `shell.leading` / `shell.bottom`                                   | 窗口 chrome 座位       | frame chrome / part seat                          |
@@ -66,8 +66,8 @@ Space
   - board 的 active widget。
 - **surface**：
   - stage cell → window group；
-  - panel / dock → widget board；
-  - widget window 是 window，内容是 board，不是 region。
+  - sidebar / panel → widget board window；
+  - widget board window 是 window，内容是 board，不是 region；它可以在 stage / sidebar / panel。
 - **chrome**：
   - window group tab strip / actions → frame + window；
   - widget header / actions → board / widget；
@@ -79,14 +79,14 @@ Space
 | canonical              | 不要用                         | 说明                                                              |
 | ---------------------- | ------------------------------ | ----------------------------------------------------------------- |
 | **application**        | container / app instance       | 启动身份；window 由 app 打开                                      |
-| **window**             | tab / view                     | app 的实例；application window 或 widget window                   |
+| **window**             | tab / view                     | app 的实例；application window 或 widget board window             |
 | **window group**       | editor group / view group      | windows 的容器；editor group 是 adapter runtime                   |
-| **widget board**       | container / view group / panel | 摆放 widget 的布局面                                              |
+| **widget board**       | container / view group / panel | 一个 window 的内容面；board 是 window                              |
 | **widget**             | view / tab                     | 可组合内容；在 board 里                                           |
 | **placement**          | membership                     | window → group；widget → board                                    |
 | **surface**            | region content                 | region 的内容根；window group / board / opaque                    |
 | **application window** | editor view / editor group     | editor / chat / diff / terminal 的 window                         |
-| **widget window**      | container window               | 承载 board 的 window                                              |
+| **widget board window** | container window / widget window | 承载 board 的 window；board 是 window，widget 是 view              |
 | **editor group**       | prac window group              | `IEditorGroupView`，adapter runtime                               |
 | **editor window**      | separate window type           | editor application window 的简称                                  |
 | **catalogue**          | registry                       | 合并后的 widget / window 目录                                     |
@@ -96,7 +96,7 @@ Space
 
 | 包                 | 职责                                              |
 | ------------------ | ------------------------------------------------- |
-| `ui-frame`         | Space / split / grid / region / dock / panel      |
+| `ui-frame`         | Space / split / grid / region / dock rail / sidebar / panel |
 | `ui-window`        | window / window group / tab strip / active        |
 | `ui-widget`        | widget / board / `prac.view` / `prac.viewActions` |
 | `ui-workbench`     | 默认放置 / arrangement / recall                   |

@@ -76,8 +76,8 @@ bundle/web-app  // composition root only
 - [2026-10-05-vscode-dsh-layout-boundary.md](2026-10-05-vscode-dsh-layout-boundary.md)：surface / isolation。
 - [2026-10-15-ui-layout-grid.md](2026-10-15-ui-layout-grid.md)：frame geometry。
 - [2026-10-17-stack-view-chrome.md](2026-10-17-stack-view-chrome.md)：stack / widget header。
-- [2026-10-23-ui-scheme.md](../proposed/2026-10-23-ui-scheme.md)：产品设计。
-- [2026-10-27-ui-user-stories.md](../proposed/2026-10-27-ui-user-stories.md)：用户故事 / 验收。
+- [2026-10-23-ui-scheme.md](2026-10-23-ui-scheme.md)：产品设计。
+- [2026-10-27-ui-user-stories.md](2026-10-27-ui-user-stories.md)：用户故事 / 验收。
 - [2026-09-19-architecture.md](2026-09-19-architecture.md)：需求 → 架构。
 
 ## 5. 约束
@@ -120,5 +120,5 @@ bundle/web-app  // composition root only
 - [2026-09-13-vs-concept-boundary.md](2026-09-13-vs-concept-boundary.md)：术语边界。
 - [2026-09-19-architecture.md](2026-09-19-architecture.md)：需求 → 架构。
 - [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)：UI 组合模型。
-- [2026-10-23-ui-scheme.md](../proposed/2026-10-23-ui-scheme.md)：产品设计。
+- [2026-10-23-ui-scheme.md](2026-10-23-ui-scheme.md)：产品设计。
 - [docs/architecture.md](../../../docs/architecture.md)：目标架构。

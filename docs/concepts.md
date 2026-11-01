@@ -17,7 +17,9 @@ Widget（可组合内容）
 
 Application --opens(1..N)--> Window
 Window --hosts(0..1)--> Widget board
-Dock / Panel --hosts(0..N)--> Widget board
+Dock --rail--> Application（launcher）
+Dock --content--> Sidebar
+Sidebar / Panel --hosts(0..N)--> Widget board
 Widget board --places(0..N)--> Widget
 Window group --contains--> Window
 ```
@@ -26,27 +28,29 @@ Window group --contains--> Window
 | ---------------- | ---------------------------------------------------------------------------------------- | ----------------------------------- |
 | **Application**  | 启动身份；定义 window kind / single-multi / 默认 placement / 默认 composition / launcher | 不是内容容器；不直接进 window group |
 | **Window**       | app 打开的实例；有 placement / lifecycle / active                                        | 不是 tab；不是 widget               |
-| **Widget board** | 摆放 widget 的布局面                                                                     | 不是 app；不是 window；不是 region  |
+| **Widget board** | 一种 **window**：内容是一块摆放 widget 的 board                                           | 不是 app；不是 window group；不是 region |
 | **Widget**       | 可组合内容                                                                               | 不是 window；不直接进 window group  |
 | **Window group** | windows 的容器；tab strip 的 tab 是 window                                               | 不是 editor group；不是 board       |
-| **Space**        | 命名的 stage 布局                                                                        | 不是 project folder                 |
+| **Space**        | 命名的 stage 布局；状态按 project folder 存                                               | 不是 project folder                 |
 
 ### Window 两种
 
 | kind                   | 内容              | 例子                                                        |
 | ---------------------- | ----------------- | ----------------------------------------------------------- |
 | **application window** | app-owned 内容    | editor（一个文件）、chat、diff、terminal、browser、settings |
-| **widget window**      | 一个 widget board | stage 上的 Explorer board、单 Timeline board                |
+| **widget board window** | 一个 widget board | stage / sidebar / panel 上的 Explorer board、单 Timeline board |
 
-- 所有 stage window 都是 editor input / `EditorWindow` 形态；
+- window 是 frame 权威；每个 stage window 在 adapter 侧有 1:1 `EditorInput` 投影（含 chat / widget）；`EditorWindow` 是它在 adapter 侧的表示；
 - application window 与 widget window 只是内容不同；
+- adapter 的 `PracWindowProjection` 是 frame-owned window 的唯一写入口；`EditorGroupModel` 是它的投影。写审计区分 projection（frame 发起）与 external（app / editor 命令）；`EditorGroupModel` 仍由 upstream editor service 写，不是字面只读。
 - widget window 由 board host app 打开；board composition 可改，window identity 不变。
 
 ### 关系约束
 
-- window 可以没有 board（application window）；
-- board 可以没有 window（panel / dock）；
-- widget 可以没有 board（未放置）；
+- window 可以没有 board（application window）；board 本身就是一个 window；
+- widget 可以没有 board（未放置）；widget 不单独成为 window；
+- board window 可以在 stage / sidebar / panel；位置不改变它是 window；
+- **dock 是 rail / launcher，不是 surface**；sidebar 是它的内容区域，不是 dock 本身；
 - window group 只包含 window；
 - window owner（appId）与 widget source 是两件事；
 - widget 在兼容 board 之间移动；placement 改、source 不变；
@@ -59,21 +63,24 @@ Space
   split / grid / region
        └─ surface
             ├─ window group（stage cell）
-            └─ widget board（panel / dock）
+            └─ window group（sidebar / panel，内含 board window）
 ```
 
 - **split / grid / region** 是几何节点；region 是叶子盒子；
 - **surface** 是 region 的内容根：
   - stage cell → window group；
-  - panel / dock → widget board；
+  - panel / sidebar → window group（内含 board window）；
   - opaque host → 外部内容；
 - **placement 有两条边**：
   - window → window group；
-  - widget → widget board；
+  - widget → board root；
 - **active 有两级**：
   - window group 的 active window；
   - board 的 active widget；
-- **widget window** 是 window，内容是 board，不是 region。
+- **widget window** 是 window，内容是 board，不是 region；
+- **layout roots**：frame 和 board 共用同一个 LayoutEngine；frame root 的 item 是 window，board root 的 item 是 widget；
+- **board hole**：board root 是 window content 里的 layout hole，参与 frame 的 hit-test / 拖拽 / split；
+- **跨 root 拖拽**：允许 move widget；split 只在目标 board root 内完成。
 
 ## 三、Chrome / isolation
 
@@ -103,7 +110,8 @@ Space
 
 - frame 不认识 `vscode:` / `dsh:`；
 - adaptor 只翻译，不拥有 frame / window / widget 的 layout / active / placement；
-- `prac.view` 是 widget 注册面；window / board 有各自注册面。
+- `prac.view` 是 widget 注册面（历史名字；对外应是 `prac.widget`；当前代码仍是 view，属于待收的命名债）；window / board 有各自注册面。
+- **view 是 adapter / source 术语，不是 prac 的原生对象**；VS Code `ViewDescriptor`、DSH slot 都在 adapter 侧落到 widget。
 
 ## 五、术语
 
@@ -113,11 +121,13 @@ Space
 | **window**             | tab / view                     | app 的实例；application window 或 widget window               |
 | **window group**       | editor group / view group      | windows 的容器                                                |
 | **widget board**       | container / view group / panel | 摆放 widget 的布局面                                          |
-| **widget**             | view / tab                     | 可组合内容；在 board 里                                       |
+| **widget**             | view / tab                     | 可组合内容；在 board 里；是 VS Code view / DSH slot 的落点    |
 | **placement**          | membership                     | window→group；widget→board                                    |
+| **dock / rail**        | dock as surface / stage        | launcher 条；不是 region / surface，不与 stage 同类             |
+| **sidebar / panel**    | dock                           | 内容区域，承载 widget board window；不是 dock rail               |
 | **surface**            | region content                 | region 的内容根                                               |
 | **application window** | editor view / editor group     | editor / chat / diff / terminal 的 window                     |
-| **widget window**      | container window               | 承载 board 的 window                                          |
+| **widget board window** | container window / widget window | 承载 board 的 window；board 是 window，widget 是 view          |
 | **editor group**       | prac window group              | `IEditorGroupView`，adapter runtime                           |
 | **editor window**      | separate window type           | editor application window 的简称                              |
 | **catalogue**          | registry                       | 合并后的 widget / window 目录                                 |
@@ -129,7 +139,8 @@ Space
 - **seat**：没有独立对象；
 - **region tree 直接以 view 为 child**：region 的 child 是 surface，不是 view；
 - **editor group 作为 prac UI 类型**：只是 adapter runtime；
-- **“view 是唯一单位”**：window 是编排单位，widget 是内容单元。
+- **“view 是唯一单位”**：window 是编排单位，widget 是内容单元；
+- **把 view 当作 prac 的原生对象**：view 只属于 adapter / source；prac 侧是 window / board / widget。
 
 ## 七、包
 
