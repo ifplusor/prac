@@ -49,16 +49,17 @@ import type { PracDshFace } from "prac-client-ui-dsh/lib";
 // whichever package owns them (the mechanism declares the `root` children it registers,
 // including `shell.overlay`), so nothing here re-imports a key's owner for comparison.
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
-import type { FrameView, LayoutState, Side } from "prac-client-ui-frame/lib";
+import type { LayoutState, Side } from "prac-client-ui-frame/lib";
 import type { PracWidgetsFace } from "prac-client-ui-widget/lib";
 // Types only, for its `Context` merge (`ctx.pracVscode`): the arrangement follows
 // the app's open-file set, and naming the face puts that service in this program.
-import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
+import type { PracVscodeFace, VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 import {
   CENTER,
   LEFT,
   RIGHT,
   arrange,
+  VIEW_DEFAULTS,
   containerBoardTargets,
   openFileInto,
   placeCatalogue,
@@ -196,7 +197,10 @@ function RecallSurface({ layout, onFocus }: RecallSurfaceProps): ReactElement | 
     () => layout.getState(),
     () => layout.getState(),
   );
-  const views = layout.listViews();
+  // Widgets live on their board now, not in the frame's view table. The recall surface is
+  // the mechanism's window catalogue; widget recall (cross-board move / hide) moves with the
+  // board model instead of minting a second frame record for a widget.
+  const views = layout.listViews().filter((view) => view.kind !== "widget");
   const regions = layout.listRegions();
   const active = views.length === 0 ? 0 : Math.min(cursor, views.length - 1);
 
@@ -614,63 +618,153 @@ export function apply(ctx: Context): void {
   // arrangement follows the app's catalogue instead of a fixed editor view: file
   // entries drive the active window and the centre, view entries are placed by their own
   // location (with the arrangement's exclusions).
-  const viewStub = (id: string): FrameView =>
-    ({
-      id,
-      host: undefined,
-      mount: () => undefined,
-      release: () => undefined,
-      focus: () => undefined,
-    }) as unknown as FrameView;
   const widgets = ctx as unknown as { pracWidgets: PracWidgetsFace };
-  const containerBoards = new Map<string, ReturnType<PracWidgetsFace["createBoardGroup"]>>();
-  const ensureContainerBoard = (
-    region: string,
-    label: string,
-  ): ReturnType<PracWidgetsFace["createBoardGroup"]> | undefined => {
-    const existing = containerBoards.get(region);
-    if (existing !== undefined) return existing;
+  /** The board window each container region hosts (one window per board). */
+  type ContainerBoard = ReturnType<PracWidgetsFace["createBoardWindow"]>;
+  interface ContainerEntry {
+    readonly board: ContainerBoard;
+    /** Whether the surface registration has succeeded (the region may come later). */
+    registered: boolean;
+  }
+  const containerBoards = new Map<string, ContainerEntry>();
+  const ensureContainerBoard = (region: string, label: string): ContainerBoard | undefined => {
+    let entry = containerBoards.get(region);
+    if (entry === undefined || entry.board.disposed) {
+      try {
+        // A container region's surface is a window group whose one window is a board.
+        entry = { board: widgets.pracWidgets.createBoardWindow(region, label), registered: false };
+      } catch {
+        return undefined;
+      }
+      containerBoards.set(region, entry);
+    }
+    if (entry.registered) return entry.board;
     try {
-      const board = widgets.pracWidgets.createBoardGroup(region, label);
-      layout.registerSurface(board, region);
-      containerBoards.set(region, board);
-      return board;
+      layout.registerSurface(entry.board, region);
+      layout.setViewBoard(entry.board.windowId, entry.board.boardId);
+      entry.registered = true;
+      return entry.board;
     } catch {
+      // The region may not exist yet. The catalogue sync retries.
       return undefined;
     }
   };
-  const placeContainerView = (view: string, region: string, label: string): boolean => {
+  /**
+   * Put one widget on a container's board.
+   *
+   * A record the frame still holds for the same id predates board windows (a
+   * persisted layout, or a placement made before the surface existed): the board
+   * is now the widget's home, so the frame record is **forgotten**, not hidden —
+   * two homes would render the widget twice.
+   */
+  const addBoardWidget = (
+    board: ContainerBoard,
+    view: string,
+    declared?: { readonly size?: number; readonly folded?: boolean },
+  ): void => {
+    if (layout.getState().views[view] !== undefined) layout.removeView(view);
+    if (board.hasWidget(view)) return;
+    try {
+      board.addWidget(view, declared);
+    } catch {
+      // The board was disposed between passes; the next sync rebuilds it.
+    }
+  };
+  /**
+   * Project board windows into the app's editor model as identity inputs.
+   *
+   * A board window's content is rendered by the frame; the app only needs to know the
+   * window exists (the same `PracWindowInput` shape the chat uses). A region without
+   * an editor group has nowhere to project into — `mapWindow` is a no-op there — so a
+   * sidebar board gets its identity once an editor window lives in that group.
+   */
+  const mappedBoards = new Set<string>();
+  const syncBoardWindowProjection = (vscode: PracVscodeFace): void => {
+    const alive = new Set(
+      [...containerBoards.values()]
+        .filter((entry) => entry.registered)
+        .map((entry) => entry.board.windowId),
+    );
+    for (const id of mappedBoards) {
+      if (alive.has(id)) continue;
+      vscode.unmapWindow(id);
+      mappedBoards.delete(id);
+    }
+    const mappedIds = new Set(vscode.mappedWindows());
+    for (const entry of containerBoards.values()) {
+      if (!entry.registered) continue;
+      const id = entry.board.windowId;
+      if (mappedIds.has(id)) continue;
+      // The editor group of a sidebar lives at the **window's** region (the stack row),
+      // not the container region the board window's record sits in: project into the
+      // group that already hosts this group's other windows.
+      const hostedRegion = entry.board.hostedWindows
+        .filter((windowId) => windowId !== id)
+        .map((windowId) => layout.getState().views[windowId]?.region)
+        .find((region) => typeof region === "string");
+      if (hostedRegion === undefined) continue;
+      vscode.mapWindow(id, entry.board.label ?? "Board", hostedRegion);
+      mappedBoards.add(id);
+    }
+  };
+  const placeContainerView = (
+    view: string,
+    region: string,
+    label: string,
+    declared?: { readonly size?: number; readonly folded?: boolean },
+  ): boolean => {
     const board = ensureContainerBoard(region, label);
     if (board === undefined) return false;
-    try {
-      board.add(viewStub(view));
-      return true;
-    } catch {
-      return false;
-    }
+    addBoardWidget(board, view, declared);
+    return board.hasWidget(view);
   };
   const syncContainerBoards = (entries: readonly VscodeCatalogueEntry[]): void => {
     const wanted = new Map(containerBoardTargets(entries).map((target) => [target.region, target]));
-    for (const [region, board] of containerBoards) {
+    // A contributed view that leaves the catalogue has no subject left on its board: the
+    // board's widget record is forgotten (the source owns what closing means, and the
+    // catalogue **is** that source's statement of what exists).
+    const offered = new Set([...wanted.values()].flatMap((target) => target.views));
+    for (const [region, entry] of containerBoards) {
       if (wanted.has(region)) continue;
-      layout.unregisterViewGroup(board.id);
-      board.dispose();
+      if (entry.registered) layout.unregisterWindowGroup(entry.board.id);
+      entry.board.dispose();
       containerBoards.delete(region);
     }
     for (const target of wanted.values()) {
       const board = ensureContainerBoard(target.region, target.label);
       if (board === undefined) continue;
-      for (const view of target.views) {
-        if (board.view(view) !== undefined) continue;
+      // New widgets append in catalogue order; an order the person set (or one restored
+      // from the board's own persistence) is theirs and is not overwritten.
+      for (const view of target.views) addBoardWidget(board, view, VIEW_DEFAULTS[view]);
+    }
+    for (const entry of containerBoards.values()) {
+      if (!entry.registered) continue;
+      for (const widget of entry.board.widgetOrder()) {
+        if (!widget.startsWith("vscode:view:") || offered.has(widget)) continue;
         try {
-          board.add(viewStub(view));
+          entry.board.removeWidget(widget);
         } catch {
-          // The frame may not have materialized the row yet; the next layout pass retries.
+          // The board went away between passes; the next sync rebuilds it.
         }
       }
-      // Re-project after the frame may have converted the container region to a split.
+    }
+    // A single editor window can live in the sidebar's WindowGroup: a file the frame
+    // placed in a container's region is a **window** of that group (the workbench owns
+    // its record; the group hosts it).
+    const records = layout.getState().views;
+    for (const [region, entry] of containerBoards) {
+      if (!entry.registered) continue;
+      const hosted = Object.entries(records)
+        .filter(
+          ([id, record]) =>
+            id.startsWith("vscode:file:") &&
+            typeof record.region === "string" &&
+            (record.region === region || record.region.startsWith(`${region}/`)),
+        )
+        .sort((a, b) => a[1].order - b[1].order)
+        .map(([id]) => id);
       try {
-        board.reorder([...board.state.order]);
+        entry.board.syncWindows(hosted);
       } catch {
         // A disposed board is removed on the next pass.
       }
@@ -678,13 +772,13 @@ export function apply(ctx: Context): void {
   };
   ctx.effect(
     () => () => {
-      for (const board of containerBoards.values()) {
-        layout.unregisterViewGroup(board.id);
-        board.dispose();
+      for (const entry of containerBoards.values()) {
+        if (entry.registered) layout.unregisterWindowGroup(entry.board.id);
+        entry.board.dispose();
       }
       containerBoards.clear();
     },
-    "prac-workbench: container boards",
+    "prac-workbench: container board windows",
   );
 
   // VS Code's panel shortcut: Ctrl/Cmd+J toggles the bottom track.
@@ -702,6 +796,39 @@ export function apply(ctx: Context): void {
 
   ctx.inject(["pracVscode"], (scope) => {
     const vscode = scope.pracVscode;
+    // The conversation is frame-rendered; project its identity so the editor
+    // model includes the window (order / close-if-empty) without rendering it twice.
+    let chatRegion: string | undefined;
+    let chatMapped = false;
+    const syncChat = (): void => {
+      const record = layout.getState().views[conversation];
+      if (record === undefined || record.hidden === true) {
+        if (chatMapped) vscode.unmapWindow(conversation);
+        chatMapped = false;
+        chatRegion = undefined;
+        return;
+      }
+      const region = record.region ?? undefined;
+      if (!chatMapped || region !== chatRegion) {
+        chatRegion = region;
+        chatMapped = true;
+        vscode.mapWindow(conversation, "Chat", region);
+      }
+      layout.setViewFlags(conversation, { closable: true });
+      if (layout.activeView() === conversation) vscode.activateWindow(conversation);
+    };
+    scope.effect(() => {
+      syncChat();
+      const offLayout = layout.subscribe(syncChat);
+      const offClose = layout.onDidRequestCloseView((view) => {
+        if (view === conversation) layout.hide(view);
+      });
+      return () => {
+        offLayout();
+        offClose();
+      };
+    }, "prac-web-app: conversation projection");
+
     const sync = (): void => {
       const catalogue = vscode.catalogue();
       const files = catalogue.filter((entry) => entry.source === "file");
@@ -715,6 +842,13 @@ export function apply(ctx: Context): void {
       // centre, or beside the file's other placement.
       placeCatalogue(layout, catalogue, placeContainerView);
       syncContainerBoards(catalogue);
+      syncBoardWindowProjection(vscode);
+      // Model discriminator: a file view is a window; a contributed view is a
+      // widget. Board windows are not classified yet; dsh:* stays the default window.
+      for (const id of Object.keys(layout.getState().views)) {
+        if (id.startsWith("vscode:file:")) layout.setViewKind(id, "window");
+        else if (id.startsWith("vscode:view:")) layout.setViewKind(id, "widget");
+      }
       if (layout.activeContainer("bottom") === null) {
         const terminal = layout
           .regionChildren("bottom")
@@ -776,18 +910,6 @@ export function apply(ctx: Context): void {
       return [...groups.entries()].map(([id, group]) => ({ id, ...group }));
     };
 
-    const viewForChild = (childId: string): string | undefined => {
-      const container = /\/container:(.+)$/.exec(childId)?.[1];
-      if (container !== undefined) {
-        return vscode
-          .catalogue()
-          .find((entry) => entry.source === "view" && entry.containerId === container)?.view;
-      }
-      // A child of its own is named after the view (`right/<view id>`).
-      const slash = childId.indexOf("/");
-      const direct = slash < 0 ? childId : childId.slice(slash + 1);
-      return direct.includes(":") ? direct : undefined;
-    };
     /** A dock's tool windows: the children the arrangement put in that region. */
     const dockItems = (regionId: string): PracRailItem[] =>
       layout.regionChildren(regionId).map((child) => ({
@@ -830,11 +952,10 @@ export function apply(ctx: Context): void {
       },
       onDidChange: railSubscribe,
       select: (id) => {
-        // The rail names a container, not a view: select the container child first, then front the
-        // view inside it. Both are layout operations — no click on a hidden strip.
+        // The rail names a container, not a view: selecting its child shows the container's
+        // **board window**. Its widgets live on the board — showing one as a frame view would
+        // give it a second home.
         layout.selectContainer(LEFT, `left/container:${id}`);
-        const entry = vscode.catalogue().find((candidate) => candidate.containerId === id);
-        if (entry !== undefined) layout.show(entry.view);
       },
     };
 
@@ -877,12 +998,17 @@ export function apply(ctx: Context): void {
         }
         layout.setCollapsed(RIGHT, false);
         layout.selectContainer(RIGHT, id);
-        const view = viewForChild(id);
-        if (view !== undefined) layout.show(view);
       },
     };
 
-    /** Move a container's tool window from one dock to the other, preserving its views. */
+    /**
+     * Move a container's tool window from one dock to the other.
+     *
+     * The container's **board window** is what moves: its surface is re-registered in the
+     * target child region (the record follows the surface), so the widgets, their order and
+     * their layout stay on the same board. Copying the views across as frame records would
+     * split a widget's home in two.
+     */
     const moveContainer = (containerId: string, from: "left" | "right"): void => {
       const target = from === "left" ? RIGHT : LEFT;
       const views = vscode
@@ -890,6 +1016,7 @@ export function apply(ctx: Context): void {
         .filter((entry) => entry.source === "view" && entry.containerId === containerId);
       if (views.length === 0) return;
       const label = views[0]?.containerTitle ?? views[0]?.title ?? containerId;
+      const sourceChild = `${from}/container:${containerId}`;
       const targetChild = `${target}/container:${containerId}`;
       // A direct view in the target (chat parked in the right dock) must get a child of its own
       // before the region becomes a selector, or the new child would hide it.
@@ -906,10 +1033,24 @@ export function apply(ctx: Context): void {
       const existing = layout.regionChildren(target).filter((child) => child.id !== targetChild);
       layout.setRegionChildren(target, [...existing, { id: targetChild, label }]);
       layout.setCollapsed(target, false);
-      for (const entry of views) layout.place(entry.view, targetChild);
-      const remaining = layout
-        .regionChildren(from)
-        .filter((child) => child.id !== `${from}/container:${containerId}`);
+      // Re-register the board window's surface in its new region. Unregistering first releases
+      // the old group → region binding and removes the projection; registering again places the
+      // same window record in the target.
+      const entry = containerBoards.get(sourceChild);
+      if (entry?.registered === true) {
+        layout.unregisterWindowGroup(entry.board.id);
+        entry.registered = false;
+        containerBoards.delete(sourceChild);
+        try {
+          layout.registerSurface(entry.board, targetChild);
+          layout.setViewBoard(entry.board.windowId, entry.board.boardId);
+          entry.registered = true;
+          containerBoards.set(targetChild, entry);
+        } catch {
+          // The target region may be rebuilt by the next layout pass; the catalogue sync retries.
+        }
+      }
+      const remaining = layout.regionChildren(from).filter((child) => child.id !== sourceChild);
       layout.setRegionChildren(from, remaining);
       layout.selectContainer(target, targetChild);
     };
@@ -989,8 +1130,8 @@ export function apply(ctx: Context): void {
   // The environment layer: additive, and the only slot a prac surface of our
   // own may float in (registering into `root` would shadow the whole frame).
   // The conversation's action, in the frame's per-view header slot.
-  slots.inject("prac.viewActions", () =>
-    slots.register({ name: "prac.viewActions", key: conversation }, () =>
+  slots.inject("prac.windowActions", () =>
+    slots.register({ name: "prac.windowActions", key: conversation }, () =>
       createElement(ConversationAction, { onShow: () => layout.show(conversation) }),
     ),
   );

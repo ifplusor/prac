@@ -5,16 +5,31 @@
  */
 
 import type { Context } from "@deepseek-ai/cordis";
-import type { SurfaceRegistry, ViewGroup } from "prac-ui-kit";
-import { WidgetBoardGroup } from "./boardGroup.js";
+import type { Side } from "prac-client-ui-frame/lib";
+import type { BoardWindowFrameFace } from "./boardWindowGroup.js";
+import { BoardWindowGroup } from "./boardWindowGroup.js";
 import { WidgetRegistry } from "./widget.js";
 
 /** The widget-board factory / registry other plugins inject. */
 export interface PracWidgetsFace {
   readonly registry: WidgetRegistry;
-  createBoardGroup(id: string, label?: string): WidgetBoardGroup;
-  /** Boards currently created by this service, for diagnostics / gates. */
-  boards(): readonly WidgetBoardGroup[];
+  /** Create a board window: one window whose content is a board. */
+  createBoardWindow(id: string, label?: string): BoardWindowGroup;
+  /** Board windows currently created by this service, for diagnostics / gates. */
+  boards(): readonly BoardWindowGroup[];
+  /**
+   * Move one widget from one board to another.
+   *
+   * Cross-board is **move only** (the widget keeps its source / content identity);
+   * an optional split is completed inside the **target** board's root, never across
+   * the two boards.
+   */
+  moveWidget(
+    widgetId: string,
+    fromBoardId: string,
+    toBoardId: string,
+    options?: { readonly split?: Side },
+  ): boolean;
 }
 
 declare module "@deepseek-ai/cordis" {
@@ -25,29 +40,45 @@ declare module "@deepseek-ai/cordis" {
 
 /** Install the widget service. */
 export function apply(ctx: Context): void {
-  const surfaces = ctx as unknown as { pracSurfaces: SurfaceRegistry<ViewGroup> };
-  const boards = new Map<string, WidgetBoardGroup>();
+  const boards = new Map<string, BoardWindowGroup>();
+  const frame = ctx.pracFrame;
+  /** The frame facts a board window registers through. */
+  const windowFace: BoardWindowFrameFace = {
+    registerBoardLayout: (boardId, content, chrome) =>
+      frame.registerBoardLayout(
+        boardId,
+        { getState: () => content.get(), subscribe: (listener) => content.subscribe(listener) },
+        chrome,
+      ),
+    setViewBoard: (viewId, boardId) => frame.setViewBoard(viewId, boardId),
+  };
   const face: PracWidgetsFace = {
     registry: new WidgetRegistry(),
-    createBoardGroup: (id, label) => {
+    createBoardWindow: (id, label) => {
       const existing = boards.get(id);
-      if (existing !== undefined && !existing.disposed) return existing;
-      const board = new WidgetBoardGroup(id, label);
+      if (existing !== undefined) return existing;
+      const board = new BoardWindowGroup(id, label, windowFace);
       boards.set(id, board);
       return board;
     },
     boards: () => [...boards.values()].filter((board) => !board.disposed),
+    moveWidget: (widgetId, fromBoardId, toBoardId, options = {}) => {
+      const find = (id: string): BoardWindowGroup | undefined =>
+        boards.get(id) ?? [...boards.values()].find((board) => board.boardId === id);
+      const from = find(fromBoardId);
+      const to = find(toBoardId);
+      if (from === undefined || to === undefined || from === to) return false;
+      if (!from.hasWidget(widgetId)) return false;
+      from.removeWidget(widgetId);
+      to.addWidget(widgetId);
+      if (options.split !== undefined) to.splitWidget(widgetId, options.split);
+      return true;
+    },
   };
   ctx.provide("pracWidgets", face);
   globalThis.__pracWidgets = face;
   ctx.effect(() => () => {
     if (globalThis.__pracWidgets === face) delete globalThis.__pracWidgets;
-  });
-  ctx.effect(() => {
-    const registration = surfaces.pracSurfaces.register("widget-board", {
-      create: ({ nodeId }) => new WidgetBoardGroup(nodeId),
-    });
-    return () => registration.dispose();
   });
 }
 

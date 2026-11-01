@@ -30,7 +30,15 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
-    "prac-ui-kit": "workspace:*"
+    "@deepseek-ai/dsh-client-store": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "immer": "^10.1.1",
+    "prac-client-ui-frame": "workspace:*",
+    "prac-ui-kit": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zustand": "~4.5.7"
   },
   "dsh": {
     "client": {

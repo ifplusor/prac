@@ -13,7 +13,7 @@ import type {
   GroupBinding,
   MoveIntent,
   View as FrameView,
-  ViewGroup as FrameViewGroup,
+  ViewGroup as FrameWindowGroup,
   ViewHost,
 } from "prac-ui-kit";
 
@@ -63,7 +63,7 @@ export interface VscodeView {
 }
 
 /** The group runtime the adapter's factory must produce. */
-export interface VscodeGroupRuntime extends FrameViewGroup {
+export interface VscodeGroupRuntime extends FrameWindowGroup {
   readonly binding?: GroupBinding;
   setBinding(binding: GroupBinding | undefined): void;
   add(view: FrameView): void;

@@ -6,5 +6,5 @@
 # stays checked.
 overlay/embeddedWorkbench.ts
 overlay/embeddedWebMain.ts
-overlay/pracEditorGroup.ts
-overlay/pracEditorHost.ts
+overlay/pracWindowGroup.ts
+overlay/pracWindowGroupHost.ts

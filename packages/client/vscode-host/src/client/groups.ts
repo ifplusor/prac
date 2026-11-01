@@ -8,7 +8,7 @@
  * @module prac-client-vscode-host/client/groups
  */
 
-import type { View as FrameView, ViewGroup as FrameViewGroup, Surface } from "prac-ui-kit";
+import type { View as FrameView, ViewGroup as FrameWindowGroup, Surface } from "prac-ui-kit";
 import type { VscodeCatalogueEntry } from "./public.js";
 import type { VscodeGroupRuntime } from "./resources.js";
 import {
@@ -21,9 +21,9 @@ import {
 
 /** The frame operations the group host needs. */
 export interface VscodeGroupLayout {
-  registerViewGroup(group: FrameViewGroup, regionId: string): unknown;
+  registerWindowGroup(group: FrameWindowGroup, regionId: string): unknown;
   registerSurface?(surface: Surface, regionId: string): unknown;
-  unregisterViewGroup(groupId: string): void;
+  unregisterWindowGroup(groupId: string): void;
 }
 
 /** Inputs for the VS Code group host. */
@@ -62,7 +62,7 @@ export class VscodeGroupHost {
       if (this.options.layout.registerSurface !== undefined && surface.group !== undefined) {
         this.options.layout.registerSurface(surface, regionId);
       } else {
-        this.options.layout.registerViewGroup(group, regionId);
+        this.options.layout.registerWindowGroup(group, regionId);
       }
     } catch (cause) {
       group.dispose();
@@ -94,7 +94,7 @@ export class VscodeGroupHost {
           this.add(item.resource, item.regionId);
         } catch {
           // The frame may rebuild a container child between listRegions and
-          // registerViewGroup; the next sync will retry on the new tree.
+          // registerWindowGroup; the next sync will retry on the new tree.
         }
       }
     }
@@ -190,7 +190,7 @@ export class VscodeGroupHost {
     for (const [viewId, view] of this.#views) {
       if (view.group === entry.group) this.#views.delete(viewId);
     }
-    this.options.layout.unregisterViewGroup(groupId);
+    this.options.layout.unregisterWindowGroup(groupId);
     entry.group.dispose();
   }
 
@@ -209,21 +209,9 @@ export function viewGroupsFromCatalogue(
     readonly region?: string | null;
   }[],
 ): VscodeViewGroup[] {
-  const byContainer = new Map<string, { title?: string }>();
-  for (const entry of entries) {
-    if (entry.containerId === undefined) continue;
-    byContainer.set(entry.containerId, { title: entry.containerTitle });
-  }
-  const groups: VscodeViewGroup[] = [...byContainer].map(([containerId, { title }]) => ({
-    apiVersion: VSCODE_API_VERSION,
-    kind: "ViewGroup",
-    metadata: { id: `vscode:group:${containerId}` },
-    spec: {
-      groupKind: "container",
-      containerId,
-      ...(title === undefined ? {} : { title }),
-    },
-  }));
+  // A container is a **board window** in prac (the workbench owns its region and its widget
+  // placement); the window-group resources here are the stage's editor groups only.
+  const groups: VscodeViewGroup[] = [];
   const editorRegions = new Set<string>();
   for (const entry of entries) {
     if (entry.source === "file" && typeof entry.region === "string" && entry.region !== "") {
@@ -291,6 +279,10 @@ export function planViewGroups(
   const planned: PlannedVscodeGroup[] = [];
   for (const resource of viewGroupsFromCatalogue(entries)) {
     const entry = entries.find((candidate) => candidate.containerId === resource.spec.containerId);
+    // A container is a **board window** in prac (the workbench owns its region and its
+    // widget placement); a window group is only the stage's shape. Registering a container
+    // group here as well would race the board for the same region.
+    if (resource.spec.groupKind === "container") continue;
     if (resource.spec.groupKind === "editor") {
       const region = resource.metadata.id.slice(EDITOR_GROUP_PREFIX.length);
       if (regionIds.includes(region)) planned.push({ resource, regionId: region });

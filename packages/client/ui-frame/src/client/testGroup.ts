@@ -1,22 +1,22 @@
 /** Test-only frame group; production groups are owned by ui-window / ui-widget. */
-import type { GroupBinding } from "./contracts.js";
+import type { WindowGroupBinding } from "./windowModel.js";
 import type { FrameView } from "./view.js";
-import type { ViewGroupMode, ViewGroupPlacement, ViewGroupState } from "./viewGroup.js";
+import type { WindowGroupMode, WindowGroupPlacement, WindowGroupState } from "./windowModel.js";
 
 export class TestGroup {
   readonly #views = new Map<string, FrameView>();
   readonly #order: string[] = [];
   readonly #listeners = new Set<() => void>();
   #active: string | undefined;
-  #binding: GroupBinding | undefined;
+  #binding: WindowGroupBinding | undefined;
 
   constructor(
     readonly id: string,
-    readonly mode: ViewGroupMode = "stack",
+    readonly mode: WindowGroupMode = "stack",
     readonly label?: string,
   ) {}
 
-  get state(): ViewGroupState {
+  get state(): WindowGroupState {
     return {
       id: this.id,
       mode: this.mode,
@@ -26,7 +26,7 @@ export class TestGroup {
     };
   }
 
-  get placements(): readonly ViewGroupPlacement[] {
+  get placements(): readonly WindowGroupPlacement[] {
     return this.#order.map((viewId, order) => ({
       viewId,
       groupId: this.id,
@@ -36,7 +36,7 @@ export class TestGroup {
     }));
   }
 
-  get binding(): GroupBinding | undefined {
+  get binding(): WindowGroupBinding | undefined {
     return this.#binding;
   }
 
@@ -74,7 +74,7 @@ export class TestGroup {
     this.#emit();
   }
 
-  setBinding(binding: GroupBinding | undefined): void {
+  setBinding(binding: WindowGroupBinding | undefined): void {
     this.#binding?.dispose();
     this.#binding = binding;
     this.#emit();

@@ -193,9 +193,21 @@ describe("grid node", () => {
         placements: { "region-2": { row: 0, column: 0 } },
       }),
       views: {
-        "dsh:main:conversation": { region: "center", order: 0, hidden: false, front: true },
-        "vscode:file:p1:file:///a.ts": { region: "region-2", order: 0, hidden: false, front: true },
-        "dsh:sidebar": { region: "left", order: 0, hidden: true },
+        "dsh:main:conversation": {
+          region: "center",
+          order: 0,
+          hidden: false,
+          front: true,
+          kind: "window",
+        },
+        "vscode:file:p1:file:///a.ts": {
+          region: "region-2",
+          order: 0,
+          hidden: false,
+          front: true,
+          kind: "window",
+        },
+        "dsh:sidebar": { region: "left", order: 0, hidden: true, kind: "window" },
       },
     };
     const normalized = normalizeViews(layout);

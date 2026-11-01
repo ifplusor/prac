@@ -38,6 +38,8 @@ export const DSH_CONVERSATION_KEY = "conversation";
  * by this frame. An entry's view id is what it declares (`vscode:view:<app view id>`).
  */
 export const VIEW_SLOT = "prac.view";
+export const WINDOW_SLOT = "prac.window";
+export const WIDGET_SLOT = "prac.widget";
 
 /**
  * The source segment of a view id (`dsh:`, `vscode:`, …); `""` when there is none.
@@ -62,6 +64,8 @@ export function viewSource(viewId: string): string {
  * who it is.
  */
 let declaredViewIds: ReadonlySet<string> = new Set<string>();
+/** The content slot each declared view registered into. */
+let declaredViewSlots: ReadonlyMap<string, "window" | "widget" | "legacy"> = new Map();
 /** The display title each `prac.view` entry declares, keyed by view id. */
 let declaredViewLabels: ReadonlyMap<string, string> = new Map<string, string>();
 /** The icon class each `prac.view` entry declares, keyed by view id. */
@@ -88,17 +92,26 @@ export function readDeclaredViewIds(slots: Context["slots"]): ReadonlySet<string
   const labels = new Map<string, string>();
   const icons = new Map<string, string>();
   const paneHeaders = new Set<string>();
-  for (const entry of slots.entries(VIEW_SLOT)) {
-    const id = entry.options.id;
-    if (id === undefined || id === "") continue;
-    ids.add(id);
-    const label = entry.options.label;
-    if (typeof label === "string" && label !== "") labels.set(id, label);
-    const options = entry.options as { icon?: unknown; paneHeader?: unknown };
-    if (typeof options.icon === "string" && options.icon !== "") icons.set(id, options.icon);
-    if (options.paneHeader === true) paneHeaders.add(id);
+  const slotsById = new Map<string, "window" | "widget" | "legacy">();
+  for (const [slot, kind] of [
+    [WINDOW_SLOT, "window"],
+    [WIDGET_SLOT, "widget"],
+    [VIEW_SLOT, "legacy"],
+  ] as const) {
+    for (const entry of slots.entries(slot)) {
+      const id = entry.options.id;
+      if (id === undefined || id === "") continue;
+      ids.add(id);
+      slotsById.set(id, kind);
+      const label = entry.options.label;
+      if (typeof label === "string" && label !== "") labels.set(id, label);
+      const options = entry.options as { icon?: unknown; paneHeader?: unknown };
+      if (typeof options.icon === "string" && options.icon !== "") icons.set(id, options.icon);
+      if (options.paneHeader === true) paneHeaders.add(id);
+    }
   }
   declaredViewIds = ids;
+  declaredViewSlots = slotsById;
   declaredViewLabels = labels;
   declaredViewIcons = icons;
   declaredViewPaneHeaders = paneHeaders;
@@ -114,6 +127,11 @@ export function readDeclaredViewIds(slots: Context["slots"]): ReadonlySet<string
  * @param viewId - the view identity.
  * @returns the declared label, or undefined for DSH slots/unknown ids.
  */
+/** The content slot a declared view registered into. */
+export function declaredViewSlot(viewId: string): "window" | "widget" | "legacy" | undefined {
+  return declaredViewSlots.get(viewId);
+}
+
 export function declaredViewLabel(viewId: string): string | undefined {
   return declaredViewLabels.get(viewId);
 }
@@ -195,6 +213,29 @@ export interface ViewInfo {
   readonly hidden: boolean;
   /** The view's order inside its region (lower renders first), or null. */
   readonly order: number | null;
+  /** Whether this frame view is a window or a widget. */
+  readonly kind: "window" | "widget";
+}
+
+/** A `ViewInfo` proven to be a window. */
+export interface WindowInfo extends ViewInfo {
+  readonly kind: "window";
+}
+
+/** A `ViewInfo` proven to be a widget. */
+export interface WidgetInfo extends ViewInfo {
+  readonly kind: "widget";
+}
+
+/** The classified view-info union. */
+export type TypedViewInfo = WindowInfo | WidgetInfo;
+
+export function isWindowInfo(view: ViewInfo): view is WindowInfo {
+  return view.kind === "window";
+}
+
+export function isWidgetInfo(view: ViewInfo): view is WidgetInfo {
+  return view.kind === "widget";
 }
 
 /**

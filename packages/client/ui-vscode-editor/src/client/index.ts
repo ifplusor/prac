@@ -28,11 +28,21 @@
 
 import type { Context } from "@deepseek-ai/cordis";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
-import type { PracVscodeFace, VscodeCatalogueEntry } from "prac-client-vscode-host/client";
-import type { PracLayoutFace, ViewSlotKey } from "prac-client-ui-frame/lib";
+import type {
+  PracVscodeAction,
+  PracVscodeFace,
+  VscodeCatalogueEntry,
+} from "prac-client-vscode-host/client";
+import type {
+  PracLayoutFace,
+  PracWindowActionsFace,
+  ViewSlotKey,
+  WindowAction,
+  WindowActionModel,
+} from "prac-client-ui-frame/lib";
 
 /** The slot these views are registered into (checked against the mechanism's key). */
-const SLOT: ViewSlotKey = "prac.view";
+const SLOT: ViewSlotKey = "prac.window";
 
 /**
  * Declare one view entry per open file, and keep that set in sync with the app.
@@ -49,6 +59,7 @@ export function apply(ctx: Context): void {
   // is what keeps this slot's use of it checked.
   const host: PracVscodeFace = ctx.pracVscode;
   const slots: SlotRegistry = ctx.slots;
+  const windowActions: PracWindowActionsFace = ctx.pracWindowActions;
   // The type-only import and the ambient merge can come through different
   // declaration copies (vscode-host bundles its own), so cast at the boundary.
   const layout: PracLayoutFace = ctx.pracFrame as unknown as PracLayoutFace;
@@ -73,6 +84,20 @@ export function apply(ctx: Context): void {
      */
     let lastFront: string | null = null;
     let lastAppActive: string | null = null;
+    /** The action model last published per view, as `placement + model` shape. */
+    const lastActionShapes = new Map<string, string>();
+
+    const toWindowAction = (action: PracVscodeAction): WindowAction => ({
+      id: action.id,
+      label: action.label,
+      ...(action.icon === undefined ? {} : { icon: action.icon }),
+      enabled: action.enabled,
+      checked: action.checked,
+      ...(action.tooltip === undefined ? {} : { tooltip: action.tooltip }),
+      ...(action.submenu === undefined
+        ? {}
+        : { submenu: action.submenu.map((child) => toWindowAction(child)) }),
+    });
 
     /** Push one view's chrome, and keep prac's front and the app's active editor aligned. */
     const sync = (): void => {
@@ -103,6 +128,33 @@ export function apply(ctx: Context): void {
       }
       const current = [...entries.values()].find((entry) => entry.active)?.placement ?? null;
       const front = placementOfView(active);
+      // The editor window's title actions are the app's model, but the chrome is
+      // prac's: publish them for **every** open file view, so a split's new group
+      // has its own tab-strip actions before it becomes the global active view.
+      const wantedActions = new Set<string>();
+      for (const { view } of files) {
+        const placement = host.filePlacement(view)?.placement;
+        if (placement === undefined) continue;
+        wantedActions.add(view);
+        const model = host.editorActions(placement);
+        const shape = JSON.stringify({ placement, model });
+        if (lastActionShapes.get(view) === shape) continue;
+        if (model.primary.length === 0 && model.secondary.length === 0) {
+          windowActions.remove(view);
+        } else {
+          const actionModel: WindowActionModel = {
+            primary: model.primary.map(toWindowAction),
+            secondary: model.secondary.map(toWindowAction),
+          };
+          windowActions.set(view, actionModel, (id) => host.runEditorAction(placement, id));
+        }
+        lastActionShapes.set(view, shape);
+      }
+      for (const view of lastActionShapes.keys()) {
+        if (wantedActions.has(view)) continue;
+        windowActions.remove(view);
+        lastActionShapes.delete(view);
+      }
       const frontMoved = active !== lastFront;
       const appMoved = current !== lastAppActive;
       lastFront = active;
@@ -140,6 +192,8 @@ export function apply(ctx: Context): void {
     // layout is a source too.
     const stopLayout = layout.subscribe(sync);
     return () => {
+      for (const view of lastActionShapes.keys()) windowActions.remove(view);
+      lastActionShapes.clear();
       stopLayout();
       stopEditors();
       stopClose();
@@ -189,4 +243,4 @@ export function apply(ctx: Context): void {
 export const name = "prac-client-ui-vscode-editor";
 
 /** The DSH services this plugin needs: the slot, the mechanism, and the app face. */
-export const inject = ["slots", "pracVscode", "pracFrame"];
+export const inject = ["slots", "pracVscode", "pracFrame", "pracWindowActions"];

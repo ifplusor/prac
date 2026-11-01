@@ -505,8 +505,8 @@ describe("nested regions (containers)", () => {
 
   /** One visible view in each container, so both are present. */
   const bothFilled: LayoutState["views"] = {
-    a: { region: "left.explorer", order: 0, hidden: false },
-    b: { region: "left.search", order: 0, hidden: false },
+    a: { region: "left.explorer", order: 0, hidden: false, kind: "window" },
+    b: { region: "left.search", order: 0, hidden: false, kind: "window" },
   };
 
   it("lists nested regions in tree order, children after their parent", () => {

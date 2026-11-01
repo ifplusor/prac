@@ -27,7 +27,10 @@ const catalogue = await page.evaluate(() => ({
   rows: [...document.querySelectorAll("[data-prac-recall-row]")].map((row) =>
     row.getAttribute("data-prac-recall-row"),
   ),
-  views: globalThis.__pracFrame.listViews().map((view) => view.id),
+  views: globalThis.__pracFrame
+    .listViews()
+    .filter((view) => view.kind !== "widget")
+    .map((view) => view.id),
   selected:
     document
       .querySelector("[data-prac-recall-row][data-prac-recall-selected]")
@@ -35,7 +38,9 @@ const catalogue = await page.evaluate(() => ({
 }));
 
 // Hide one row, then show it again through the same surface.
-const target = "vscode:view:outline";
+// A frame **window** view: widgets are board-owned and no longer start from the frame's
+// view table, so the recall surface must not offer them (a second home would double-render).
+const target = "dsh:main:conversation";
 const before = await page.evaluate(
   (id) => globalThis.__pracFrame.listViews().find((view) => view.id === id),
   target,
@@ -64,11 +69,11 @@ report({
   checks: {
     "Cmd/Ctrl+Alt+V opens the recall surface": catalogue.rows.length > 0,
     "the surface lists the frame catalogue": catalogue.rows.length === catalogue.views.length,
-    "the Explorer views are listed": [
+    "board-owned widgets are not listed as frame views": [
       "vscode:view:workbench.explorer.fileView",
       "vscode:view:outline",
       "vscode:view:timeline",
-    ].every((id) => catalogue.rows.includes(id)),
+    ].every((id) => !catalogue.rows.includes(id)),
     "a row is selected": catalogue.selected !== null,
     "hide removes the view from screen": hidden?.hidden === true,
     "show restores it": restored?.hidden !== true,

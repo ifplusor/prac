@@ -1,5 +1,5 @@
 /**
- * prac's own **editor group** — the equivalent of the workbench's `EditorGroupView`.
+ * prac's **window group** — the display-unit group in one tile.
  *
  * The workbench's editor container cannot be borrowed as-is: the **part** cannot be
  * combined with DSH's views (which is why file surfaces stopped being parts in the
@@ -8,29 +8,34 @@
  * is prac's object, and its element is mounted into a prac region: that is what lets
  * one region hold a file surface next to any other view.
  *
+ * Upstream calls the same shape an **editor group** (`IEditorGroupView`): that is
+ * the interface this class implements, not a second prac concept. In prac terms a
+ * window group holds **windows** (application instances), one of which is active at
+ * a time; the frame's tab strip is its window switcher.
+ *
  * What *is* borrowed, deliberately, is everything that is behaviour rather than
  * container:
  *
  * - `EditorGroupModel` — which editors are open, their order, the active one, and
  *   preview / pinned / sticky / transient semantics. Most members below delegate.
- * - `EditorPanes` — creating panes, their lifecycle, moving their DOM.
+ * - `PracEditorPaneHost` — creating panes, their lifecycle, moving their DOM.
  * - The pane classes themselves (registered through `IEditorPaneRegistry`), so the
  *   editing experience is the workbench's own rather than a look-alike.
  *
- * One requirement comes with `EditorPanes` and is easy to miss: a group needs **its
+ * One requirement comes with a pane host and is easy to miss: a group needs **its
  * own instance scope** — a progress bar plus a scoped `IContextKeyService`, with
  * `IEditorProgressService` provided *per group* by an `EditorProgressIndicator`. It
  * is not a global service; the composition has to build this scope (measured:
  * without it construction fails with `UNKNOWN service editorProgressService`).
  *
- * Vision: **prac's region tree is the editor grid.** One region that holds files is
- * one group; splitting a region is how a second group is born.
+ * Vision: **prac's region tree is the window grid.** One region that holds files is
+ * one window group; splitting a region is how a second window group is born.
  *
  * This file lives in the upstream-tree payload (see `.eslintignore`): it imports
  * `vs/...` internals by relative path and is compiled inside the checkout, by
  * upstream's build, not by the repo's own checker.
  *
- * @module prac/vscode/overlay/pracEditorGroup
+ * @module prac/vscode/overlay/pracWindowGroup
  */
 import { Emitter, Event } from "../../base/common/event.js";
 import { Disposable, DisposableStore } from "../../base/common/lifecycle.js";
@@ -42,8 +47,6 @@ import {
   getActionBarActions,
   PrimaryAndSecondaryActions,
 } from "../../platform/actions/browser/menuEntryActionViewItem.js";
-import { ToolBar } from "../../base/browser/ui/toolbar/toolbar.js";
-import { IContextMenuService } from "../../platform/contextview/browser/contextView.js";
 import { Separator, SubmenuAction } from "../../base/common/actions.js";
 import { ICommandService } from "../../platform/commands/common/commands.js";
 import { IContextKeyService } from "../../platform/contextkey/common/contextkey.js";
@@ -83,7 +86,6 @@ import {
   GroupIdentifier,
   IActiveEditorChangeEvent,
   IEditorCloseEvent,
-  IEditorOpenContext,
   IEditorWillMoveEvent,
   IEditorWillOpenEvent,
   IFindEditorOptions,
@@ -100,7 +102,8 @@ import {
 import { EditorInput } from "../common/editor/editorInput.js";
 import { EditorHeaderControl } from "./parts/editor/editorHeaderControl.js";
 import { EditorPane } from "./parts/editor/editorPane.js";
-import { EditorPanes } from "./parts/editor/editorPanes.js";
+import { PracEditorPaneHost } from "./pracEditorPaneHost.js";
+import { isProjectionWrite } from "./pracWindowProjection.js";
 import {
   createEditorTypeActions,
   getAvailableEditorTypes,
@@ -122,9 +125,9 @@ import { URI } from "../../base/common/uri.js";
 export const UNSUPPORTED_GROUP_OPERATIONS = ["replaceEditors"] as const;
 
 /**
- * prac's editor group: an `IEditorGroupView` whose DOM belongs to a prac region.
+ * A prac window group: the workbench's `IEditorGroupView`, one per file-holding region.
  */
-export class PracEditorGroup extends Disposable implements IEditorGroupView {
+export class PracWindowGroup extends Disposable implements IEditorGroupView {
   /** The group's element; the embedder mounts it into a prac region. */
   readonly element: HTMLElement;
   /** The title area above the editor: breadcrumbs, and the place actions would go. */
@@ -138,29 +141,39 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
    * instantiating service 'editorService'` and took the whole boot down.
    */
   private header: EditorHeaderControl | undefined;
-  /** The editor actions toolbar in the title row (the workbench's own actions). */
-  private actionsBar: ToolBar | undefined;
-  /** The element the actions toolbar renders into. */
-  private actionsElement: HTMLElement | undefined;
-  /** What the actions toolbar's menu subscriptions are bound to. */
-  private readonly actionsDisposables = this._register(new DisposableStore());
-
   /** The element prac mounted this group into, once it has (see `create`). */
   host: HTMLElement | undefined;
 
-  /** Where `EditorPanes` puts each pane's container (`.editor-instance`). */
+  /** Where the active pane host puts its container (`.editor-instance`). */
   private readonly editorContainer: HTMLElement;
 
   private readonly model: EditorGroupModel;
-  private readonly editorPanes: EditorPanes;
   private readonly progressBar: ProgressBar;
+  /** The scoped instantiation service each pane host is created in. */
+  private readonly paneInstantiationService: IInstantiationService;
+  /** One host per editor window; only the active host's element is mounted. */
+  private readonly paneHosts = new Map<EditorInput, PracEditorPaneHost>();
+  private activePaneHost: PracEditorPaneHost | undefined;
 
   /** The scope the group's panes live in; the interface exposes it. */
   readonly scopedContextKeyService: IContextKeyService;
 
-  /** The host this group belongs to (prac's region-level editor host). */
+  /** The host this group belongs to (prac's region-level window-group host). */
   readonly groupsView: IEditorGroupsView;
 
+  /** Counts of model writes, by kind (diagnostics / single-writer audit). */
+  private readonly modelWriteCounts = {
+    open: 0,
+    close: 0,
+    move: 0,
+    active: 0,
+    pin: 0,
+    other: 0,
+    projectionMove: 0,
+    externalMove: 0,
+    projectionActive: 0,
+    externalActive: 0,
+  };
   private _isActive = false;
   private _isVisible = true;
   private _disposed = false;
@@ -208,16 +221,20 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
     this._index = index;
 
     this.element = document.createElement("div");
-    this.element.classList.add("editor-group-container", "prac-editor-group");
+    this.element.classList.add("editor-group-container", "prac-window-group");
     // The title area (the part above the editor): breadcrumbs live here, and this is
     // what upstream's `EditorTitleControl` composes. prac draws its own **tabs** in the
     // region's strip, so the workbench's tab control is deliberately not created — but
     // the rest of the title area is, because without it the editor has no breadcrumbs
     // (measured: no `.monaco-breadcrumbs` in the group at all, and `titleHeight` 0).
     this.titleElement = document.createElement("div");
-    this.titleElement.classList.add("prac-editor-title");
+    this.titleElement.classList.add("prac-window-title");
     this.editorContainer = document.createElement("div");
     this.editorContainer.classList.add("editor-container");
+    // The pane host is absolutely positioned; anchor it to the editor box, not
+    // the group, or it covers the breadcrumbs above it.
+    this.editorContainer.style.position = "relative";
+    this.editorContainer.style.overflow = "hidden";
     this.element.append(this.titleElement, this.editorContainer);
 
     // The model first: everything below (the group's events, the progress
@@ -249,9 +266,7 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
       ),
     );
 
-    this.editorPanes = this._register(
-      scoped.createInstance(EditorPanes, this.element, this.editorContainer, this),
-    );
+    this.paneInstantiationService = scoped;
   }
 
   //#region The model's bookkeeping, delegated
@@ -322,9 +337,7 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
   }
 
   get activeEditorPane(): IVisibleEditorPane | undefined {
-    // Upstream asks `EditorPanes` (`editorPanes.ts:84`), so this forwards rather than
-    // keeping a second copy that can lag behind the panes.
-    return (this.editorPanes.activeEditorPane ?? undefined) as IVisibleEditorPane | undefined;
+    return this.activePaneHost?.pane;
   }
 
   get whenRestored(): Promise<void> {
@@ -410,7 +423,7 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
    * Open an editor in this group.
    *
    * The order the workbench's group guarantees: the model learns about the editor
-   * first (order, pinned, preview are the model's call), then `EditorPanes` creates
+   * first (order, pinned, preview are the model's call), then the pane host creates
    * the pane, and only then is it made active and the events fired.
    *
    * @param editor - the editor input, already resolved by the editor service.
@@ -496,17 +509,14 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
         openOptions.active = true;
       }
       this.model.openEditor(target, openOptions);
-      const result = await this.editorPanes.openEditor(
-        target,
-        options,
-        internalOptions,
-        Object.create(null) as IEditorOpenContext,
-      );
+      const host = this.hostFor(target);
+      const result = await host.open(target, options, internalOptions);
       if (result.error !== undefined) {
         this._onDidOpenEditorFail.fire(target);
         return undefined;
       }
       const pane = (result.pane ?? undefined) as IVisibleEditorPane | undefined;
+      if (this.model.isActive(target)) this.showHost(host);
       // Announce the active editor **here**, not from the model's change: upstream fires
       // this after `editorPane.openEditor` has resolved and only when the input actually
       // changed (`editorGroupView.ts:1300-1304`), because listeners ask
@@ -636,20 +646,18 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
       if (next !== null && next !== undefined) {
         // Closing the active editor reveals the next one (upstream
         // `doCloseActiveEditor` -> `doOpenEditor(nextActiveEditor)`).
-        await this.editorPanes.openEditor(
-          next,
-          { preserveFocus: options?.preserveFocus },
-          undefined,
-          Object.create(null) as IEditorOpenContext,
-        );
+        const nextHost = this.hostFor(next);
+        await nextHost.open(next, { preserveFocus: options?.preserveFocus });
+        this.showHost(nextHost);
+        this.dropHost(candidate);
       } else {
-        this.editorPanes.closeEditor(candidate);
+        this.dropHost(candidate);
         // Upstream announces the now-empty group (`editorGroupView.ts:1682`); with the
         // next editor present the announcement comes from opening it, above.
         this._onDidActiveEditorChange.fire({ editor: undefined });
       }
     } else {
-      this.editorPanes.closeEditor(candidate);
+      this.dropHost(candidate);
     }
     this._onDidCloseEditor.fire(event);
     return true;
@@ -860,7 +868,7 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
    */
   moveEditor(editor: EditorInput, target: IEditorGroup, options?: IEditorOptions): boolean {
     if (target === this) return this.moveEditorInsideGroup(editor, options);
-    return this.doMoveOrCopyAcrossGroups(editor, target as PracEditorGroup, options, false);
+    return this.doMoveOrCopyAcrossGroups(editor, target as PracWindowGroup, options, false);
   }
 
   /**
@@ -894,7 +902,7 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
    */
   copyEditor(editor: EditorInput, target: IEditorGroup, options?: IEditorOptions): void {
     if (target === this) return;
-    this.doMoveOrCopyAcrossGroups(editor, target as PracEditorGroup, options, true);
+    this.doMoveOrCopyAcrossGroups(editor, target as PracWindowGroup, options, true);
   }
 
   /**
@@ -923,8 +931,11 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
     const current = this.model.indexOf(editor);
     if (current === -1) return false;
     if (current !== index) {
+      // A frame-order projection is not a tab drag: moving a preview editor must
+      // not silently promote it to a pinned tab.
+      const preview = this.model.previewEditor === editor;
       this.model.moveEditor(editor, index);
-      this.model.pin(editor);
+      if (!preview) this.model.pin(editor);
     }
     if (options?.sticky) this.stickEditor(editor);
     return true;
@@ -942,7 +953,7 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
    */
   private doMoveOrCopyAcrossGroups(
     editor: EditorInput,
-    target: PracEditorGroup,
+    target: PracWindowGroup,
     options: IEditorOptions | undefined,
     keepCopy: boolean,
   ): boolean {
@@ -1028,9 +1039,9 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
    * The workbench's editor actions for this group's active editor.
    *
    * Upstream's own body (`editorGroupView.ts:2134-2176`): the `MenuId.EditorTitle` menu,
-   * read for the active resource, plus the "Reopen Editor With" submenu. prac renders
-   * these in the group header (see `ensureHeader`), which is where a person finds them
-   * without upstream's tab bar.
+   * read for the active resource, plus the "Reopen Editor With" submenu. The model is
+   * handed to the frame, which renders it in the tab strip (the group header carries
+   * only breadcrumbs).
    *
    * @param disposables - where the menu subscription lives.
    * @param menuId - the menu to read; `MenuId.EditorTitle` by default.
@@ -1102,20 +1113,6 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
     return { actions, onDidChange };
   }
 
-  /** Re-read the editor actions for the active editor into the toolbar. */
-  private updateEditorActions(): void {
-    if (this.actionsBar === undefined) return;
-    this.actionsDisposables.clear();
-    const { actions, onDidChange } = this.createEditorActions(
-      this.actionsDisposables,
-      MenuId.EditorTitle,
-    );
-    this.actionsBar.setActions(actions.primary, actions.secondary);
-    if (onDidChange !== undefined) {
-      this.actionsDisposables.add(onDidChange(() => this.updateEditorActions()));
-    }
-  }
-
   //#endregion
 
   //#region The view contract (prac's region tree is the grid)
@@ -1145,21 +1142,32 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
    * @param left - the box's left offset.
    */
   layout(width: number, height: number, top: number, left: number): void {
-    this._dimension = new Dimension(width, height);
+    // A region that is being re-parented during a tab switch can report 0×0 for a
+    // frame: the view host is detached from the grid before it is attached again.
+    // Recording that as the group's size makes the header lay the breadcrumbs out
+    // at 0px, and if no later layout arrives the blank strip stays (measured:
+    // ordinary markdown tab switches, final `.monaco-breadcrumbs` width 0 while
+    // the title was still 1272). Keep the last real box until a real one arrives;
+    // a collapsed region is not visible, so its stale size cannot be seen.
+    if (width > 0 && height > 0) this._dimension = new Dimension(width, height);
+    else if (this._dimension.width <= 0 || this._dimension.height <= 0) {
+      this._dimension = new Dimension(width, height);
+    }
+    width = this._dimension.width;
+    height = this._dimension.height;
     // The title spans the full width; the editor follows it (upstream
     // `editorGroupView.ts:2232-2252`).
     // The header is created when the first editor opens (see `ensureHeader`), so a group
     // that is laid out before that simply has no title yet.
-    // The breadcrumbs take the room the actions leave them: upstream lays them out over
-    // the full width because its tab bar holds the actions, while here they share the row.
-    const actionsWidth = this.actionsElement?.offsetWidth ?? 0;
-    this.header?.layout(Math.max(0, width - actionsWidth));
+    // The breadcrumbs take the full width: the tab strip (and its actions) is the
+    // frame's, not this header's.
+    this.header?.layout(width);
     const titleHeight = this.titleHeight.total;
     this.titleElement.style.height = `${titleHeight}px`;
     this.progressBar.getContainer().style.top = `${Math.max(this.titleHeight.offset - 2, 0)}px`;
     const editorHeight = Math.max(0, height - titleHeight);
     this.editorContainer.style.height = `${editorHeight}px`;
-    this.editorPanes.layout({ width, height: editorHeight, top: top + titleHeight, left });
+    this.activePaneHost?.layout({ width, height: editorHeight, top: top + titleHeight, left });
     this._onDidChange.fire({ width, height });
   }
 
@@ -1184,24 +1192,9 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
           false,
         ),
       );
-      // The editor actions (split, pin, close, `…`) belong to the tab bar upstream
-      // (`editorTabsControl.ts:391` renders them into `.editor-actions`); prac's tab bar
-      // is the frame's, so they live at the **right end of the group header** instead of
-      // being absent. The actions themselves are the workbench's — `MenuId.EditorTitle`,
-      // the same menu — so what appears is VS Code's own list.
-      this.actionsElement = document.createElement("div");
-      this.actionsElement.classList.add("prac-editor-actions");
-      this.actionsElement.style.cssText =
-        "display:flex;flex:0 0 auto;align-items:center;padding-left:6px";
+      // The title area carries only the editor's own header (breadcrumbs): the
+      // editor's actions belong to the frame's tab strip now.
       this.titleElement.style.cssText = "display:flex;align-items:center;position:relative";
-      this.titleElement.append(this.actionsElement);
-      const contextMenu = this.instantiationService.invokeFunction((accessor) =>
-        accessor.get(IContextMenuService),
-      );
-      this.actionsBar = this._register(
-        new ToolBar(this.actionsElement, contextMenu, { ariaLabel: "Editor actions" }),
-      );
-      this.updateEditorActions();
     }
     return this.header;
   }
@@ -1219,7 +1212,7 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
    */
   setVisible(visible: boolean): void {
     this._isVisible = visible;
-    this.editorPanes.setVisible(visible);
+    this.activePaneHost?.setVisible(visible);
   }
 
   isVisible(): boolean {
@@ -1239,7 +1232,7 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
 
   focus(): void {
     this._onDidFocus.fire();
-    this.activeEditorPane?.focus();
+    this.activePaneHost?.focus();
   }
 
   setActive(isActive: boolean): void {
@@ -1276,10 +1269,93 @@ export class PracEditorGroup extends Disposable implements IEditorGroupView {
 
   //#endregion
 
+  /** The host for one editor window, created on first use. */
+  private hostFor(editor: EditorInput): PracEditorPaneHost {
+    let host = this.paneHosts.get(editor);
+    if (host !== undefined) return host;
+    host = this._register(
+      this.paneInstantiationService.createInstance(PracEditorPaneHost, this),
+    );
+    this.paneHosts.set(editor, host);
+    this._register(
+      host.onDidFocus(() => {
+        if (this.activePaneHost === host) this._onDidFocus.fire();
+      }),
+    );
+    return host;
+  }
+
+  /** Mount one host in the group's editor box, detaching the previous one. */
+  private showHost(host: PracEditorPaneHost): void {
+    if (this.activePaneHost !== host) {
+      if (this.activePaneHost !== undefined) {
+        this.activePaneHost.setVisible(false);
+        this.activePaneHost.element.remove();
+      }
+      this.activePaneHost = host;
+      host.setVisible(true);
+      this.editorContainer.append(host.element);
+      this.relayout();
+    } else if (!host.element.isConnected) {
+      this.editorContainer.append(host.element);
+    }
+  }
+
+  /** Drop a closed window's host (the model has already removed the editor). */
+  private dropHost(editor: EditorInput): void {
+    const host = this.paneHosts.get(editor);
+    if (host === undefined) return;
+    host.close();
+    host.dispose();
+    host.element.remove();
+    this.paneHosts.delete(editor);
+    if (this.activePaneHost === host) this.activePaneHost = undefined;
+  }
+
+  /** The model writes this group has seen, by kind. */
+  modelWriteAudit(): Readonly<{
+    open: number;
+    close: number;
+    move: number;
+    active: number;
+    pin: number;
+    other: number;
+    projectionMove: number;
+    externalMove: number;
+    projectionActive: number;
+    externalActive: number;
+  }> {
+    return this.modelWriteCounts;
+  }
+
   private onModelChanged(event: IGroupModelChangeEvent): void {
+    switch (event.kind) {
+      case GroupModelChangeKind.EDITOR_OPEN:
+        this.modelWriteCounts.open += 1;
+        break;
+      case GroupModelChangeKind.EDITOR_CLOSE:
+        this.modelWriteCounts.close += 1;
+        break;
+      case GroupModelChangeKind.EDITOR_MOVE:
+        this.modelWriteCounts.move += 1;
+        if (isProjectionWrite()) this.modelWriteCounts.projectionMove += 1;
+        else this.modelWriteCounts.externalMove += 1;
+        break;
+      case GroupModelChangeKind.EDITOR_ACTIVE:
+        this.modelWriteCounts.active += 1;
+        if (isProjectionWrite()) this.modelWriteCounts.projectionActive += 1;
+        else this.modelWriteCounts.externalActive += 1;
+        break;
+      case GroupModelChangeKind.EDITOR_PIN:
+      case GroupModelChangeKind.EDITOR_STICKY:
+      case GroupModelChangeKind.EDITOR_TRANSIENT:
+        this.modelWriteCounts.pin += 1;
+        break;
+      default:
+        this.modelWriteCounts.other += 1;
+    }
     // The title area follows the model the same way upstream's title control does.
     this.header?.handleEditorsChange(event.kind !== GroupModelChangeKind.EDITOR_ACTIVE);
-    if (event.kind === GroupModelChangeKind.EDITOR_ACTIVE) this.updateEditorActions();
     // Nothing to do: the model's changes reach the outside through `onDidModelChange`
     // (the editor service subscribes to it), and the **active editor** is announced by
     // `openEditor`/`closeEditor` once the pane exists — the order upstream uses.

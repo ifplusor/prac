@@ -169,15 +169,21 @@ export function apply(ctx: Context): void {
 
   // The workbench's `addGroup` needs prac's region tree: a group is a region, so the frame
   // makes the region (synchronously) and the host binds the group to the id it returns.
+  //
+  // An empty *editor* group does not mean an empty *window* group. The conversation
+  // (and any other app's window) keeps the group alive; the editor has no authority
+  // to close a group / region it does not own alone. `hasOtherWindows` is what lets
+  // the host refuse to remove the group before the region is touched.
+  const hasOtherWindows = (region: string): boolean =>
+    regionHoldsOtherWindow(ctx.pracFrame.getState().views, region, (id) =>
+      id.startsWith(FILE_VIEW_PREFIX),
+    );
   embed.setGroupRegionChannel({
     createRegionBeside: (region, side) => ctx.pracFrame.createRegionBeside(region, side),
     regionInDirection: (region, side) => ctx.pracFrame.regionInDirection(region, side),
+    hasOtherWindows,
     removeRegion: (region) => {
-      // An empty *editor* group does not mean an empty *window* group. The
-      // conversation (and any other app's window) keeps the group alive; the
-      // editor has no authority to close a region it does not own alone.
-      const views = ctx.pracFrame.getState().views;
-      if (regionHoldsOtherWindow(views, region, (id) => id.startsWith(FILE_VIEW_PREFIX))) return;
+      if (hasOtherWindows(region)) return;
       ctx.pracFrame.removeRegion(region);
     },
   });
@@ -276,8 +282,19 @@ export function apply(ctx: Context): void {
         stopViews();
       };
     },
+    mapWindow: (id: string, title: string, region?: string) => embed.mapWindow(id, title, region),
+    mappedWindows: () => embed.mappedWindows(),
+    activeWindow: () => embed.activeWindow(),
+    activateWindow: (id: string) => embed.activateWindow(id),
+    unmapWindow: (id: string) => embed.unmapWindow(id),
+    orderWindow: (id: string, index: number) => embed.orderWindow(id, index),
+    orderFile: (resource: string, index: number) => embed.orderFile(resource, index),
+    windowOrder: (region?: string) => embed.windowOrder(region),
     containerActions: (containerId: string) => embed.containerActions(containerId),
     runAction: (containerId: string, actionId: string) => embed.runAction(containerId, actionId),
+    editorActions: (placement?: string) => embed.editorActions(placement),
+    runEditorAction: (placement: string | undefined, actionId: string) =>
+      embed.runEditorAction(placement, actionId),
     hostFor: (view: string): (() => ReactElement | null) => {
       const placement = placementOfFileView(view);
       if (placement !== undefined) return embed.file(placement.placement, placement.resource);
@@ -343,9 +360,7 @@ export function apply(ctx: Context): void {
     filePlacement: (viewId) => face.filePlacement(viewId),
     onReorder: (groupId, order) => {
       if (!groupId.startsWith("vscode:group:editor:")) return;
-      order.forEach((file, index) =>
-        face.capabilities.editors.actions.reorder(file.placement, file.resource, index),
-      );
+      order.forEach((file, index) => face.orderFile(file.resource, index));
     },
   });
 
@@ -358,26 +373,39 @@ export function apply(ctx: Context): void {
    * this is the second bridge, and it is the one a tab drag moves.
    */
   const syncFrameEditorOrder = (): void => {
+    const mapped = new Set(face.mappedWindows());
     const byRegion = new Map<
       string,
-      { order: number; file: { placement: string; resource: string } }[]
+      (
+        | { order: number; kind: "file"; file: { placement: string; resource: string } }
+        | { order: number; kind: "window"; id: string }
+      )[]
     >();
     for (const view of ctx.pracFrame.listViews()) {
-      if (view.region === null || view.hidden || !view.id.startsWith("vscode:file:")) continue;
-      const file = face.filePlacement(view.id);
-      if (file === undefined) continue;
-      const list = byRegion.get(view.region) ?? [];
-      list.push({ order: view.order ?? 0, file });
-      byRegion.set(view.region, list);
+      if (view.region === null || view.hidden) continue;
+      const file = view.id.startsWith("vscode:file:") ? face.filePlacement(view.id) : undefined;
+      if (file !== undefined) {
+        const list = byRegion.get(view.region) ?? [];
+        list.push({ order: view.order ?? 0, kind: "file", file });
+        byRegion.set(view.region, list);
+      } else if (mapped.has(view.id)) {
+        const list = byRegion.get(view.region) ?? [];
+        list.push({ order: view.order ?? 0, kind: "window", id: view.id });
+        byRegion.set(view.region, list);
+      }
     }
     for (const [region, entries] of byRegion) {
       entries.sort((a, b) => a.order - b.order);
-      const key = JSON.stringify(entries.map((entry) => entry.file));
+      const key = JSON.stringify(entries);
       if (frameEditorOrder.get(region) === key) continue;
       frameEditorOrder.set(region, key);
-      entries.forEach((entry, index) =>
-        face.capabilities.editors.actions.reorder(entry.file.placement, entry.file.resource, index),
-      );
+      entries.forEach((entry, index) => {
+        if (entry.kind === "file") {
+          face.orderFile(entry.file.resource, index);
+        } else {
+          face.orderWindow(entry.id, index);
+        }
+      });
     }
   };
 

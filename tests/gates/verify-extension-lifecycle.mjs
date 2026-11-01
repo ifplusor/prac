@@ -9,6 +9,7 @@ import { openPrac, report, requireUrl } from "./harness.mjs";
 
 const phase = process.env.PHASE ?? "restored";
 const VIEW = "vscode:view:pracGateView";
+const APP_VIEW = "pracGateView";
 
 const url = requireUrl();
 const { page, close } = await openPrac(url);
@@ -19,13 +20,37 @@ await page.waitForTimeout(2500);
 
 const state = () =>
   page.evaluate(
-    ({ view }) => ({
-      catalogue:
-        globalThis.__pracVscodeFace?.catalogue().filter((entry) => entry.view === view) ?? [],
-      frames: globalThis.__pracFrame?.listViews().filter((entry) => entry.id === view) ?? [],
-      hosts: document.querySelectorAll(`[data-prac-view-host][data-prac-view-id="${view}"]`).length,
-    }),
-    { view: VIEW },
+    ({ view, appView }) => {
+      // A contributed view lives on its container's board now; the host mounts inside the
+      // board window's isolation root.
+      const deepHosts = () => {
+        let count = 0;
+        const walk = (root) => {
+          for (const element of root.querySelectorAll("*")) {
+            if (element.shadowRoot) {
+              count += element.shadowRoot.querySelectorAll(
+                `[data-vscode-embed-view="${appView}"]`,
+              ).length;
+              walk(element.shadowRoot);
+            }
+          }
+        };
+        count += document.querySelectorAll(`[data-vscode-embed-view="${appView}"]`).length;
+        walk(document);
+        return count;
+      };
+      const boards = (globalThis.__pracWidgets?.boards?.() ?? []).map((board) =>
+        typeof board.widgetOrder === "function" ? [...board.widgetOrder()] : [],
+      );
+      return {
+        catalogue:
+          globalThis.__pracVscodeFace?.catalogue().filter((entry) => entry.view === view) ?? [],
+        frames: globalThis.__pracFrame?.listViews().filter((entry) => entry.id === view) ?? [],
+        owners: boards.filter((widgets) => widgets.includes(view)).length,
+        hosts: deepHosts(),
+      };
+    },
+    { view: VIEW, appView: APP_VIEW },
   );
 
 async function waitFor(predicate) {
@@ -37,8 +62,9 @@ async function waitFor(predicate) {
 }
 
 async function activateView() {
+  // The view is a widget on the Explorer board; selecting the container is how a person
+  // brings its board window (and the widget inside it) on screen.
   await page.click('[data-prac-activity="left"] [data-prac-rail-item="workbench.view.explorer"]');
-  await page.evaluate((view) => globalThis.__pracFrame.setFront(view), VIEW);
   await page.waitForTimeout(1200);
 }
 
@@ -66,7 +92,7 @@ if (phase === "absent") {
   await command("prac.gate.show");
   await activateView();
   await waitFor(
-    (value) => value.catalogue.length === 1 && value.frames.length === 1 && value.hosts > 0,
+    (value) => value.catalogue.length === 1 && value.owners === 1 && value.hosts > 0,
   );
   facts = await state();
 }
@@ -84,7 +110,7 @@ report({
         }
       : {
           "the reinstalled extension contributes the view": facts.catalogue.length === 1,
-          "the reinstalled view is placed in the frame": facts.frames.length === 1,
+          "the reinstalled view is placed on a board": facts.owners === 1,
           "the reinstalled view mounts a host": facts.hosts > 0,
         },
   ok:

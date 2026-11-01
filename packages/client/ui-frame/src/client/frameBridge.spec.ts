@@ -4,7 +4,7 @@ import type { LayoutState } from "./contract.js";
 import type { LayoutStore } from "./store.js";
 import { View } from "./view.js";
 import { TestGroup } from "./testGroup.js";
-import { ViewGroupLayoutBridge } from "./frameBridge.js";
+import { WindowGroupLayoutBridge } from "./frameBridge.js";
 
 function memoryStore(): LayoutStore {
   let state: LayoutState = {
@@ -25,13 +25,13 @@ function memoryStore(): LayoutStore {
   };
 }
 
-describe("ViewGroupLayoutBridge", () => {
+describe("WindowGroupLayoutBridge", () => {
   it("projects membership, order and active", () => {
     const store = memoryStore();
     const group = new TestGroup("g1", "select");
     group.add(new View("v1"));
     group.add(new View("v2"));
-    const bridge = new ViewGroupLayoutBridge(group, store, "left");
+    const bridge = new WindowGroupLayoutBridge(group, store, "left");
 
     expect(bridge.regionId).toBe("left");
     expect(store.get().views["v1"]?.region).toMatch(/^left/);
@@ -52,7 +52,7 @@ describe("ViewGroupLayoutBridge", () => {
     store.update((state) => place(state, "v1", "right"));
     const group = new TestGroup("g1");
     group.add(new View("v1"));
-    new ViewGroupLayoutBridge(group, store, "left");
+    new WindowGroupLayoutBridge(group, store, "left");
 
     expect(Object.keys(store.get().views)).toEqual(["v1"]);
     expect(store.get().views["v1"]?.region).toMatch(/^left/);
@@ -62,7 +62,7 @@ describe("ViewGroupLayoutBridge", () => {
     const store = memoryStore();
     const group = new TestGroup("g1");
     group.add(new View("v1"));
-    const bridge = new ViewGroupLayoutBridge(group, store, "left");
+    const bridge = new WindowGroupLayoutBridge(group, store, "left");
     store.update((state) => ({
       ...state,
       views: { ...state.views, v1: { ...state.views["v1"]!, hidden: true } },
@@ -78,7 +78,7 @@ describe("ViewGroupLayoutBridge", () => {
     const store = memoryStore();
     const group = new TestGroup("g1");
     group.add(new View("v1"));
-    const bridge = new ViewGroupLayoutBridge(group, store, "left");
+    const bridge = new WindowGroupLayoutBridge(group, store, "left");
 
     group.remove("v1");
     expect(store.get().views["v1"]).toBeUndefined();

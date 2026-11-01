@@ -24,16 +24,40 @@ await page.waitForTimeout(3000);
 const VIEW = "vscode:view:pracGateView";
 const APP_VIEW = "pracGateView";
 
-/** Read the catalogue and frame placement for the fixture's view. */
+/** Read the catalogue and the boards that own the fixture's view. */
 const state = () =>
   page.evaluate(
-    ({ view, appView }) => ({
-      catalogue: globalThis.__pracVscodeFace
-        ?.catalogue()
-        .filter((entry) => entry.view === view || entry.appId === appView),
-      frames: globalThis.__pracFrame?.listViews().filter((entry) => entry.id === view) ?? [],
-      hosts: document.querySelectorAll(`[data-vscode-embed-view="${appView}"]`).length,
-    }),
+    ({ view, appView }) => {
+      // The host mounts inside the container board window's isolation root.
+      const deepHosts = () => {
+        let count = 0;
+        const walk = (root) => {
+          for (const element of root.querySelectorAll("*")) {
+            if (element.shadowRoot) {
+              count += element.shadowRoot.querySelectorAll(`[data-vscode-embed-view="${appView}"]`).length;
+              walk(element.shadowRoot);
+            }
+          }
+        };
+        count += document.querySelectorAll(`[data-vscode-embed-view="${appView}"]`).length;
+        walk(document);
+        return count;
+      };
+      const boards = (globalThis.__pracWidgets?.boards?.() ?? []).map((board) => ({
+        id: board.id,
+        widgets:
+          typeof board.widgetOrder === "function" ? [...board.widgetOrder()] : [],
+      }));
+      return {
+        catalogue: globalThis.__pracVscodeFace
+          ?.catalogue()
+          .filter((entry) => entry.view === view || entry.appId === appView),
+        frames: globalThis.__pracFrame?.listViews().filter((entry) => entry.id === view) ?? [],
+        boards,
+        owners: boards.filter((board) => board.widgets.includes(view)).map((board) => board.id),
+        hosts: deepHosts(),
+      };
+    },
     { view: VIEW, appView: APP_VIEW },
   );
 
@@ -82,12 +106,11 @@ report({
   checks: {
     "the fixture view starts absent": before.catalogue.length === 0 && before.frames.length === 0,
     "the view enters the catalogue": shown.catalogue.length === 1,
-    "the view materializes in the frame":
-      shown.frames.length === 1 && shown.frames[0]?.hidden === false,
+    "the view materializes on a board window": shown.owners.length === 1,
     "the view leaves the catalogue": hidden.catalogue.length === 0,
-    "the view is removed from the frame": hidden.frames.length === 0,
+    "the view is removed from the board": hidden.owners.length === 0,
     "the host is released": hidden.hosts === 0,
-    "the view returns": shownAgain.catalogue.length === 1 && shownAgain.frames.length === 1,
+    "the view returns": shownAgain.catalogue.length === 1 && shownAgain.owners.length === 1,
     "no prac-owned console errors":
       own("__pracFrame").length === 0 && own("vscode-embed:").length === 0,
   },

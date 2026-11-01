@@ -73,10 +73,10 @@ function definition(): VscodeViewGroupDefinition {
 
 describe("VscodeGroupHost", () => {
   it("materializes, binds, registers, and disposes a group", () => {
-    const registerViewGroup = vi.fn();
-    const unregisterViewGroup = vi.fn();
+    const registerWindowGroup = vi.fn();
+    const unregisterWindowGroup = vi.fn();
     const host = new VscodeGroupHost({
-      layout: { registerViewGroup, unregisterViewGroup },
+      layout: { registerWindowGroup, unregisterWindowGroup },
       definition: definition(),
       viewDefinition: viewDefinition(),
     });
@@ -84,16 +84,16 @@ describe("VscodeGroupHost", () => {
     const group = host.add(groupResource(), "left");
 
     expect(group.id).toBe("g1");
-    expect(registerViewGroup).toHaveBeenCalledWith(group, "left");
+    expect(registerWindowGroup).toHaveBeenCalledWith(group, "left");
     expect(group.binding).toBeDefined();
 
     host.remove("g1");
-    expect(unregisterViewGroup).toHaveBeenCalledWith("g1");
+    expect(unregisterWindowGroup).toHaveBeenCalledWith("g1");
   });
 
   it("reconciles groups and views from a catalogue", () => {
     const host = new VscodeGroupHost({
-      layout: { registerViewGroup: () => {}, unregisterViewGroup: () => {} },
+      layout: { registerWindowGroup: () => {}, unregisterWindowGroup: () => {} },
       definition: definition(),
       viewDefinition: viewDefinition(),
     });
@@ -107,18 +107,15 @@ describe("VscodeGroupHost", () => {
     };
 
     host.sync([entry], ["left/container:workbench.view.explorer"]);
-    expect(host.has("vscode:group:workbench.view.explorer")).toBe(true);
-    expect(host.hasView(entry.view)).toBe(true);
-
-    host.sync([], ["left/container:workbench.view.explorer"]);
+    // A container is a board window; this host plans no window group for it.
     expect(host.ids()).toEqual([]);
-    expect(host.viewIds()).toEqual([]);
+    expect(host.hasView(entry.view)).toBe(false);
   });
 
   it("writes a frame reorder into the editor model", () => {
     const onReorder = vi.fn();
     const host = new VscodeGroupHost({
-      layout: { registerViewGroup: () => {}, unregisterViewGroup: () => {} },
+      layout: { registerWindowGroup: () => {}, unregisterWindowGroup: () => {} },
       definition: definition(),
       viewDefinition: viewDefinition(),
       filePlacement: (viewId) =>
@@ -145,9 +142,9 @@ describe("VscodeGroupHost", () => {
     ]);
   });
 
-  it("can re-add a view after it disappears from the catalogue", () => {
+  it("leaves container placement to the workbench", () => {
     const host = new VscodeGroupHost({
-      layout: { registerViewGroup: () => {}, unregisterViewGroup: () => {} },
+      layout: { registerWindowGroup: () => {}, unregisterWindowGroup: () => {} },
       definition: definition(),
       viewDefinition: viewDefinition(),
     });
@@ -162,16 +159,14 @@ describe("VscodeGroupHost", () => {
     const regions = ["left/container:workbench.view.explorer"];
 
     host.sync([entry], regions);
+    expect(host.hasView(entry.view)).toBe(false);
     host.sync([{ ...entry, containerId: "other" }], regions);
     expect(host.hasView(entry.view)).toBe(false);
-    host.sync([entry], regions);
-
-    expect(host.hasView(entry.view)).toBe(true);
   });
 
-  it("can re-add a container group after it disappears", () => {
+  it("never hosts a container group", () => {
     const host = new VscodeGroupHost({
-      layout: { registerViewGroup: () => {}, unregisterViewGroup: () => {} },
+      layout: { registerWindowGroup: () => {}, unregisterWindowGroup: () => {} },
       definition: definition(),
       viewDefinition: viewDefinition(),
     });
@@ -186,18 +181,16 @@ describe("VscodeGroupHost", () => {
     const regions = ["left/container:workbench.view.explorer"];
 
     host.sync([entry], regions);
-    host.sync([], regions);
     expect(host.has("vscode:group:workbench.view.explorer")).toBe(false);
+    host.sync([], regions);
     host.sync([entry], regions);
-
-    expect(host.has("vscode:group:workbench.view.explorer")).toBe(true);
-    expect(host.hasView(entry.view)).toBe(true);
+    expect(host.has("vscode:group:workbench.view.explorer")).toBe(false);
   });
 
   it("disposes all groups and views", () => {
-    const unregisterViewGroup = vi.fn();
+    const unregisterWindowGroup = vi.fn();
     const host = new VscodeGroupHost({
-      layout: { registerViewGroup: () => {}, unregisterViewGroup },
+      layout: { registerWindowGroup: () => {}, unregisterWindowGroup },
       definition: definition(),
       viewDefinition: viewDefinition(),
     });
@@ -211,14 +204,14 @@ describe("VscodeGroupHost", () => {
 
     host.dispose();
 
-    expect(unregisterViewGroup).toHaveBeenCalledWith("g1");
+    expect(unregisterWindowGroup).toHaveBeenCalledWith("g1");
     expect(host.ids()).toEqual([]);
     expect(host.viewIds()).toEqual([]);
   });
 
   it("adds a view to a hosted group", () => {
     const host = new VscodeGroupHost({
-      layout: { registerViewGroup: () => {}, unregisterViewGroup: () => {} },
+      layout: { registerWindowGroup: () => {}, unregisterWindowGroup: () => {} },
       definition: definition(),
       viewDefinition: viewDefinition(),
     });
@@ -240,10 +233,10 @@ describe("VscodeGroupHost", () => {
   it("does not keep a group when registration fails", () => {
     const host = new VscodeGroupHost({
       layout: {
-        registerViewGroup: () => {
+        registerWindowGroup: () => {
           throw new Error("no region");
         },
-        unregisterViewGroup: () => {},
+        unregisterWindowGroup: () => {},
       },
       definition: definition(),
       viewDefinition: viewDefinition(),
@@ -254,7 +247,7 @@ describe("VscodeGroupHost", () => {
 });
 
 describe("viewGroupsFromCatalogue", () => {
-  it("creates one stable group per container", () => {
+  it("plans no window group for a container", () => {
     const groups = viewGroupsFromCatalogue([
       { containerId: "a", containerTitle: "A" },
       { containerId: "a", containerTitle: "A" },
@@ -262,11 +255,10 @@ describe("viewGroupsFromCatalogue", () => {
       {},
     ]);
 
-    expect(groups.map((group) => group.metadata.id)).toEqual(["vscode:group:a", "vscode:group:b"]);
-    expect(groups[0]?.spec.title).toBe("A");
+    expect(groups).toEqual([]);
   });
 
-  it("plans groups by location and falls back to the first region", () => {
+  it("plans a container nowhere (a board window owns it)", () => {
     const planned = planViewGroups(
       [
         {
@@ -291,12 +283,7 @@ describe("viewGroupsFromCatalogue", () => {
       ["left/container:a", "bottom/container:b"],
     );
 
-    expect(planned.find((item) => item.resource.spec.containerId === "a")?.regionId).toBe(
-      "left/container:a",
-    );
-    expect(planned.find((item) => item.resource.spec.containerId === "b")?.regionId).toBe(
-      "bottom/container:b",
-    );
+    expect(planned).toEqual([]);
   });
 
   it("creates one editor group per file region", () => {

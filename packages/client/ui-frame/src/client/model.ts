@@ -26,6 +26,7 @@ import {
   type RegionSelector,
   type Side,
   type SplitNode,
+  type FrameViewKind,
   type ViewRecord,
 } from "./contract.js";
 import { allocateContent, allocateStack, isStackSplit, nodeBasis } from "prac-ui-kit";
@@ -513,10 +514,25 @@ export function revealRegion(tree: LayoutNode, id: string): LayoutNode {
  * @param state - current state.
  * @param viewId - the view identity.
  */
-export function ensureView(state: LayoutState, viewId: string): ViewRecord {
-  const existing: ViewRecord | undefined = state.views[viewId];
-  return existing ?? { region: firstRegionId(state.tree), order: 0, hidden: true };
+export function ensureView(state: LayoutState, viewId: string, kind?: FrameViewKind): ViewRecord;
+export function ensureView<TRecord extends ViewRecord>(
+  state: LayoutState<TRecord>,
+  viewId: string,
+  create: (viewId: string) => TRecord,
+): TRecord;
+export function ensureView<TRecord extends ViewRecord>(
+  state: LayoutState<TRecord>,
+  viewId: string,
+  kindOrCreate: FrameViewKind | ((viewId: string) => TRecord) = "window",
+): TRecord | ViewRecord {
+  const existing = state.views[viewId];
+  if (existing !== undefined) return existing;
+  if (typeof kindOrCreate === "function") return kindOrCreate(viewId);
+  return { region: firstRegionId(state.tree), order: 0, hidden: true, kind: kindOrCreate };
 }
+
+/** Build one item record for a generic layout state. */
+export type LayoutItemFactory<TRecord extends ViewRecord> = (viewId: string) => TRecord;
 
 /**
  * Place a view in a region (creating the view record if needed).
@@ -538,7 +554,12 @@ export function ensureView(state: LayoutState, viewId: string): ViewRecord {
  * @param viewId - the view identity.
  * @param regionId - the destination region.
  */
-export function place(state: LayoutState, viewId: string, regionId: string): LayoutState {
+export function place<TRecord extends ViewRecord = ViewRecord>(
+  state: LayoutState<TRecord>,
+  viewId: string,
+  regionId: string,
+  create?: LayoutItemFactory<TRecord>,
+): LayoutState<TRecord> {
   const current = state.views[viewId];
   if (current !== undefined && !current.hidden) {
     // The landing region is where routing would put it — a container shows a child
@@ -553,7 +574,7 @@ export function place(state: LayoutState, viewId: string, regionId: string): Lay
       return state;
     }
   }
-  const next = placeQuietly(state, viewId, regionId);
+  const next = placeQuietly(state, viewId, regionId, create);
   // Placing into a container shows that container: the selector ancestors are
   // what decide which child is on screen. The *landing* region is the one to
   // reveal — routing may have put the view in a child of the region named.
@@ -615,8 +636,13 @@ function dropOwnChild(tree: LayoutNode, viewId: string): LayoutNode {
  * @param viewId - the view identity.
  * @param regionId - the destination region.
  */
-export function placeQuietly(state: LayoutState, viewId: string, regionId: string): LayoutState {
-  const view = ensureView(state, viewId);
+export function placeQuietly<TRecord extends ViewRecord = ViewRecord>(
+  state: LayoutState<TRecord>,
+  viewId: string,
+  regionId: string,
+  create?: LayoutItemFactory<TRecord>,
+): LayoutState<TRecord> {
+  const view = create === undefined ? ensureView(state, viewId) : ensureView(state, viewId, create);
   // A region that selects among children shows none of its own views, so a
   // direct placement into it lands in a child of its own — "a container with
   // one view", the shape the design gives a view that stands alone.
@@ -642,7 +668,7 @@ export function placeQuietly(state: LayoutState, viewId: string, regionId: strin
       views[id] = { ...record, front: false };
     }
   }
-  views[viewId] = { ...view, region: landing.region, hidden: false, order, front: true };
+  views[viewId] = { ...view, region: landing.region, hidden: false, order, front: true } as TRecord;
   // A placement is where a stack appears or changes shape: normalise on the way out.
   return ensureStackShape({ ...state, tree: landing.tree, views });
 }
@@ -654,7 +680,10 @@ export function placeQuietly(state: LayoutState, viewId: string, regionId: strin
  * @param regionId - the region.
  * @returns the order a newly arriving view takes.
  */
-function maxOrder(state: LayoutState, regionId: string): number {
+function maxOrder<TRecord extends ViewRecord>(
+  state: LayoutState<TRecord>,
+  regionId: string,
+): number {
   // A stack's views live in its rows, not directly in the region: ask the split for them too, or a
   // placement into a stack would always get order 0.
   const split = findSplit(state.tree, regionId);
@@ -798,7 +827,9 @@ export function moveViewInRegion(
  * @param state - current state.
  * @returns the shaped state, or the same state when every stack already has that shape.
  */
-export function ensureStackShape(state: LayoutState): LayoutState {
+export function ensureStackShape<TRecord extends ViewRecord = ViewRecord>(
+  state: LayoutState<TRecord>,
+): LayoutState<TRecord> {
   let changed = false;
   const views = { ...state.views };
 
@@ -825,7 +856,7 @@ export function ensureStackShape(state: LayoutState): LayoutState {
     if (record !== undefined && record.region !== leaf.id) {
       // The height lives in the tree now; the record no longer carries one (G1: `tabs` has none).
       const { size: _size, cachedSize: _cached, ...rest } = record;
-      views[viewId] = { ...rest, region: leaf.id, collapsed: undefined };
+      views[viewId] = { ...rest, region: leaf.id, collapsed: undefined } as TRecord;
       changed = true;
     }
     return leaf;
@@ -1023,14 +1054,17 @@ export function ensureStackShape(state: LayoutState): LayoutState {
           : { ...entry, collapsed: false, flex: false, size: from, cachedSize: from },
     );
     const { size: _size, cachedSize: _cached, ...rest } = record;
-    views[viewId] = { ...rest, collapsed: undefined };
+    views[viewId] = { ...rest, collapsed: undefined } as TRecord;
     changed = true;
   }
   if (!changed) return state;
   return { ...state, tree, views };
 }
 
-export function frontView(state: LayoutState, regionId: string): string | undefined {
+export function frontView<TRecord extends ViewRecord>(
+  state: LayoutState<TRecord>,
+  regionId: string,
+): string | undefined {
   const views = visibleViews(state, regionId);
   return views.find((id) => state.views[id]?.front === true) ?? views[0];
 }
@@ -1056,12 +1090,50 @@ export function setFront(state: LayoutState, viewId: string): LayoutState {
 }
 
 /**
+ * Move one view's tab to another tab's place in the same region.
+ *
+ * Orders are only compared **within** a region (`visibleViews` sorts by them), so the
+ * region's visible list is renumbered after the move — and the drag is a reorder, not a
+ * placement: nothing else about the view changes.
+ *
+ * @param state - the current layout state.
+ * @param regionId - the region whose tabs were dragged in.
+ * @param dragged - the view that was dragged.
+ * @param target - the view it was dropped on.
+ * @returns the next state, or the same one when nothing moves.
+ */
+export function reorderTab<TRecord extends ViewRecord>(
+  state: LayoutState<TRecord>,
+  regionId: string,
+  dragged: string,
+  target: string,
+): LayoutState<TRecord> {
+  if (dragged === target) return state;
+  const list = visibleViews(state, regionId);
+  const from = list.indexOf(dragged);
+  const to = list.indexOf(target);
+  if (from === -1 || to === -1) return state;
+  const next = [...list];
+  next.splice(from, 1);
+  next.splice(to, 0, dragged);
+  const views = { ...state.views };
+  next.forEach((id, index) => {
+    const record = views[id];
+    if (record !== undefined) views[id] = { ...record, order: index };
+  });
+  return { ...state, views };
+}
+
+/**
  * The region's visible views, in order. The first one renders.
  *
  * @param state - current state.
  * @param regionId - the region to inspect.
  */
-export function visibleViews(state: LayoutState, regionId: string): string[] {
+export function visibleViews<TRecord extends ViewRecord>(
+  state: LayoutState<TRecord>,
+  regionId: string,
+): string[] {
   // A stack's views live in its **rows** (the entry leaves a `column` split holds), so listing a
   // region's views has to look through the split: the rest of the system still asks "which views
   // are in this region" and must keep getting the same answer it always did.
@@ -1232,11 +1304,29 @@ export function normalizeViews(state: LayoutState): LayoutState {
   return changed ? { ...state, views } : state;
 }
 
-export function resolveSizes(state: LayoutState, width: number, height: number): Map<string, Box> {
+/** Chrome insets reserved from a region's content box. */
+export interface LayoutInsets {
+  readonly inlineStart: number;
+  readonly inlineEnd: number;
+  readonly blockStart: number;
+  readonly blockEnd: number;
+}
+
+export function resolveSizes(
+  state: LayoutState,
+  width: number,
+  height: number,
+  insets?: (nodeId: string) => LayoutInsets | undefined,
+): Map<string, Box> {
   const out = new Map<string, Box>();
   const visit = (node: LayoutNode, w: number, h: number): void => {
     if (node.type === "region") {
-      out.set(node.id, { width: w, height: h });
+      const inset = insets?.(node.id);
+      const contentWidth =
+        inset === undefined ? w : Math.max(0, w - inset.inlineStart - inset.inlineEnd);
+      const contentHeight =
+        inset === undefined ? h : Math.max(0, h - inset.blockStart - inset.blockEnd);
+      out.set(node.id, { width: contentWidth, height: contentHeight });
       // A selector region hands its child the box **minus the bar it draws** when it shows one: the
       // bar is real pixels (the frame draws it as soon as there are two children to choose between),
       // and a stack drawn from the allocation would otherwise overflow its container by that much.
@@ -1244,7 +1334,7 @@ export function resolveSizes(state: LayoutState, width: number, height: number):
       const child = activeChild(state, node);
       if (child !== null) {
         const bar = drawsRegionBar(node) ? HEADER_HEIGHT : 0;
-        visit(child, w, Math.max(0, h - bar));
+        visit(child, contentWidth, Math.max(0, contentHeight - bar));
       }
       return;
     }

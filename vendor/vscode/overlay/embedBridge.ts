@@ -95,6 +95,12 @@ export interface PracVscodeAction {
   readonly submenu?: readonly PracVscodeAction[];
 }
 
+/** The active editor window's title actions, split the way the frame renders them. */
+export interface PracVscodeActionModel {
+  readonly primary: readonly PracVscodeAction[];
+  readonly secondary: readonly PracVscodeAction[];
+}
+
 export interface WorkbenchFace {
   /**
    * Create a registered view into an external host element.
@@ -167,6 +173,25 @@ export interface WorkbenchFace {
    */
   runAction: (containerId: string, actionId: string) => void;
   /**
+   * The active editor window's resolved title actions (`MenuId.EditorTitle`).
+   *
+   * The embedder renders them in prac's tab strip, not in the workbench's own
+   * group header: the model is the app's, the chrome is prac's.
+   *
+   * @param placement - the file placement whose group's actions to read; absent
+   * means the active group. Each group's tab strip asks for its own.
+   * @returns primary and secondary actions for that window.
+   */
+  editorActions: (placement?: string) => PracVscodeActionModel;
+  /**
+   * Run one editor-title action by id.
+   *
+   * @param placement - the placement whose group owns the action; absent means
+   * the active group.
+   * @param actionId - the action id from {@link editorActions}.
+   */
+  runEditorAction: (placement: string | undefined, actionId: string) => void;
+  /**
    * Mount **one placement's editing surface** into an external host element.
    *
    * The unit is the placement — a file in one editor group — not the file and not
@@ -233,6 +258,32 @@ export interface WorkbenchFace {
    * @param resource - the file's URI, as a string.
    */
   openFile: (resource: string) => void;
+  /** Open a file as a preview editor (gate-only, mirrors Explorer single-click). */
+  openPreviewFile: (resource: string) => void;
+  /**
+   * Project a frame-owned window into the active group as an empty editor.
+   *
+   * The frame keeps rendering the content; this only gives VS Code the window's
+   * identity for order / active / close-if-empty.
+   *
+   * @param id - the frame window / view id.
+   * @param title - its visible title.
+   */
+  mapWindow: (id: string, title: string, region?: string) => void;
+  /** The frame-owned windows projected so far (diagnostics / gates). */
+  mappedWindows: () => readonly string[];
+  /** The frame-owned window currently projected as the active editor. */
+  activeWindow: () => string | null;
+  /** Make one frame-owned window the active editor. */
+  activateWindow: (id: string) => void;
+  /** Remove a frame-owned window's projection. */
+  unmapWindow: (id: string) => void;
+  /** Project a frame window's position in the active group's editor order. */
+  orderWindow: (id: string, index: number) => void;
+  /** Project a file view's position through the same window projection. */
+  orderFile: (resource: string, index: number) => void;
+  /** The active group's editor order, with frame window ids in place. */
+  windowOrder: (region?: string) => readonly string[];
   /**
    * The file **placements** the workbench currently has open, in its own order.
    *
@@ -261,6 +312,7 @@ export interface WorkbenchFace {
   setGroupRegionChannel: (channel: {
     createRegionBeside(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
     regionInDirection(region: string, side: "left" | "right" | "up" | "down"): string | undefined;
+    hasOtherWindows(region: string): boolean;
     removeRegion(region: string): void;
   }) => void;
   /**

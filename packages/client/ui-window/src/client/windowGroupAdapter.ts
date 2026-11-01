@@ -9,7 +9,7 @@
 
 import type {
   View as FrameView,
-  ViewGroup as FrameViewGroup,
+  ViewGroup as FrameWindowGroup,
   GroupBinding,
   Surface,
   ViewGroupPlacement,
@@ -34,8 +34,8 @@ export class WindowGroupAdapter implements ViewGroupRuntime, Surface {
     this.#group = new WindowGroup(id);
   }
 
-  get group(): FrameViewGroup {
-    return this as unknown as FrameViewGroup;
+  get group(): FrameWindowGroup {
+    return this as unknown as FrameWindowGroup;
   }
 
   get element(): HTMLElement | undefined {

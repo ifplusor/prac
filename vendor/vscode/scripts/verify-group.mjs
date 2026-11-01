@@ -48,6 +48,31 @@ const state = async () =>
         const region = element ? globalThis.__deep.closest(element, "[data-prac-region]") : null;
         return region?.getAttribute("data-prac-region") ?? null;
       })(),
+      hosts: [...(globalThis.__vscodeEmbed?.fileHosts?.values() ?? [])]
+        .filter((host) => host.resource === uri)
+        .map((host) => ({
+          placement: host.placement,
+          connected: host.element.isConnected,
+          lines: host.element.querySelectorAll(".view-line").length,
+          parentRegion: host.element.parentElement?.closest("[data-prac-region]")?.getAttribute("data-prac-region") ?? null,
+          width: Math.round(host.element.getBoundingClientRect().width),
+        })),
+      domRegions: globalThis.__deep
+        .all("[data-prac-region]")
+        .map((element) => element.getAttribute("data-prac-region")),
+      activeWindowOrder: globalThis.__vscodeEmbed?.face?.windowOrder?.() ?? [],
+      centerWindowOrder: globalThis.__vscodeEmbed?.face?.windowOrder?.("center") ?? [],
+      editors: (globalThis.__vscodeEmbed?.face?.capabilities?.editors?.snapshot() ?? []).map(
+        (entry) => ({
+          placement: entry.placement,
+          group: entry.group,
+          region: entry.region,
+          active: entry.active,
+        }),
+      ),
+      frameViews: (globalThis.__pracFrame?.listViews() ?? [])
+        .filter((view) => view.id.includes(uri))
+        .map((view) => ({ id: view.id, region: view.region, hidden: view.hidden, front: view.front })),
     };
   }, FILE.uri);
 
@@ -196,7 +221,11 @@ const failed = Object.entries(checks)
   .filter(([, value]) => value !== true)
   .map(([name]) => name);
 console.log(
-  JSON.stringify({ url, fixture: FILE.name, before, after, focused, commandRan, checks }, null, 2),
+  JSON.stringify(
+    { url, fixture: FILE.name, before, after, focused, emptied, splitAgain, commandRan, checks },
+    null,
+    2,
+  ),
 );
 await browser.close().catch(() => undefined);
 if (failed.length > 0) {

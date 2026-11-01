@@ -17,7 +17,21 @@ await page.waitForTimeout(2500);
 
 const sample = () =>
   page.evaluate(() => {
-    const rows = [...document.querySelectorAll("[data-prac-stack-entry]")].map((entry) => ({
+    // A container's widgets are laid out inside its board window's isolation root.
+    const deepAll = (selector) => {
+      const found = [...document.querySelectorAll(selector)];
+      const walk = (root) => {
+        for (const element of root.querySelectorAll("*")) {
+          if (element.shadowRoot) {
+            found.push(...element.shadowRoot.querySelectorAll(selector));
+            walk(element.shadowRoot);
+          }
+        }
+      };
+      walk(document);
+      return found;
+    };
+    const rows = deepAll("[data-prac-stack-entry]").map((entry) => ({
       id: entry.getAttribute("data-prac-stack-entry"),
       collapsed: entry.getAttribute("data-prac-stack-collapsed") === "true",
       height: Math.round(entry.getBoundingClientRect().height),
@@ -28,7 +42,7 @@ const sample = () =>
         entry.querySelector("[data-prac-stack-body]")?.getBoundingClientRect().height ?? 0,
       ),
     }));
-    const sashes = document.querySelectorAll("[data-prac-sash]").length;
+    const sashes = deepAll("[data-prac-sash]").length;
     return { rows, sashes };
   });
 

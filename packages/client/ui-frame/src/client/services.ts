@@ -24,7 +24,12 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type { MainPanelId, PanelInfo } from "@deepseek-ai/dsh-client-ui-layout/client";
 import type { HostObservable } from "@deepseek-ai/dsh-client-ui-renderer/client";
-import { DSH_CONVERSATION_KEY, DSH_MAIN_PREFIX, catalogueViewIds } from "./catalogue.js";
+import {
+  DSH_CONVERSATION_KEY,
+  DSH_MAIN_PREFIX,
+  catalogueViewIds,
+  declaredViewSlot,
+} from "./catalogue.js";
 import { SurfaceRegistry, type Surface } from "./surface.js";
 import {
   CENTER_REGION,
@@ -75,7 +80,9 @@ import {
 } from "./model.js";
 import type { LayoutStore } from "./store.js";
 import { View, type FrameView } from "./view.js";
-import { ViewGroupHost, type FrameGroup, type FrameViewGroup } from "./frameGroups.js";
+import { ContentHostRegistry } from "./contentHosts.js";
+import { BoardLayoutRegistry } from "./boardLayouts.js";
+import { WindowGroupHost, type FrameGroup, type FrameWindowGroup } from "./frameGroups.js";
 
 /** Whether a view's region sits inside the subtree a region id names. */
 function inRegionSubtree(region: string, target: string): boolean {
@@ -91,9 +98,13 @@ export interface LayoutServices {
   /** The `panelInfo` root hook's observable. */
   readonly panelInfo: HostObservable<PanelInfo>;
   /** The frame's view-group owner. */
-  readonly viewGroups: ViewGroupHost;
+  readonly viewGroups: WindowGroupHost;
   /** Surface factories registered by window / widget plugins. */
   readonly surfaces: SurfaceRegistry;
+  /** Runtime content hosts for windows; keyed by `contentId`. */
+  readonly contentHosts: ContentHostRegistry;
+  /** Board layout roots; keyed by `boardId`. */
+  readonly boardLayouts: BoardLayoutRegistry;
 }
 
 /**
@@ -115,7 +126,7 @@ export function createServices(
   // one-view rows. Hiding the last visible view, placing one, folding one — they all change the shape
   // (a stack that falls back to one row melts, an empty leftover holds no space), so the normaliser
   // runs on the way out of each change rather than only on placements.
-  const viewGroups = new ViewGroupHost(store);
+  const viewGroups = new WindowGroupHost(store);
   const surfaces = new SurfaceRegistry();
   const write = store.update.bind(store);
   store.update = (change: Parameters<typeof store.update>[0]) =>
@@ -246,6 +257,8 @@ export function createServices(
     },
   };
 
+  const contentHosts = new ContentHostRegistry();
+  const boardLayouts = new BoardLayoutRegistry();
   const pracFrame: PracLayoutFace = {
     getState: store.get,
     subscribe: store.subscribe,
@@ -255,8 +268,22 @@ export function createServices(
       return catalogueViewIds(ctx.slots).map((id) => {
         const record: ViewRecord | undefined = state.views[id];
         return record === undefined
-          ? { id, region: null, hidden: true, order: null }
-          : { id, region: record.region, hidden: record.hidden, order: record.order };
+          ? {
+              id,
+              region: null,
+              hidden: true,
+              order: null,
+              kind: declaredViewSlot(id) === "widget" ? "widget" : "window",
+            }
+          : {
+              id,
+              region: record.region,
+              hidden: record.hidden,
+              order: record.order,
+              // A widget the board owns has no frame record; its declared slot still says what
+              // it is, and `listViews` must not report it as a window.
+              kind: record?.kind ?? (declaredViewSlot(id) === "widget" ? "widget" : "window"),
+            };
       });
     },
     /** The regions a view can be moved to (id + collapse state). */
@@ -334,6 +361,40 @@ export function createServices(
       store.update((state) => setFront(state, viewId));
     },
     /** Declare the height a view wants as a stack row (see the model's doc). */
+    registerContentHost(
+      contentId: string,
+      host: import("./windowModel.js").ContentHost,
+    ): () => void {
+      return contentHosts.register(contentId, host);
+    },
+    registerBoardLayout(
+      boardId: string,
+      source:
+        | import("./boardLayouts.js").BoardLayoutSource
+        | import("./contract.js").LayoutState<import("./contract.js").WidgetRecord>,
+      chrome?: import("./chrome.js").ChromeRegistry<import("./contract.js").WidgetRecord>,
+    ): () => void {
+      return boardLayouts.register(boardId, source, chrome);
+    },
+    setViewBoard(viewId: string, boardId: string | undefined): void {
+      store.update((state) => {
+        const view = ensureView(state, viewId);
+        const { boardId: _old, ...rest } = view;
+        return {
+          ...state,
+          views: {
+            ...state.views,
+            [viewId]: boardId === undefined ? rest : { ...rest, boardId },
+          },
+        };
+      });
+    },
+    setViewKind(viewId: string, kind: "window" | "widget"): void {
+      store.update((state) => {
+        const view = ensureView(state, viewId);
+        return { ...state, views: { ...state.views, [viewId]: { ...view, kind } } };
+      });
+    },
     setViewSize(viewId: string, size: number): void {
       store.update((state) => setViewSize(state, viewId, size));
     },
@@ -353,13 +414,13 @@ export function createServices(
     createView(id: string): FrameView {
       return new View(id);
     },
-    registerViewGroup(group: FrameViewGroup, regionId: string): FrameGroup {
+    registerWindowGroup(group: FrameWindowGroup, regionId: string): FrameGroup {
       return viewGroups.register(group, regionId);
     },
     registerSurface(surface: Surface, regionId: string): FrameGroup {
       return viewGroups.registerSurface(surface, regionId);
     },
-    unregisterViewGroup(groupId: string): void {
+    unregisterWindowGroup(groupId: string): void {
       viewGroups.unregister(groupId);
     },
     setViewCollapsed(viewId: string, collapsed: boolean): void {
@@ -552,5 +613,5 @@ export function createServices(
     },
   };
 
-  return { layout, pracFrame, panelInfo, viewGroups, surfaces };
+  return { layout, pracFrame, panelInfo, viewGroups, surfaces, contentHosts, boardLayouts };
 }

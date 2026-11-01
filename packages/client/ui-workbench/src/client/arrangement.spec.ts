@@ -78,7 +78,7 @@ function recordingFace(views: LayoutState["views"] = {}): {
     (method: string) =>
     (id: string, region: string): void => {
       calls.push({ method, args: [id, region] });
-      live[id] = { ...(live[id] ?? { order: 0, hidden: false }), region };
+      live[id] = { ...(live[id] ?? { order: 0, hidden: false, kind: "window" }), region };
     };
   const face = {
     getState: () => stateWith(live),
@@ -89,6 +89,7 @@ function recordingFace(views: LayoutState["views"] = {}): {
         region: record.region ?? null,
         hidden: record.hidden === true,
         order: record.order ?? null,
+        kind: record.kind ?? "window",
       })),
     listRegions: () => [],
     removeRegion: () => undefined,
@@ -116,10 +117,14 @@ function recordingFace(views: LayoutState["views"] = {}): {
     show: record("show"),
     hide: (id: string): void => {
       calls.push({ method: "hide", args: [id] });
-      if (live[id] !== undefined) live[id] = { ...live[id], hidden: true };
+      if (live[id] !== undefined) live[id] = { ...live[id], hidden: true, kind: "window" };
     },
     setViewCollapsed: record("setViewCollapsed"),
     setViewSize: record("setViewSize"),
+    setViewKind: record("setViewKind"),
+    registerContentHost: () => () => {},
+    registerBoardLayout: () => () => {},
+    setViewBoard: () => {},
     setCollapsed: record("setCollapsed"),
     setWidth: record("setWidth"),
     splitView: record("splitView"),
@@ -142,10 +147,10 @@ function recordingFace(views: LayoutState["views"] = {}): {
     createView: (() => {
       throw new Error("not used by this test double");
     }) as PracLayoutFace["createView"],
-    registerViewGroup: (() => {
+    registerWindowGroup: (() => {
       throw new Error("not used by this test double");
-    }) as PracLayoutFace["registerViewGroup"],
-    unregisterViewGroup: () => {},
+    }) as PracLayoutFace["registerWindowGroup"],
+    unregisterWindowGroup: () => {},
     registerSurface: () => ({}) as never,
   } satisfies PracLayoutFace;
   return { face, calls, children };
@@ -156,14 +161,15 @@ const shapes = (calls: readonly Call[]) => calls.map((call) => [call.method, ...
 
 describe("staleFileViews", () => {
   const records = {
-    [FILE_VIEW]: { region: CENTER, order: 0, hidden: false },
+    [FILE_VIEW]: { region: CENTER, order: 0, hidden: false, kind: "window" },
     "vscode:file:vscode-remote://127.0.0.1:3084/workspace/closed.ts": {
       region: CENTER,
       order: 1,
       hidden: false,
+      kind: "window",
     },
-    [DSH_CONVERSATION_VIEW]: { region: CENTER, order: 2, hidden: false },
-    "vscode:view:workbench.view.search": { region: LEFT, order: 3, hidden: false },
+    [DSH_CONVERSATION_VIEW]: { region: CENTER, order: 2, hidden: false, kind: "window" },
+    "vscode:view:workbench.view.search": { region: LEFT, order: 3, hidden: false, kind: "window" },
   } satisfies Record<string, ViewRecord>;
   const resourceOf = (view: string): string | undefined =>
     view.startsWith("vscode:file:") ? view.slice("vscode:file:".length) : undefined;
@@ -191,7 +197,7 @@ describe("staleFileViews", () => {
 describe("restoreCentre", () => {
   it("moves the conversation back when the centre holds something else", () => {
     const { face, calls } = recordingFace({
-      [DSH_CONVERSATION_VIEW]: { region: RIGHT, order: 0, hidden: false },
+      [DSH_CONVERSATION_VIEW]: { region: RIGHT, order: 0, hidden: false, kind: "window" },
     });
     expect(restoreCentre(face)).toBe(true);
     expect(shapes(calls)).toEqual([["place", DSH_CONVERSATION_VIEW, CENTER]]);
@@ -199,7 +205,7 @@ describe("restoreCentre", () => {
 
   it("leaves it where it is when the centre is already its", () => {
     const { face, calls } = recordingFace({
-      [DSH_CONVERSATION_VIEW]: { region: CENTER, order: 0, hidden: false },
+      [DSH_CONVERSATION_VIEW]: { region: CENTER, order: 0, hidden: false, kind: "window" },
     });
     expect(restoreCentre(face)).toBe(false);
     expect(shapes(calls)).toEqual([]);
@@ -246,8 +252,6 @@ describe("arrange", () => {
       ["hide", "dsh:rightbar"],
       // The title bar owns session navigation: the sidebar stays registered but off screen.
       ["hide", DSH_SIDEBAR_VIEW],
-      // The Explorer is the primary the shell starts on.
-      ["place", "vscode:view:workbench.view.explorer", LEFT],
     ]);
   });
 
@@ -255,8 +259,8 @@ describe("arrange", () => {
     // A previous session moved the conversation into the bottom bar and the DSH
     // sidebar to the right. Re-asserting the defaults would undo both.
     const { face, calls } = recordingFace({
-      [DSH_CONVERSATION_VIEW]: { region: "bottom", order: -2, hidden: false },
-      [DSH_SIDEBAR_VIEW]: { region: RIGHT, order: -1, hidden: false },
+      [DSH_CONVERSATION_VIEW]: { region: "bottom", order: -2, hidden: false, kind: "window" },
+      [DSH_SIDEBAR_VIEW]: { region: RIGHT, order: -1, hidden: false, kind: "window" },
     });
     arrange(face);
     expect(shapes(calls.slice(2))).toEqual([
@@ -266,7 +270,6 @@ describe("arrange", () => {
       ["place", "dsh:rightbar", RIGHT],
       ["hide", "dsh:rightbar"],
       ["hide", DSH_SIDEBAR_VIEW],
-      ["place", "vscode:view:workbench.view.explorer", LEFT],
     ]);
   });
 
@@ -275,7 +278,9 @@ describe("arrange", () => {
       (view) => view !== DSH_SIDEBAR_VIEW,
     );
     const { face, calls } = recordingFace(
-      Object.fromEntries(known.map((view) => [view, { region: LEFT, order: 0, hidden: false }])),
+      Object.fromEntries(
+        known.map((view) => [view, { region: LEFT, order: 0, hidden: false, kind: "window" }]),
+      ),
     );
     arrange(face);
     expect(shapes(calls.slice(2))).toEqual([
@@ -284,7 +289,6 @@ describe("arrange", () => {
       ["setRegionSelector", BOTTOM, "title"],
       ["place", DSH_SIDEBAR_VIEW, LEFT],
       ["hide", DSH_SIDEBAR_VIEW],
-      ["place", "vscode:view:workbench.view.explorer", LEFT],
     ]);
   });
 });
@@ -400,7 +404,7 @@ describe("placeCatalogue", () => {
     // The app copied the editor into another group (Split Editor): the file already has
     // a view, and the new placement goes **beside** it rather than on top of it.
     const { face, calls } = recordingFace({
-      "vscode:file:p1:x": { region: CENTER, order: 0, hidden: false },
+      "vscode:file:p1:x": { region: CENTER, order: 0, hidden: false, kind: "window" },
     });
     placeCatalogue(face, [
       entry({
@@ -428,7 +432,7 @@ describe("placeCatalogue", () => {
     // The person may have moved it, and the catalogue is not more authoritative about
     // placement than they are.
     const { face, calls } = recordingFace({
-      "vscode:file:p1:x": { region: "right", order: 0, hidden: false },
+      "vscode:file:p1:x": { region: "right", order: 0, hidden: false, kind: "window" },
     });
     placeCatalogue(face, [
       entry({

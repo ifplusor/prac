@@ -167,7 +167,7 @@ const viewLabel = (viewId: string): string =>
  * what is left, and **Outline** / **Timeline** start **folded** — headers you click to open. prac reads
  * these the way it reads every other declaration: the view says what it wants, the layout obeys.
  */
-const VIEW_DEFAULTS: Readonly<Record<string, { size?: number; folded?: boolean }>> = {
+export const VIEW_DEFAULTS: Readonly<Record<string, { size?: number; folded?: boolean }>> = {
   "vscode:view:workbench.explorer.openEditorsView": { size: 120 },
   "vscode:view:outline": { folded: true },
   "vscode:view:timeline": { folded: true },
@@ -176,7 +176,12 @@ const VIEW_DEFAULTS: Readonly<Record<string, { size?: number; folded?: boolean }
 export function placeCatalogue(
   layout: PracLayout,
   entries: readonly VscodeCatalogueEntry[],
-  placeContainerView?: (view: string, region: string, label: string) => boolean,
+  placeContainerView?: (
+    view: string,
+    region: string,
+    label: string,
+    declared?: { readonly size?: number; readonly folded?: boolean },
+  ) => boolean,
 ): void {
   const groups = new Map<string, Map<string, { label: string; views: string[] }>>();
   for (const entry of entries) {
@@ -229,10 +234,16 @@ export function placeCatalogue(
       for (const view of bucket.views) {
         if (known[view] !== undefined) continue;
         const child = childRegionId(region, key);
-        const handled = placeContainerView?.(view, child, bucket.label) === true;
-        if (!handled) layout.placeQuietly(view, child);
         // What this view declares about its height — the layout only reads it (see `VIEW_DEFAULTS`).
         const declared = VIEW_DEFAULTS[view];
+        // With a container-placement callback, the **container owns** the placement: `false`
+        // means "the container is not materialized yet", and the catalogue sync retries. Falling
+        // back to a frame record would put the widget in two places (double render).
+        if (placeContainerView !== undefined) {
+          placeContainerView(view, child, bucket.label, declared);
+          continue;
+        }
+        layout.placeQuietly(view, child);
         if (declared?.size !== undefined) layout.setViewSize(view, declared.size);
         if (declared?.folded === true) layout.setViewCollapsed(view, true);
       }
@@ -389,9 +400,6 @@ export function arrange(layout: PracLayout): void {
   // The title bar owns session/workspace selection; the DSH sidebar remains
   // registered (the recall surface can still reach it) but starts hidden.
   layout.hide(DSH_SIDEBAR_VIEW);
-  // The hidden sidebar used to be the left region's only child. The Explorer is
-  // the primary the shell starts on (the title bar's switchers replace sessions).
-  if (known["vscode:view:workbench.view.explorer"] === undefined) {
-    layout.place("vscode:view:workbench.view.explorer", "left");
-  }
+  // The left region's content is the container **board window** the catalogue sync creates;
+  // placing a bare Explorer view here would be a second, empty home for the same container.
 }

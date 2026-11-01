@@ -31,7 +31,9 @@ await page.waitForTimeout(1500);
 // everything it placed — the region and its container children.
 await page.waitForFunction(
   (bottom) =>
-    globalThis.__pracFrame.listViews().some((view) => (view.region ?? "").startsWith(`${bottom}/`)),
+    Object.values(globalThis.__pracFrame.getState().views).some((record) =>
+      (record.region ?? "").startsWith(`${bottom}/`),
+    ),
   BOTTOM,
   { timeout: 90_000 },
 );
@@ -51,10 +53,12 @@ await page.waitForFunction(
 async function emptyTheBar() {
   for (let attempt = 0; attempt < 20; attempt++) {
     await page.evaluate((bottom) => {
-      for (const view of globalThis.__pracFrame.listViews()) {
-        const region = view.region ?? "";
+      // A container's surface is a board window record; the widget views live on the
+      // board, so emptying the bar means hiding the records the frame actually has.
+      for (const [id, record] of Object.entries(globalThis.__pracFrame.getState().views)) {
+        const region = record.region ?? "";
         if (region === bottom || region.startsWith(`${bottom}/`)) {
-          globalThis.__pracFrame.hide(view.id);
+          globalThis.__pracFrame.hide(id);
         }
       }
     }, BOTTOM);

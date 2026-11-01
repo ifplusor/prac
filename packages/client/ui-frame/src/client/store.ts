@@ -26,7 +26,7 @@
 
 import { createSnapshotStore } from "@deepseek-ai/dsh-client-store";
 import { useSyncExternalStore } from "react";
-import { type LayoutState } from "./contract.js";
+import { type LayoutState, type ViewRecord } from "./contract.js";
 import { defaultTree, normalizeGrids, normalizeViews } from "./model.js";
 
 /**
@@ -100,9 +100,9 @@ export function createStore(
     activePanelId: null,
   };
   // `flush: "raf"` batches a burst of updates into one frame; persistence writes
-  // on every committed state, under one key this origin shares (see `STATE_KEY`:
-  // localStorage is per origin, so two DSH tabs on the same origin are not
-  // separated yet — the per-workspace scope is deferred).
+  // on every committed state. The caller supplies the key: the frame scopes it
+  // by workspace (`?workspace=`, the same identity the page boots from), so two
+  // folders on one origin do not share a layout.
   const snapshot = createSnapshotStore<LayoutState>(initial, {
     flush: "raf",
     persist: { name: key },
@@ -112,9 +112,19 @@ export function createStore(
   // would otherwise keep the empty track forever; heal it once, before anyone
   // subscribes, so the fix reaches a layout that already exists.
   const hydrated = snapshot.getSnapshot();
-  const healedTree = normalizeGrids(hydrated.tree);
+  const rawViews = hydrated.views as Record<string, ViewRecord & { kind?: "window" | "widget" }>;
+  const views = Object.fromEntries(
+    Object.entries(rawViews).map(([id, record]) => [
+      id,
+      { ...record, kind: record.kind ?? "window" } as ViewRecord,
+    ]),
+  );
+  const hydratedWithKind = { ...hydrated, views };
+  const healedTree = normalizeGrids(hydratedWithKind.tree);
   const healed = normalizeViews(
-    healedTree === hydrated.tree ? hydrated : { ...hydrated, tree: healedTree },
+    healedTree === hydratedWithKind.tree
+      ? hydratedWithKind
+      : { ...hydratedWithKind, tree: healedTree },
   );
   if (healed !== hydrated) snapshot.set(healed);
   return {

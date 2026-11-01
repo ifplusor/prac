@@ -16,8 +16,21 @@ export default defineConfig({
       format: ["esm"],
       platform: "browser",
       outExtensions: () => ({ js: ".js", dts: ".d.mts" }),
-      deps: { neverBundle: ["react"] },
+      deps: {
+        neverBundle: [
+          "react",
+          "react-dom",
+          "@deepseek-ai/cordis",
+          "@deepseek-ai/dsh-client-store",
+          "@deepseek-ai/dsh-client-ui-slots",
+          "@deepseek-ai/dsh-client-ui-primitives",
+          "@deepseek-ai/dsh-client-ui-dockkit",
+        ],
+      },
     },
-    clientPack("prac-client-ui-widget", { entry: "src/client/plugin.ts" }),
+    clientPack("prac-client-ui-widget", {
+      entry: "src/client/plugin.ts",
+      external: ["react-dom", "@deepseek-ai/dsh-client-store"],
+    }),
   ],
 });

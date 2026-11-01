@@ -10,7 +10,7 @@
  */
 
 import type { RegionInfo, ViewInfo } from "./catalogue.js";
-import type { FrameGroup, FrameViewGroup } from "./frameGroups.js";
+import type { FrameGroup, FrameWindowGroup } from "./frameGroups.js";
 import type { Surface } from "./surface.js";
 import type { FrameView } from "./view.js";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
@@ -47,8 +47,16 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface SlotMap {
     /** prac's slot: a `root`-scoped list slot every prac surface declares one view into. */
     "prac.view": { kind: "list"; scope: "root" };
+    /** Window content: file / chat / board window content. */
+    "prac.window": { kind: "list"; scope: "root" };
+    /** Widget content: VS Code view / DSH widget content. */
+    "prac.widget": { kind: "list"; scope: "root" };
     /** The per-view action surface a `prac.view` owner may fill; keyed by view id. */
     "prac.viewActions": { kind: "keyed"; scope: "root" };
+    /** Window content actions (chat / board), keyed by window id. */
+    "prac.windowActions": { kind: "keyed"; scope: "root" };
+    /** Widget content actions, keyed by widget id. */
+    "prac.widgetActions": { kind: "keyed"; scope: "root" };
     /** The per-container action surface; keyed by container id. */
     // The child slots of the `root` slot prac registers — declared by their **owner**, which
     // is the frame (see the `ui-slots` contract: a slot table is merged by the plugin that
@@ -71,6 +79,8 @@ declare module "@deepseek-ai/cordis" {
     pracFrame: PracLayoutFace;
     /** The Space registry: named layouts over the same project folder. */
     pracSpaces: PracSpacesFace;
+    /** The active window's resolved actions, rendered in the tab strip. */
+    pracWindowActions: PracWindowActionsFace;
   }
 }
 
@@ -78,6 +88,35 @@ declare module "@deepseek-ai/cordis" {
 export interface SpaceInfo {
   readonly id: string;
   readonly name: string;
+}
+
+/** One resolved action a window offers (the adapter's model, frame-rendered). */
+export interface WindowAction {
+  readonly id: string;
+  readonly label: string;
+  readonly icon?: string;
+  readonly enabled: boolean;
+  readonly checked: boolean;
+  readonly tooltip?: string;
+  readonly submenu?: readonly WindowAction[];
+}
+
+/** The model the frame renders at the tab strip: primary inline, secondary overflow. */
+export interface WindowActionModel {
+  readonly primary: readonly WindowAction[];
+  readonly secondary: readonly WindowAction[];
+}
+
+/** The frame's window-action registry (keyed by view id). */
+export interface PracWindowActionsFace {
+  /** Set (or replace) the model for one view. */
+  set(viewId: string, model: WindowActionModel, run: (id: string) => void): void;
+  /** Remove the model for one view. */
+  remove(viewId: string): void;
+  /** The model for one view, if any. */
+  get(viewId: string): { model: WindowActionModel; run: (id: string) => void } | undefined;
+  /** Subscribe to changes. */
+  subscribe(listener: () => void): () => void;
 }
 
 /** The Space registry face (`ctx.pracSpaces`). */
@@ -100,7 +139,10 @@ export interface PracSpacesFace {
 
 /** Split axis: `row` distributes width, `column` distributes height. */
 /** Where one view sits, and in what order inside its region. */
-export interface ViewRecord {
+/** Whether a frame view is a window or a widget. */
+export type FrameViewKind = "window" | "widget";
+
+interface ViewRecordBase {
   /**
    * The height this view **declares** for its row, or the height a lone (melted) view keeps while
    * it has no row. A row's authoritative height is the leaf's `size`; this field only seeds it and
@@ -126,6 +168,12 @@ export interface ViewRecord {
    * first — the order `distributeEmptySpace` uses (`splitview.ts:1349-1355`).
    */
   max?: number;
+  /** Content host id; when present the frame renders the host, not a slot. */
+  contentId?: string;
+  /** Region id used as this window's nested content. */
+  contentRegion?: string;
+  /** Board id whose LayoutState<WidgetRecord> renders this window. */
+  boardId?: string;
   region: string;
   /**
    * The region's open order.
@@ -156,15 +204,38 @@ export interface ViewRecord {
 }
 
 /** The whole layout store state (replaced immutably on every update). */
-export interface LayoutState {
+/** A record proven to be a window. */
+export interface WindowRecord extends ViewRecordBase {
+  kind: "window";
+}
+
+/** A record proven to be a widget. */
+export interface WidgetRecord extends ViewRecordBase {
+  kind: "widget";
+}
+
+/** The discriminated record union. */
+export type ViewRecord = WindowRecord | WidgetRecord;
+/** Compatibility alias for code that only needs the discriminated union. */
+export type TypedViewRecord = ViewRecord;
+
+export function isWindowRecord(record: ViewRecord): record is WindowRecord {
+  return record.kind === "window";
+}
+
+export function isWidgetRecord(record: ViewRecord): record is WidgetRecord {
+  return record.kind === "widget";
+}
+
+export interface LayoutState<TRecord extends ViewRecord = ViewRecord> {
   /** Measured frame width, in px (0 until the first measurement). */
   viewportWidth: number;
   /** Measured frame height, in px. */
   viewportHeight: number;
   /** The region tree. */
   tree: LayoutNode;
-  /** The view table: `viewId → placement`. */
-  views: Record<string, ViewRecord>;
+  /** The item table: `itemId → placement`. Frame uses Window/Widget; a board uses widgets. */
+  views: Record<string, TRecord>;
   /**
    * Bumped whenever the slot registry's view registrations change. The view
    * *table* only moves when the arrangement acts; the *catalogue* also moves
@@ -441,14 +512,28 @@ export interface PracLayoutFace {
    * @returns the registered group/region pair.
    */
   createView(id: string): FrameView;
-  registerViewGroup(group: FrameViewGroup, regionId: string): FrameGroup;
+  /** Classify an existing view as a window or a widget (model discriminator). */
+  setViewKind(viewId: string, kind: FrameViewKind): void;
+  /** Register a content host for a window; returns the unregister function. */
+  registerContentHost(contentId: string, host: import("./windowModel.js").ContentHost): () => void;
+  /** Register a board layout root for a board window; returns the unregister function. */
+  registerBoardLayout(
+    boardId: string,
+    source:
+      | import("./boardLayouts.js").BoardLayoutSource
+      | import("./contract.js").LayoutState<import("./contract.js").WidgetRecord>,
+    chrome?: import("./chrome.js").ChromeRegistry<import("./contract.js").WidgetRecord>,
+  ): () => void;
+  /** Point a window record at a board layout root (or clear it). */
+  setViewBoard(viewId: string, boardId: string | undefined): void;
+  registerWindowGroup(group: FrameWindowGroup, regionId: string): FrameGroup;
   registerSurface(surface: Surface, regionId: string): FrameGroup;
   /**
    * Remove a view group's frame projection.
    *
    * @param groupId - the view-group id.
    */
-  unregisterViewGroup(groupId: string): void;
+  unregisterWindowGroup(groupId: string): void;
   /**
    * Fold a view's body away inside a stack, keeping its header.
    *

@@ -54,11 +54,17 @@
 
 import type { Context } from "@deepseek-ai/cordis";
 import type { ThemeSnapshot } from "@deepseek-ai/dsh-client-ui-theme/client";
-import type { PracLayoutFace, PracSpacesFace } from "./contract.js";
+import type {
+  PracLayoutFace,
+  PracSpacesFace,
+  PracWindowActionsFace,
+  WindowActionModel,
+} from "./contract.js";
 import { createFrame, ensureStyles } from "./frame.js";
 import { createServices } from "./services.js";
-import { createStore, createSwitchingStore, STATE_KEY } from "./store.js";
+import { createStore, createSwitchingStore } from "./store.js";
 import { ThemePresenter } from "./theme.js";
+import { workspaceScope } from "./workspace-scope.js";
 
 declare global {
   /**
@@ -69,8 +75,10 @@ declare global {
    * published it.
    */
   var __pracFrame: PracLayoutFace | undefined;
+  /** The board layout registry, for the live gates / a page-level probe. */
+  var __pracBoardLayouts: import("./boardLayouts.js").BoardLayoutRegistry | undefined;
 }
-import { VIEW_SLOT, readDeclaredViewIds } from "./catalogue.js";
+import { VIEW_SLOT, WIDGET_SLOT, WINDOW_SLOT, readDeclaredViewIds } from "./catalogue.js";
 
 /**
  * Install the mechanism: declare the frame's slots, publish the faces, keep the
@@ -92,8 +100,11 @@ export function apply(ctx: Context): void {
 
   // The Space registry: named layouts over the same project folder. Each Space
   // owns a layout store with its own persistence key; the switcher fronts the
-  // active one so the frame and the faces are built once.
-  const SPACES_KEY = "prac-spaces/v1";
+  // active one so the frame and the faces are built once. The scope is the
+  // project folder (the same `?workspace=` the page boots from), not the origin:
+  // switching folders must not carry one folder's Spaces into another.
+  const scope = workspaceScope(window.location.search);
+  const SPACES_KEY = `prac-spaces/v1/${scope}`;
   interface PersistedSpace {
     id: string;
     name: string;
@@ -132,7 +143,7 @@ export function apply(ctx: Context): void {
   const storeFor = (id: string): ReturnType<typeof createStore> => {
     let store = spaceStores.get(id);
     if (store === undefined) {
-      store = createStore(close, id === "space-1" ? STATE_KEY : `prac-layout/space-${id}`);
+      store = createStore(close, `prac-layout/v1/${scope}/${id}`);
       spaceStores.set(id, store);
     }
     return store;
@@ -182,11 +193,32 @@ export function apply(ctx: Context): void {
       return () => spaceListeners.delete(listener);
     },
   };
-  const { layout, pracFrame, panelInfo, viewGroups, surfaces } = createServices(
-    ctx,
-    store,
-    closeListeners,
-  );
+  const { layout, pracFrame, panelInfo, viewGroups, surfaces, contentHosts, boardLayouts } =
+    createServices(ctx, store, closeListeners);
+
+  // The active window's resolved actions: the adapter pushes a model, the frame
+  // renders it at the tab strip's right end. The entry is keyed by **view id**
+  // (the tab), so switching tabs switches the model with no second active state.
+  const windowActionEntries = new Map<
+    string,
+    { model: WindowActionModel; run: (id: string) => void }
+  >();
+  const windowActionListeners = new Set<() => void>();
+  const windowActions: PracWindowActionsFace = {
+    set: (viewId, model, run) => {
+      windowActionEntries.set(viewId, { model, run });
+      for (const listener of windowActionListeners) listener();
+    },
+    remove: (viewId) => {
+      if (!windowActionEntries.delete(viewId)) return;
+      for (const listener of windowActionListeners) listener();
+    },
+    get: (viewId) => windowActionEntries.get(viewId),
+    subscribe: (listener) => {
+      windowActionListeners.add(listener);
+      return () => windowActionListeners.delete(listener);
+    },
+  };
 
   ctx.effect(() => {
     // A view may already have registered (activation order is not ours to
@@ -203,8 +235,12 @@ export function apply(ctx: Context): void {
           // The slot prac's own views (`prac:*`) and VS part hosts (`vscode:*`)
           // register into; the entry's declared id is its view id.
           "prac.view": { kind: "list", scope: "root" },
+          "prac.window": { kind: "list", scope: "root" },
+          "prac.widget": { kind: "list", scope: "root" },
           // The action surface a view may fill; keyed by its `prac.view` id.
           "prac.viewActions": { kind: "keyed", scope: "root" },
+          "prac.windowActions": { kind: "keyed", scope: "root" },
+          "prac.widgetActions": { kind: "keyed", scope: "root" },
           // The action surface a container may fill; keyed by its container id.
         },
       },
@@ -213,6 +249,9 @@ export function apply(ctx: Context): void {
       createFrame(store, {
         currentSession: ctx.uiSession.adapter.current,
         viewGroups,
+        contentHosts,
+        boardLayouts,
+        windowActions,
       }),
     );
     const disposePanelInfo = ctx.slots.provideRoot({ hooks: { panelInfo } });
@@ -233,6 +272,7 @@ export function apply(ctx: Context): void {
     const disposePracFrame = ctx.provide("pracFrame", pracFrame);
     const disposePracSurfaces = ctx.provide("pracSurfaces", surfaces);
     const disposePracSpaces = ctx.provide("pracSpaces", pracSpaces);
+    const disposeWindowActions = ctx.provide("pracWindowActions", windowActions);
     // The catalogue's live sources. `listViews()` reads the registry on every
     // call, so a later registration is already visible; these subscriptions
     // only bump `catalogueVersion`, which is how a subscribed UI (and this
@@ -246,16 +286,27 @@ export function apply(ctx: Context): void {
       }));
     };
     const offMain = ctx.slots.subscribe("main", bumpCatalogue);
-    const stopSlot = ctx.slots.subscribe(VIEW_SLOT, bumpCatalogue);
+    // The adapters register into the split content slots (`prac.window` / `prac.widget`) since
+    // the kind split; a title / icon / pane-header declared there has to reach the catalogue
+    // just like a legacy `prac.view` entry, or every header falls back to the raw id.
+    const stopSlots = ([VIEW_SLOT, WINDOW_SLOT, WIDGET_SLOT] as const).map((slot) =>
+      ctx.slots.subscribe(slot, bumpCatalogue),
+    );
     // A page-level probe for verification: the bundle's `require` resolves
     // only registered bundle ids, so a driver script cannot reach the
     // Cordis context. Publishing the face is the minimal honest door —
     // removal is scoped to the instance we published.
     globalThis.__pracFrame = pracFrame;
+    // The board layout registry, published for the live gates (a board's state is not
+    // reachable through the frame's view table).
+    globalThis.__pracBoardLayouts = boardLayouts;
     return () => {
       if (globalThis.__pracFrame === pracFrame) delete globalThis.__pracFrame;
-      stopSlot();
+      if (globalThis.__pracBoardLayouts === boardLayouts) delete globalThis.__pracBoardLayouts;
+      for (const stop of stopSlots) stop();
       offMain();
+      disposeWindowActions();
+      windowActionEntries.clear();
       disposePracSpaces();
       disposePracSurfaces();
       disposePracFrame();

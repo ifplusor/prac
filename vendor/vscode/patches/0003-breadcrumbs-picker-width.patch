@@ -1,0 +1,22 @@
+diff --git a/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts b/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
+index 1cd83779..98ebd7c4 100644
+--- a/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
++++ b/src/vs/workbench/browser/parts/editor/breadcrumbsControl.ts
+@@ -383,7 +383,16 @@ export class BreadcrumbsControl {
+ 		// breadcrumbs widget accordingly to avoid it rendering behind the dropdown.
+ 		if (dim && this._editorTypeNode) {
+ 			const editorTypeWidth = this._editorTypeNode.offsetWidth;
+-			dim = new dom.Dimension(Math.max(0, dim.width - editorTypeWidth), dim.height);
++			// The picker is a flex child of `.breadcrumbs-control`, but on the first
++			// layout after a re-parent (measured: an ordinary tab switch) its flex
++			// sizing has not applied yet and it reports the whole strip's width.
++			// Subtracting that lays the breadcrumbs out at 0px, and the blank strip
++			// stays until another layout happens to arrive. A dropdown is never as
++			// wide as the strip it sits in; ignore that transient measurement and let
++			// `_updateEditorTypeControl` re-run this layout when the real width is set.
++			if (editorTypeWidth < dim.width) {
++				dim = new dom.Dimension(Math.max(0, dim.width - editorTypeWidth), dim.height);
++			}
+ 		}
+ 		this._widget.layout(dim);
+ 	}

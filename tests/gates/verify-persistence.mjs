@@ -1,17 +1,18 @@
 /**
- * Verification of frame persistence in the rail UI.
+ * Verification of layout persistence in the rail UI.
  *
- * The old gate assumed a visible bottom region and a container bar. The current
- * rail has left / center and the Explorer stack; this gate still verifies the
- * important contract: the resized left track and a folded stack entry survive a
- * real reload, and the persisted key exists.
+ * The important contract: a resized **frame** track and a folded **board** row
+ * survive a real reload, and both persisted keys exist. The frame keeps the
+ * region geometry; a container's board keeps its widget order / heights / folds
+ * (the board is a window content now, so the fold lives in the board's own
+ * state rather than in the frame's view table).
  *
  * Usage: URL='http://127.0.0.1:3084/?token=...' vp run verify:persistence
  */
-import { openPrac, report, requireUrl } from "./harness.mjs";
+import { clearLayoutState, openPrac, report, requireUrl } from "./harness.mjs";
 
-const STATE_KEY = "prac-layout/v1";
 const LEFT = "left";
+const BOARD = "left/container:workbench.view.explorer";
 const VIEW = "vscode:view:outline";
 const WIDTH = 340;
 const url = requireUrl();
@@ -25,9 +26,22 @@ async function settle() {
 
 const sample = () =>
   page.evaluate(
-    ({ key, left, view }) => {
+    ({ left, view, boardId }) => {
       const region = document.querySelector(`[data-prac-region="${left}"]`);
-      const row = document.querySelector(`[data-prac-stack-entry="${view}"]`);
+      // The board's rows are inside the window's isolation root.
+      const rows = [];
+      const walk = (root) => {
+        rows.push(...root.querySelectorAll(`[data-prac-stack-entry]`));
+        for (const element of root.querySelectorAll("*")) {
+          if (element.shadowRoot) walk(element.shadowRoot);
+        }
+      };
+      walk(document);
+      const row = rows.find(
+        (candidate) => candidate.getAttribute("data-prac-stack-entry") === view,
+      );
+      const board = globalThis.__pracWidgets?.boards?.().find((candidate) => candidate.id === boardId);
+      const tree = board?.boardState?.tree;
       return {
         leftWidth: region ? Math.round(region.getBoundingClientRect().width) : null,
         row: row
@@ -36,24 +50,32 @@ const sample = () =>
               height: Math.round(row.getBoundingClientRect().height),
             }
           : null,
-        hasKey: localStorage.getItem(key) !== null,
+        boardCollapsed:
+          tree?.type === "split" && Array.isArray(tree.children)
+            ? tree.children.find((child) => child.id === `${boardId}/board/stack/${view}`)
+                ?.collapsed === true
+            : undefined,
+        hasFrameKey: Object.keys(localStorage).some(
+          (key) => key === "prac-layout/v1" || key.startsWith("prac-layout/v1/"),
+        ),
+        hasBoardKey: Object.keys(localStorage).some((key) => key.startsWith("prac-board/v1/")),
       };
     },
-    { key: STATE_KEY, left: LEFT, view: VIEW },
+    { left: LEFT, view: VIEW, boardId: BOARD },
   );
 
-await page.evaluate((key) => localStorage.removeItem(key), STATE_KEY);
+await clearLayoutState(page);
 await page.reload({ waitUntil: "load" });
 await settle();
 const initial = await sample();
 
 await page.evaluate(
-  ({ left, view, width }) => {
-    const layout = globalThis.__pracFrame;
-    layout.setWidth(left, width);
-    layout.setViewCollapsed(view, true);
+  ({ left, view, width, boardId }) => {
+    globalThis.__pracFrame.setWidth(left, width);
+    const board = globalThis.__pracWidgets.boards().find((candidate) => candidate.id === boardId);
+    board.content.setWidgetCollapsed(view, true);
   },
-  { left: LEFT, view: VIEW, width: WIDTH },
+  { left: LEFT, view: VIEW, width: WIDTH, boardId: BOARD },
 );
 await page.waitForTimeout(1200);
 const changed = await sample();
@@ -68,12 +90,13 @@ report({
   url,
   facts: { initial, changed, reloaded },
   checks: {
-    "the persisted key exists": changed.hasKey,
+    "the persisted keys exist": changed.hasFrameKey && changed.hasBoardKey,
     "the resize survives a reload":
       Math.abs((reloaded.leftWidth ?? 0) - (initial.leftWidth ?? 0)) >= 20,
     "the folded outline: its row comes back": reloaded.row !== null,
-    "the folded state survives": reloaded.row?.collapsed === true,
+    "the folded state survives":
+      reloaded.row?.collapsed === true && reloaded.boardCollapsed === true,
     "the folded row keeps only its header": (reloaded.row?.height ?? 99) <= 30,
   },
-  ok: "OK: a resized track and a folded stack entry persist across reload",
+  ok: "OK: a resized track and a folded board row persist across reload",
 });

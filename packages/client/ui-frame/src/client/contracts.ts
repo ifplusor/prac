@@ -13,6 +13,5 @@ export type {
   GroupBinding,
   MoveIntent,
   ViewHost,
-  ViewGroupRuntime,
   ViewRuntime,
 } from "prac-ui-kit";

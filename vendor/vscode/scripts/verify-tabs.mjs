@@ -101,6 +101,8 @@ const facts = () =>
         .snapshot()
         .map((entry) => entry.resource.split("/").pop())
         .filter((name) => ["a.txt", "b.txt", "c.txt"].includes(name)),
+      tabActions: globalThis.__deep.all("[data-prac-window-action]").length,
+      groupHeaderActions: globalThis.__deep.all(".prac-window-actions").length,
     };
   });
 
@@ -128,12 +130,18 @@ await page.waitForTimeout(2500);
 const clicked = await facts();
 
 step("activate the first file from the app");
+const activateAuditBefore = await page.evaluate(() =>
+  globalThis.__vscodeEmbed.face.editorModelWriteAudit(),
+);
 await page.evaluate(
   (uri) => globalThis.__vscodeEmbed.face.capabilities.editors.actions.activate(uri),
   A.uri,
 );
 await page.waitForTimeout(2500);
 const activated = await facts();
+const activateAuditAfter = await page.evaluate(() =>
+  globalThis.__vscodeEmbed.face.editorModelWriteAudit(),
+);
 // Sampled twice: a pair that keeps flipping between the app and prac's front (the storm
 // this reconciliation used to fall into) would differ here.
 await page.waitForTimeout(2500);
@@ -142,9 +150,43 @@ const activatedLater = await facts();
 step("drag the first tab onto the third");
 const aView = await tabIdOf(A);
 const cView = await tabIdOf(C);
+const dragAuditBefore = await page.evaluate(() =>
+  globalThis.__vscodeEmbed.face.editorModelWriteAudit(),
+);
 await page.dragAndDrop(`[data-prac-tab="${aView}"]`, `[data-prac-tab="${cView}"]`);
 await page.waitForTimeout(2500);
 const dragged = await facts();
+const dragAuditAfter = await page.evaluate(() =>
+  globalThis.__vscodeEmbed.face.editorModelWriteAudit(),
+);
+
+step("split via the tab-strip action");
+const regionsBefore = await page.evaluate(() => globalThis.__pracFrame.listRegions().length);
+await page
+  .locator('[data-prac-window-action="workbench.action.splitEditor"]')
+  .first()
+  .click();
+await page.waitForTimeout(3500);
+const regionsAfter = await page.evaluate(() => globalThis.__pracFrame.listRegions().length);
+const splitActionHosts = await page.evaluate(
+  () => globalThis.__deep.all("[data-prac-window-actions]").length,
+);
+
+step("open the overflow menu");
+await page.locator("[data-prac-window-actions-more]").first().click();
+await page.waitForTimeout(400);
+const menu = await page.evaluate(() => {
+  const element = document.querySelector("[data-prac-window-actions-menu]");
+  if (element === null) return null;
+  const rect = element.getBoundingClientRect();
+  const strip = globalThis.__deep.one("[data-prac-tab-strip]")?.getBoundingClientRect();
+  return {
+    inBody: element.parentElement === document.body,
+    belowStrip: strip === undefined ? false : rect.top >= strip.bottom - 1,
+    height: Math.round(rect.height),
+  };
+});
+await page.keyboard.press("Escape");
 
 await browser.close();
 
@@ -152,6 +194,8 @@ const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 const checks = {
   // 1. Open order, and opening a file appends it (the strip is not MRU).
   tabsAreInOpenOrder: same(opened.tabs, ["a.txt", "b.txt", "c.txt"]),
+  fileActionsRenderInTheTabStrip: opened.tabActions > 0,
+  noGroupHeaderActions: opened.groupHeaderActions === 0,
   openingAFilesAppendsIt: opened.front === "c.txt" && opened.surface === "c.txt",
   // 2. Activation does not move a tab: the click changes what is shown, not where.
   clickingKeepsTheOrder: same(clicked.tabs, opened.tabs),
@@ -161,10 +205,27 @@ const checks = {
   activateKeepsTheOrder: same(activated.tabs, opened.tabs),
   activateFrontsTheFile: activated.front === "a.txt" && activated.surface === "a.txt",
   activatePullsTheApp: activated.app === "a.txt",
+  appActivateWritesActiveOnly:
+    activateAuditAfter.open === activateAuditBefore.open &&
+    activateAuditAfter.close === activateAuditBefore.close &&
+    activateAuditAfter.move === activateAuditBefore.move &&
+    activateAuditAfter.active - activateAuditBefore.active === 1 &&
+    activateAuditAfter.externalActive - activateAuditBefore.externalActive === 1 &&
+    activateAuditAfter.projectionActive === activateAuditBefore.projectionActive,
   // 4. Dragging is the only thing that reorders, and it changes nothing else.
+  dragWritesModelOnce:
+    dragAuditAfter.move - dragAuditBefore.move === 1 &&
+    dragAuditAfter.projectionMove - dragAuditBefore.projectionMove === 1 &&
+    dragAuditAfter.externalMove === dragAuditBefore.externalMove &&
+    dragAuditAfter.open === dragAuditBefore.open &&
+    dragAuditAfter.close === dragAuditBefore.close,
   dragReorders: same(dragged.tabs, ["b.txt", "c.txt", "a.txt"]),
   dragReordersTheEditorModel: same(dragged.appOrder, ["b.txt", "c.txt", "a.txt"]),
   dragKeepsTheFront: dragged.front === "a.txt" && dragged.surface === "a.txt",
+  splitActionCreatesAnotherRegion: regionsAfter > regionsBefore,
+  splitGroupHasItsOwnActions: splitActionHosts >= 2,
+  overflowMenuEscapesTheStrip:
+    menu !== null && menu.inBody === true && menu.belowStrip === true && menu.height > 0,
   // 3b. It **stays** that way: a reconciliation that keeps flipping would differ here.
   activateSettles: same(activated, activatedLater),
   noErrors: consoleErrors.filter((line) => line.includes("vscode-embed")).length === 0,
@@ -172,7 +233,21 @@ const checks = {
 
 console.log(
   JSON.stringify(
-    { url, files: [A.name, B.name, C.name], opened, clicked, activated, dragged, checks },
+    {
+      url,
+      files: [A.name, B.name, C.name],
+      opened,
+      clicked,
+      activated,
+      dragged,
+      dragAuditBefore,
+      dragAuditAfter,
+      regionsBefore,
+      regionsAfter,
+      splitActionHosts,
+      menu,
+      checks,
+    },
     null,
     2,
   ),

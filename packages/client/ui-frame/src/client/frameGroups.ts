@@ -10,13 +10,17 @@
  */
 
 import { findNode } from "./model.js";
-import type { GroupAction, GroupActionBinding, ViewGroup } from "prac-ui-kit";
+import type {
+  WindowGroup,
+  WindowGroupAction as GroupAction,
+  WindowGroupActionBinding as GroupActionBinding,
+} from "./windowModel.js";
 import type { LayoutStore } from "./store.js";
-import { ViewGroupLayoutBridge } from "./frameBridge.js";
+import { WindowGroupLayoutBridge } from "./frameBridge.js";
 import type { Surface } from "./surface.js";
 
 /** The structural group shape the frame consumes. */
-export type FrameViewGroup = ViewGroup;
+export type FrameWindowGroup = WindowGroup;
 
 /** One bar entry projected from a hosted group. */
 export interface GroupBarItem {
@@ -33,13 +37,13 @@ export interface FrameGroup {
   /** The surface registered for this region. */
   readonly surface: Surface;
   /** Convenience view of `surface.group`. */
-  readonly group: FrameViewGroup;
+  readonly group: FrameWindowGroup;
   readonly regionId: string;
-  readonly bridge: ViewGroupLayoutBridge;
+  readonly bridge: WindowGroupLayoutBridge;
 }
 
 /** Owns the group → region bindings for one frame store. */
-export class ViewGroupHost {
+export class WindowGroupHost {
   readonly #groups = new Map<string, FrameGroup>();
   readonly #regions = new Map<string, string>();
   readonly #stop: () => void;
@@ -49,7 +53,7 @@ export class ViewGroupHost {
   }
 
   /** Register a group in an existing region. */
-  register(group: FrameViewGroup, regionId: string, surface?: Surface): FrameGroup {
+  register(group: FrameWindowGroup, regionId: string, surface?: Surface): FrameGroup {
     if (this.#groups.has(group.id)) throw new Error(`view group already registered: ${group.id}`);
     if (this.#regions.has(regionId)) {
       throw new Error(`region already hosts a view group: ${regionId}`);
@@ -58,7 +62,7 @@ export class ViewGroupHost {
     if (node === null || (node.type !== "region" && surface?.kind !== "widget-board")) {
       throw new Error(`unknown region: ${regionId}`);
     }
-    const bridge = new ViewGroupLayoutBridge(group, this.store, regionId);
+    const bridge = new WindowGroupLayoutBridge(group, this.store, regionId);
     const owningSurface: Surface = surface ?? {
       kind: group.state.mode === "select" ? "window-group" : "widget-board",
       group,

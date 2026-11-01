@@ -3,14 +3,13 @@
  * placements, and the swap survives a reload. The drag is HTML drag-and-drop;
  * the model half is covered by `grid.spec.ts`.
  */
-import { openPrac, report, requireUrl } from "./harness.mjs";
+import { clearLayoutState, openPrac, report, requireUrl } from "./harness.mjs";
 
-const STATE_KEY = "prac-layout/v1";
 const CONVERSATION = "dsh:main:conversation";
 
 const url = requireUrl();
 const { page, close } = await openPrac(url);
-await page.evaluate((key) => localStorage.removeItem(key), STATE_KEY);
+await clearLayoutState(page);
 await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForTimeout(2500);

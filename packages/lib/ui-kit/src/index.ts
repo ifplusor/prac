@@ -7,3 +7,4 @@ export * from "./grid.js";
 export * from "./snapshot.js";
 export * from "./tree.js";
 export * from "./surface.js";
+export * from "./layoutRoot.js";

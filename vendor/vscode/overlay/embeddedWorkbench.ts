@@ -73,11 +73,11 @@ import { onUnexpectedError } from "../../base/common/errors.js";
 import { Direction, Grid, ISerializableView, IViewSize } from "../../base/browser/ui/grid/grid.js";
 import { Part } from "./part.js";
 import { ViewPane } from "./parts/views/viewPane.js";
-import { PracEditorHost, setGroupRegionChannel } from "./pracEditorHost.js";
+import { PracWindowGroupHost, setGroupRegionChannel } from "./pracWindowGroupHost.js";
 import { registerPracTurnDiff } from "./pracTurnDiff.js";
 import { ITimelineService } from "../../workbench/contrib/timeline/common/timeline.js";
-import type { GroupRegionChannel } from "./pracEditorHost.js";
-import type { PracEditorGroup } from "./pracEditorGroup.js";
+import type { GroupRegionChannel } from "./pracWindowGroupHost.js";
+import type { PracWindowGroup } from "./pracWindowGroup.js";
 import { IMarkerService, MarkerSeverity } from "../../platform/markers/common/markers.js";
 import type { IMarker } from "../../platform/markers/common/markers.js";
 import {
@@ -94,6 +94,10 @@ import {
   Extensions as WorkbenchExtensions,
 } from "../common/contributions.js";
 import { EditorExtensions, EditorsOrder, IEditorFactoryRegistry } from "../common/editor.js";
+import { EditorPaneDescriptor, IEditorPaneRegistry } from "./editor.js";
+import { PracWindowInput } from "./pracWindowInput.js";
+import { PracWindowPane } from "./pracWindowPane.js";
+import { PracWindowProjection } from "./pracWindowProjection.js";
 import { WorkbenchContextKeysHandler } from "./contextkeys.js";
 import { setARIAContainer } from "../../base/browser/ui/aria/aria.js";
 import { setHoverDelegateFactory } from "../../base/browser/ui/hover/hoverDelegateFactory.js";
@@ -105,6 +109,8 @@ import {
   PART_HOST_ATTR,
   readEmbedBridge,
   type EmbedBridge,
+  type PracVscodeAction,
+  type PracVscodeActionModel,
   type ViewCatalogueEntry,
 } from "./embedBridge.js";
 import { IHoverService, WorkbenchHoverDelegate } from "../../platform/hover/browser/hover.js";
@@ -315,6 +321,10 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
   private readonly containerMenuActions = new Map<string, ViewContainerMenuActions>();
   /** The original actions behind the latest container action tree, for `run`. */
   private readonly containerActionRuns = new Map<string, Map<string, IAction>>();
+  /** Action handlers per placement (`""` = the active group), for {@link runEditorAction}. */
+  private readonly editorActionRuns = new Map<string, Map<string, IAction>>();
+  /** The single write boundary for frame-owned window projections. */
+  private windowProjection!: PracWindowProjection;
 
   private readonly mountedViews = new Map<
     string,
@@ -387,7 +397,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     {
       readonly placement: string;
       readonly resource: string;
-      readonly group: PracEditorGroup;
+      readonly group: PracWindowGroup;
       readonly element: HTMLElement;
     }
   >();
@@ -535,6 +545,14 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
 
         Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).start(accessor);
         Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).start(accessor);
+        Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
+          EditorPaneDescriptor.create(
+            PracWindowPane,
+            PracWindowPane.ID,
+            "Prac Window",
+          ),
+          [new SyncDescriptor(PracWindowInput)],
+        );
 
         this._register(instantiationService.createInstance(WorkbenchContextKeysHandler));
         this._register(
@@ -566,18 +584,34 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
             containerActions: (containerId: string) => this.containerActions(containerId),
             runAction: (containerId: string, actionId: string) =>
               this.runAction(containerId, actionId),
+            editorActions: (placement?: string) => this.editorActions(placement),
+            runEditorAction: (placement: string | undefined, actionId: string) =>
+              this.runEditorAction(placement, actionId),
             mountFileInto: (placement: string, resource: string, element: HTMLElement) =>
               this.mountFileInto(placement, resource, element),
             focusFile: (placement: string, resource: string) => this.focusFile(placement, resource),
             releaseFile: (placement: string, resource: string) =>
               this.releaseFile(placement, resource),
             openFile: (resource: string) => this.openFile(resource),
+            openPreviewFile: (resource: string) => this.openPreviewFile(resource),
+            mapWindow: (id: string, title: string, region?: string) =>
+              this.windowProjection.map(id, title, region),
+            mappedWindows: () => this.windowProjection.mapped(),
+            activeWindow: () => this.windowProjection.active(),
+            activateWindow: (id: string) => this.windowProjection.activate(id),
+            unmapWindow: (id: string) => this.windowProjection.unmap(id),
+            orderWindow: (id: string, index: number) => this.windowProjection.order(id, index),
+            orderFile: (resource: string, index: number) =>
+              this.windowProjection.orderFile(resource, index),
+            windowOrder: (region?: string) => this.windowProjection.windowOrder(region),
+            projectionWriteAudit: () => this.windowProjection.audit(),
+            editorModelWriteAudit: () => this.editorModelWriteAudit(),
             capabilities: {
               editors: this.createEditorsCapability(),
               diagnostics: this.createDiagnosticsCapability(),
             },
             /**
-             * The app's region channel for `addGroup` (see `pracEditorHost`'s
+             * The app's region channel for `addGroup` (see `pracWindowGroupHost`'s
              * `setGroupRegionChannel`): prac's frame owns the region tree, so the workbench asks
              * the app to make the region a new group will live in.
              */
@@ -651,7 +685,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     serviceCollection.set(IViewsService, new SyncDescriptor(PracViewsService));
 
     // prac's shell owns the editor: **prac is the editor host** (see
-    // `pracEditorHost.ts`), so the workbench's own editor parts manager is replaced
+    // `pracWindowGroupHost.ts`), so the workbench's own editor parts manager is replaced
     // rather than created off-screen. Overriding after the singleton descriptors is
     // what makes the later registration win.
     //
@@ -664,7 +698,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     const embedBridge =
       this.options?.embedBridge ?? readEmbedBridge(this.environmentService?.options);
     if (embedBridge?.deferParts) {
-      serviceCollection.set(IEditorGroupsService, new SyncDescriptor(PracEditorHost));
+      serviceCollection.set(IEditorGroupsService, new SyncDescriptor(PracWindowGroupHost));
     }
 
     const instantiationService = new InstantiationService(serviceCollection, true);
@@ -699,6 +733,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     this.markerService = accessor.get(IMarkerService);
     this.untitledTextEditorService = accessor.get(IUntitledTextEditorService);
     this.editorGroupService = accessor.get(IEditorGroupsService);
+    this.windowProjection = new PracWindowProjection(this.editorService, this.editorGroupService);
     this.paneCompositeService = accessor.get(IPaneCompositePartService);
     this.viewDescriptorService = accessor.get(IViewDescriptorService);
     this.titleService = accessor.get(ITitleService);
@@ -949,6 +984,64 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     void action.run();
   }
 
+  /**
+   * The active editor window's title actions.
+   *
+   * The menu is scoped to the active group's active editor; the embedder renders
+   * the returned model in prac's tab strip rather than in the group header.
+   *
+   * @returns primary and secondary actions for the active window.
+   */
+  editorActions(placement?: string): PracVscodeActionModel {
+    const groupId = placement === undefined ? undefined : this.placements.get(placement)?.group;
+    const group =
+      groupId === undefined
+        ? (this.editorGroupService.activeGroup as PracWindowGroup | undefined)
+        : (this.editorGroupService.getGroup(groupId) as PracWindowGroup | undefined);
+    if (group === undefined) return { primary: [], secondary: [] };
+    const store = new DisposableStore();
+    try {
+      const { actions } = group.createEditorActions(store);
+      const runs = new Map<string, IAction>();
+      const toAction = (action: IAction): PracVscodeAction => {
+        runs.set(action.id, action);
+        const submenu =
+          action instanceof SubmenuAction
+            ? action.actions.map((child) => toAction(child))
+            : undefined;
+        return {
+          id: action.id,
+          label: action.label,
+          icon: typeof action.class === "string" ? action.class : undefined,
+          enabled: action.enabled,
+          checked: action.checked,
+          tooltip: action.tooltip,
+          ...(submenu === undefined ? {} : { submenu }),
+        };
+      };
+      const primary = actions.primary.map(toAction);
+      const secondary = actions.secondary.map(toAction);
+      // Copy **after** mapping: `toAction` is what fills `runs`, and the return
+      // used to map after the copy — the model showed actions whose handlers
+      // were never in the run map (clicked, nothing happened).
+      this.editorActionRuns.set(placement ?? "", runs);
+      return { primary, secondary };
+    } finally {
+      store.dispose();
+    }
+  }
+
+  /**
+   * Run one editor-title action by id.
+   *
+   * @param actionId - the action id from {@link editorActions}.
+   */
+  runEditorAction(placement: string | undefined, actionId: string): void {
+    const action = this.editorActionRuns.get(placement ?? "")?.get(actionId);
+    if (action === undefined) return;
+    void action.run();
+  }
+
   //#region View catalogue
 
   /** Listeners waiting on catalogue changes. */
@@ -1079,7 +1172,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       : URI.file(resource);
     void instantiationService
       .invokeFunction(async (accessor) => {
-        const host = accessor.get(IEditorGroupsService) as unknown as PracEditorHost;
+        const host = accessor.get(IEditorGroupsService) as unknown as PracWindowGroupHost;
         const resolver = accessor.get(IEditorResolverService);
         // The region is read from the DOM the frame rendered ("the adaptor recognises
         // its root from elements"): the view host sits inside its region. A host with
@@ -1163,11 +1256,11 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    * @param region - the region the frame rendered this placement in.
    */
   private groupForMount(
-    host: PracEditorHost,
+    host: PracWindowGroupHost,
     placement: string,
     uri: URI,
     region: string,
-  ): PracEditorGroup {
+  ): PracWindowGroup {
     const record = this.updatePlacements().get(placement);
     const named = record === undefined ? undefined : host.groupById(record.group);
     if (named === undefined) {
@@ -1256,7 +1349,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    * @param group - the group.
    * @param element - the element the group is shown in.
    */
-  private layoutGroup(group: PracEditorGroup, element: HTMLElement): void {
+  private layoutGroup(group: PracWindowGroup, element: HTMLElement): void {
     const box = element.getBoundingClientRect();
     group.layout(Math.round(box.width), Math.round(box.height), 0, 0);
   }
@@ -1288,7 +1381,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       // The named placement's group when it is ours, otherwise whichever holds the
       // file: the same file can sit in two groups, and only the embedder knows which
       // of them the person is in.
-      const named = (this.editorGroupService as unknown as PracEditorHost).groupById(
+      const named = (this.editorGroupService as unknown as PracWindowGroupHost).groupById(
         this.updatePlacements().get(placement)?.group ?? -1,
       );
       const groups =
@@ -1333,6 +1426,66 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    *
    * @param resource - the file's URI, as a string.
    */
+  /** Aggregate editor-model writes across the groups (diagnostics). */
+  editorModelWriteAudit(): Readonly<{
+    open: number;
+    close: number;
+    move: number;
+    active: number;
+    pin: number;
+    other: number;
+    projectionMove: number;
+    externalMove: number;
+    projectionActive: number;
+    externalActive: number;
+  }> {
+    const total = {
+      open: 0,
+      close: 0,
+      move: 0,
+      active: 0,
+      pin: 0,
+      other: 0,
+      projectionMove: 0,
+      externalMove: 0,
+      projectionActive: 0,
+      externalActive: 0,
+    };
+    for (const group of this.editorGroupService.groups) {
+      const writes = (group as unknown as PracWindowGroup).modelWriteAudit();
+      total.open += writes.open;
+      total.close += writes.close;
+      total.move += writes.move;
+      total.active += writes.active;
+      total.pin += writes.pin;
+      total.other += writes.other;
+      total.projectionMove += writes.projectionMove;
+      total.externalMove += writes.externalMove;
+      total.projectionActive += writes.projectionActive;
+      total.externalActive += writes.externalActive;
+    }
+    return total;
+  }
+
+  /**
+   * Open a file as a preview editor. Gate-only: the app's own open is pinned
+   * (decision 17), but the workbench's Explorer single-click path is preview,
+   * and this is how a gate can exercise that state.
+   *
+   * @param resource - the file URI.
+   */
+  openPreviewFile(resource: string): void {
+    try {
+      const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource) ? URI.parse(resource) : URI.file(resource);
+      void this.fileService
+        .canHandleResource(uri)
+        .then(() => this.editorService.openEditor({ resource: uri, options: { pinned: false } }))
+        .catch((error) => this.logService.error(`vscode-embed: preview open failed for ${resource}`, error));
+    } catch (error) {
+      this.logService.error(`vscode-embed: preview open failed for ${resource}`, error);
+    }
+  }
+
   openFile(resource: string): void {
     try {
       const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
@@ -1352,7 +1505,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
         // tab rather than VS Code's italic preview that the next single click replaces
         // (measured on the rig: the capability never reports `preview` for an app-opened
         // file). Editors the *workbench* opens — a command, an extension — follow
-        // upstream's derivation, `enablePreview` included, in `PracEditorGroup.openEditor`.
+        // upstream's derivation, `enablePreview` included, in `PracWindowGroup.openEditor`.
         .then(() => this.editorService.openEditor({ resource: uri, options: { pinned: true } }))
         .catch((error) => {
           this.logService.error(`vscode-embed: openFile failed for ${resource}`, error);
@@ -1511,7 +1664,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
     try {
       const tokens = this.placementTokens();
       return this.openEditors().map(({ resource, group: groupId }) => {
-        const group = this.editorGroupService.getGroup(groupId) as PracEditorGroup | undefined;
+        const group = this.editorGroupService.getGroup(groupId) as PracWindowGroup | undefined;
         return {
           placement: tokens.get(editorKey(resource, groupId)) ?? "",
           resource,
@@ -1609,7 +1762,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
       previews: ReadonlySet<string>,
       tokens: ReadonlyMap<string, string>,
     ) => {
-      const group = this.editorGroupService.getGroup(groupId) as PracEditorGroup | undefined;
+      const group = this.editorGroupService.getGroup(groupId) as PracWindowGroup | undefined;
       const resource = editor.resource?.toString() ?? "";
       return {
         resource,
@@ -1699,7 +1852,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
         reorder: (placement: string, resource: string, index: number) => {
           const groupId = this.placements.get(placement)?.group;
           if (groupId === undefined) return;
-          const group = this.editorGroupService.getGroup(groupId) as PracEditorGroup | undefined;
+          const group = this.editorGroupService.getGroup(groupId) as PracWindowGroup | undefined;
           if (group === undefined) return;
           const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
             ? URI.parse(resource)

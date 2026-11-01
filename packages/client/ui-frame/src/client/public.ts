@@ -27,7 +27,10 @@ export type { RegionInfo, ViewInfo } from "./catalogue.js";
 /**
  * The slot key a prac surface registers its view into (`prac.view`).
  */
-export type ViewSlotKey = typeof import("./catalogue.js").VIEW_SLOT;
+export type ViewSlotKey =
+  | typeof import("./catalogue.js").VIEW_SLOT
+  | typeof import("./catalogue.js").WINDOW_SLOT
+  | typeof import("./catalogue.js").WIDGET_SLOT;
 
 // Runtime contracts the adapters may name.
 export type {
@@ -35,13 +38,11 @@ export type {
   GroupActionBinding,
   GroupBinding,
   MoveIntent,
-  ViewGroupRuntime,
   ViewHost,
   ViewRuntime,
 } from "./contracts.js";
 export type { FrameView, View } from "./view.js";
-export type { ViewGroupMode, ViewGroupPlacement, ViewGroupState } from "./viewGroup.js";
 
-export type { ViewGroupLayoutBridge } from "./frameBridge.js";
+export type { WindowGroupLayoutBridge } from "./frameBridge.js";
 
-export type { FrameGroup, FrameViewGroup, GroupBarItem, ViewGroupHost } from "./frameGroups.js";
+export type { FrameGroup, FrameWindowGroup, GroupBarItem, WindowGroupHost } from "./frameGroups.js";

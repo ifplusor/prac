@@ -2,14 +2,13 @@
  * Drag a view from the recall catalogue into a grid cell. The row carries the
  * view id; the cell resolves its landing region and places the view there.
  */
-import { openPrac, report, requireUrl } from "./harness.mjs";
+import { clearLayoutState, openPrac, report, requireUrl } from "./harness.mjs";
 
-const STATE_KEY = "prac-layout/v1";
 const CONVERSATION = "dsh:main:conversation";
 const VIEW = "dsh:sidebar";
 const url = requireUrl();
 const { page, close } = await openPrac(url);
-await page.evaluate((key) => localStorage.removeItem(key), STATE_KEY);
+await clearLayoutState(page);
 await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForTimeout(2500);

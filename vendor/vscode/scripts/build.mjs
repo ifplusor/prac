@@ -179,6 +179,10 @@ const OVERLAY = [
   // checkout had just been cleaned (2026-09-16).
   { from: "overlay/extensionsGallery.ts", to: "src/vs/workbench/browser/extensionsGallery.ts" },
   { from: "overlay/embeddedWorkbench.ts", to: "src/vs/workbench/browser/embeddedWorkbench.ts" },
+  { from: "overlay/pracEditorPaneHost.ts", to: "src/vs/workbench/browser/pracEditorPaneHost.ts" },
+  { from: "overlay/pracWindowInput.ts", to: "src/vs/workbench/browser/pracWindowInput.ts" },
+  { from: "overlay/pracWindowProjection.ts", to: "src/vs/workbench/browser/pracWindowProjection.ts" },
+  { from: "overlay/pracWindowPane.ts", to: "src/vs/workbench/browser/pracWindowPane.ts" },
   { from: "overlay/pracWindowGroup.ts", to: "src/vs/workbench/browser/pracWindowGroup.ts" },
   { from: "overlay/pracWindowGroupHost.ts", to: "src/vs/workbench/browser/pracWindowGroupHost.ts" },
   { from: "overlay/pracTurnDiff.ts", to: "src/vs/workbench/browser/pracTurnDiff.ts" },

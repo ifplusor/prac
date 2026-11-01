@@ -1,5 +1,9 @@
 /**
- * prac's **editor host** — the workbench-facing side of prac's own editor area.
+ * prac's **window-group host** — the workbench-facing side of prac's window groups.
+ *
+ * It implements the workbench's `IEditorGroupsService`, but the object it serves is
+ * prac's **window group** (a tile's display-unit group), not a separate editor-area
+ * concept.
  *
  * The workbench's editor *part* is what upstream provides here, and it cannot be
  * borrowed: it is a grid of groups that cannot hold prac views, and it is the thing
@@ -9,7 +13,7 @@
  * to, and the two host views a group needs — on top of **prac's region tree**, which
  * is the editor grid:
  *
- * - a region that holds files owns one {@link PracEditorGroup};
+ * - a region that holds files owns one {@link PracWindowGroup};
  * - splitting a region is how a second group is born;
  * - `activeGroup` is the group of the region prac has focus in.
  *
@@ -24,7 +28,7 @@
  * This file lives in the upstream-tree payload (see `.eslintignore`): it imports
  * `vs/...` internals by relative path and is compiled inside the checkout.
  *
- * @module prac/vscode/overlay/pracEditorHost
+ * @module prac/vscode/overlay/pracWindowGroupHost
  */
 import { Emitter, Event } from "../../base/common/event.js";
 import { Disposable, IDisposable, toDisposable } from "../../base/common/lifecycle.js";
@@ -76,13 +80,13 @@ import {
   IAuxiliaryEditorPart,
   IEditorGroupsService,
 } from "../services/editor/common/editorGroupsService.js";
-import { PracEditorGroup } from "./pracEditorGroup.js";
+import { PracWindowGroup } from "./pracWindowGroup.js";
 import { DeepPartial } from "../../base/common/types.js";
 
 /**
  * Everything this host refuses, and why.
  *
- * Each entry belongs to a real grid of editor groups; prac's grid is its region tree,
+ * Each entry belongs to a real grid of editor groups upstream; prac's grid is its region tree,
  * so the mapping is a decision of its own. The host logs instead of pretending.
  */
 export const UNSUPPORTED_HOST_OPERATIONS = [
@@ -94,7 +98,10 @@ export const UNSUPPORTED_HOST_OPERATIONS = [
 ] as const;
 
 /**
- * prac's editor host: the editor service, its part, and the hosts a group asks for.
+ * prac's window-group host: the editor service, its part, and the hosts a group asks for.
+ *
+ * "Editor" in the member/interface names below is upstream's vocabulary for the
+ * service this class implements; prac's own object is the window group.
  */
 /**
  * The app's region channel, installed by the embedder once prac's frame is up.
@@ -114,6 +121,8 @@ export interface GroupRegionChannel {
   createRegionBeside(region: string, side: PracSide): string | undefined;
   /** The region adjacent to another one in a direction, or undefined when there is none. */
   regionInDirection(region: string, side: PracSide): string | undefined;
+  /** Whether a region still holds a window that the editor group does not own. */
+  hasOtherWindows(region: string): boolean;
   /** Remove a region: the inverse of {@link createRegionBeside}. */
   removeRegion(region: string): void;
 }
@@ -143,7 +152,7 @@ function sideOfDirection(direction: GroupDirection): "left" | "right" | "up" | "
   }
 }
 
-export class PracEditorHost
+export class PracWindowGroupHost
   extends Disposable
   implements IEditorGroupsService, IEditorGroupsView, IEditorPartsView, IEditorPart
 {
@@ -151,10 +160,10 @@ export class PracEditorHost
 
   readonly windowId = mainWindow.vscodeWindowId;
 
-  private readonly _groups: PracEditorGroup[] = [];
+  private readonly _groups: PracWindowGroup[] = [];
   /** The region each group belongs to, by the group's own id. */
   private readonly _regions = new Map<GroupIdentifier, string>();
-  private _activeGroup: PracEditorGroup | undefined;
+  private _activeGroup: PracWindowGroup | undefined;
   private _partOptions: IEditorPartOptions;
   private _dimension: IDimension = new Dimension(0, 0);
 
@@ -288,11 +297,11 @@ export class PracEditorHost
    * @param label - the label prac shows for that region.
    * @returns the group.
    */
-  ensureGroup(region: string, label: string): PracEditorGroup {
+  ensureGroup(region: string, label: string): PracWindowGroup {
     const existing = this._groups.find((group) => this._regions.get(group.id) === region);
     if (existing !== undefined) return existing;
     const group = this._register(
-      new PracEditorGroup(
+      new PracWindowGroup(
         this,
         this.instantiationService,
         this.logService,
@@ -332,7 +341,7 @@ export class PracEditorHost
    * @param identifier - the group's identifier.
    * @returns the group, or `undefined` when the host never made one.
    */
-  groupById(identifier: number): PracEditorGroup | undefined {
+  groupById(identifier: number): PracWindowGroup | undefined {
     return this._groups.find((group) => group.id === identifier);
   }
 
@@ -348,7 +357,7 @@ export class PracEditorHost
    * @param group - the group that moved.
    * @param region - the region it is shown in now.
    */
-  rehomeGroup(group: PracEditorGroup, region: string): void {
+  rehomeGroup(group: PracWindowGroup, region: string): void {
     this._regions.set(group.id, region);
   }
 
@@ -358,7 +367,7 @@ export class PracEditorHost
    * @param region - the region id.
    * @returns the group, or `undefined`.
    */
-  groupForRegion(region: string): PracEditorGroup | undefined {
+  groupForRegion(region: string): PracWindowGroup | undefined {
     return this._groups.find((group) => this._regions.get(group.id) === region);
   }
 
@@ -371,7 +380,7 @@ export class PracEditorHost
    * @param group - the group.
    * @returns the region id, or `undefined` for a group that is not registered.
    */
-  regionOf(group: PracEditorGroup): string | undefined {
+  regionOf(group: PracWindowGroup): string | undefined {
     return this._regions.get(group.id);
   }
 
@@ -404,7 +413,7 @@ export class PracEditorHost
    */
   private groupElement(group: GroupIdentifier): HTMLElement | undefined {
     const resolved = this.getGroup(group);
-    return resolved === undefined ? undefined : (resolved as PracEditorGroup).host;
+    return resolved === undefined ? undefined : (resolved as PracWindowGroup).host;
   }
 
   /**
@@ -416,15 +425,15 @@ export class PracEditorHost
   layoutGroup(group: GroupIdentifier, box: { width: number; height: number }): void {
     const resolved = this.getGroup(group);
     if (resolved === undefined) return;
-    (resolved as PracEditorGroup).layout(box.width, box.height, 0, 0);
+    (resolved as PracWindowGroup).layout(box.width, box.height, 0, 0);
     this._dimension = new Dimension(box.width, box.height);
     this._onDidLayout.fire(this._dimension);
   }
 
   activateGroup(group: IEditorGroup | GroupIdentifier): IEditorGroupView {
-    const resolved = typeof group === "number" ? this.getGroup(group) : (group as PracEditorGroup);
+    const resolved = typeof group === "number" ? this.getGroup(group) : (group as PracWindowGroup);
     if (resolved === undefined) return this._requireActiveGroup();
-    this.setActiveGroup(resolved as PracEditorGroup, true);
+    this.setActiveGroup(resolved as PracWindowGroup, true);
     return resolved;
   }
 
@@ -440,9 +449,9 @@ export class PracEditorHost
     // in that direction and binding the group to it. The channel is the app's (the frame owns
     // the tree); without it there is nothing to add and the active group is the honest answer.
     const source =
-      typeof location === "number" ? this.getGroup(location) : (location as PracEditorGroup);
+      typeof location === "number" ? this.getGroup(location) : (location as PracWindowGroup);
     const from = source ?? this._activeGroup;
-    const region = from === undefined ? undefined : this.regionOf(from as PracEditorGroup);
+    const region = from === undefined ? undefined : this.regionOf(from as PracWindowGroup);
     const side = sideOfDirection(direction);
     const created =
       region === undefined || groupRegionChannel === undefined
@@ -459,21 +468,43 @@ export class PracEditorHost
 
   removeGroup(group: IEditorGroupView | GroupIdentifier): void {
     const resolved = (typeof group === "number" ? this.getGroup(group) : group) as
-      | PracEditorGroup
+      | PracWindowGroup
       | undefined;
     if (resolved === undefined) return;
+    // A group that is empty of editors is not necessarily empty of **windows**: the
+    // conversation or a board can keep the region alive. Removing the group here would
+    // drop that window's group while the region stays behind (the region guard only
+    // refuses to delete the region). Ask the frame before touching the group.
+    const region = this._regions.get(resolved.id);
+    if (region !== undefined && groupRegionChannel?.hasOtherWindows(region) === true) return;
     const index = this._groups.indexOf(resolved);
     if (index >= 0) this._groups.splice(index, 1);
     // The **region** goes with the group: in prac a group *is* a region, and a region whose
     // group is gone has nothing to show — leaving it behind is what made an emptied side
     // unremovable (upstream removes the group here; the region is prac's half of that).
-    const region = this._regions.get(resolved.id);
     if (region !== undefined) groupRegionChannel?.removeRegion(region);
     this._regions.delete(resolved.id);
     resolved.dispose();
     this._onDidRemoveGroup.fire(resolved);
     this._groups.forEach((candidate, position) => candidate.notifyIndexChanged(position));
-    if (this._activeGroup === resolved) this._activeGroup = this._groups[0];
+    if (this._activeGroup === resolved) {
+      // Hand activity to a **neighbour**, not to whichever group happens to be
+      // first in creation order. The first group is often a placeholder (or the
+      // conversation's group), and `workbench.action.splitEditorToNextGroup`
+      // reads the active group's selected editors: leaving the conversation
+      // there made the next split copy the chat and never ask the frame for a
+      // region. The group before the removed one is the one the person was
+      // working beside; fall back to the next, then to anything left.
+      const previous = index > 0 ? this._groups[index - 1] : undefined;
+      const next = this._groups[index];
+      const neighbour =
+        [previous, next].find((candidate) => candidate !== undefined && candidate.count > 0) ??
+        previous ??
+        next ??
+        this._groups[0];
+      this._activeGroup = neighbour;
+      neighbour?.setActive(true);
+    }
     if (this._activeGroup !== undefined) this._onDidChangeActiveGroup.fire(this._activeGroup);
   }
 
@@ -482,7 +513,7 @@ export class PracEditorHost
    *
    * @returns the active group.
    */
-  private _requireActiveGroup(): PracEditorGroup {
+  private _requireActiveGroup(): PracWindowGroup {
     if (this._activeGroup === undefined) {
       // No region holds files yet: make one, so the editor service always has a group
       // to open into. The embedder relabels it as soon as a region claims it.
@@ -491,7 +522,7 @@ export class PracEditorHost
     return this._activeGroup;
   }
 
-  private setActiveGroup(group: PracEditorGroup, explicit: boolean): void {
+  private setActiveGroup(group: PracWindowGroup, explicit: boolean): void {
     const previous = this._activeGroup;
     if (previous !== undefined) previous.setActive(false);
     this._activeGroup = group;
@@ -546,7 +577,7 @@ export class PracEditorHost
           : typeof source === "number"
             ? this.getGroup(source)
             : (source as IEditorGroupView);
-      const region = from === undefined ? undefined : this.regionOf(from as PracEditorGroup);
+      const region = from === undefined ? undefined : this.regionOf(from as PracWindowGroup);
       const neighbour =
         region === undefined || groupRegionChannel === undefined
           ? undefined
@@ -737,7 +768,7 @@ export class PracEditorHost
     contextKey: RawContextKey<T>,
     group: IEditorGroupView,
   ): IContextKey<T> {
-    return contextKey.bindTo((group as PracEditorGroup).scopedContextKeyService) as IContextKey<T>;
+    return contextKey.bindTo((group as PracWindowGroup).scopedContextKeyService) as IContextKey<T>;
   }
 
   //#endregion

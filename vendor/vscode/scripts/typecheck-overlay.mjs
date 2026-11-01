@@ -32,7 +32,7 @@ const workDir = resolve(process.env.PRAC_VSCODE_DIR ?? join(repoRoot, ".build/vs
 // ever been transpiled (unused injected fields, an incomplete `IWorkbenchLayoutService`
 // implementation, `ServicesAccessorLike`). Fixing those is its own task; until then
 // they would drown out the errors this script exists to catch.
-const FILES = ["pracWindowGroup", "pracWindowGroupHost", "embedBridge"];
+const FILES = ["pracEditorPaneHost", "pracWindowGroup", "pracWindowGroupHost", "pracWindowInput", "pracWindowPane", "pracWindowProjection", "embedBridge"];
 
 const config = {
   extends: "./src/tsconfig.base.json",

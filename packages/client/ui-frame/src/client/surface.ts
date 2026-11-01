@@ -15,22 +15,22 @@ import {
   type SurfaceFactory as KitSurfaceFactory,
   type SurfaceKind as KitSurfaceKind,
 } from "prac-ui-kit";
-import type { FrameViewGroup } from "./frameGroups.js";
+import type { FrameWindowGroup } from "./frameGroups.js";
 
 /** Product-defined surface kinds used by the frame. */
 export type SurfaceKind = KitSurfaceKind;
 
 /** One mounted surface with its frame group. */
-export type Surface = KitSurface<FrameViewGroup>;
+export type Surface = KitSurface<FrameWindowGroup>;
 
 /** Creates one surface for a region. */
-export type SurfaceFactory = KitSurfaceFactory<FrameViewGroup>;
+export type SurfaceFactory = KitSurfaceFactory<FrameWindowGroup>;
 
 /** Placement / host input supplied by the frame. */
 export type SurfaceCreateOptions = KitSurfaceCreateOptions;
 
 /** Socket registry specialised to the frame's group type. */
-export class SurfaceRegistry extends KitSurfaceRegistry<FrameViewGroup> {}
+export class SurfaceRegistry extends KitSurfaceRegistry<FrameWindowGroup> {}
 
 declare module "@deepseek-ai/cordis" {
   interface Context {

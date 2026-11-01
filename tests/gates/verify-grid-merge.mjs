@@ -2,13 +2,12 @@
  * Shift-dragging one grid cell onto another merges them into a single cell whose
  * body is a split of the two regions; the merge persists.
  */
-import { openPrac, report, requireUrl } from "./harness.mjs";
+import { clearLayoutState, openPrac, report, requireUrl } from "./harness.mjs";
 
-const STATE_KEY = "prac-layout/v1";
 const CONVERSATION = "dsh:main:conversation";
 const url = requireUrl();
 const { page, close } = await openPrac(url);
-await page.evaluate((key) => localStorage.removeItem(key), STATE_KEY);
+await clearLayoutState(page);
 await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForTimeout(2500);

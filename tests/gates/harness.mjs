@@ -66,6 +66,47 @@ export function isKnownNoise(line) {
 }
 
 /**
+ * Remove the frame's persisted state for the page's current workspace.
+ *
+ * The layout / Space keys are scoped by workspace (`prac-layout/v1/<scope>/…`),
+ * so a gate cannot name one key any more. Remove every generation / Space under
+ * the prefix; the legacy unscoped key is removed too.
+ *
+ * @param {any} page - the Playwright page.
+ * @returns {Promise<void>} resolves after the keys are gone.
+ */
+export async function clearLayoutState(page) {
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (
+        key === "prac-layout/v1" ||
+        key.startsWith("prac-layout/v1/") ||
+        key === "prac-spaces/v1" ||
+        key.startsWith("prac-spaces/v1/") ||
+        key === "prac-board/v1" ||
+        key.startsWith("prac-board/v1/")
+      ) {
+        localStorage.removeItem(key);
+      }
+    }
+  });
+}
+
+/**
+ * Whether the frame has persisted state for the page's current workspace.
+ *
+ * @param {any} page - the Playwright page.
+ * @returns {Promise<boolean>} true when a scoped (or legacy) layout key exists.
+ */
+export async function hasLayoutState(page) {
+  return page.evaluate(() =>
+    Object.keys(localStorage).some(
+      (key) => key === "prac-layout/v1" || key.startsWith("prac-layout/v1/"),
+    ),
+  );
+}
+
+/**
  * Open the prac page: chromium, console capture, and the frame waited for.
  *
  * @param {string} url - the page URL.

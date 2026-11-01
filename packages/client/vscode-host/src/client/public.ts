@@ -35,6 +35,12 @@ export interface PracVscodeAction {
   readonly submenu?: readonly PracVscodeAction[];
 }
 
+/** The active editor window's title actions, split the way the frame renders them. */
+export interface PracVscodeActionModel {
+  readonly primary: readonly PracVscodeAction[];
+  readonly secondary: readonly PracVscodeAction[];
+}
+
 /** The shared VS Code client mechanism this package publishes on the registry. */
 export interface PracVscodeFace {
   /**
@@ -67,7 +73,46 @@ export interface PracVscodeFace {
    * @param containerId - the container id from a catalogue entry.
    * @returns primary and secondary actions the frame can render.
    */
+  /**
+   * Project a frame-owned window (chat / board) into the active group as an
+   * empty editor; the frame keeps rendering its content.
+   *
+   * @param id - the frame window / view id.
+   * @param title - its visible title.
+   */
+  mapWindow(id: string, title: string, region?: string): void;
+  /** The frame-owned windows projected so far (diagnostics / gates). */
+  mappedWindows(): readonly string[];
+  /** The frame-owned window currently projected as the active editor. */
+  activeWindow(): string | null;
+  /** Make one frame-owned window the active editor. */
+  activateWindow(id: string): void;
+  /** Remove a frame-owned window's projection. */
+  unmapWindow(id: string): void;
+  /** Project a frame window's position in the active group's editor order. */
+  orderWindow(id: string, index: number): void;
+  /** Project a file view's position through the same window projection. */
+  orderFile(resource: string, index: number): void;
+  /** The active group's editor order, with frame window ids in place. */
+  windowOrder(region?: string): readonly string[];
   containerActions(containerId: string): readonly PracVscodeAction[];
+  /**
+   * The active editor window's resolved title actions.
+   *
+   * The frame renders them in the tab strip, not the workbench's group header.
+   *
+   * @param placement - the file placement whose group's actions to read; absent
+   * means the active group.
+   * @returns primary and secondary actions for that window.
+   */
+  editorActions(placement?: string): PracVscodeActionModel;
+  /**
+   * Run one editor-title action by id.
+   *
+   * @param placement - the placement whose group owns the action.
+   * @param actionId - the action id from {@link PracVscodeFace.editorActions}.
+   */
+  runEditorAction(placement: string | undefined, actionId: string): void;
   /**
    * Run one container-title action by id.
    *

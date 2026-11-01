@@ -156,6 +156,7 @@ await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeo
 const folder = await page.evaluate(
   () => (globalThis.__vscodeEmbed.face.workspaceInfo().folders ?? [])[0] ?? null,
 );
+const mappedWindows = await page.evaluate(() => globalThis.__vscodeEmbed.face.mappedWindows());
 const ALL_FIXTURES = writeFixtures();
 const FILES = ALL_FIXTURES.slice(0, 2);
 const REST = ALL_FIXTURES.slice(2);
@@ -259,6 +260,35 @@ await waitForSurface(uriOf(FILE_A));
 step("first file");
 const mounted = await measure(uriOf(FILE_A));
 const oneSurface = await liveSurfaces();
+const viewKinds = await page.evaluate(() => {
+  const views = globalThis.__pracFrame.getState().views;
+  const file = Object.entries(views).find(([id]) => id.startsWith("vscode:file:"));
+  // A contributed view lives on its container's **board** now, not in the frame's view table.
+  const boards = globalThis.__pracWidgets?.boards?.() ?? [];
+  const widget = boards
+    .map((board) => Object.entries(board.boardState?.views ?? {}))
+    .flat()
+    .find(([id]) => id.startsWith("vscode:view:"));
+  return { file: file?.[1].kind ?? null, widget: widget?.[1].kind ?? null };
+});
+const breadcrumbs = await page.evaluate(() => {
+  const crumbs = globalThis.__deep
+    .all(".monaco-breadcrumbs")
+    .find((element) => element.getBoundingClientRect().width > 0);
+  const editor = globalThis.__deep
+    .all(".editor-container")
+    .find((element) => element.getBoundingClientRect().height > 0);
+  if (crumbs === null || crumbs === undefined || editor === null || editor === undefined) {
+    return null;
+  }
+  const crumbBox = crumbs.getBoundingClientRect();
+  const editorBox = editor.getBoundingClientRect();
+  return {
+    items: globalThis.__deep.all(".monaco-breadcrumb-item").length,
+    bottom: crumbBox.bottom,
+    editorTop: editorBox.top,
+  };
+});
 
 // A second file: the app keeps both open (two tabs), the centre shows the front view,
 // and the group's pane holds the file it shows. One surface — the first file's
@@ -269,6 +299,12 @@ step("second file");
 const second = await measure(uriOf(FILE_B));
 const afterSecond = await liveSurfaces();
 const twoFiles = await tabsOf();
+const frontAudit = await page.evaluate(async (uri) => {
+  const before = globalThis.__vscodeEmbed.face.editorModelWriteAudit();
+  globalThis.__pracFrame.setFront(globalThis.__pracFileView(uri));
+  await new Promise((resolve) => setTimeout(resolve, 1600));
+  return { before, after: globalThis.__vscodeEmbed.face.editorModelWriteAudit() };
+}, uriOf(FILE_A));
 
 // Clicking the first file's tab re-fronts its view (order is what a tab strip renders
 // first), so its surface comes back — and the app's active editor follows, because
@@ -642,6 +678,86 @@ const closedOne = await page.evaluate(async (resource) => {
   };
 }, uriOf(FILE_A));
 
+step("project the frame's active window");
+const activeProjection = await page.evaluate(
+  async ({ conversation, file }) => {
+    const wait = () => new Promise((resolve) => setTimeout(resolve, 1600));
+    const front = globalThis.__pracFrame.activeView();
+    if (front !== null && front !== conversation) globalThis.__pracFrame.hide(front);
+    globalThis.__pracFrame.setFront(conversation);
+    await wait();
+    const chat = globalThis.__vscodeEmbed.face.activeWindow();
+    const chatOrder = globalThis.__vscodeEmbed.face.windowOrder();
+    globalThis.__pracFrame.place(conversation, "right");
+    await wait();
+    const rightOrder = globalThis.__vscodeEmbed.face.windowOrder("right");
+    globalThis.__vscodeEmbed.face.openFile(file);
+    await wait();
+    globalThis.__pracFrame.hide(conversation);
+    await wait();
+    const hiddenMapped = globalThis.__vscodeEmbed.face.mappedWindows();
+    globalThis.__pracFrame.show(conversation);
+    globalThis.__pracFrame.setFront(conversation);
+    await wait();
+    return {
+      chat,
+      frame: globalThis.__pracFrame.activeView(),
+      fileView: globalThis.__pracFileView(file),
+      fileActive: globalThis.__vscodeEmbed.face.activeWindow(),
+      chatOrder,
+      rightOrder,
+      fileOrder: globalThis.__vscodeEmbed.face.windowOrder(),
+      hiddenMapped,
+      shownMapped: globalThis.__vscodeEmbed.face.mappedWindows(),
+    };
+  },
+  { conversation: "dsh:main:conversation", file: uriOf(REST[0]) },
+);
+
+step("audit the window projection writes");
+const projectionAudit = await page.evaluate(async () => {
+  const before = globalThis.__vscodeEmbed.face.projectionWriteAudit();
+  globalThis.__pracFrame.setFront(globalThis.__pracFrame.activeView());
+  await new Promise((resolve) => setTimeout(resolve, 1400));
+  return { before, after: globalThis.__vscodeEmbed.face.projectionWriteAudit() };
+});
+
+step("close the conversation tab");
+const closedChat = await page.evaluate(async (conversation) => {
+  if (globalThis.__pracFrame.getState().views[conversation]?.region !== "center") {
+    globalThis.__pracFrame.place(conversation, "center");
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+  }
+  const button = globalThis.__deep.one(`[data-prac-tab-close="${conversation}"]`);
+  if (button === null || button === undefined) return { clicked: false };
+  button.click();
+  await new Promise((resolve) => setTimeout(resolve, 1800));
+  return {
+    clicked: true,
+    mapped: globalThis.__vscodeEmbed.face.mappedWindows(),
+    hidden: globalThis.__pracFrame.getState().views[conversation]?.hidden === true,
+  };
+}, "dsh:main:conversation");
+step("preview survives close/reopen conversation");
+const previewAfterReopen = await page.evaluate(async ({ conversation, file }) => {
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  globalThis.__pracFrame.show(conversation);
+  globalThis.__pracFrame.setFront(conversation);
+  await wait(1200);
+  const close = globalThis.__deep.one(`[data-prac-tab-close="${conversation}"]`);
+  close?.click();
+  await wait(1200);
+  globalThis.__pracFrame.show(conversation);
+  globalThis.__pracFrame.setFront(conversation);
+  await wait(1200);
+  globalThis.__vscodeEmbed.face.openPreviewFile(file);
+  await wait(2200);
+  return globalThis.__vscodeEmbed.face.capabilities.editors
+    .snapshot()
+    .filter((entry) => entry.resource === file)
+    .map((entry) => entry.preview);
+}, { conversation: "dsh:main:conversation", file: uriOf(REST[1]) });
+
 await browser.close();
 
 const painted = (colours) => typeof colours === "number" && colours > 4;
@@ -653,7 +769,17 @@ const checks = {
     oneSurface.length === 1 &&
     oneSurface[0].resource === uriOf(FILE_A) &&
     mounted.region === "center",
+  frameFrontDoesNotWriteModel:
+    frontAudit.before.open === frontAudit.after.open &&
+    frontAudit.before.close === frontAudit.after.close &&
+    frontAudit.before.move === frontAudit.after.move &&
+    frontAudit.before.pin === frontAudit.after.pin,
+  fileViewIsWindow: viewKinds.file === "window",
+  sidebarViewIsWidget: viewKinds.widget === "widget",
   firstShowsItsOwnText: mounted.lines > 3 && mounted.text.includes(FILE_A.marker),
+  breadcrumbsRender: breadcrumbs !== null && breadcrumbs.items >= 2,
+  breadcrumbsSitAboveEditor:
+    breadcrumbs !== null && breadcrumbs.bottom <= breadcrumbs.editorTop + 1,
   secondShowsItsOwnText: second.lines > 3 && second.text.includes(FILE_B.marker),
   // 2. Paint, because present-but-blank is the failure mode.
   firstFileIsPainted: painted(mounted.colours),
@@ -785,6 +911,23 @@ const checks = {
     closedOne.surfaces[0].placement === closedOne.placements[0] &&
     closedOne.surfaces[0].lines > 0 &&
     closedOne.openFiles.includes(uriOf(FILE_A)),
+  frameWindowIsProjected: mappedWindows.includes("dsh:main:conversation"),
+  chatActiveProjects: activeProjection.chat === "dsh:main:conversation",
+  fileActiveProjects:
+    activeProjection.fileActive === null && activeProjection.frame === activeProjection.fileView,
+  chatOrderProjects: activeProjection.chatOrder[0] === "dsh:main:conversation",
+  chatMovesRegion: activeProjection.rightOrder[0] === "dsh:main:conversation",
+  fileOrderProjects: activeProjection.fileOrder[0] === uriOf(REST[0]),
+  hiddenWindowUnmaps: !activeProjection.hiddenMapped.includes("dsh:main:conversation"),
+  shownWindowRemaps: activeProjection.shownMapped.includes("dsh:main:conversation"),
+  previewSurvivesCloseReopen:
+    previewAfterReopen.length === 1 && previewAfterReopen[0] === true,
+  projectionIsQuiet:
+    JSON.stringify(projectionAudit.before) === JSON.stringify(projectionAudit.after),
+  closingChatUnmapsProjection:
+    closedChat.clicked === true &&
+    !closedChat.mapped.includes("dsh:main:conversation") &&
+    closedChat.hidden === true,
   splitEditorCopiesThePlacement:
     splitRan === "ran" &&
     copied.placements.length === 2 &&

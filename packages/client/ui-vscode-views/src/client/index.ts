@@ -29,9 +29,11 @@ import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "prac-client-vscode-host/client";
+// Type-only: brings the frame's slot declarations into this program.
+import type {} from "prac-client-ui-frame/lib";
 
 /** The slot these views are registered into (checked against the mechanism's key). */
-const SLOT = "prac.view" as const;
+const SLOT = "prac.widget" as const;
 
 /**
  * Declare one view per entry of the app's view catalogue, and keep it in sync.
@@ -88,7 +90,7 @@ export function apply(ctx: Context): void {
             // the literal's excess-property check. `paneHeader` is what tells the
             // frame to overlay its fold/drag control on the app's own pane header
             // instead of drawing a second row header.
-            const options = { name: SLOT, id: view, label, icon, paneHeader: true };
+            const options = { name: SLOT, id: view, label, icon, paneHeader: true } as const;
             registered.set(view, {
               label,
               icon,

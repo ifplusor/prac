@@ -15,6 +15,7 @@
 
 import {
   createElement,
+  Fragment,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -30,74 +31,62 @@ import type {
 } from "react";
 import { createPortal } from "react-dom";
 import type { UsePanelInfo } from "@deepseek-ai/dsh-client-ui-layout/client";
+import { TabStrip } from "./layoutTabs.js";
+import { StackHeader, StackRowOverlay } from "./layoutStack.js";
+import { LayoutSashDrag } from "./layoutSashDrag.js";
+import { GridCellHandles, GridTrackHandle } from "./layoutGrid.js";
+import { beginStackReorder } from "./layoutStackDrag.js";
+import { ViewActions } from "./layoutActions.js";
+import { ContainerBar } from "./layoutContainerBar.js";
+import { LayoutIsolation } from "./layoutIsolation.js";
+import { LayoutItem, type ItemRenderSlot } from "./layoutItem.js";
+import { LayoutRenderer } from "./layoutRenderer.js";
+import type { LayoutDecoration, LayoutDecorationContext } from "./layoutRenderer.js";
+import { readStackRows, startEntryDrag, type StackContainer } from "./resizeController.js";
+import type {
+  ChromeContext,
+  ChromeItemFacts,
+  ChromeRegistry,
+  ChromeSlotFace,
+  LayoutIntents,
+} from "./chrome.js";
+import { createFrameChrome } from "./frameChrome.js";
+import { createLayoutIntents } from "./chromeIntents.js";
 import type { UseSessions } from "@deepseek-ai/dsh-client-ui-session/client";
-import {
-  DSH_MAIN_PREFIX,
-  DSH_RIGHTBAR_VIEW,
-  DSH_SIDEBAR_VIEW,
-  VIEW_SLOT,
-  declaredViewIcon,
-  declaredViewLabel,
-  declaredViewPaneHeader,
-  viewKind,
-} from "./catalogue.js";
-import type { GroupBarItem, ViewGroupHost } from "./frameGroups.js";
+import { declaredViewIcon, declaredViewLabel, declaredViewPaneHeader } from "./catalogue.js";
+import type { GroupBarItem, WindowGroupHost } from "./frameGroups.js";
 import {
   SASH_SIZE,
   type Box,
   type Dir,
   type LayoutNode,
-  ZERO_BOX,
   type RegionNode,
-  type SplitNode,
   type StyleObject,
+  type PracWindowActionsFace,
+  type WindowAction,
 } from "./contract.js";
-import { mountIsolated, releaseIsolated } from "./isolation.js";
 import {
   entrySashState,
-  type EntrySashState,
-  activeChild,
-  chosenChild,
   edgeRegion,
   findRegion,
-  findSplit,
   isPresent,
   frontView,
-  gridShape,
-  gridTrackWeights,
   mergeGridCells,
   place,
   moveGridCell,
-  unmergeGridCell,
-  resizeBoundary,
-  resizeGridCell,
-  resizeGridTrack,
   resolveSizes,
   setFront,
   selectChild,
-  showsTabStrip,
+  reorderTab,
   visibleViews,
-  MIN_ENTRY,
-  HEADER_HEIGHT,
-  STACK_HEADER_HEIGHT,
-  altDragTarget,
-  redistributeOnDrag,
-  stackDragAnchor,
-  setViewCollapsed,
-  moveViewInRegion,
   resetStackBoundary,
   setEntryFolded,
-  moveEntry,
   setEntryHeight,
-  setCollapsed,
   findNode,
-  distributeSplitEvenly,
   drawsRegionBar,
-  type SnapTarget,
-  snapTargets,
 } from "./model.js";
 import { type LayoutStore, useLayout } from "./store.js";
-import type { LayoutState } from "./contract.js";
+import type { ViewRecord } from "./contract.js";
 
 /** A minimal pointer event, as the sash drag machine reads it. */
 interface PointerDragEvent {
@@ -133,70 +122,19 @@ interface PointerDragEvent {
  * keys, so a dispatch to a key the frame did not declare is a type error.
  */
 type RenderSlot = import("@deepseek-ai/dsh-client-ui-slots").PropsRenderSlots<
-  "sidebar" | "main" | "rightbar" | "shell.overlay" | "prac.view" | "prac.viewActions"
+  | "sidebar"
+  | "main"
+  | "rightbar"
+  | "shell.overlay"
+  | "prac.view"
+  | "prac.window"
+  | "prac.widget"
+  | "prac.viewActions"
+  | "prac.windowActions"
+  | "prac.widgetActions"
 >["renderSlot"];
 
 // ── the frame ─────────────────────────────────────────────────────────
-
-/** Props of one placed view. */
-interface ViewProps {
-  viewId: string;
-  renderSlot: RenderSlot;
-  /** The box of the region currently rendering this view. */
-  box: Box;
-  viewportWidth: number;
-}
-
-/**
- * Render one of DSH's own slots as a view: the keyed `main` slot per key, the
- * `sidebar` and `rightbar` single slots with the owner props their occupants
- * read.
- *
- * @param viewId - a `dsh:` view id.
- * @param renderSlot - DSH's slot dispatch face.
- * @param box - the box of the region rendering the view.
- * @param viewportWidth - the measured frame width.
- * @returns the rendered slot, or null for an unknown `dsh:` id.
- */
-function renderDshView(
-  viewId: string,
-  renderSlot: RenderSlot,
-  box: Box,
-  viewportWidth: number,
-): ReactNode {
-  if (viewId.startsWith(DSH_MAIN_PREFIX)) {
-    return renderSlot("main", {}, { entryKey: viewId.slice(DSH_MAIN_PREFIX.length) });
-  }
-  if (viewId === DSH_SIDEBAR_VIEW) {
-    return renderSlot("sidebar", { collapsed: box.width === 0, width: box.width });
-  }
-  if (viewId === DSH_RIGHTBAR_VIEW) {
-    return renderSlot("rightbar", {
-      width: box.width,
-      viewportWidth,
-      canShow: box.width > 0,
-    });
-  }
-  return null;
-}
-
-/**
- * One placed view, rendered in its own component so each instance keeps its
- * own hooks: `renderSlot` is called once per view per render.
- *
- * The **declaration** decides the dispatch, never the position and never the id's
- * name: DSH's own slots render through DSH's slot face, and a view the
- * `prac.view` slot declares renders that declaration (membership is read from the
- * registry — see {@link viewKind}). Anything else renders nothing.
- *
- * @param props - the placed view's identity, slot face and region box.
- */
-function View({ viewId, renderSlot, box, viewportWidth }: ViewProps): ReactNode {
-  const kind = viewKind(viewId);
-  if (kind === "declared") return renderSlot(VIEW_SLOT, {}, { only: viewId });
-  if (kind === "dsh") return renderDshView(viewId, renderSlot, box, viewportWidth);
-  return null;
-}
 
 /**
  * A view inside its own isolation boundary.
@@ -209,51 +147,6 @@ function View({ viewId, renderSlot, box, viewportWidth }: ViewProps): ReactNode 
  *
  * @param props - the view's rendered tree.
  */
-function IsolatedView({
-  children,
-  clickThrough = false,
-  chrome,
-  viewId,
-}: {
-  children?: ReactNode;
-  /** The box itself lets events pass; its entries opt back in (the float layer). */
-  clickThrough?: boolean;
-  /** When the frame owns the row title, hide the view's own duplicate collapse affordance. */
-  chrome?: "frame";
-  /** The view this boundary hosts, for diagnostics and gates. */
-  viewId?: string;
-}): ReactElement {
-  const host = useRef<HTMLDivElement | null>(null);
-  const [content, setContent] = useState<HTMLElement | null>(null);
-  useLayoutEffect(() => {
-    const element = host.current;
-    if (!element) return undefined;
-    setContent(mountIsolated(element));
-    return () => {
-      releaseIsolated(element);
-      setContent(null);
-    };
-  }, []);
-  return createElement(
-    "div",
-    {
-      ref: host,
-      "data-prac-view-host": "",
-      ...(viewId === undefined ? {} : { "data-prac-view-id": viewId }),
-      ...(chrome === "frame" ? { "data-prac-view-chrome": "frame" } : {}),
-      style: {
-        display: "flex",
-        flexDirection: "column",
-        flex: "1 1 auto",
-        minWidth: 0,
-        minHeight: 0,
-        ...(clickThrough ? { pointerEvents: "none" as const } : {}),
-      },
-    },
-    content ? createPortal(children, content) : null,
-  );
-}
-
 /** A view's display label: its declared title, else the tail of its id. */
 function viewLabel(viewId: string): string {
   return declaredViewLabel(viewId) ?? (viewId.split(":").pop() ?? viewId).replace(/[-_]/g, " ");
@@ -282,607 +175,7 @@ const viewIconNode = (viewId: string): ReactElement | null => {
       });
 };
 
-/** The header a stacked view carries: its label plus a fold toggle. */
-
-const STACK_HEADER_STYLE: StyleObject = {
-  display: "block",
-  height: STACK_HEADER_HEIGHT,
-  boxSizing: "border-box",
-  width: "100%",
-  textAlign: "left",
-  padding: "2px 6px",
-  font: "inherit",
-  fontSize: "11px",
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  cursor: "pointer",
-  border: "none",
-  borderTop: "1px solid rgba(128, 128, 128, 0.25)",
-  background: "transparent",
-  color: "inherit",
-  opacity: 0.8,
-};
-
-/** The window group's tab strip: one row above the active window's body. */
-const TAB_STRIP_STYLE: StyleObject = {
-  display: "flex",
-  alignItems: "stretch",
-  height: HEADER_HEIGHT,
-  boxSizing: "border-box",
-  flex: "0 0 auto",
-  overflow: "hidden",
-  background: "rgba(127,127,127,0.10)",
-};
-
-/** One tab. */
-const TAB_STYLE: StyleObject = {
-  font: "inherit",
-  fontSize: "11px",
-  lineHeight: "1",
-  height: HEADER_HEIGHT,
-  boxSizing: "border-box",
-  padding: "4px 10px",
-  border: "none",
-  borderRight: "1px solid rgba(127,127,127,0.22)",
-  background: "transparent",
-  color: "inherit",
-  opacity: 0.7,
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-  maxWidth: "220px",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  flex: "0 0 auto",
-};
-
 /** The unsaved marker inside a tab. */
-/** The close affordance on a tab whose declarer allows closing. */
-const TAB_CLOSE_STYLE: StyleObject = {
-  fontSize: "11px",
-  lineHeight: "1",
-  marginLeft: "6px",
-  padding: "0 2px",
-  borderRadius: "3px",
-  opacity: 0.75,
-  cursor: "pointer",
-};
-
-const TAB_DIRTY_STYLE: StyleObject = {
-  fontSize: "9px",
-  marginRight: "5px",
-  verticalAlign: "middle",
-  opacity: 0.9,
-};
-
-/**
- * Move one view's tab to another tab's place in the same region.
- *
- * Orders are only compared **within** a region (`visibleViews` sorts by them), so the
- * region's visible list is renumbered after the move — and the drag is a reorder, not a
- * placement: nothing else about the view changes.
- *
- * @param state - the current layout state.
- * @param regionId - the region whose tabs were dragged in.
- * @param dragged - the view that was dragged.
- * @param target - the view it was dropped on.
- * @returns the next state, or the same one when nothing moves.
- */
-function reorderTab(
-  state: LayoutState,
-  regionId: string,
-  dragged: string,
-  target: string,
-): LayoutState {
-  if (dragged === target) return state;
-  const list = visibleViews(state, regionId);
-  const from = list.indexOf(dragged);
-  const to = list.indexOf(target);
-  if (from === -1 || to === -1) return state;
-  const next = [...list];
-  next.splice(from, 1);
-  next.splice(to, 0, dragged);
-  const views = { ...state.views };
-  next.forEach((id, index) => {
-    const record = views[id];
-    if (record !== undefined) views[id] = { ...record, order: index };
-  });
-  return { ...state, views };
-}
-
-/** The active tab, which is the view the region renders. */
-const TAB_ACTIVE_STYLE: StyleObject = {
-  opacity: 1,
-  background: "rgba(127,127,127,0.22)",
-  boxShadow: "inset 0 -1px 0 rgba(127,127,127,0.9)",
-};
-
-/**
- * The one stack-entry drag in flight, if any.
- *
- * Module state on purpose: the frame is a singleton per page, an entry is rendered by a plain
- * function (so a hook inside it would break the hook order), and only one drag can be in flight.
- */
-/** One in-flight drag of an entry by its title: reordering, not resizing. */
-/**
- * How far a press may drift before it counts as a drag instead of a click.
- *
- * A title bar answers to both: a click folds the entry (`setViewCollapsed`), a drag reorders it
- * (`moveViewInRegion`). This slop is what drag-and-drop layers use to tell the two apart.
- */
-const REORDER_SLOP = 4;
-
-let reorderDrag: {
-  viewId: string;
-  pointerId: number;
-  container: HTMLElement;
-  line: HTMLElement;
-  origin: { x: number; y: number };
-  moved: boolean;
-  target: { reference: string; direction: "up" | "down" } | null;
-} | null = null;
-
-/** What a stack entry looks like through the little of the DOM this file touches. */
-interface StackEntryNode {
-  getBoundingClientRect(): { readonly bottom: number; readonly height: number };
-  getAttribute(name: string): string | null;
-}
-
-/** Read a stack's entries, top-down, as they stand on screen. */
-/** What {@link readStackRows} needs of a container — a plain element qualifies structurally. */
-type StackContainer = Parameters<typeof readStackRows>[0];
-
-function readStackRows(
-  container: { querySelectorAll(selectors: string): readonly StackEntryNode[] } | null,
-): { viewId: string; height: number; folded: boolean }[] {
-  return [...(container?.querySelectorAll("[data-prac-stack-entry]") ?? [])].map((node) => ({
-    viewId:
-      node.getAttribute("data-prac-stack-row") ?? node.getAttribute("data-prac-stack-entry") ?? "",
-    height: Math.round(node.getBoundingClientRect().height),
-    folded: node.getAttribute("data-prac-stack-collapsed") === "true",
-  }));
-}
-
-/**
- * One in-flight drag of a boundary between two **stack rows** (entry leaves).
- *
- * The rows come from the DOM (`readStackRows`), the arithmetic is `redistributeOnDrag`, and the
- * writes go into the tree — a row's height is its region's `size`, so the drawn height and the
- * stored height are one number. A stack row does **not** snap: dragging changes heights only; the
- * fold toggle is the one way a row folds (D3–D5).
- */
-interface EntryDragState {
-  pointerId: number;
-  draggedId: string;
-  container: StackContainer;
-  rows: { viewId: string; height: number; folded: boolean }[];
-  start: number;
-  origin: number;
-  limit: number;
-}
-
-let rowDrag: EntryDragState | null = null;
-
-function startEntryDrag(
-  store: LayoutStore,
-  container: StackContainer,
-  rowId: string,
-  pointerId: number,
-  origin: number,
-  element: {
-    setPointerCapture?(pointerId: number): void;
-    releasePointerCapture?(pointerId: number): void;
-  } | null,
-): void {
-  const rows = readStackRows(container);
-  // The boundary under a folded row still resizes the stack: the nearest **open** row above it is
-  // the one that changes height, and the folded header moves with the boundary. Anchoring on the
-  // folded row itself made every move a no-op (`stackDragAnchor`).
-  const anchor = stackDragAnchor(rows, rowId);
-  if (anchor === undefined) return;
-  const index = rows.findIndex((row) => row.viewId === anchor.viewId);
-  if (index < 0) return;
-  const below = rows.slice(index + 1);
-  // The drag is computed from the rows **as drawn**: seed every open row with that number before
-  // the first move. Otherwise the untouched rows keep older claims, and `allocateStack`'s
-  // proportional pass re-fits them on every pointermove — the elastic bounce reported during a drag
-  // (only the rows the drag wrote matched what was on screen).
-  store.update((state) => {
-    let next = state;
-    for (const row of rows) {
-      if (!row.folded && row.height > 0) next = setEntryHeight(next, row.viewId, row.height);
-    }
-    return next;
-  });
-  const drag: EntryDragState = {
-    pointerId,
-    draggedId: anchor.viewId,
-    container,
-    rows,
-    start: anchor.height,
-    origin,
-    limit:
-      anchor.height + below.reduce((total, row) => total + Math.max(0, row.height - MIN_ENTRY), 0),
-  };
-  rowDrag = drag;
-  const move = (moveEvent: PointerEvent): void => {
-    if (rowDrag !== drag || moveEvent.pointerId !== drag.pointerId) return;
-    moveEvent.preventDefault();
-    const pointerDelta = moveEvent.clientY - drag.origin;
-    // B6: Alt narrows the drag to the adjacent view's half (`SplitView.onSashStart`'s alt branch);
-    // it changes heights only, never a fold.
-    if (moveEvent.altKey === true) {
-      const wanted = altDragTarget(drag.rows, drag.draggedId, drag.start + pointerDelta);
-      const target = Math.max(MIN_ENTRY, Math.min(drag.limit, Math.round(wanted)));
-      const sizes = redistributeOnDrag(drag.rows, drag.draggedId, target);
-      store.update((state) => {
-        let next = state;
-        for (const [id, height] of sizes) next = setEntryHeight(next, id, height);
-        return next;
-      });
-      return;
-    }
-    // D3–D5: a stack row does not snap — the drag changes heights only, and the fold toggle is the
-    // one way a row folds.
-    const wanted = Math.round(drag.start + pointerDelta);
-    const target = Math.max(MIN_ENTRY, Math.min(drag.limit, wanted));
-    const sizes = redistributeOnDrag(drag.rows, drag.draggedId, target);
-    store.update((state) => {
-      let next = state;
-      for (const [id, height] of sizes) next = setEntryHeight(next, id, height);
-      return next;
-    });
-  };
-  /** End the drag from any source: pointerup, pointercancel, or the window losing focus. */
-  const finish = (): void => {
-    if (rowDrag !== drag) return;
-    rowDrag = null;
-    // "What is on screen is what the state says" (D2): the drag wrote the two rows it moved, and the
-    // rows it did not touch may still claim a height the allocation has since re-fitted — write what
-    // each of them is actually drawn at, so the claims and the screen agree again.
-    const settled = readStackRows(drag.container);
-    store.update((state) => {
-      let next = state;
-      for (const row of settled) {
-        // A folded row is a header, not a height (J3): writing its 20px back would clamp it to the
-        // floor and leave a misleading `size` behind.
-        if (row.height > 0 && !row.folded) next = setEntryHeight(next, row.viewId, row.height);
-      }
-      return next;
-    });
-    element?.releasePointerCapture?.(pointerId);
-    document.removeEventListener("pointermove", move, true);
-    document.removeEventListener("pointerup", stop, true);
-    document.removeEventListener("pointercancel", cancel, true);
-    window.removeEventListener("blur", cancel);
-  };
-  const stop = (upEvent: PointerEvent): void => {
-    if (rowDrag !== drag || upEvent.pointerId !== drag.pointerId) return;
-    finish();
-  };
-  const cancel = (): void => {
-    if (rowDrag !== drag) return;
-    finish();
-  };
-  // Capture on the document, like the region boundary: a VS Code view host
-  // inside the stack stops pointer events in its own subtree, and the row
-  // boundary must keep following the pointer regardless.
-  document.addEventListener("pointermove", move, { passive: false, capture: true });
-  document.addEventListener("pointerup", stop, true);
-  document.addEventListener("pointercancel", cancel, true);
-  window.addEventListener("blur", cancel);
-  element?.setPointerCapture?.(pointerId);
-}
-
-/** One in-flight sash drag. */
-interface DragState {
-  pointerId: number;
-  /** Pointer position along the split axis when the drag started. */
-  origin: number;
-  /** Which boundary of the split moved: the one after this child of its present children. */
-  index: number;
-  /** What the split's present children were drawn at when the drag started. */
-  drawn: ReadonlyMap<string, number>;
-  /** Set while the frame re-renders after a block went in or out, so the drag re-reads the pixels. */
-  settling?: boolean;
-  /** The blocks this drag may take away, and which side of their limits it is on. */
-  snap: { before?: SnapTarget; after?: SnapTarget };
-}
-
-/** A generic (non-stack) split boundary drag: one at a time, driven from the window. */
-interface SashDragState extends DragState {
-  splitId: string;
-  dir: Dir;
-}
-
-let sashDrag: SashDragState | null = null;
-let sashCleanup: (() => void) | null = null;
-
-/** What the split's present children are drawn at right now. */
-function readSplitDrawn(store: LayoutStore, splitId: string, dir: Dir): Map<string, number> {
-  const state = store.get();
-  const node = findNode(state.tree, splitId);
-  const drawn = new Map<string, number>();
-  if (node === null || node.type !== "split") return drawn;
-  // A grid can be `display: contents` (one cell), so it has no DOM box of its
-  // own; fall back to the model's resolved box for that child.
-  const resolved = resolveSizes(state, state.viewportWidth, state.viewportHeight);
-  for (const child of node.children.filter((entry) => isPresent(state, entry))) {
-    const element =
-      document.querySelector(`[data-prac-region="${CSS.escape(child.id)}"]`) ??
-      document.querySelector(`[data-prac-split="${CSS.escape(child.id)}"]`) ??
-      document.querySelector(`[data-prac-grid="${CSS.escape(child.id)}"]`);
-    const rect = element?.getBoundingClientRect();
-    const measured = rect === undefined ? undefined : dir === "row" ? rect.width : rect.height;
-    const fallback = resolved.get(child.id);
-    const size =
-      measured !== undefined && measured > 0
-        ? measured
-        : fallback?.[dir === "row" ? "width" : "height"];
-    if (size !== undefined) drawn.set(child.id, size);
-  }
-  return drawn;
-}
-
-/**
- * Start a split-boundary drag.
- *
- * The move/up listeners live on the **window**, not on the sash element. A fast drag would otherwise
- * depend on the pointer staying over a four-pixel element (or on pointer capture surviving a
- * re-render that moves the sash under the pointer) — the reported "too fast and it stops" failure.
- * The element only supplies the starting pixels; the window keeps delivering events until pointerup,
- * pointercancel, or a window blur.
- */
-function startSashDrag(
-  store: LayoutStore,
-  splitId: string,
-  dir: Dir,
-  index: number,
-  pointerId: number,
-  origin: number,
-  element: {
-    setPointerCapture?(pointerId: number): void;
-    releasePointerCapture?(pointerId: number): void;
-  } | null,
-): void {
-  // A second pointerdown while a boundary drag is still live replaces it cleanly (no stale window
-  // listeners left behind by the first).
-  sashCleanup?.();
-  const drawn = readSplitDrawn(store, splitId, dir);
-  const drag: SashDragState = {
-    pointerId,
-    splitId,
-    dir,
-    index,
-    origin,
-    drawn,
-    snap: snapTargets(store.get(), splitId, index, drawn),
-  };
-  sashDrag = drag;
-  const move = (event: PointerEvent): void => {
-    if (sashDrag !== drag || event.pointerId !== drag.pointerId) return;
-    event.preventDefault();
-    if (drag.settling === true) return;
-    const point = dir === "row" ? event.clientX : event.clientY;
-    const delta = point - drag.origin;
-    // VS Code's sash snap, unless Alt is held (`splitview.ts:929`): past the limit the block goes
-    // away with its size remembered, and back across the limit it returns.
-    if (!event.altKey) {
-      const before = drag.snap.before;
-      const after = drag.snap.after;
-      const wantedBeforeHidden = before !== undefined && before.size + delta < before.half;
-      const wantedAfterHidden = after !== undefined && after.size - delta < after.half;
-      const flipBefore = before !== undefined && before.hidden !== wantedBeforeHidden;
-      const flipAfter = after !== undefined && after.hidden !== wantedAfterHidden;
-      if (flipBefore || flipAfter) {
-        store.update((state) => {
-          let next = state;
-          if (flipBefore && before !== undefined) {
-            next = setCollapsed(next, before.id, wantedBeforeHidden, before.size);
-          }
-          if (flipAfter && after !== undefined) {
-            next = setCollapsed(next, after.id, wantedAfterHidden, after.size);
-          }
-          return next;
-        });
-        drag.settling = true;
-        const from = point;
-        requestAnimationFrame(() => {
-          if (sashDrag !== drag) return;
-          drag.settling = false;
-          drag.origin = from;
-          drag.drawn = readSplitDrawn(store, splitId, dir);
-          drag.snap = snapTargets(store.get(), splitId, drag.index, drag.drawn);
-        });
-        return;
-      }
-    }
-    // The model moves the boundary: the drag is clamped to what the two sides can do (`min` / `max`)
-    // and the space is handed out by `Sizing` — `distribute` spreads it over the whole side in
-    // proportion (the default), `expand` pushes the neighbour only. `drawn` stays the base the drag
-    // started from: `delta` is measured from the same pointer, so both have to be one coordinate.
-    store.update((state) =>
-      resizeBoundary(state, splitId, drag.index, delta, "distribute", drag.drawn),
-    );
-  };
-  const cleanup = (): void => {
-    document.removeEventListener("pointermove", move, true);
-    document.removeEventListener("pointerup", finish, true);
-    document.removeEventListener("pointercancel", finish, true);
-    window.removeEventListener("blur", cancel);
-    if (sashDrag === drag) sashDrag = null;
-    if (sashCleanup === cleanup) sashCleanup = null;
-    element?.releasePointerCapture?.(drag.pointerId);
-  };
-  const finish = (event?: PointerEvent): void => {
-    if (sashDrag !== drag) return;
-    if (event !== undefined && event.pointerId !== drag.pointerId) return;
-    cleanup();
-  };
-  const cancel = (): void => finish();
-  sashCleanup = cleanup;
-  // Capture on the document: a view host may stop pointer events inside its
-  // own subtree, and the boundary must keep following the pointer regardless.
-  document.addEventListener("pointermove", move, { passive: false, capture: true });
-  document.addEventListener("pointerup", finish, true);
-  document.addEventListener("pointercancel", finish, true);
-  window.addEventListener("blur", cancel);
-  element?.setPointerCapture?.(pointerId);
-}
-
-/** Props of one draggable boundary. */
-interface SashProps {
-  store: LayoutStore;
-  splitId: string;
-  dir: Dir;
-  index: number;
-  leftId: string;
-  rightId: string;
-  /** A stack row boundary's `SashState`; the generic region boundaries leave it undefined. */
-  stackState?: EntrySashState;
-  /** Where the boundary sits along the split's axis, in px (the preceding children's extent). */
-  offset: number;
-}
-
-/**
- * A draggable boundary between two adjacent regions.
- *
- * The sash is an **absolute overlay**: it takes no flex space, stays transparent until hovered or
- * dragged, and sits on the shared edge. Its drag is driven from the window (`startSashDrag`), so a
- * fast pointer cannot outrun a four-pixel element. The rule set is the one the spec fixes:
- * fixed|fixed grows one and shrinks the other; fixed|flex changes the fixed one; flex|flex does
- * nothing. The flex side keeps its own minimum, so a fixed neighbour can never squeeze it away.
- *
- * @param props - the boundary's identity and the two regions it separates.
- */
-function Sash({
-  store,
-  splitId,
-  dir,
-  index,
-  leftId,
-  rightId,
-  stackState,
-  offset,
-}: SashProps): ReactElement {
-  const sashRef = useRef<HTMLDivElement | null>(null);
-  const half = SASH_SIZE / 2;
-  // The model's offset is the initial guess; the DOM is the authority for the exact pixel. The
-  // previous sibling is the region to the left/above the boundary (the sash is rendered after it).
-  useLayoutEffect(() => {
-    const element = sashRef.current;
-    const previous = element?.previousElementSibling;
-    const parent = element?.parentElement;
-    if (!element || !previous || !parent) return;
-    const parentBox = parent.getBoundingClientRect();
-    const previousBox = previous.getBoundingClientRect();
-    // A **grid wrapper with one cell** is `display: contents`, so its own rect is empty even though
-    // its child is drawn; measuring it put the boundary at 0. Fall back to the allocation then.
-    const drawn = dir === "row" ? previousBox.width > 0 : previousBox.height > 0;
-    if (dir === "row") {
-      element.style.left = drawn
-        ? `${previousBox.right - parentBox.left - half}px`
-        : `${offset - half}px`;
-    } else {
-      element.style.top = drawn
-        ? `${previousBox.bottom - parentBox.top - half}px`
-        : `${offset - half}px`;
-    }
-  });
-  const onPointerDown = (event: PointerDragEvent): void => {
-    if (event.button !== 0) return;
-    const state = store.get();
-    const split = findSplit(state.tree, splitId);
-    const a = findRegion(state.tree, leftId);
-    const b = findRegion(state.tree, rightId);
-    // A collapsed block is deliberately draggable: that is how a drag brings it back (VS Code keeps
-    // the sash usable for exactly this, `splitview.ts:1417-1420`).
-    if (!split || !a || !b) return;
-    const element = event.currentTarget;
-    const container = element.parentElement;
-    if (a.entry === true && b.entry === true && container !== null) {
-      // Between two stack rows the boundary is the stack's own: floors and the four `SashState`
-      // values are the stack's semantics (B/C/D), not the generic two-region resize.
-      const rows = readStackRows(container as unknown as StackContainer);
-      const at = rows.findIndex((row) => row.viewId === a.id);
-      if (at < 0) return;
-      const state = entrySashState(
-        store.get(),
-        a.id,
-        new Map(rows.map((row) => [row.viewId, row.height])),
-      );
-      if (state === "disabled") return;
-      startEntryDrag(
-        store,
-        container as unknown as StackContainer,
-        a.id,
-        event.pointerId,
-        event.clientY,
-        element,
-      );
-      event.preventDefault();
-      return;
-    }
-    // The move/up listeners live on the window (`startSashDrag`): a fast drag cannot outrun a
-    // four-pixel element or a re-render that moves it.
-    startSashDrag(
-      store,
-      splitId,
-      dir,
-      index,
-      event.pointerId,
-      dir === "row" ? event.clientX : event.clientY,
-      element,
-    );
-    event.preventDefault();
-  };
-
-  const onDoubleClick = (): void => {
-    const state = store.get();
-    const a = findRegion(state.tree, leftId);
-    const b = findRegion(state.tree, rightId);
-    if (a?.entry !== true || b?.entry !== true) {
-      // A region boundary: a reset never lands on a **hidden** neighbour (VS Code returns early
-      // there, `splitview.ts:1193-1199`); otherwise the split's blocks share what there is evenly.
-      const drawn = readSplitDrawn(store, splitId, dir);
-      const { before, after } = snapTargets(state, splitId, index, drawn);
-      if (before?.hidden === true || after?.hidden === true) return;
-      store.update((next) => distributeSplitEvenly(next, splitId, drawn));
-      return;
-    }
-    // A row's parent element is the split's container, which is what `readStackRows` walks.
-    const container = document.querySelector(
-      `[data-prac-region="${CSS.escape(leftId)}"]`,
-    )?.parentElement;
-    if (container === null || container === undefined) return;
-    const reset = resetStackBoundary(readStackRows(container as unknown as StackContainer), leftId);
-    store.update((next) => {
-      let out = next;
-      for (const { viewId, height } of reset) out = setEntryHeight(out, viewId, height);
-      return out;
-    });
-  };
-
-  // The sash **overlays** the boundary instead of being a flex child: the regions fill the split,
-  // and the four-pixel strip is centered on the shared edge. It is transparent until hovered (or
-  // dragged), like VS Code's `monaco-sash`.
-  const style: StyleObject =
-    dir === "row"
-      ? { left: offset - half, top: 0, bottom: 0, width: SASH_SIZE }
-      : { top: offset - half, left: 0, right: 0, height: SASH_SIZE };
-  return createElement("div", {
-    "data-prac-sash": `${splitId}:${index}`,
-    ref: sashRef,
-    onDoubleClick,
-    "data-prac-sash-dir": dir,
-    "data-prac-sash-left": leftId,
-    "data-prac-sash-right": rightId,
-    ...(stackState === undefined ? {} : { "data-prac-stack-sash-state": stackState }),
-    "aria-hidden": "true",
-    style,
-    onPointerDown,
-  });
-}
-
 /** Frame-wide rules that cannot be expressed as inline styles on rendered entries. */
 const FRAME_STYLES = `
 [data-prac-overlay-layer] { display: flex; flex-direction: column; }
@@ -896,6 +189,9 @@ const FRAME_STYLES = `
 [data-prac-sash][data-prac-stack-sash-state="at-maximum"] { cursor: n-resize; }
 [data-prac-sash][data-prac-stack-sash-state="disabled"] { cursor: default; pointer-events: none; }
 [data-prac-sash]:hover, [data-prac-sash]:active { background: rgba(127, 127, 127, 0.35); }
+[data-prac-widget-drop-active] { outline: 2px solid rgba(90, 160, 255, 0.9); outline-offset: -2px; }
+[data-prac-widget-drop-active][data-prac-widget-drop-side="left"], [data-prac-widget-drop-active][data-prac-widget-drop-side="right"] { outline-color: rgba(90, 160, 255, 0.95); }
+[data-prac-widget-drop-active][data-prac-widget-drop-side="top"], [data-prac-widget-drop-active][data-prac-widget-drop-side="bottom"] { outline-color: rgba(255, 170, 70, 0.95); }
 :host([data-prac-view-chrome="frame"]) .pane-header .twisty-container,
 :host([data-prac-view-chrome="frame"]) .pane-header .icon,
 :host([data-prac-view-chrome="frame"]) .pane-header .title { display: none; }
@@ -928,74 +224,136 @@ export function ensureStyles(): void {
 }
 
 /**
- * A region's flex sizing: flexible, fixed at `size`, or collapsed to nothing.
+ * A stack row's bottom `SASH_SIZE` px is its boundary: start a row resize.
  *
- * @param node - the region to style.
- * @param dir - the parent split's axis (the axis the minimum belongs on).
+ * The row is a region (`data-prac-region`), but its boundary semantics are the
+ * stack's own (B/C/D), so the drag goes through the entry controller rather than
+ * the generic split resize.
+ *
+ * @param store - the layout store.
+ * @param node - the stack row.
+ * @param event - the pointer press on the row.
  */
-function regionStyle(node: RegionNode, dir: Dir, fill = false, allocated?: number): StyleObject {
-  if (node.collapsed) {
-    // A folded stack row is **only its header** — a row that vanished entirely would lose the fold
-    // switch that opens it again (design B4/D1).
-    if (node.entry === true)
-      return {
-        flex: `0 0 ${STACK_HEADER_HEIGHT}px`,
-        minWidth: 0,
-        minHeight: 0,
-        overflow: "hidden",
-      };
-    return { flex: "0 0 0px", minWidth: 0, minHeight: 0, overflow: "hidden" };
-  }
-  // The minimum is expressed on the split's own axis: a flex region with
-  // `min-width: 0` can be squeezed to nothing by its siblings.
-  const minimum = {
-    minWidth: dir === "row" ? node.min : 0,
-    minHeight: dir === "column" ? node.min : 0,
-  };
-  const stack: StyleObject =
-    node.stack === true || (node.children?.length ?? 0) > 0
-      ? { display: "flex", flexDirection: "column" }
-      : {};
-  // A selector's child is not sized by a split — the selector hands it the whole
-  // box — so it always fills, whatever basis it carries.
-  if (fill) return { flex: "1 1 0", ...minimum, overflow: "hidden", ...stack };
-  // A stack row is **drawn** at what the allocation gave it. The tree's `size` is only that row's
-  // claim: the room a region gains has to end up in exactly one row (C6/C8), and which row that is
-  // was decided by `allocateStack`, so the style has to follow the allocation rather than the claim.
-  if (allocated !== undefined) {
-    return {
-      flex: `0 0 ${Math.round(allocated)}px`,
-      ...minimum,
-      overflow: "hidden",
-      ...stack,
-    };
-  }
-  if (node.flex) return { flex: "1 1 0", ...minimum, overflow: "hidden", ...stack };
-  return { flex: `0 0 ${node.size}px`, ...minimum, overflow: "hidden", ...stack };
+function startEntryBoundaryDrag(
+  store: LayoutStore,
+  node: RegionNode,
+  event: ReactPointerEvent<HTMLDivElement>,
+): void {
+  if (event.button !== 0) return;
+  const element = event.currentTarget;
+  const rect = element.getBoundingClientRect();
+  if (event.clientY < rect.bottom - SASH_SIZE) return;
+  const container = element.parentElement;
+  if (container === null) return;
+  // The **last** row has no boundary (B7), and a `Disabled` one must not start a
+  // drag at all — no resize, no fallback. Only `Enabled`/`AtMinimum`/`AtMaximum`
+  // reach the starter.
+  const rows = readStackRows(container as unknown as StackContainer);
+  const at = rows.findIndex((row) => row.viewId === node.id);
+  if (at < 0 || at >= rows.length - 1) return;
+  const state = entrySashState(
+    store.get(),
+    node.id,
+    new Map(rows.map((row) => [row.viewId, row.height])),
+  );
+  if (state === "disabled") return;
+  startEntryDrag(
+    store,
+    container as unknown as StackContainer,
+    node.id,
+    event.pointerId,
+    event.clientY,
+    element,
+  );
+  event.preventDefault();
 }
 
 /**
- * A split's flex container: one axis, with children sized by their own basis.
+ * Double-clicking a stack row's bottom boundary resets the pair, the way a
+ * double-click on a sash does (design B5).
  *
- * @param node - the split to style.
+ * @param store - the layout store.
+ * @param node - the stack row.
+ * @param event - the double click.
  */
-function splitStyle(node: SplitNode): StyleObject {
-  // The basis is the region's, the way `regionStyle` computes it: a split that took a **fixed**
-  // region's place (a stack standing where the track was) has to keep that size, not take a share.
-  // A size of 0 means "no opinion" — the container layer builds its children that way — while a
-  // positive size with `flex: false` is a fixed extent the region carried over (the track a stack
-  // now stands in). Either way the split must not shrink a sized neighbour.
-  const basis =
-    node.flex === false && (node.size ?? 0) > 0 ? `0 0 ${node.size}px` : ("1 1 0" as const);
-  return {
-    display: "flex",
-    flexDirection: node.dir === "row" ? "row" : "column",
-    flex: basis,
-    minWidth: 0,
-    minHeight: 0,
-    overflow: "hidden",
-    position: "relative",
-  };
+function resetEntryBoundary(
+  store: LayoutStore,
+  node: RegionNode,
+  event: ReactMouseEvent<HTMLDivElement>,
+): void {
+  const element = event.currentTarget;
+  const rect = element.getBoundingClientRect();
+  if (event.clientY < rect.bottom - SASH_SIZE) return;
+  const container = element.parentElement;
+  if (container === null) return;
+  const reset = resetStackBoundary(readStackRows(container as unknown as StackContainer), node.id);
+  store.update((next) => {
+    let out = next;
+    for (const { viewId, height } of reset) out = setEntryHeight(out, viewId, height);
+    return out;
+  });
+}
+
+/** Accept a tab / view / grid-cell drag over a grid cell while cells can move. */
+function gridCellDragOver(canDrag: boolean, event: ReactDragEvent<HTMLDivElement>): void {
+  if (canDrag) event.preventDefault();
+}
+
+/**
+ * Drop something onto one grid cell.
+ *
+ * Tabs and views land in the cell's region (or its leading edge when the cell is
+ * a split); a grid cell dragged from another cell swaps placements, and
+ * Shift-drag merges the two.
+ *
+ * @param store - the layout store.
+ * @param gridId - the grid that owns the cell.
+ * @param childId - the cell's child id.
+ * @param canDrag - whether more than one cell is present.
+ * @param event - the drop.
+ */
+function dropOnGridCell(
+  store: LayoutStore,
+  gridId: string,
+  childId: string,
+  canDrag: boolean,
+  event: ReactDragEvent<HTMLDivElement>,
+): void {
+  const state = store.get();
+  const grid = findNode(state.tree, gridId);
+  if (grid === null || grid.type !== "grid") return;
+  const child = grid.children.find((candidate) => candidate.id === childId);
+  if (child === undefined) return;
+  const landing = (): RegionNode | null =>
+    child.type === "region" ? child : edgeRegion(state, child, "left");
+  const tab = event.dataTransfer?.getData("text/plain");
+  if (tab !== undefined && tab !== "") {
+    const target = landing();
+    if (target !== null) {
+      event.preventDefault();
+      store.update((current) => place(current, tab, target.id));
+    }
+    return;
+  }
+  const view = event.dataTransfer?.getData("text/prac-view");
+  if (view !== undefined && view !== "") {
+    const target = landing();
+    if (target !== null) {
+      event.preventDefault();
+      store.update((current) => place(current, view, target.id));
+    }
+    return;
+  }
+  if (!canDrag) return;
+  const source = event.dataTransfer?.getData("text/prac-grid-cell");
+  if (source === undefined || source === "") return;
+  event.preventDefault();
+  store.update((current) => {
+    const tree = event.shiftKey
+      ? mergeGridCells(current.tree, gridId, source, childId)
+      : moveGridCell(current.tree, gridId, source, childId);
+    return tree === current.tree ? current : { ...current, tree };
+  });
 }
 
 /**
@@ -1010,6 +368,202 @@ function splitStyle(node: SplitNode): StyleObject {
 export interface CurrentSessionSource {
   getSnapshot(): { readonly key?: string };
   subscribe(listener: () => void): () => void;
+}
+
+/** One text action in the tab strip; the model supplies the label and the run. */
+const TAB_ACTION_STYLE: StyleObject = {
+  font: "inherit",
+  fontSize: "11px",
+  lineHeight: "1",
+  height: "100%",
+  maxWidth: "140px",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  padding: "0 5px",
+  border: 0,
+  background: "transparent",
+  color: "inherit",
+  cursor: "pointer",
+};
+
+/** The actions a window offers, rendered at the tab strip's right end. */
+function TabActions({
+  face,
+  viewId,
+}: {
+  face: PracWindowActionsFace;
+  viewId: string;
+}): ReactElement | null {
+  const entry = useSyncExternalStore(
+    (listener) => face.subscribe(listener),
+    () => face.get(viewId),
+  );
+  const [open, setOpen] = useState(false);
+  const [menu, setMenu] = useState({ top: 0, right: 0 });
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const toggleRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const outside = (event: PointerEvent): void => {
+      const target = event.target as Node | null;
+      if (menuRef.current?.contains(target) === true) return;
+      if (toggleRef.current?.contains(target) === true) return;
+      setOpen(false);
+    };
+    const escape = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [open]);
+  if (entry === undefined) return null;
+  const run = (action: WindowAction, event: MouseEvent): void => {
+    event.stopPropagation();
+    entry.run(action.id);
+    setOpen(false);
+  };
+  const button = (action: WindowAction, showLabel: boolean): ReactElement =>
+    createElement(
+      "button",
+      {
+        key: action.id,
+        type: "button",
+        "data-prac-window-action": action.id,
+        title: action.tooltip ?? action.label,
+        "aria-label": action.label,
+        "aria-pressed": action.checked ? "true" : undefined,
+        disabled: action.enabled === false,
+        onClick: (event: MouseEvent) => run(action, event),
+        style: {
+          ...TAB_ACTION_STYLE,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: showLabel ? "flex-start" : "center",
+          gap: "4px",
+          maxWidth: showLabel ? "none" : "140px",
+          width: showLabel ? "100%" : undefined,
+          height: showLabel ? "auto" : "100%",
+          padding: showLabel ? "4px 8px" : undefined,
+          textAlign: "left",
+          color: showLabel ? "#eee" : "inherit",
+          opacity: action.enabled === false ? 0.4 : 1,
+        },
+      },
+      action.icon === undefined
+        ? null
+        : createElement("span", {
+            className: action.icon,
+            "aria-hidden": "true",
+            style: {
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "16px",
+              height: "100%",
+              fontSize: "14px",
+              flex: "0 0 auto",
+            },
+          }),
+      action.icon === undefined || showLabel
+        ? createElement(
+            "span",
+            { style: { overflow: "hidden", textOverflow: "ellipsis" } },
+            action.checked ? "\u2713 " : "",
+            action.label === "" ? action.id : action.label,
+          )
+        : null,
+    );
+  const visible = (actions: readonly WindowAction[]): readonly WindowAction[] =>
+    actions.filter((action) => action.id !== "vs.actions.separator");
+  const list = (actions: readonly WindowAction[]): ReactElement[] =>
+    visible(actions).flatMap((action) =>
+      action.submenu === undefined
+        ? [button(action, true)]
+        : [
+            createElement(
+              "span",
+              { key: action.id, style: { padding: "2px 6px", opacity: 0.7 } },
+              action.label,
+            ),
+            ...visible(action.submenu).map((child) => button(child, true)),
+          ],
+    );
+  /**
+   * The overflow menu lives in the document, not the tab strip: the strip and
+   * the region both clip (`overflow: hidden` / `contain: paint`), so an
+   * absolutely positioned menu was cut off at the first row.
+   */
+  const overflow =
+    open && visible(entry.model.secondary).length > 0
+      ? createPortal(
+          createElement(
+            "div",
+            {
+              ref: menuRef,
+              role: "menu",
+              "data-prac-window-actions-menu": viewId,
+              style: {
+                position: "fixed",
+                top: `${menu.top}px`,
+                right: `${menu.right}px`,
+                zIndex: 10000,
+                display: "flex",
+                flexDirection: "column",
+                minWidth: "180px",
+                padding: "4px",
+                background: "rgba(40,40,40,0.98)",
+                border: "1px solid rgba(127,127,127,0.35)",
+                boxShadow: "0 6px 20px rgba(0,0,0,0.35)",
+              },
+            },
+            ...list(entry.model.secondary),
+          ),
+          document.body,
+        )
+      : null;
+  return createElement(
+    "div",
+    {
+      "data-prac-window-actions": viewId,
+      style: { display: "flex", alignItems: "center", flex: "0 0 auto", height: "100%" },
+    },
+    ...visible(entry.model.primary).map((action) => button(action, false)),
+    visible(entry.model.secondary).length === 0
+      ? null
+      : createElement(
+          "button",
+          {
+            ref: toggleRef,
+            type: "button",
+            "aria-label": "More actions",
+            "aria-haspopup": "menu",
+            "aria-expanded": open ? "true" : "false",
+            title: "More actions",
+            "data-prac-window-actions-more": viewId,
+            onClick: (event: MouseEvent) => {
+              const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+              setMenu({ top: rect.bottom, right: Math.max(8, window.innerWidth - rect.right) });
+              setOpen((value) => !value);
+            },
+            style: {
+              ...TAB_ACTION_STYLE,
+              display: "inline-flex",
+              alignItems: "center",
+            },
+          },
+          createElement("span", {
+            className: "codicon codicon-ellipsis",
+            "aria-hidden": "true",
+            style: { fontSize: "14px" },
+          }),
+        ),
+    overflow,
+  );
 }
 
 /** Props DSH hands the root slot component. */
@@ -1031,7 +585,11 @@ export function createFrame(
   store: LayoutStore,
   sources: {
     readonly currentSession: CurrentSessionSource;
-    readonly viewGroups?: ViewGroupHost;
+    readonly viewGroups?: WindowGroupHost;
+    readonly contentHosts?: import("./contentHosts.js").ContentHostRegistry;
+    readonly boardLayouts?: import("./boardLayouts.js").BoardLayoutRegistry;
+    readonly chrome?: ChromeRegistry<ViewRecord>;
+    readonly windowActions: PracWindowActionsFace;
   },
 ): (props: FrameProps) => ReactElement {
   return function PracFrame({ renderSlot, useSessions, usePanelInfo }: FrameProps): ReactElement {
@@ -1072,7 +630,32 @@ export function createFrame(
       };
     }, []);
 
-    const sizes = resolveSizes(state, state.viewportWidth, state.viewportHeight);
+    const sizes = resolveSizes(
+      state,
+      state.viewportWidth,
+      state.viewportHeight,
+      sources.chrome === undefined
+        ? undefined
+        : (nodeId) => {
+            const node = findNode(state.tree, nodeId);
+            if (node === null) return undefined;
+            const ctx = { state, node, regionId: nodeId };
+            const total = { inlineStart: 0, inlineEnd: 0, blockStart: 0, blockEnd: 0 };
+            for (const anchor of [
+              "region.frame",
+              "region.tabs",
+              "region.header",
+              "region.footer",
+            ] as const) {
+              const metrics = sources.chrome!.metrics(anchor, ctx);
+              total.inlineStart += metrics.inlineStart;
+              total.inlineEnd += metrics.inlineEnd;
+              total.blockStart += metrics.blockStart;
+              total.blockEnd += metrics.blockEnd;
+            }
+            return total;
+          },
+    );
     // The `SashState` tests are about what the rows are **drawn** at: a flexible row claims 0 in the
     // tree, so the claim alone cannot answer B2. `sizes` is this render's allocation.
     const rowHeights = new Map<string, number>([...sizes].map(([id, box]) => [id, box.height]));
@@ -1102,113 +685,7 @@ export function createFrame(
       down: PointerDragEvent,
       viewId: string,
       containerIn?: HTMLElement | null,
-    ): void => {
-      const container = containerIn ?? (down.currentTarget as HTMLElement).parentElement;
-      if (container === null || container === undefined) return;
-      const line = document.createElement("div");
-      line.setAttribute("data-prac-stack-drop", viewId);
-      Object.assign(line.style, {
-        position: "absolute",
-        left: "0",
-        right: "0",
-        height: "2px",
-        background: "var(--vscode-focusBorder, #007fd4)",
-        pointerEvents: "none",
-        zIndex: "6",
-      });
-      const drag = {
-        viewId,
-        pointerId: down.pointerId,
-        container,
-        line,
-        origin: { x: down.clientX, y: down.clientY },
-        moved: false,
-        target: null as { reference: string; direction: "up" | "down" } | null,
-      };
-      reorderDrag = drag;
-      const rows = (): { id: string; element: HTMLElement; top: number; bottom: number }[] =>
-        [...container.querySelectorAll<HTMLElement>("[data-prac-stack-entry]")].map((element) => {
-          const rect = element.getBoundingClientRect();
-          return {
-            id:
-              element.getAttribute("data-prac-stack-row") ??
-              element.getAttribute("data-prac-stack-entry") ??
-              "",
-            element,
-            top: rect.top,
-            bottom: rect.bottom,
-          };
-        });
-      const stop = (): void => {
-        window.removeEventListener("pointermove", move);
-        window.removeEventListener("pointerup", finish);
-        window.removeEventListener("pointercancel", drop);
-        drag.line.remove();
-        if (reorderDrag === drag) reorderDrag = null;
-      };
-      const drop = (): void => {
-        if (reorderDrag !== drag) return;
-        stop();
-      };
-      const move = (moveEvent: PointerEvent): void => {
-        if (reorderDrag !== drag || moveEvent.pointerId !== drag.pointerId) return;
-        // A press that stays put is a **click** (fold/unfold); only real movement reorders.
-        if (
-          Math.abs(moveEvent.clientX - drag.origin.x) > REORDER_SLOP ||
-          Math.abs(moveEvent.clientY - drag.origin.y) > REORDER_SLOP
-        ) {
-          drag.moved = true;
-        }
-        if (!drag.moved) return;
-        const hit = rows().find(
-          (row) => moveEvent.clientY >= row.top && moveEvent.clientY < row.bottom,
-        );
-        if (hit === undefined || hit.id === "") {
-          // Off the rows: nothing will be dropped, so show nothing.
-          drag.target = null;
-          drag.line.remove();
-          return;
-        }
-        const direction = moveEvent.clientY < hit.top + (hit.bottom - hit.top) / 2 ? "up" : "down";
-        drag.target = { reference: hit.id, direction };
-        hit.element.appendChild(drag.line);
-        drag.line.style.top = direction === "up" ? "0" : "";
-        drag.line.style.bottom = direction === "down" ? "0" : "";
-      };
-      const finish = (upEvent: PointerEvent): void => {
-        if (reorderDrag !== drag || upEvent.pointerId !== drag.pointerId) return;
-        const target = drag.target;
-        const moved = drag.moved;
-        stop();
-        if (!moved) {
-          // They clicked the title rather than dragging it: that is the fold switch.
-          const height = readStackRows(container as unknown as StackContainer).find(
-            (row) => row.viewId === viewId,
-          )?.height;
-          store.update((state) =>
-            findRegion(state.tree, viewId)?.entry === true
-              ? setEntryFolded(
-                  state,
-                  viewId,
-                  findRegion(state.tree, viewId)?.collapsed !== true,
-                  height,
-                )
-              : setViewCollapsed(state, viewId, state.views[viewId]?.collapsed !== true, height),
-          );
-          return;
-        }
-        if (target === null || target.reference === viewId) return;
-        store.update((state) =>
-          findRegion(state.tree, viewId)?.entry === true
-            ? moveEntry(state, viewId, target.reference, target.direction)
-            : moveViewInRegion(state, viewId, target.reference, target.direction),
-        );
-      };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", finish);
-      window.addEventListener("pointercancel", drop);
-      down.preventDefault();
-    };
+    ): void => beginStackReorder(store, down, viewId, containerIn);
 
     /**
      * One region's tab strip: the visible views in order, the front one active.
@@ -1222,99 +699,28 @@ export function createFrame(
      */
     const tabStrip = (views: readonly string[], regionId: string): ReactElement => {
       const active = frontView(state, regionId) ?? views[0];
-      return createElement(
-        "div",
-        {
-          key: "tabs",
-          "data-prac-tab-strip": "",
-          style: TAB_STRIP_STYLE,
-        },
-        views.map((viewId) =>
+      return createElement(TabStrip, {
+        state,
+        regionId,
+        views,
+        active,
+        label: viewLabel,
+        onActivate: (viewId: string) => store.update((current) => setFront(current, viewId)),
+        onClose: (viewId: string) => store.requestCloseView(viewId),
+        onReorder: (id: string, dragged: string, target: string) =>
+          store.update((current) => reorderTab(current, id, dragged, target)),
+        renderActions: (viewId: string | undefined) =>
           createElement(
-            "button",
-            {
-              key: viewId,
-              type: "button",
-              "data-prac-tab": viewId,
-              "data-prac-tab-active": viewId === active ? "true" : "false",
-              // Tabs reorder by dragging one onto another, the way VS Code's do. The
-              // drag carries the view id; the drop renumbers the region's visible list.
-              draggable: true,
-              onDragStart: (event: DragEvent) => {
-                // A tab carries a **typeless** payload, not text: the embedded editor
-                // accepts text drops, so `text/plain` made a tab dragged onto the
-                // editor insert its raw view id into the file. The cell's drop
-                // handler reads `text/prac-view`; every other target ignores it.
-                event.dataTransfer?.setData("text/prac-view", viewId);
-                event.dataTransfer?.setData("text/plain", "");
-                if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = "move";
-              },
-              onDragOver: (event: DragEvent) => {
-                // A drop target has to refuse the default to be droppable at all.
-                event.preventDefault();
-              },
-              onDrop: (event: DragEvent) => {
-                event.preventDefault();
-                const dragged =
-                  event.dataTransfer?.getData("text/prac-view") ||
-                  event.dataTransfer?.getData("text/plain");
-                if (!dragged) return;
-                store.update((current) => reorderTab(current, regionId, dragged, viewId));
-              },
-              // **A click changes which tab is front, never the strip's order**: VS Code's
-              // tabs stay where they were opened, and merging the two made prac's strip
-              // MRU (the activated tab jumped to the first position and stayed there).
-              onClick: () => store.update((current) => setFront(current, viewId)),
-              "data-prac-tab-dirty": state.views[viewId]?.flags?.dirty === true ? "true" : "false",
-              "data-prac-tab-preview":
-                state.views[viewId]?.flags?.preview === true ? "true" : "false",
-              style: {
-                ...TAB_STYLE,
-                ...(viewId === active ? TAB_ACTIVE_STYLE : {}),
-                // VS Code's preview tab: the label is italic until the file is
-                // pinned. The dot is the unsaved marker.
-                ...(state.views[viewId]?.flags?.preview === true ? { fontStyle: "italic" } : {}),
-              },
-            },
-            ...(state.views[viewId]?.flags?.dirty === true
-              ? [createElement("span", { key: "dirty", style: TAB_DIRTY_STYLE }, "\u25cf")]
-              : []),
-            viewLabel(viewId),
-            // The close affordance the view's declarer asked for. The frame reports the
-            // request and nothing else: what "closed" means is the declarer's (for a
-            // file, closing the app's editor retracts its view).
-            ...(state.views[viewId]?.flags?.closable === true
-              ? [
-                  createElement(
-                    "span",
-                    {
-                      key: "close",
-                      "data-prac-tab-close": viewId,
-                      title: "Close",
-                      style: TAB_CLOSE_STYLE,
-                      onClick: (event: MouseEvent) => {
-                        // The tab itself fronts its view on click; closing must not.
-                        event.stopPropagation();
-                        store.requestCloseView(viewId);
-                      },
-                    },
-                    "\u00d7",
-                  ),
-                ]
-              : []),
+            Fragment,
+            null,
+            createElement(TabActions, { face: sources.windowActions, viewId: viewId ?? "" }),
+            createElement(ViewActions, {
+              viewId: viewId ?? "",
+              kind: viewId === undefined ? "window" : (state.views[viewId]?.kind ?? "window"),
+              renderSlot,
+            }),
           ),
-        ),
-        createElement("span", { key: "filler", style: { flex: "1 1 auto" } }),
-        createElement(
-          "div",
-          {
-            key: "actions",
-            "data-prac-tab-actions": active,
-            style: { display: "flex", alignItems: "center", flex: "0 0 auto", height: "100%" },
-          },
-          renderSlot("prac.viewActions", {}, { entryKey: active }),
-        ),
-      );
+      });
     };
 
     /**
@@ -1325,11 +731,31 @@ export function createFrame(
      */
     const viewBody = (viewId: string, box: Box, chrome?: "frame"): ReactElement =>
       createElement(
-        IsolatedView,
+        LayoutIsolation,
         { key: viewId, viewId, ...(chrome === undefined ? {} : { chrome }) },
-        createElement(View, {
+        createElement(LayoutItem, {
           viewId,
-          renderSlot,
+          viewKind: state.views[viewId]?.kind ?? "window",
+          contentHost:
+            state.views[viewId]?.contentId === undefined
+              ? undefined
+              : sources.contentHosts?.get(state.views[viewId]!.contentId!),
+          ...(state.views[viewId]?.contentRegion === undefined
+            ? {}
+            : {
+                contentRegion: state.views[viewId]!.contentRegion!,
+                renderContentRegion: (regionId: string) => {
+                  const node = findNode(state.tree, regionId);
+                  return node?.type === "region" ? renderRegion(node, "row") : null;
+                },
+              }),
+          ...(state.views[viewId]?.boardId === undefined
+            ? {}
+            : {
+                board: sources.boardLayouts?.get(state.views[viewId]!.boardId!),
+              }),
+          itemFacts,
+          renderSlot: renderSlot as unknown as ItemRenderSlot,
           box,
           viewportWidth: state.viewportWidth,
         }),
@@ -1380,8 +806,6 @@ export function createFrame(
       );
 
     const containerBar = (node: RegionNode, activeId: string): ReactElement => {
-      // `activeId` is the selected path (`regionId/childId`); the action slot is
-      // keyed by the child's container id, not the path or the `container:` prefix.
       const selectedId = activeId.slice(activeId.lastIndexOf("/") + 1);
       const actionKey = selectedId.startsWith("container:")
         ? selectedId.slice("container:".length)
@@ -1396,95 +820,30 @@ export function createFrame(
         groups.get(childId) ??
         groups.get(`${node.id}/${childId}`) ??
         [...groups.values()].find((item) => item.regionId.endsWith(`/${childId}`));
-      return createElement(
-        "div",
-        {
-          key: "containers",
-          "data-prac-container-bar": node.id,
-          role: "tablist",
-          "aria-label": node.label ?? ` ${node.id} containers`,
-          "aria-orientation": "horizontal",
-          style: TAB_STRIP_STYLE,
+      const childAt = (childId: string): LayoutNode | undefined =>
+        (node.children ?? []).find((child) => child.id === childId);
+      const active = groupAt(activeId);
+      return createElement(ContainerBar, {
+        containerId: node.id,
+        label: node.label ?? `${node.id} containers`,
+        items: (node.children ?? []).map((child) => ({
+          id: child.id,
+          label: groupAt(child.id)?.label ?? child.label ?? viewLabel(child.id),
+          active: child.id === activeId,
+          empty: !isPresent(state, child),
+        })),
+        actionKey,
+        actions: active?.actions ?? [],
+        onSelect: (childId: string) => {
+          const child = childAt(childId);
+          if (child === undefined) return;
+          store.update((current) => {
+            const tree = selectChild(current.tree, node.id, childId);
+            return tree === current.tree ? current : { ...current, tree };
+          });
         },
-        (node.children ?? []).map((child) =>
-          createElement(
-            "button",
-            {
-              key: child.id,
-              type: "button",
-              "data-prac-container": child.id,
-              "data-prac-container-active": child.id === activeId ? "true" : "false",
-              role: "tab",
-              "aria-selected": child.id === activeId ? "true" : "false",
-              tabIndex: child.id === activeId ? 0 : -1,
-              "aria-label": groupAt(child.id)?.label ?? child.label ?? child.id,
-              // An entry whose container has nothing visible is **shown** as empty rather than
-              // silently skipped: clicking it still selects it, and the pane says so.
-              "data-prac-container-empty": isPresent(state, child) ? "false" : "true",
-              ...(isPresent(state, child) ? {} : { title: "Nothing in this container yet" }),
-              onClick: () =>
-                store.update((current) => {
-                  const tree = selectChild(current.tree, node.id, child.id);
-                  return tree === current.tree ? current : { ...current, tree };
-                }),
-              style: {
-                ...TAB_STYLE,
-                ...(child.id === activeId ? TAB_ACTIVE_STYLE : {}),
-                ...(isPresent(state, child) ? {} : { opacity: 0.55 }),
-              },
-            },
-            // The group's own label wins; otherwise either shape may carry the name
-            // (a child that became a stack is a split — see `SplitNode.label`), and the
-            // id is only the last resort.
-            groupAt(child.id)?.label ?? child.label ?? viewLabel(child.id),
-          ),
-        ),
-        createElement(
-          "div",
-          {
-            key: "actions",
-            "data-prac-container-actions": actionKey,
-            "data-prac-container-action-bar": actionKey,
-            style: {
-              display: "flex",
-              alignItems: "center",
-              flex: "0 0 auto",
-              height: "100%",
-            },
-          },
-          (() => {
-            const group = groupAt(activeId);
-            if (group?.actions !== undefined && group.actions.length > 0) {
-              return group.actions.map((action) =>
-                createElement(
-                  "button",
-                  {
-                    key: action.id,
-                    type: "button",
-                    "data-prac-group-action": action.id,
-                    title: action.tooltip ?? action.label,
-                    disabled: !action.enabled,
-                    onClick: () => group.runAction?.(action.id),
-                    style: {
-                      font: "inherit",
-                      fontSize: "11px",
-                      height: "100%",
-                      padding: "0 5px",
-                      border: 0,
-                      background: "transparent",
-                      color: "inherit",
-                      cursor: action.enabled ? "pointer" : "default",
-                      opacity: action.enabled ? 1 : 0.55,
-                    },
-                  },
-                  action.label,
-                ),
-              );
-            }
-            return null;
-          })(),
-        ),
-      );
+        onAction: (actionId: string) => active?.runAction?.(actionId),
+      });
     };
 
     /**
@@ -1504,72 +863,30 @@ export function createFrame(
      * `cachedSize`, the same two-field rule a folded row has everywhere else.
      */
     const entryHeader = (node: RegionNode, viewId: string): ReactElement =>
-      createElement(
-        "div",
-        {
-          "data-prac-stack-header": node.id,
-          style: { ...STACK_HEADER_STYLE, display: "flex", alignItems: "center", gap: "2px" },
+      createElement(StackHeader, {
+        nodeId: node.id,
+        viewId,
+        folded: node.collapsed === true,
+        label: viewLabel(viewId),
+        icon: viewIconNode(viewId),
+        onToggle: (event) => {
+          const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
+          const height = row?.getBoundingClientRect().height;
+          store.update((current) =>
+            setEntryFolded(current, node.id, node.collapsed !== true, height),
+          );
         },
-        createElement(
-          "button",
-          {
-            type: "button",
-            // Readers find a row's switch by the **view** it shows (the handler uses the region).
-            "data-prac-stack-toggle": viewId,
-            "aria-expanded": node.collapsed === true ? "false" : "true",
-            title: node.collapsed === true ? "Expand" : "Collapse",
-            onClick: (event: ReactMouseEvent<HTMLElement>) => {
-              const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
-              const height = row?.getBoundingClientRect().height;
-              store.update((current) =>
-                setEntryFolded(current, node.id, node.collapsed !== true, height),
-              );
-            },
-            style: {
-              background: "none",
-              border: "none",
-              color: "inherit",
-              cursor: "pointer",
-              padding: "0 2px",
-              font: "inherit",
-            },
-          },
-          node.collapsed === true ? "\u25b8" : "\u25be",
-        ),
-        viewIconNode(viewId),
-        createElement(
-          "span",
-          {
-            "data-prac-stack-title": node.id,
-            onPointerDownCapture: (event: PointerDragEvent) => {
-              if (event.button !== 0) return;
-              const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
-              beginReorder(event, node.id, row?.parentElement ?? null);
-            },
-            style: {
-              flex: "1 1 auto",
-              cursor: "pointer",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            },
-          },
-          viewLabel(viewId),
-        ),
-        createElement(
-          "div",
-          {
-            "data-prac-stack-actions": node.id,
-            style: {
-              display: "flex",
-              alignItems: "center",
-              flex: "0 0 auto",
-              height: "100%",
-            },
-          },
-          renderSlot("prac.viewActions", {}, { entryKey: viewId }),
-        ),
-      );
+        onReorder: (event) => {
+          if (event.button !== 0) return;
+          const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
+          beginReorder(event as unknown as PointerDragEvent, node.id, row?.parentElement ?? null);
+        },
+        renderActions: createElement(ViewActions, {
+          viewId,
+          kind: state.views[viewId]?.kind ?? "window",
+          renderSlot,
+        }),
+      });
 
     /**
      * The frame's controls over a view that already brings its own pane header.
@@ -1584,689 +901,224 @@ export function createFrame(
      * @param viewId - the view on the row.
      */
     const entryOverlay = (node: RegionNode, viewId: string): ReactElement =>
-      createElement(
-        "div",
-        {
-          "data-prac-stack-overlay": node.id,
-          style: {
-            position: "absolute",
-            // Start below the sash: the boundary strip owns the row's first SASH_SIZE pixels, and
-            // an overlay on top of it would swallow the boundary drag.
-            top: SASH_SIZE,
-            left: 0,
-            right: "120px",
-            height: STACK_HEADER_HEIGHT,
-            zIndex: 6,
-            display: "flex",
-            alignItems: "center",
-            gap: "2px",
-          },
+      createElement(StackRowOverlay, {
+        nodeId: node.id,
+        viewId,
+        folded: node.collapsed === true,
+        label: viewLabel(viewId),
+        onToggle: (event) => {
+          const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
+          const height = row?.getBoundingClientRect().height;
+          store.update((current) =>
+            setEntryFolded(current, node.id, node.collapsed !== true, height),
+          );
         },
-        createElement(
-          "button",
-          {
-            type: "button",
-            "data-prac-stack-toggle": viewId,
-            "aria-expanded": node.collapsed === true ? "false" : "true",
-            title: node.collapsed === true ? "Expand" : "Collapse",
-            onClick: (event: ReactMouseEvent<HTMLElement>) => {
-              const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
-              const height = row?.getBoundingClientRect().height;
-              store.update((current) =>
-                setEntryFolded(current, node.id, node.collapsed !== true, height),
-              );
-            },
-            style: {
-              background: "none",
-              border: "none",
-              color: "inherit",
-              cursor: "pointer",
-              padding: "0 2px",
-              font: "inherit",
-            },
-          },
-          node.collapsed === true ? "\u25b8" : "\u25be",
-        ),
-        createElement(
-          "span",
-          {
-            "data-prac-stack-title": node.id,
-            onPointerDownCapture: (event: PointerDragEvent) => {
-              if (event.button !== 0) return;
-              const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
-              beginReorder(event, node.id, row?.parentElement ?? null);
-            },
-            style: {
-              flex: "1 1 auto",
-              height: "100%",
-              cursor: "pointer",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            },
-          },
-          viewLabel(viewId),
-        ),
-      );
+        onReorder: (event) => {
+          if (event.button !== 0) return;
+          const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
+          beginReorder(event as unknown as PointerDragEvent, node.id, row?.parentElement ?? null);
+        },
+      });
 
-    const renderRegion = (node: RegionNode, dir: Dir, fill = false): ReactElement => {
-      const box = sizes.get(node.id) ?? ZERO_BOX;
-      const child = activeChild(state, node);
-      const chosen = chosenChild(state, node);
-      // The pane follows what was **picked**: a container with nothing in it says so, instead of the
-      // track quietly rendering a different container. The fallback still covers the other case — the
-      // record names nothing that is in the tree any more — where there is nothing to name a pane after.
-      const shown = chosen ?? child;
-      if (shown !== null) {
-        return createElement(
-          "div",
-          {
-            key: node.id,
-            "data-prac-region": node.id,
-            style: regionStyle(
-              node,
-              dir,
-              fill,
-              node.entry === true ? sizes.get(node.id)?.height : undefined,
-            ),
-          },
-          [
-            // The bar marks what the person **picked**; when nothing of it is on screen the pane
-            // below says why instead of the track quietly showing a different container.
-            drawsRegionBar(node) ? containerBar(node, shown.id) : null,
-            chosen !== null && !isPresent(state, chosen)
-              ? emptyPane(chosen.id)
-              : child === null
-                ? null
-                : // The chosen child may be a split (a stack took a region's place in this list).
-                  child.type === "split" || child.type === "grid"
-                  ? renderNode(child, dir)
-                  : renderRegion(child, dir, true),
-          ],
-        );
-      }
+    /**
+     * The frame's chrome, assembled for this render.
+     *
+     * Each contribution forwards to a control surface the frame already owns;
+     * the renderer decides where the anchor sits. `sources.chrome` (another
+     * container's contributions) is copied in first, so the frame adds to it
+     * rather than replacing it.
+     */
+    const renderTabs = (ctx: ChromeContext<ViewRecord>): ReactNode => {
+      const node = ctx.node;
+      if (node.type !== "region") return null;
       const views = visibleViews(state, node.id);
-      // Whether the row's view brings its own pane header. A declaration, not a
-      // source-prefix guess: the frame renders the same shape for every view that
-      // says it has one.
-      const paneHeader = views.length === 1 && declaredViewPaneHeader(views[0] ?? "");
-      const sashState: EntrySashState =
-        node.entry === true ? entrySashState(state, node.id, rowHeights) : "disabled";
-      return createElement(
-        "div",
-        {
-          key: node.id,
-          "data-prac-region": node.id,
-          ...(sources.viewGroups?.surfaceFor(node.id) === undefined
-            ? {}
-            : { "data-prac-surface": sources.viewGroups.surfaceFor(node.id)?.kind }),
-          ref: (element: HTMLDivElement | null): void => {
-            if (element === null) return;
-            sources.viewGroups?.surfaceFor(node.id)?.attach?.(element);
-          },
-          // A stack row is a region too: carry the entry markers so the frame's DOM-based helpers
-          // (`readStackRows`, the reorder gesture, the gates) see a row where they expect one.
-          ...(node.entry === true
+      if (views.length === 0) return null;
+      return tabStrip(views, node.id);
+    };
+
+    const renderContainerBar = (ctx: ChromeContext<ViewRecord>): ReactNode => {
+      const node = ctx.node;
+      if (node.type !== "region" || !drawsRegionBar(node)) return null;
+      return containerBar(node, ctx.itemId ?? node.active ?? "");
+    };
+
+    const renderRowHeader = (ctx: ChromeContext<ViewRecord>): ReactNode => {
+      const node = ctx.node;
+      if (node.type !== "region" || node.entry !== true) return null;
+      const viewId = ctx.itemId ?? visibleViews(state, node.id)[0];
+      return viewId === undefined ? null : entryHeader(node, viewId);
+    };
+
+    const renderRowOverlay = (ctx: ChromeContext<ViewRecord>): ReactNode => {
+      const node = ctx.node;
+      if (node.type !== "region" || node.entry !== true || node.collapsed === true) return null;
+      const views = visibleViews(state, node.id);
+      if (views.length !== 1) return null;
+      const viewId = views[0]!;
+      return declaredViewPaneHeader(viewId) ? entryOverlay(node, viewId) : null;
+    };
+
+    const renderSash = (ctx: ChromeContext<ViewRecord>): ReactNode => {
+      const node = ctx.node;
+      if (node.type !== "split" || ctx.beforeId === undefined || ctx.afterId === undefined)
+        return null;
+      const before = findRegion(state.tree, ctx.beforeId);
+      const after = findRegion(state.tree, ctx.afterId);
+      if (before === null || after === null) return null;
+      return createElement(LayoutSashDrag, {
+        store,
+        splitId: node.id,
+        dir: node.dir,
+        index: ctx.index ?? 1,
+        leftId: before.id,
+        rightId: after.id,
+        offset: ctx.offset ?? 0,
+        ...(before.entry === true && after.entry === true
+          ? { stackState: entrySashState(state, before.id, rowHeights) }
+          : {}),
+      });
+    };
+
+    const renderGridCell = (ctx: ChromeContext<ViewRecord>): ReactNode => {
+      const grid = ctx.node;
+      const child = ctx.child;
+      const placement = ctx.placement;
+      const shape = ctx.shape;
+      if (
+        grid.type !== "grid" ||
+        child === undefined ||
+        placement === undefined ||
+        shape === undefined
+      )
+        return null;
+      return createElement(GridCellHandles, {
+        store,
+        grid,
+        child,
+        placement,
+        shape,
+        cellCount: ctx.cellCount ?? 0,
+      });
+    };
+
+    const renderGridTrack = (ctx: ChromeContext<ViewRecord>): ReactNode => {
+      const grid = ctx.node;
+      if (
+        grid.type !== "grid" ||
+        ctx.track === undefined ||
+        ctx.index === undefined ||
+        ctx.shape === undefined
+      )
+        return null;
+      return createElement(GridTrackHandle, {
+        store,
+        grid,
+        axis: ctx.track,
+        index: ctx.index,
+        shape: ctx.shape,
+      });
+    };
+
+    const chrome = createFrameChrome(
+      {
+        renderTabs,
+        renderContainerBar,
+        renderRowHeader,
+        renderRowOverlay,
+        renderSash,
+        renderGridCell,
+        renderGridTrack,
+      },
+      sources.chrome,
+    );
+    const intents: LayoutIntents = createLayoutIntents(store);
+
+    /**
+     * The frame's node decoration: surfaces, stack-row gestures, grid drops.
+     *
+     * Geometry stays in the renderer; these are the container's own facts (which
+     * DOM element hosts a surface, where a press starts a row resize, what a drop
+     * on a cell means).
+     */
+    const decorateNode = (
+      ctx: LayoutDecorationContext<ViewRecord>,
+    ): LayoutDecoration | undefined => {
+      const node = ctx.node;
+      const surface = sources.viewGroups?.surfaceFor(node.id);
+      const surfacePart: LayoutDecoration =
+        surface === undefined
+          ? {}
+          : {
+              attrs: { "data-prac-surface": surface.kind },
+              ref: (element: HTMLDivElement | null): void => {
+                if (element !== null) surface.attach?.(element);
+              },
+            };
+      if (ctx.kind === "region") {
+        // A selector region renders a child that owns the surface: attaching the
+        // child's surface to the selector too made two nodes claim one element
+        // (the old renderer attached it on the child only).
+        const selector = node.type === "region" && (node.children?.length ?? 0) > 0;
+        return {
+          ...(selector ? {} : surfacePart),
+          ...(node.type === "region" && node.entry === true
             ? {
-                // A row's bottom `SASH_SIZE` px is the boundary — the design says a row's bottom
-                // edge **is** it, and the frame draws a sash there as well. Both call one starter.
-                onPointerDownCapture: (event: PointerDragEvent) => {
-                  if (event.button !== 0) return;
-                  const element = event.currentTarget as unknown as HTMLElement;
-                  const rect = element.getBoundingClientRect();
-                  if (event.clientY < rect.bottom - SASH_SIZE) return;
-                  const container = element.parentElement;
-                  if (container === null) return;
-                  // The **last** row has no boundary (B7), and a `Disabled` one must not start a
-                  // drag at all — no resize, no fallback. Only `Enabled`/`AtMinimum`/`AtMaximum`
-                  // reach the starter.
-                  const rows = readStackRows(container as unknown as StackContainer);
-                  const at = rows.findIndex((row) => row.viewId === node.id);
-                  if (at < 0 || at >= rows.length - 1) return;
-                  const state = entrySashState(
-                    store.get(),
-                    node.id,
-                    new Map(rows.map((row) => [row.viewId, row.height])),
-                  );
-                  if (state === "disabled") return;
-                  startEntryDrag(
-                    store,
-                    container as unknown as StackContainer,
-                    node.id,
-                    event.pointerId,
-                    event.clientY,
-                    element,
-                  );
-                  event.preventDefault();
-                },
-                onDoubleClick: (event: ReactMouseEvent<HTMLElement>) => {
-                  // The boundary is this row's bottom edge, so a double-click here resets the pair the
-                  // way a double-click on the sash does (design B5).
-                  const element = event.currentTarget as HTMLElement;
-                  const rect = element.getBoundingClientRect();
-                  if (event.clientY < rect.bottom - SASH_SIZE) return;
-                  const container = element.parentElement;
-                  if (container === null) return;
-                  const reset = resetStackBoundary(
-                    readStackRows(container as unknown as StackContainer),
-                    node.id,
-                  );
-                  store.update((next) => {
-                    let out = next;
-                    for (const { viewId, height } of reset)
-                      out = setEntryHeight(out, viewId, height);
-                    return out;
-                  });
-                },
-                // `data-prac-stack-entry` carries the **view** id (every gate and probe reads it that
-                // way); the frame's own helpers key on the region, in `data-prac-stack-row`.
-                "data-prac-stack-entry": views[0] ?? "",
-                "data-prac-stack-row": node.id,
-                // The boundary under this row follows `SashState` (B2/B4): `Disabled` has no handle
-                // or resize cursor; `AtMinimum`/`AtMaximum` keep the handle and a **directional**
-                // cursor; `Enabled` is the ordinary resize. Readers ask with these markers.
-                "data-prac-stack-handle": sashState === "disabled" ? "false" : "true",
-                "data-prac-stack-sash-state": sashState,
-                "data-prac-stack-collapsed": node.collapsed === true ? "true" : "false",
+                onPointerDownCapture: (event: ReactPointerEvent<HTMLDivElement>) =>
+                  startEntryBoundaryDrag(store, node, event),
+                onDoubleClick: (event: ReactMouseEvent<HTMLDivElement>) =>
+                  resetEntryBoundary(store, node, event),
               }
             : {}),
-          style: {
-            ...regionStyle(
-              node,
-              dir,
-              fill,
-              // A row is drawn at its allocated extent (C6/C8): the gain a region made belongs to one
-              // row, and the allocation is what says which.
-              node.entry === true ? sizes.get(node.id)?.height : undefined,
-            ),
-            // The overlay is absolute inside its row; the row is the containing block.
-            ...(node.entry === true && views.length === 1 && node.collapsed !== true && paneHeader
-              ? { position: "relative" }
-              : {}),
-          },
-        },
-        showsTabStrip(state, node)
-          ? [tabStrip(views, node.id), viewBody(frontView(state, node.id) ?? views[0] ?? "", box)]
-          : node.entry === true && views.length === 1
-            ? (() => {
-                const viewId = views[0] ?? "";
-                const stackBody =
-                  node.collapsed === true
-                    ? null
-                    : createElement(
-                        "div",
-                        {
-                          "data-prac-stack-body": node.id,
-                          style: {
-                            display: "flex",
-                            flexDirection: "column",
-                            flex: "1 1 auto",
-                            minHeight: 0,
-                            position: "relative",
-                            overflow: "hidden",
-                          },
-                        },
-                        viewBody(viewId, box, paneHeader ? "frame" : undefined),
-                      );
-                // A view with its own pane header owns the row title. The expanded row is just
-                // the view plus the frame's fold/drag overlay; a folded row has no view, so the
-                // frame's own header (with the declared title) is what remains.
-                if (paneHeader) {
-                  return node.collapsed === true
-                    ? [entryHeader(node, viewId)]
-                    : [stackBody, entryOverlay(node, viewId)];
-                }
-                return [entryHeader(node, viewId), stackBody];
-              })()
-            : // No strip: the region still shows its **front** view. It used to take the
-              // first by order, which is a different question — measured with a region a view
-              // had just been split into: the file that was copied in was front, the
-              // region rendered its neighbour, and the new file's view got no surface.
-              [viewBody(frontView(state, node.id) ?? views[0] ?? "", box)],
-      );
+        };
+      }
+      if (ctx.kind === "split") return surfacePart;
+      if (ctx.kind === "grid") return undefined;
+      if (ctx.kind === "cell") {
+        const canDrag = (ctx.cellCount ?? 0) > 1;
+        return {
+          onDragOver: (event: ReactDragEvent<HTMLDivElement>) => gridCellDragOver(canDrag, event),
+          onDrop: (event: ReactDragEvent<HTMLDivElement>) =>
+            dropOnGridCell(store, node.id, ctx.itemId ?? "", canDrag, event),
+        };
+      }
+      return undefined;
     };
 
     /**
-     * Recursive: a split overlays its present children's boundaries with sashes.
+     * Render one layout subtree through the generic renderer.
      *
-     * @param node - the subtree to render.
+     * The frame no longer draws region DOM itself: it assembles the renderer's
+     * inputs (allocation, item renderer, chrome, intents, decorations) and the
+     * renderer owns the geometry. `renderRegion` remains the frame's name for
+     * "render a subtree rooted here" — the window-content path calls it for a
+     * region inside a window, and the root call is the same function.
+     *
+     * @param node - the subtree root.
      * @param dir - the parent split's axis.
+     * @param fill - whether the root fills a selector's box.
      */
-    const renderNode = (node: LayoutNode, dir: Dir): ReactElement => {
-      if (node.type === "region") return renderRegion(node, dir);
-      if (node.type === "grid") {
-        const cells = node.children.filter((child) => isPresent(state, child));
-        const shape = gridShape(node, cells.length);
-        const columnWeights = gridTrackWeights(node, "column", shape.columns);
-        const rowWeights = gridTrackWeights(node, "row", shape.rows);
-        const columnTotal = columnWeights.reduce((sum, value) => sum + value, 0);
-        const rowTotal = rowWeights.reduce((sum, value) => sum + value, 0);
-        return createElement(
-          "div",
-          {
-            key: node.id,
-            "data-prac-grid": node.id,
-            style:
-              cells.length <= 1
-                ? // One cell is topology, not a second box: `display: contents`
-                  // keeps the cell in the parent split's geometry.
-                  { display: "contents" }
-                : {
-                    display: "grid",
-                    gridTemplateColumns: columnWeights.map((weight) => `${weight}fr`).join(" "),
-                    gridTemplateRows: rowWeights.map((weight) => `${weight}fr`).join(" "),
-                    width: "100%",
-                    height: "100%",
-                    minWidth: 0,
-                    minHeight: 0,
-                    position: "relative",
-                  },
-          },
-          ...cells.map((child, index) => {
-            // **Any** one-cell grid is transparent: no extra flex wrapper. The wrapper
-            // only means something when there are sibling cells to place it against;
-            // with one cell it becomes a flex item with no `flex` of its own, and the
-            // cell then takes half the stage even though the grid says one column
-            // (measured after closing a split editor: `center` 636px of a 1272px stage).
-            if (cells.length <= 1) {
-              return createElement(
-                "div",
-                {
-                  key: child.id,
-                  "data-prac-grid-cell": child.id,
-                  style: { display: "contents" },
-                },
-                renderNode(child, dir),
-              );
-            }
-            const placement = node.placements?.[child.id] ?? {
-              row: Math.floor(index / shape.columns),
-              column: index % shape.columns,
-            };
-            const rendered = renderNode(child, dir);
-            const canDrag = cells.length > 1;
-            return createElement(
-              "div",
-              {
-                key: `cell:${child.id}`,
-                "data-prac-grid-cell": child.id,
-                onDragOver: (event: ReactDragEvent<HTMLElement>) => {
-                  if (canDrag) event.preventDefault();
-                },
-                onDrop: (event: ReactDragEvent<HTMLElement>) => {
-                  const tab = event.dataTransfer?.getData("text/plain");
-                  if (tab !== undefined && tab !== "") {
-                    const landing =
-                      child.type === "region" ? child : edgeRegion(state, child, "left");
-                    if (landing !== null) {
-                      event.preventDefault();
-                      store.update((current) => place(current, tab, landing.id));
-                    }
-                    return;
-                  }
-                  const view = event.dataTransfer?.getData("text/prac-view");
-                  if (view !== undefined && view !== "") {
-                    const landing =
-                      child.type === "region" ? child : edgeRegion(state, child, "left");
-                    if (landing !== null) {
-                      event.preventDefault();
-                      store.update((current) => place(current, view, landing.id));
-                    }
-                    return;
-                  }
-                  if (!canDrag) return;
-                  const source = event.dataTransfer?.getData("text/prac-grid-cell");
-                  if (source === undefined || source === "") return;
-                  event.preventDefault();
-                  store.update((current) => {
-                    const tree = event.shiftKey
-                      ? mergeGridCells(current.tree, node.id, source, child.id)
-                      : moveGridCell(current.tree, node.id, source, child.id);
-                    return tree === current.tree ? current : { ...current, tree };
-                  });
-                },
-                style: {
-                  gridRow: `${placement.row + 1} / span ${placement.rowSpan ?? 1}`,
-                  gridColumn: `${placement.column + 1} / span ${placement.columnSpan ?? 1}`,
-                  minWidth: 0,
-                  minHeight: 0,
-                  display: "flex",
-                  position: "relative",
-                },
-              },
-              canDrag
-                ? createElement(
-                    "button",
-                    {
-                      type: "button",
-                      draggable: true,
-                      "data-prac-grid-handle": child.id,
-                      title: "Drag to move this grid cell; Shift-drag to merge",
-                      onDragStart: (event: ReactDragEvent<HTMLElement>) => {
-                        event.dataTransfer?.setData("text/prac-grid-cell", child.id);
-                        if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = "move";
-                      },
-                      style: {
-                        position: "absolute",
-                        top: 2,
-                        left: 2,
-                        zIndex: 2,
-                        width: 12,
-                        height: 12,
-                        padding: 0,
-                        border: "1px solid rgba(127,127,127,0.55)",
-                        borderRadius: 2,
-                        background: "rgba(127,127,127,0.25)",
-                        color: "inherit",
-                        cursor: "grab",
-                        opacity: 0.45,
-                      },
-                      "aria-label": "Move grid cell",
-                    },
-                    "⠿",
-                  )
-                : null,
-              canDrag && cells.length > 1
-                ? createElement(
-                    "button",
-                    {
-                      type: "button",
-                      "data-prac-grid-merge": child.id,
-                      title: "Merge this grid cell with the next one",
-                      onClick: () =>
-                        store.update((current) => {
-                          const other = node.children.find(
-                            (candidate) => candidate.id !== child.id,
-                          );
-                          if (other === undefined) return current;
-                          const tree = mergeGridCells(current.tree, node.id, child.id, other.id);
-                          return tree === current.tree ? current : { ...current, tree };
-                        }),
-                      style: {
-                        position: "absolute",
-                        left: 2,
-                        bottom: 2,
-                        zIndex: 2,
-                        width: 18,
-                        height: 18,
-                        fontSize: 11,
-                        lineHeight: 1,
-                        padding: 0,
-                        border: "1px solid rgba(127,127,127,0.55)",
-                        borderRadius: 2,
-                        background: "rgba(127,127,127,0.25)",
-                        color: "inherit",
-                        cursor: "pointer",
-                        opacity: 0.7,
-                      },
-                      "aria-label": `Merge grid cell ${child.id} with its neighbour`,
-                    },
-                    "⊞",
-                  )
-                : null,
-              child.type === "split" && child.id.startsWith("merge:")
-                ? createElement(
-                    "button",
-                    {
-                      type: "button",
-                      "data-prac-grid-unmerge": child.id,
-                      title: "Split this merged grid cell",
-                      onClick: () =>
-                        store.update((current) => {
-                          const tree = unmergeGridCell(current.tree, node.id, child.id);
-                          return tree === current.tree ? current : { ...current, tree };
-                        }),
-                      style: {
-                        position: "absolute",
-                        left: 2,
-                        bottom: 2,
-                        zIndex: 2,
-                        width: 18,
-                        height: 18,
-                        fontSize: 11,
-                        lineHeight: 1,
-                        padding: 0,
-                        border: "1px solid rgba(127,127,127,0.55)",
-                        borderRadius: 2,
-                        background: "rgba(127,127,127,0.25)",
-                        color: "inherit",
-                        cursor: "pointer",
-                        opacity: 0.7,
-                      },
-                      "aria-label": `Unmerge grid cell ${child.id}`,
-                    },
-                    "⧉",
-                  )
-                : null,
-              canDrag
-                ? createElement(
-                    "button",
-                    {
-                      type: "button",
-                      "data-prac-grid-resize": child.id,
-                      title: "Drag to resize this grid cell",
-                      onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
-                        if (event.button !== 0) return;
-                        const gridElement = (event.currentTarget as HTMLElement).closest(
-                          "[data-prac-grid]",
-                        );
-                        const rect = gridElement?.getBoundingClientRect();
-                        if (rect === undefined || rect.width <= 0 || rect.height <= 0) return;
-                        const startX = event.clientX;
-                        const startY = event.clientY;
-                        const rowSpan = placement.rowSpan ?? 1;
-                        const columnSpan = placement.columnSpan ?? 1;
-                        const move = (pointer: PointerEvent): void => {
-                          const rows = Math.max(
-                            1,
-                            rowSpan +
-                              Math.round(
-                                (pointer.clientY - startY) /
-                                  Math.max(1, rect.height / Math.max(1, shape.rows)),
-                              ),
-                          );
-                          const columns = Math.max(
-                            1,
-                            columnSpan +
-                              Math.round(
-                                (pointer.clientX - startX) /
-                                  Math.max(1, rect.width / Math.max(1, shape.columns)),
-                              ),
-                          );
-                          store.update((current) => {
-                            const tree = resizeGridCell(
-                              current.tree,
-                              node.id,
-                              child.id,
-                              rows,
-                              columns,
-                            );
-                            return tree === current.tree ? current : { ...current, tree };
-                          });
-                        };
-                        const finish = (): void => {
-                          window.removeEventListener("pointermove", move);
-                          window.removeEventListener("pointerup", finish);
-                        };
-                        window.addEventListener("pointermove", move);
-                        window.addEventListener("pointerup", finish, { once: true });
-                        event.preventDefault();
-                        event.stopPropagation();
-                      },
-                      style: {
-                        position: "absolute",
-                        right: 2,
-                        bottom: 2,
-                        zIndex: 2,
-                        width: 12,
-                        height: 12,
-                        padding: 0,
-                        border: "1px solid rgba(127,127,127,0.55)",
-                        borderRadius: 2,
-                        background: "rgba(127,127,127,0.25)",
-                        color: "inherit",
-                        cursor: "nwse-resize",
-                        opacity: 0.45,
-                      },
-                      "aria-label": "Resize grid cell",
-                    },
-                    "⤢",
-                  )
-                : null,
-              rendered,
-            );
-          }),
-          ...columnWeights.slice(0, -1).map((_, index) =>
-            createElement("div", {
-              key: `track:column:${index}`,
-              "data-prac-grid-track": `column:${index + 1}`,
-              title: "Drag to resize grid columns",
-              onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
-                if (event.button !== 0) return;
-                const gridElement = (event.currentTarget as HTMLElement).closest(
-                  "[data-prac-grid]",
-                );
-                const rect = gridElement?.getBoundingClientRect();
-                if (rect === undefined || rect.width <= 0) return;
-                let last = event.clientX;
-                const move = (pointer: PointerEvent): void => {
-                  const delta = pointer.clientX - last;
-                  last = pointer.clientX;
-                  store.update((current) => {
-                    const tree = resizeGridTrack(
-                      current.tree,
-                      node.id,
-                      "column",
-                      index,
-                      delta,
-                      rect.width,
-                    );
-                    return tree === current.tree ? current : { ...current, tree };
-                  });
-                };
-                const finish = (): void => {
-                  window.removeEventListener("pointermove", move);
-                  window.removeEventListener("pointerup", finish);
-                };
-                window.addEventListener("pointermove", move);
-                window.addEventListener("pointerup", finish, { once: true });
-                event.preventDefault();
-                event.stopPropagation();
-              },
-              style: {
-                position: "absolute",
-                left: `${(columnWeights.slice(0, index + 1).reduce((sum, value) => sum + value, 0) / columnTotal) * 100}%`,
-                top: 0,
-                bottom: 0,
-                width: 5,
-                transform: "translateX(-50%)",
-                zIndex: 3,
-                cursor: "col-resize",
-                background: "transparent",
-              },
-            }),
-          ),
-          ...rowWeights.slice(0, -1).map((_, index) =>
-            createElement("div", {
-              key: `track:row:${index}`,
-              "data-prac-grid-track": `row:${index + 1}`,
-              title: "Drag to resize grid rows",
-              onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
-                if (event.button !== 0) return;
-                const gridElement = (event.currentTarget as HTMLElement).closest(
-                  "[data-prac-grid]",
-                );
-                const rect = gridElement?.getBoundingClientRect();
-                if (rect === undefined || rect.height <= 0) return;
-                let last = event.clientY;
-                const move = (pointer: PointerEvent): void => {
-                  const delta = pointer.clientY - last;
-                  last = pointer.clientY;
-                  store.update((current) => {
-                    const tree = resizeGridTrack(
-                      current.tree,
-                      node.id,
-                      "row",
-                      index,
-                      delta,
-                      rect.height,
-                    );
-                    return tree === current.tree ? current : { ...current, tree };
-                  });
-                };
-                const finish = (): void => {
-                  window.removeEventListener("pointermove", move);
-                  window.removeEventListener("pointerup", finish);
-                };
-                window.addEventListener("pointermove", move);
-                window.addEventListener("pointerup", finish, { once: true });
-                event.preventDefault();
-                event.stopPropagation();
-              },
-              style: {
-                position: "absolute",
-                top: `${(rowWeights.slice(0, index + 1).reduce((sum, value) => sum + value, 0) / rowTotal) * 100}%`,
-                left: 0,
-                right: 0,
-                height: 5,
-                transform: "translateY(-50%)",
-                zIndex: 3,
-                cursor: "row-resize",
-                background: "transparent",
-              },
-            }),
-          ),
-        );
-      }
-      const present = node.children.filter((child) => isPresent(state, child));
-      const parts: ReactElement[] = [];
-      // The sashes are absolutely positioned, so the children flow edge to edge and the boundary
-      // offset is the sum of the extents before it (the allocation, not the DOM).
-      let offset = 0;
-      present.forEach((child, index) => {
-        if (index > 0) {
-          const before = edgeRegion(state, present[index - 1], "right");
-          const after = edgeRegion(state, child, "left");
-          if (before && after) {
-            parts.push(
-              createElement(Sash, {
-                key: `sash:${node.id}:${index}`,
-                store,
-                splitId: node.id,
-                dir: node.dir,
-                index,
-                leftId: before.id,
-                rightId: after.id,
-                offset,
-                ...(before.entry === true && after.entry === true
-                  ? { stackState: entrySashState(state, before.id, rowHeights) }
-                  : {}),
-              }),
-            );
-          }
-        }
-        parts.push(renderNode(child, node.dir));
-        const box = sizes.get(child.id);
-        offset += node.dir === "row" ? (box?.width ?? 0) : (box?.height ?? 0);
+    const itemFacts = (viewId: string): ChromeItemFacts => ({
+      ...(declaredViewLabel(viewId) === undefined ? {} : { label: declaredViewLabel(viewId)! }),
+      ...(declaredViewIcon(viewId) === undefined ? {} : { icon: declaredViewIcon(viewId)! }),
+      paneHeader: declaredViewPaneHeader(viewId),
+    });
+
+    const renderRegion = (node: LayoutNode, dir: Dir, fill = false): ReactElement =>
+      LayoutRenderer({
+        state,
+        root: node,
+        dir,
+        fill,
+        sizes,
+        chrome,
+        intents,
+        slotFace: renderSlot as unknown as ChromeSlotFace,
+        itemFacts,
+        renderItem: (_record, viewId, box, options) => viewBody(viewId, box, options?.chrome),
+        ownHeader: (_record, viewId) => declaredViewPaneHeader(viewId),
+        renderEmpty: (ctx) => (ctx.itemId === undefined ? null : emptyPane(ctx.itemId)),
+        decorate: decorateNode,
       });
-      return createElement(
-        "div",
-        {
-          key: node.id,
-          "data-prac-split": node.id,
-          "data-prac-split-dir": node.dir,
-          ...(sources.viewGroups?.surfaceFor(node.id) === undefined
-            ? {}
-            : { "data-prac-surface": sources.viewGroups.surfaceFor(node.id)?.kind }),
-          ref: (element: HTMLDivElement | null): void => {
-            if (element === null) return;
-            sources.viewGroups?.surfaceFor(node.id)?.attach?.(element);
-          },
-          style: splitStyle(node),
-        },
-        parts,
-      );
-    };
 
     return createElement(
       "div",
@@ -2288,7 +1140,7 @@ export function createFrame(
         usePanelInfo,
         currentSession: sources.currentSession,
       }),
-      renderNode(state.tree, "row"),
+      renderRegion(state.tree, "row"),
       // The overlay layer: above every region, click-through until an
       // entry opts into pointer events (see FRAME_STYLES).
       createElement(

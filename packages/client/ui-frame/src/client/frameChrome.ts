@@ -1,0 +1,29 @@
+/**
+ * The frame's default chrome.
+ *
+ * The frame is a container of `LayoutRenderer`: it supplies the item renderer,
+ * the allocation and this registry. Each contribution forwards to a frame-owned
+ * control surface; the renderer decides where the anchor sits.
+ *
+ * @module prac-client-ui-frame/client/frameChrome
+ */
+import type { ChromeRegistry } from "./chrome.js";
+import type { ViewRecord } from "./contract.js";
+import { createContainerChrome, type ContainerChromeParts } from "./containerChrome.js";
+
+/** The control surfaces the frame renders into the renderer's anchors. */
+export type FrameChromeParts = ContainerChromeParts<ViewRecord>;
+
+/**
+ * Assemble the frame's chrome.
+ *
+ * @param parts - the frame-rendered control surfaces.
+ * @param base - contributions another container registered first (optional).
+ * @returns a registry the renderer can read.
+ */
+export function createFrameChrome(
+  parts: FrameChromeParts,
+  base?: ChromeRegistry<ViewRecord>,
+): ChromeRegistry<ViewRecord> {
+  return createContainerChrome(parts, base);
+}
