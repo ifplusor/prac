@@ -1,3 +1,9 @@
+import type { ItemRecord } from "prac-ui-kit-workbench";
+import {
+  type ChromeRegistry,
+  createContainerChrome,
+  type ContainerChromeParts,
+} from "prac-ui-kit-content";
 /**
  * The frame's default chrome.
  *
@@ -7,9 +13,6 @@
  *
  * @module prac-client-ui-frame/client/frameChrome
  */
-import type { ChromeRegistry } from "prac-ui-kit-workbench";
-import type { ItemRecord } from "prac-ui-kit-workbench";
-import { createContainerChrome, type ContainerChromeParts } from "prac-ui-kit-workbench";
 
 /** The control surfaces the frame renders into the renderer's anchors. */
 export type FrameChromeParts = ContainerChromeParts<ItemRecord>;

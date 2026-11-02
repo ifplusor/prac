@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   compactGrid,
-  findRegion,
   gridNode,
   gridPlacements,
   mergeGridCells,
@@ -18,7 +17,8 @@ import {
   removeRegion,
   resolveSizes,
   splitRegionWith,
-} from "./model.js";
+} from "prac-ui-kit-content";
+import { findRegion } from "prac-ui-kit-layout";
 import type { LayoutState } from "./contract.js";
 
 function state(): LayoutState {

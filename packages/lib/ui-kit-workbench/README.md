@@ -1,9 +1,9 @@
 # prac-ui-kit-workbench
 
 The workbench engine as a library: the product model (Space / Window /
-WindowGroup / Board / Widget), the content surface, the React renderer and its
-chrome. It has **no DSH dependency** — no `@deepseek-ai/*` import, no plugin
-lifecycle.
+WindowGroup / Board / Widget), region content, the frame binding and frame
+state. It has **no DSH dependency** — no `@deepseek-ai/*` import, no plugin
+lifecycle. The generic renderer and chrome live in `prac-ui-kit-content`.
 
 The DSH side lives in [`prac-client-ui-frame`](../../client/ui-frame): the
 persisted snapshot store, the DSH slot catalogue, the `SlotMap` / `Context`
@@ -13,8 +13,7 @@ engine here is consumed by that plugin and by `ui-widget`.
 ## Why it is separate from the lower layers
 
 `prac-ui-kit-layout` is the pure layout kernel; `prac-ui-kit-content` is the
-generic content composition layer. This package is the workbench frame on top
-of them:
+generic content composition layer. This package is the workbench layer on top of them:
 
 ```text
 prac-ui-kit-layout     L0 geometry / tree / allocation / grid
@@ -31,16 +30,16 @@ The kit exports no `apply` / `inject` / `name` and cannot be composed as a row.
 ## Scope
 
 ```text
-contract / windowModel  LayoutState / ItemRecord / WidgetRecord, WindowGroup, ContentHost
-surface / layoutRoot / snapshot  content root, frame / board root, serializable shape
-frameState             FrameState / SpaceState / composed LayoutStore
-model                  placement, split, stack, grid, tab reorder
-store                  LayoutStore / SpaceStore interface + React hook (re-export of content)
-switching              LayoutStore switcher (re-export of content)
-layoutRenderer         re-export of the content renderer
-layout* / chrome*      tabs, stacks, sashes, grid handles, actions, drag, drop
-boardLayouts           live board roots the frame renders
-isolation              shadow-root isolation for hosted content
+contract / windowModel       LayoutState / ItemRecord / WidgetRecord, WindowGroup, ContentHost
+regionContent                RegionContent / RegionBinding / RegionContentRegistry
+frameState                   FrameState / SpaceState / composed LayoutStore
+model                        defaultTree, placement wrappers over ItemRecord
+store                        LayoutStore / SpaceStore interface
+frameGroups / frameBridge    group ↔ region binding and placement projection
+layoutRoot / contentHosts    frame / space / board roots and runtime content hosts
+boardLayouts                 live board roots the frame renders
+windowModel / windowGroupModel  Window / Board / Widget and the generic window group
+layoutActions / layoutContentHost / layoutDrop  L2-specific action, host and drop primitives
 ```
 
 Not in scope:
@@ -52,11 +51,12 @@ Not in scope:
 ## Usage
 
 ```ts
-import { LayoutRenderer, type LayoutStore, type ItemRecord } from "prac-ui-kit-workbench";
+import type { LayoutStore, ItemRecord } from "prac-ui-kit-workbench";
+import { LayoutRenderer } from "prac-ui-kit-content";
 ```
 
-The plugin supplies the persisted `LayoutStore`; this package is for code that
-needs the model or the renderer, not the live instance.
+The plugin supplies the persisted `LayoutStore`; the renderer itself is re-exported
+by `prac-ui-kit-content`, not by this package.
 
 ## Development
 

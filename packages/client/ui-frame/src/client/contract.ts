@@ -1,3 +1,16 @@
+import type {
+  BoardLayoutSource,
+  ContentHost,
+  RegionBinding,
+  ItemKind,
+  FrameWindowGroup,
+  GroupRegionContent,
+  RegionContentRegistry,
+  WidgetRecord,
+  LayoutState,
+} from "prac-ui-kit-workbench";
+import type { ChromeRegistry, ContentInfo, RegionInfo, ItemFlags } from "prac-ui-kit-content";
+import type { RegionChild, RegionSelector, Side } from "prac-ui-kit-layout";
 /**
  * The frame plugin's DSH contract.
  *
@@ -20,24 +33,6 @@ import type {} from "@deepseek-ai/dsh-client-ui-slots";
 // merged members (no `ctx.effect` / `ctx.provide`).
 export type { Context } from "@deepseek-ai/cordis";
 export type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
-import type {
-  BoardLayoutSource,
-  ChromeRegistry,
-  ContentHost,
-  ContentInfo,
-  RegionBinding,
-  ItemKind,
-  LayoutState,
-  RegionChild,
-  RegionInfo,
-  RegionSelector,
-  Side,
-  FrameWindowGroup,
-  GroupRegionContent,
-  RegionContentRegistry,
-  ItemFlags,
-  WidgetRecord,
-} from "prac-ui-kit-workbench";
 
 /** One view and where it currently sits. */
 export interface ItemInfo extends ContentInfo {

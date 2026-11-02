@@ -8,7 +8,7 @@
  * @module prac-ui-kit-workbench/frameBridge
  */
 
-import { ensureStackShape, placeQuietly, removeItem } from "./model.js";
+import { ensureStackShape, placeQuietly, removeItem } from "prac-ui-kit-content";
 import type { LayoutStore } from "./store.js";
 import type { FrameWindowGroup } from "./frameGroups.js";
 

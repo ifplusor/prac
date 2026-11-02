@@ -1,3 +1,10 @@
+import type {
+  FrameWindowGroup,
+  WindowGroupBinding,
+  WindowGroupPlacement,
+  WindowGroupState,
+  RegionContent,
+} from "prac-ui-kit-workbench";
 /**
  * Adapter from the typed `WindowGroup` model to the frame's product
  * `WindowsGroup` contract.
@@ -8,14 +15,6 @@
  *
  * @module prac-client-ui-frame/client/windowGroupAdapter
  */
-
-import type {
-  FrameWindowGroup,
-  WindowGroupBinding,
-  WindowGroupPlacement,
-  WindowGroupState,
-} from "prac-ui-kit-workbench";
-import type { RegionContent } from "prac-ui-kit-workbench";
 
 import { WindowGroup } from "./window.js";
 

@@ -3,7 +3,7 @@
 Framework-agnostic layout kernel: geometry, tree, allocation and grid.
 
 `prac-ui-kit-layout` is **incubating inside the prac monorepo**. It contains no
-React, no DOM surface, no DSH, no VS Code and no application-specific
+React, no DOM, no DSH, no VS Code and no application-specific
 window/widget model. It supplies the layout vocabulary and the pure solver; the
 host supplies content, rendering and persistence.
 
@@ -21,7 +21,7 @@ grid         placements, tracks, move / resize / merge
 
 Not in scope:
 
-- content surfaces / bindings / snapshot / layout roots (in `prac-ui-kit-workbench`)
+- region content / bindings / snapshot / layout roots (in `prac-ui-kit-content` / `prac-ui-kit-workbench`)
 - source adapters' view / view-group vocabulary
 - React components
 - CSS / theme
@@ -77,17 +77,19 @@ touches the DOM.
 ## Package boundaries
 
 ```text
-prac-ui-kit-layout   pure layout kernel (private)
-prac-ui-kit-workbench    prac's frame engine: product model / content surface / React renderer
-prac client          DSH plugins
-prac bundle          composition only
+prac-ui-kit-layout        pure layout kernel (private)
+prac-ui-kit-content       content protocols / placement / renderer / chrome
+prac-ui-kit-workbench     workbench model / region content / frame binding
+prac client               DSH plugins
+prac bundle               composition only
 ```
 
 `prac-ui-kit-layout` is the only layer that stays host- and product-agnostic.
-`prac-ui-kit-workbench` builds the frame model, the content surface and the renderer
-on top of it; `ui-frame` is the DSH plugin row that owns the store, the slot
-catalogue and the DSH contract types, and `prac-client-ui-frame` / `prac-client-ui-widget` are the
-consumers.
+`prac-ui-kit-content` builds content protocols, placement and the generic
+renderer/chrome; `prac-ui-kit-workbench` builds the workbench model, region
+content and frame binding on top of them. `prac-client-ui-frame` is the DSH
+plugin row that owns the store, the slot catalogue and the DSH contract types;
+`prac-client-ui-widget` is a consumer adapter.
 
 The package is not released from this repository yet.
 

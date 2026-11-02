@@ -1,3 +1,4 @@
+import type { WidgetRecord, LayoutState, LayoutStore } from "prac-ui-kit-workbench";
 /**
  * A board's layout store face.
  *
@@ -9,7 +10,7 @@
  *
  * @module prac-client-ui-widget/client/boardStore
  */
-import type { LayoutState, LayoutStore, WidgetRecord } from "prac-ui-kit-workbench";
+
 import type { BoardContent } from "./boardContent.js";
 
 /** Adapt a board content to the frame's shared store face. */

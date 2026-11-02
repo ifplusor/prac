@@ -1,16 +1,16 @@
 /**
  * Region-content contracts.
  *
- * A surface is the content root bound to a geometry node: a window group on the
- * stage, a widget board in a panel / dock, or an opaque host. The frame owns the
+ * Region content is the content root bound to a geometry node: a window group on
+ * the stage, a widget board in a panel / dock, or an opaque host. The frame owns the
  * registry; window and widget plugins register factories, so the frame never
  * imports either plugin.
  *
  * The content (`group`) and the host (`element`) are separate axes: content is
- * required, a mount point is optional. The renderer owns the DOM; a surface may
- * be model-only.
+ * required, a mount point is optional. The renderer owns the DOM; region content
+ * may be model-only.
  *
- * @module prac-ui-kit-workbench/surface
+ * @module prac-ui-kit-workbench/regionContent
  */
 
 import type { ContentRoot } from "prac-ui-kit-content";
@@ -18,13 +18,13 @@ import type { ContentRoot } from "prac-ui-kit-content";
 /** Product-defined content kind; the frame never hard-codes window / widget kinds. */
 export type RegionContentKind = string;
 
-/** Content constraints a surface reports to the layout solver. */
+/** Content constraints a region content reports to the layout solver. */
 export interface RegionConstraints {
   readonly minWidth?: number;
   readonly minHeight?: number;
   readonly maxWidth?: number;
   readonly maxHeight?: number;
-  /** The surface wants the remaining space on its split axis. */
+  /** The region content wants the remaining space on its split axis. */
   readonly flex?: boolean;
 }
 
@@ -41,15 +41,15 @@ export type GroupRegionContent<TGroup = unknown> = RegionContent<TGroup> & {
   readonly group: TGroup;
 };
 
-/** Inputs for creating one surface. */
+/** Inputs for creating one region content. */
 export interface RegionContentOptions {
-  /** Stable id of the geometry node this surface fills. */
+  /** Stable id of the geometry node this content fills. */
   readonly nodeId: string;
-  /** Element the surface may mount into; model-only surfaces may ignore it. */
+  /** Element the content may mount into; model-only content may ignore it. */
   readonly element?: HTMLElement;
 }
 
-/** Creates surfaces for one kind. */
+/** Creates region content for one kind. */
 export interface RegionContentFactory<TGroup = unknown> {
   create(options: RegionContentOptions): RegionContent<TGroup>;
 }

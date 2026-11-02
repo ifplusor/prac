@@ -17,7 +17,6 @@ export type {
   SplitNode,
   ItemRecord,
 } from "./contract.js";
-export type { ContentInfo, RegionInfo } from "prac-ui-kit-content";
 
 export type { WindowGroupLayoutBridge } from "./frameBridge.js";
 

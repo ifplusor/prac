@@ -2,7 +2,7 @@
   "name": "prac-ui-kit-workbench",
   "version": "0.0.0",
   "private": true,
-  "description": "prac's frame engine: product model, content surface, React renderer and chrome. A DSH-free library.",
+  "description": "prac workbench engine: Space / Window / WindowGroup / Board / Widget, region content, binding and frame state. DSH-free.",
   "license": "MIT",
   "files": [
     "dist"

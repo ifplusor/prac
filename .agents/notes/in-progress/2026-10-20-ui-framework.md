@@ -163,7 +163,7 @@ window group → window → content(board) → widget
 ```
 
 - board 是 **widget board window** 的内容；board window 可以在 stage / sidebar / panel；
-- sidebar / panel 的内容区域是 window group，里面承载 board window；dock 的 rail 是 launcher，不是内容面；`BoardWindow` 是那个 window，`BoardWindowSurface` 用 `WindowGroupModel` 承载它和可选的额外 window；
+- sidebar / panel 的内容区域是 window group，里面承载 board window；dock 的 rail 是 launcher，不是内容面；`BoardWindow` 是那个 window，`BoardWindowAdapter` 用 `WindowGroupModel` 承载它和可选的额外 window；
 - board window 的记录由 window group 投影进 frame；board 的 widget 顺序 / 行高 / 折叠归 board 自己的 store，并随 workspace 持久化；
 - board 负责 widget placement、布局、active widget；
 - board 拥有自己的 **LayoutRoot**，和 frame 的外层 layout 共用同一套 LayoutEngine；
@@ -483,10 +483,10 @@ UI 按**层**拆包，不按 window / board 领域拆；每一层都能独立使
 | 包 | 职责 | 依赖 |
 |---|---|---|
 | `prac-ui-kit-layout` | **L0**：纯 geometry / tree / allocation / grid；无 DSH / React / DOM / 内容根；无 view / viewGroup（source adapter 词汇） | 无 |
-| `prac-ui-kit-content` | **L1**（partial）：`ContentRoot` / `ContentGroup` / `ContentItem`、`PlacementRecord` / `LayoutState`、`LayoutStore` / `useLayout`、switching / snapshot / workspace / isolation、chrome / renderModel / `LayoutRenderer` / tabs / stack / sash / containerBar / grid / resize / drag / isolation、generic `model`；已出 `./content` / `./placement` / `./model` / `./store` / `./react` / `./renderer` / `./grid` 等 subpath；无 window / space / frame shell / DSH；`layoutDrop` / `layoutActions` / `layoutContentHost` 是 prac/window 专属，留在 frame | `prac-ui-kit-layout` |
-| `prac-ui-kit-workbench` | **L2**：Space（stage 虚拟桌面）、Window / WindowGroup、Board / Widget、frame shell（sidebar / panel / dock）；无 DSH、无 prac 内容种类 / catalogue / 默认 arrangement | `prac-ui-kit-layout`、`prac-ui-kit-content` |
+| `prac-ui-kit-content` | **L1**（partial）：`ContentRoot` / `ContentGroup` / `ContentItem` / `ContentHost`、`PlacementRecord` / `LayoutState`、`LayoutStore` / `useLayout`、switching / snapshot / workspace / isolation、chrome / renderModel / `LayoutRenderer` / tabs / stack / sash / containerBar / grid / resize / drag / isolation、generic `model`；已出 `./content` / `./placement` / `./model` / `./store` / `./react` / `./renderer` / `./grid` 等 subpath；无 window / space / frame shell / DSH；`layoutDrop` / `layoutActions` / `layoutContentHost` 是泛型 L2 primitive，留在 workbench | `prac-ui-kit-layout` |
+| `prac-ui-kit-workbench` | **L2**：Space（stage 虚拟桌面）、Window / WindowGroup、Board / Widget、frame shell（sidebar / panel / dock）、`RegionContent` / `RegionBinding`、frame state / board layout；不重新导出 content 的 renderer / chrome / tabs / store hook；无 DSH、无 prac 内容种类 / catalogue / 默认 arrangement | `prac-ui-kit-layout`、`prac-ui-kit-content` |
 | `prac-client-ui-frame` | **核心 DSH host**：持久化 store、DSH slot catalogue、`SlotMap` / `Context` 契约（`./client` 的 types 入口）、slot 声明、`ctx.pracFrame` / `ctx.pracSpaces` / `ctx.layout`、theme presenter；同时注册 `window-group` surface 工厂；window / window-group 小模型也在本包 | `prac-ui-kit-workbench`、DSH store / renderer / slots |
-| `prac-client-ui-widget` | **prac 的 board / widget 适配器**：`BoardWindow` / `BoardWindowSurface` / `BoardContent`、widget registry、DSH / VS Code widget source；通用 `Board` / `Widget` 在 kit | `prac-ui-kit-workbench` |
+| `prac-client-ui-widget` | **prac 的 board / widget 适配器**：`BoardWindow` / `BoardWindowAdapter` / `BoardContent`、widget registry、DSH / VS Code widget source；通用 `Board` / `Widget` 在 kit | `prac-ui-kit-workbench` |
 | `prac-client-ui-workbench` | 默认 Space / window / board 放置、arrangement、recall、持久化 defaults、open policy | 核心 + adapters |
 | `prac-client-ui-dsh` | DSH slot → application window / widget board window / widget / action | 核心、DSH slots |
 | `prac-client-vscode-host` | VS Code embed bridge / face / catalogue | 核心 |
@@ -588,7 +588,7 @@ ctx.layout           // DSH compat shim（放 ui-frame）
 
 ### 框架与包
 
-- kit 的 L2 包名从 `prac-ui-kit-workbench` 改为 `prac-ui-kit-workbench`：它承载 Space / Window / Board / Widget / frame shell，不只是 frame。
+- kit 的 L2 包名从 `prac-ui-kit-frame` 改为 `prac-ui-kit-workbench`：它承载 Space / Window / Board / Widget / frame shell，不只是 frame。
 - `prac-client-ui-frame` 不改名为 `prac-client-ui-shell`；shell 容易与 terminal 混淆。
 - client 插件不合并成一个：保留 `prac-client-ui-frame`、`prac-client-ui-widget`、`prac-client-ui-workbench`；`prac-client-ui-window` 已并入 `prac-client-ui-frame`，`pracWindows` 服务已删除。
 - `prac-client-ui-widget` 保持独立：board 是可选内容能力，且带 zustand / immer；不合并进 core。
@@ -596,7 +596,7 @@ ctx.layout           // DSH compat shim（放 ui-frame）
 - 模型是 `Region → ContentRoot → optional Group → Items → Renderer → Host`；`RegionContent` 是端口/组合，不是一层；`RegionContentRegistry` 只做 kind → factory，`RegionBinding` 是唯一绑定记录。
 - group 是可选分支；单个 editor / 终端 / plain panel 可以直接是 `ContentRoot` 的 content，不需要伪 group。
 - host 只保留一条挂载路径：`ContentHost`；`ContentMount` 已删除。
-- Board 是 window 的 content，不是 group/surface；Widget 是 board 的 item。`BoardWindow` 实现 `Window` / `ContentItem`，`BoardWindowSurface` 只是 L3 adapter。
+- Board 是 window 的 content，不是 group/surface；Widget 是 board 的 item。`BoardWindow` 实现 `Window` / `ContentItem`，`BoardWindowAdapter` 只是 L3 adapter。
 - UI 框架按 L0 layout / L1 content / L2 frame / L3 prac 分层；每层都能独立使用，L1 可独立用于 window 内容。
 - window / board / widget / space 是通用 UI 原语，属于 kit；prac 只提供内容种类、来源、catalogue、默认 arrangement、faces。
 - 拆包按层，不按 window / board 领域；`prac-ui-kit-content`（L1）已立包，先抽出 content protocols / placement / store / snapshot / isolation；renderer / model 随后迁入。

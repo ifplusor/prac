@@ -9,7 +9,7 @@
  * @module prac-ui-kit-workbench/frameGroups
  */
 
-import { findNode } from "./model.js";
+import { findNode } from "prac-ui-kit-layout";
 import type {
   WindowGroup,
   WindowGroupAction as GroupAction,
@@ -85,7 +85,7 @@ export class WindowGroupHost {
     return frameGroup;
   }
 
-  /** Register a surface's group in a region. */
+  /** Register a region content's group in a region. */
   registerContent(content: GroupRegionContent<FrameWindowGroup>, regionId: string): RegionBinding {
     return this.register(content.group, regionId, content);
   }
@@ -132,7 +132,7 @@ export class WindowGroupHost {
     }
   }
 
-  /** The surface registered for a region, if any. */
+  /** The region content registered for a region, if any. */
   contentFor(regionId: string): GroupRegionContent<FrameWindowGroup> | undefined {
     return [...this.#groups.values()].find(
       (entry) => entry.regionId === regionId || entry.regionId.startsWith(`${regionId}/`),

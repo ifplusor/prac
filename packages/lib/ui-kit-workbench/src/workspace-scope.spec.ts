@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { NO_WORKSPACE_SCOPE, workspaceScope } from "./workspace-scope.js";
+import { NO_WORKSPACE_SCOPE, workspaceScope } from "prac-ui-kit-content";
 
 describe("workspaceScope", () => {
   it("is stable for the same workspace", () => {

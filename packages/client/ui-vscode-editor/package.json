@@ -30,6 +30,8 @@
     "@types/react": "catalog:",
     "prac-client-ui-frame": "workspace:*",
     "prac-client-vscode-host": "workspace:*",
+    "prac-ui-kit-content": "workspace:*",
+    "prac-ui-kit-layout": "workspace:*",
     "prac-ui-kit-workbench": "workspace:*",
     "react": "catalog:"
   },

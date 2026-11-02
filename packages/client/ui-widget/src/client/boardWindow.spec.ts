@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { BoardWindow, BoardWindowSurface } from "./boardWindow.js";
+import { BoardWindow, BoardWindowAdapter } from "./boardWindow.js";
 
 describe("BoardWindow", () => {
   it("is one window whose content is a board", () => {
@@ -11,15 +11,15 @@ describe("BoardWindow", () => {
   });
 
   it("is hosted by a generic window group", () => {
-    const surface = new BoardWindowSurface("board", "Board");
-    expect(surface.group.primary).toBe(surface.boardWindow);
-    expect(surface.windows).toEqual([surface.boardWindow]);
+    const adapter = new BoardWindowAdapter("board", "Board");
+    expect(adapter.group.primary).toBe(adapter.boardWindow);
+    expect(adapter.windows).toEqual([adapter.boardWindow]);
 
-    surface.openWindow("editor:1");
-    expect(surface.state.order).toEqual(["board/board", "editor:1"]);
-    expect(surface.state.active).toBe("editor:1");
+    adapter.openWindow("editor:1");
+    expect(adapter.state.order).toEqual(["board/board", "editor:1"]);
+    expect(adapter.state.active).toBe("editor:1");
 
-    surface.closeWindow("board/board");
-    expect(surface.state.order).toEqual(["board/board", "editor:1"]);
+    adapter.closeWindow("board/board");
+    expect(adapter.state.order).toEqual(["board/board", "editor:1"]);
   });
 });

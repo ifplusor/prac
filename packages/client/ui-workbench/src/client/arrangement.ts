@@ -1,3 +1,4 @@
+import type { ItemRecord } from "prac-ui-kit-workbench";
 /**
  * The arrangement's **placement policy** — the part that decides where items
  * go, with no React and no DOM.
@@ -11,7 +12,6 @@
  * @module prac-web-app/client/arrangement
  */
 
-import type { ItemRecord } from "prac-ui-kit-workbench";
 import type { PracLayoutFace } from "prac-client-ui-frame/client";
 import { DSH_CONVERSATION_VIEW, DSH_RIGHTBAR_VIEW, DSH_SIDEBAR_VIEW } from "prac-client-ui-dsh/lib";
 import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";

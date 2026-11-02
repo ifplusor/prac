@@ -5,8 +5,8 @@ state, store, snapshot and isolated mounting. No DSH, no product window / board
 model.
 
 This is **L1** of the UI kit: it can be used inside a window / page / panel
-without adopting the workbench's window / Space / frame shell. The React renderer lives here too; the frame model builds on it. A headless
-consumer can use the model / store subpaths.
+without adopting the workbench's window / Space / frame shell. The React renderer and chrome live here too; the workbench model builds on this
+layer. A headless consumer can use the model / store subpaths.
 
 ## Scope
 

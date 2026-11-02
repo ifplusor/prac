@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
-import {
-  drawsRegionBar,
-  findRegion,
-  regionNode,
-  resolveSizes,
-  setRegionSelector,
-} from "./model.js";
+import { drawsRegionBar, regionNode, resolveSizes, setRegionSelector } from "prac-ui-kit-content";
+import { findRegion } from "prac-ui-kit-layout";
 import type { LayoutState, RegionSelector } from "./contract.js";
 
 /**

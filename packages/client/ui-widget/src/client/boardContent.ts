@@ -1,3 +1,21 @@
+import {
+  type LayoutRoot,
+  place,
+  removeItem,
+  setFront,
+  setItemCollapsed,
+  setItemSize,
+  splitRegionWith,
+  type LayoutState,
+  type WidgetRecord,
+} from "prac-ui-kit-workbench";
+import {
+  ensureStackShape,
+  regionNode,
+  structuralRegion,
+  workspaceScope,
+} from "prac-ui-kit-content";
+import { freshNodeId, type Side } from "prac-ui-kit-layout";
 /**
  * The runtime content of a board window.
  *
@@ -12,23 +30,6 @@
  * @module prac-client-ui-widget/client/boardContent
  */
 
-import type { LayoutRoot } from "prac-ui-kit-workbench";
-import {
-  ensureStackShape,
-  freshNodeId,
-  place,
-  regionNode,
-  removeItem,
-  setFront,
-  setItemCollapsed,
-  setItemSize,
-  splitRegionWith,
-  structuralRegion,
-  workspaceScope,
-  type LayoutState,
-  type Side,
-  type WidgetRecord,
-} from "prac-ui-kit-workbench";
 import { WidgetBoard } from "./board.js";
 
 /** A board child: a widget identity plus its content host. */

@@ -3,10 +3,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import type { ReactNode } from "react";
 import type { Box, LayoutNode, LayoutState, ItemRecord } from "./contract.js";
-import { LayoutRenderer } from "./layoutRenderer.js";
-import type { LayoutDecoration } from "./layoutRenderer.js";
-import { ChromeRegistry, type ChromeContext } from "./chrome.js";
-import { regionNode } from "./model.js";
+import {
+  ChromeRegistry,
+  LayoutRenderer,
+  regionNode,
+  type ChromeContext,
+  type LayoutDecoration,
+} from "prac-ui-kit-content";
 
 /**
  * The generic renderer's contract.
@@ -294,7 +297,7 @@ describe("LayoutRenderer", () => {
   it("lets a container decorate a node without owning its geometry", () => {
     const tree = regionNode("r", 0, { flex: true });
     const decoration: LayoutDecoration = {
-      attrs: { "data-prac-surface": "widget-board" },
+      attrs: { "data-prac-region-content": "widget-board" },
       style: { outline: "1px solid red" },
     };
     const markup = renderToStaticMarkup(
@@ -304,7 +307,7 @@ describe("LayoutRenderer", () => {
         decorate: () => decoration,
       }),
     );
-    expect(markup).toContain('data-prac-surface="widget-board"');
+    expect(markup).toContain('data-prac-region-content="widget-board"');
     expect(markup).toContain("outline:1px solid red");
   });
 });

@@ -301,6 +301,12 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 18.3.7(@types/react@18.3.31)
+      prac-ui-kit-content:
+        specifier: workspace:*
+        version: link:../../lib/ui-kit-content
+      prac-ui-kit-layout:
+        specifier: workspace:*
+        version: link:../../lib/ui-kit-layout
       prac-ui-kit-workbench:
         specifier: workspace:*
         version: link:../../lib/ui-kit-workbench
@@ -331,6 +337,12 @@ importers:
       prac-client-vscode-host:
         specifier: workspace:*
         version: link:../vscode-host
+      prac-ui-kit-content:
+        specifier: workspace:*
+        version: link:../../lib/ui-kit-content
+      prac-ui-kit-layout:
+        specifier: workspace:*
+        version: link:../../lib/ui-kit-layout
       prac-ui-kit-workbench:
         specifier: workspace:*
         version: link:../../lib/ui-kit-workbench
@@ -358,6 +370,12 @@ importers:
       prac-client-vscode-host:
         specifier: workspace:*
         version: link:../vscode-host
+      prac-ui-kit-content:
+        specifier: workspace:*
+        version: link:../../lib/ui-kit-content
+      prac-ui-kit-layout:
+        specifier: workspace:*
+        version: link:../../lib/ui-kit-layout
       prac-ui-kit-workbench:
         specifier: workspace:*
         version: link:../../lib/ui-kit-workbench
@@ -385,6 +403,12 @@ importers:
       prac-client-ui-frame:
         specifier: workspace:*
         version: link:../ui-frame
+      prac-ui-kit-content:
+        specifier: workspace:*
+        version: link:../../lib/ui-kit-content
+      prac-ui-kit-layout:
+        specifier: workspace:*
+        version: link:../../lib/ui-kit-layout
       prac-ui-kit-workbench:
         specifier: workspace:*
         version: link:../../lib/ui-kit-workbench
@@ -427,6 +451,12 @@ importers:
       prac-client-vscode-host:
         specifier: workspace:*
         version: link:../vscode-host
+      prac-ui-kit-content:
+        specifier: workspace:*
+        version: link:../../lib/ui-kit-content
+      prac-ui-kit-layout:
+        specifier: workspace:*
+        version: link:../../lib/ui-kit-layout
       prac-ui-kit-workbench:
         specifier: workspace:*
         version: link:../../lib/ui-kit-workbench
@@ -469,6 +499,12 @@ importers:
       prac-client-ui-widget:
         specifier: workspace:*
         version: link:../ui-widget
+      prac-ui-kit-content:
+        specifier: workspace:*
+        version: link:../../lib/ui-kit-content
+      prac-ui-kit-layout:
+        specifier: workspace:*
+        version: link:../../lib/ui-kit-layout
       prac-ui-kit-workbench:
         specifier: workspace:*
         version: link:../../lib/ui-kit-workbench

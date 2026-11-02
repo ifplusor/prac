@@ -1,3 +1,4 @@
+import type { FrameWindowGroup, GroupRegionContent } from "prac-ui-kit-workbench";
 /**
  * The VS Code group host.
  *
@@ -8,7 +9,6 @@
  * @module prac-client-vscode-host/client/groups
  */
 
-import type { FrameWindowGroup, GroupRegionContent } from "prac-ui-kit-workbench";
 import type { VscodeCatalogueEntry } from "./public.js";
 import type { VscodeGroupRuntime } from "./resources.js";
 import {

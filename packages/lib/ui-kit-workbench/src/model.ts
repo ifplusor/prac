@@ -31,22 +31,6 @@ import type { LayoutState } from "./contract.js";
 import { BOTTOM_REGION, CENTER_MIN, CENTER_REGION } from "./contract.js";
 import type { ItemKind, ItemRecord } from "./contract.js";
 
-export * from "prac-ui-kit-content/model";
-export {
-  STACK_HEADER_HEIGHT,
-  activeChild,
-  chosenChild,
-  edgeRegion,
-  entrySashState,
-  findParentSplit,
-  frontItem,
-  isPresent,
-  showsTabStrip,
-  stackEntries,
-  visibleItems,
-  type EntrySashState,
-} from "prac-ui-kit-content";
-
 /** The default frame topology: `left` / stage grid / `right`, with a bottom bar. */
 export function defaultTree(): SplitNode {
   return {

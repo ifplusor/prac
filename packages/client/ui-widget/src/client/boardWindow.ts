@@ -1,24 +1,24 @@
+import {
+  type ContentHost,
+  type RegionContent,
+  type Window,
+  type WindowGroup as FrameWindowGroup,
+  type WidgetRecord,
+  type LayoutState,
+  WindowGroupModel,
+} from "prac-ui-kit-workbench";
+import type { Side } from "prac-ui-kit-layout";
 /**
  * A board window and the surface that hosts it.
  *
  * The board is the **content of one window**, not a group of its own. `BoardWindow`
- * is the window (a `ContentItem`); `BoardWindowSurface` is the frame surface that
+ * is the window (a `ContentItem`); `BoardWindowAdapter` is the frame surface that
  * composes it with the generic `WindowGroupModel` so editor windows can sit beside
  * it in the same group.
  *
  * @module prac-client-ui-widget/client/boardWindow
  */
 
-import type {
-  ContentHost,
-  LayoutState,
-  Side,
-  RegionContent,
-  Window,
-  WindowGroup as FrameWindowGroup,
-  WidgetRecord,
-} from "prac-ui-kit-workbench";
-import { WindowGroupModel } from "prac-ui-kit-workbench";
 import { BoardContent, type WidgetPlacementOptions } from "./boardContent.js";
 import { createBoardChrome } from "./boardChrome.js";
 
@@ -49,7 +49,7 @@ export class BoardWindow implements Window {
 }
 
 /** A board window hosted as a surface with a generic window group. */
-export class BoardWindowSurface implements RegionContent<FrameWindowGroup> {
+export class BoardWindowAdapter implements RegionContent<FrameWindowGroup> {
   readonly kind = "window-group";
   readonly boardWindow: BoardWindow;
   readonly group: WindowGroupModel;

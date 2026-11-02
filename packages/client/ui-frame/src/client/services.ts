@@ -1,3 +1,58 @@
+import {
+  RegionContentRegistry,
+  type GroupRegionContent,
+  CENTER_REGION,
+  type LayoutState,
+  type ItemRecord,
+  ensureItem,
+  place,
+  placeQuietly,
+  pruneEmbedderRegions,
+  removeRegion as removeRegionFromTree,
+  removeItem,
+  setCollapsed,
+  setItemCollapsed,
+  setItemSize,
+  setFront,
+  splitRegionWith,
+  type LayoutStore,
+  ContentHostRegistry,
+  BoardLayoutRegistry,
+  WindowGroupHost,
+  type RegionBinding,
+  type FrameWindowGroup,
+} from "prac-ui-kit-workbench";
+import {
+  type ChromeRegistry,
+  type ItemFlags,
+  type RegionInfo,
+  activeChild,
+  regionInDirection as findRegionInDirection,
+  frontItem,
+  regionInfos,
+  ensureStackShape,
+  regionNode,
+  setRegionChildren,
+  setRegionSelector as setSelectorInTree,
+  setRegionSize,
+  selectChild,
+  structuralRegion,
+} from "prac-ui-kit-content";
+import {
+  type RegionChild,
+  type RegionSelector,
+  type Side,
+  findRegion,
+  findNode,
+  freshNodeId,
+  firstRegionId,
+  mergeGridCells,
+  moveGridCell,
+  unmergeGridCell,
+  resizeGridCell,
+  resizeGridTrack,
+  setGridTrackWeight,
+} from "prac-ui-kit-layout";
 /**
  * The faces this mechanism publishes, plus the root hook the frame's children
  * read.
@@ -30,57 +85,10 @@ import {
   catalogueViewIds,
   declaredViewSlot,
 } from "./catalogue.js";
-import { RegionContentRegistry, type GroupRegionContent } from "prac-ui-kit-workbench";
-import {
-  CENTER_REGION,
-  type LayoutState,
-  type RegionChild,
-  type RegionSelector,
-  type Side,
-  type ItemFlags,
-  type ItemRecord,
-} from "prac-ui-kit-workbench";
+
 import type { LayoutFace, PracLayoutFace, RoleBindings } from "./contract.js";
-import type { RegionInfo } from "prac-ui-kit-workbench";
+
 import type { ItemInfo } from "./contract.js";
-import {
-  activeChild,
-  ensureItem,
-  findRegion,
-  findNode,
-  freshNodeId,
-  regionInDirection as findRegionInDirection,
-  firstRegionId,
-  frontItem,
-  mergeGridCells,
-  moveGridCell,
-  unmergeGridCell,
-  resizeGridCell,
-  resizeGridTrack,
-  setGridTrackWeight,
-  place,
-  placeQuietly,
-  regionInfos,
-  pruneEmbedderRegions,
-  ensureStackShape,
-  removeRegion as removeRegionFromTree,
-  removeItem,
-  regionNode,
-  setCollapsed,
-  setItemCollapsed,
-  setItemSize,
-  setFront,
-  setRegionChildren,
-  setRegionSelector as setSelectorInTree,
-  setRegionSize,
-  selectChild,
-  splitRegionWith,
-  structuralRegion,
-} from "prac-ui-kit-workbench";
-import type { LayoutStore } from "prac-ui-kit-workbench";
-import { ContentHostRegistry } from "prac-ui-kit-workbench";
-import { BoardLayoutRegistry } from "prac-ui-kit-workbench";
-import { WindowGroupHost, type RegionBinding, type FrameWindowGroup } from "prac-ui-kit-workbench";
 
 /** Whether a view's region sits inside the subtree a region id names. */
 function inRegionSubtree(region: string, target: string): boolean {
@@ -371,9 +379,7 @@ export function createServices(
       source:
         | import("prac-ui-kit-workbench").BoardLayoutSource
         | import("prac-ui-kit-workbench").LayoutState<import("prac-ui-kit-workbench").WidgetRecord>,
-      chrome?: import("prac-ui-kit-workbench").ChromeRegistry<
-        import("prac-ui-kit-workbench").WidgetRecord
-      >,
+      chrome?: ChromeRegistry<import("prac-ui-kit-workbench").WidgetRecord>,
     ): () => void {
       return boardLayouts.register(boardId, source, chrome);
     },

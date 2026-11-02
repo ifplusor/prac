@@ -13,7 +13,7 @@ export default defineConfig({
       platform: "browser",
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
       deps: {
-        neverBundle: ["react", "react-dom"],
+        neverBundle: ["react", "react-dom", "prac-ui-kit-content", "prac-ui-kit-layout"],
       },
     },
   ],

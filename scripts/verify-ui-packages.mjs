@@ -174,6 +174,21 @@ for (const name of ["prac-ui-kit-layout", "prac-ui-kit-content", "prac-ui-kit-wo
   }
 }
 
+// L2 must consume L1, not redistribute it: workbench may import content types in
+// its own signatures, but it must not re-export content modules.
+const workbenchSrc = join(libDir, "ui-kit-workbench/src");
+if (existsSync(workbenchSrc)) {
+  for (const file of readdirSync(workbenchSrc)) {
+    if (!file.endsWith(".ts")) continue;
+    const source = readFileSync(join(workbenchSrc, file), "utf8");
+    if (/export\s+(?:type\s+)?\*?\s*\{[^}]*\}\s+from\s+"prac-ui-kit-content"/.test(source) ||
+        /export\s+\*\s+from\s+"prac-ui-kit-content"/.test(source)) {
+      failed = true;
+      console.error(`✗ prac-ui-kit-workbench must not re-export content (${file})`);
+    }
+  }
+}
+
 // The frame layer must not know prac's slot keys or content kinds: those are
 // the plugin / application vocabulary. A static literal check is enough here.
 const frameSrc = join(libDir, "ui-kit-workbench/src");

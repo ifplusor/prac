@@ -1,3 +1,18 @@
+import {
+  boardDropSide,
+  type BoardLayout,
+  ContentHostMount,
+  type ContentHost,
+  readBoardDrop,
+  type WidgetRecord,
+} from "prac-ui-kit-workbench";
+import {
+  type ChromeItemFacts,
+  type LayoutDecoration,
+  LayoutRenderer,
+  type LayoutRendererProps,
+} from "prac-ui-kit-content";
+import type { Box } from "prac-ui-kit-layout";
 /**
  * One layout item's content dispatch.
  *
@@ -13,18 +28,7 @@
  */
 import { createElement, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
-import {
-  boardDropSide,
-  type BoardLayout,
-  type Box,
-  type ChromeItemFacts,
-  ContentHostMount,
-  type ContentHost,
-  type LayoutDecoration,
-  LayoutRenderer,
-  readBoardDrop,
-  type WidgetRecord,
-} from "prac-ui-kit-workbench";
+
 import { WIDGET_SLOT, WINDOW_SLOT } from "./catalogue.js";
 import { DSH_MAIN_PREFIX, DSH_RIGHTBAR_VIEW, DSH_SIDEBAR_VIEW, viewKind } from "./catalogue.js";
 
@@ -161,7 +165,7 @@ function BoardItem({
       ctx.kind === "region" ? boardDropDecoration(board, ctx.regionId) : undefined,
     renderItem: (_record: WidgetRecord, widgetId: string) =>
       renderSlot("prac.widget", {}, { only: widgetId }),
-  });
+  } as LayoutRendererProps<WidgetRecord>);
 }
 
 /** Render one placed item. */

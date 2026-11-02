@@ -15,13 +15,13 @@ import {
   allocateContent,
   type Basis,
   distributeSplitEvenly,
-  findRegion,
   regionNode,
   resizeBoundary,
   resolveSizes,
   setCollapsed,
   snapTargets,
-} from "./model.js";
+} from "prac-ui-kit-content";
+import { findRegion } from "prac-ui-kit-layout";
 import type { Dir, LayoutNode, LayoutState, RegionNode, SplitNode } from "./contract.js";
 
 const claim = (size: number, extra: Partial<Basis> = {}): Basis => ({

@@ -12,7 +12,7 @@
  *
  * @module prac-ui-kit-workbench/boardLayouts
  */
-import type { ChromeRegistry } from "./chrome.js";
+import type { ChromeRegistry } from "prac-ui-kit-content";
 import type { LayoutState, WidgetRecord } from "./contract.js";
 
 /** The live board state a container publishes. `BoardContent` qualifies. */

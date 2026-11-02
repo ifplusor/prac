@@ -11,7 +11,8 @@
 
 import type { LayoutNode, RegionNode, SplitNode } from "prac-ui-kit-layout";
 import type { LayoutState, ItemRecord } from "./contract.js";
-import { defaultTree, findNode, replaceNode } from "./model.js";
+import { findNode, replaceNode } from "prac-ui-kit-layout";
+import { defaultTree } from "./model.js";
 import { CENTER_MIN } from "./contract.js";
 import type { LayoutStore } from "./store.js";
 

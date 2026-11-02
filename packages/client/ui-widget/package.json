@@ -35,6 +35,8 @@
     "@types/react-dom": "catalog:",
     "immer": "^10.1.1",
     "prac-client-ui-frame": "workspace:*",
+    "prac-ui-kit-content": "workspace:*",
+    "prac-ui-kit-layout": "workspace:*",
     "prac-ui-kit-workbench": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:",

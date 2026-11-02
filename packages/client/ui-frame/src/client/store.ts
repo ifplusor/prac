@@ -1,3 +1,15 @@
+import {
+  createFrameState,
+  createSpaceState,
+  defaultTree,
+  normalizeItems,
+  type LayoutState,
+  type LayoutStore,
+  type SpaceState,
+  type SpaceStore,
+  type ItemRecord,
+} from "prac-ui-kit-workbench";
+import { type LayoutNode, type SplitNode, normalizeGrids } from "prac-ui-kit-layout";
 /**
  * The frame's persisted stores: one shell state (frame-level) and one stage
  * state per Space.
@@ -12,19 +24,6 @@
  */
 
 import { createSnapshotStore } from "@deepseek-ai/dsh-client-store";
-import type { LayoutNode, SplitNode } from "prac-ui-kit-workbench";
-import {
-  createFrameState,
-  createSpaceState,
-  defaultTree,
-  normalizeGrids,
-  normalizeItems,
-  type LayoutState,
-  type LayoutStore,
-  type SpaceState,
-  type SpaceStore,
-  type ItemRecord,
-} from "prac-ui-kit-workbench";
 
 /**
  * The frame shell's key: sidebar / panel / dock / stage placeholder.

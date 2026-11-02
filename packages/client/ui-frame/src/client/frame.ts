@@ -1,3 +1,61 @@
+import {
+  ItemActions,
+  type RenderItemAction,
+  type GroupBarItem,
+  type WindowGroupHost,
+  SASH_SIZE,
+  type StyleObject,
+  setEntryFolded,
+  setEntryHeight,
+  place,
+  setFront,
+  type LayoutStore,
+  type ItemRecord,
+} from "prac-ui-kit-workbench";
+import {
+  TabStrip,
+  StackHeader,
+  StackRowOverlay,
+  LayoutSashDrag,
+  GridCellHandles,
+  GridTrackHandle,
+  beginStackReorder,
+  ContainerBar,
+  LayoutIsolation,
+  LayoutRenderer,
+  type LayoutDecoration,
+  type LayoutDecorationContext,
+  readStackRows,
+  startEntryDrag,
+  type StackContainer,
+  type ChromeContext,
+  type ChromeItemFacts,
+  type ChromeRegistry,
+  type ChromeSlotFace,
+  type LayoutIntents,
+  createLayoutIntents,
+  entrySashState,
+  edgeRegion,
+  isPresent,
+  frontItem,
+  resolveSizes,
+  selectChild,
+  reorderTab,
+  visibleItems,
+  resetStackBoundary,
+  drawsRegionBar,
+  useLayout,
+} from "prac-ui-kit-content";
+import {
+  type Box,
+  type Dir,
+  type LayoutNode,
+  type RegionNode,
+  mergeGridCells,
+  moveGridCell,
+  findNode,
+  findRegion,
+} from "prac-ui-kit-layout";
 /**
  * The frame: the region tree rendered as DOM, plus the sashes between regions.
  *
@@ -31,62 +89,15 @@ import type {
 } from "react";
 import { createPortal } from "react-dom";
 import type { UsePanelInfo } from "@deepseek-ai/dsh-client-ui-layout/client";
-import { TabStrip } from "prac-ui-kit-workbench";
-import { StackHeader, StackRowOverlay } from "prac-ui-kit-workbench";
-import { LayoutSashDrag } from "prac-ui-kit-workbench";
-import { GridCellHandles, GridTrackHandle } from "prac-ui-kit-workbench";
-import { beginStackReorder } from "prac-ui-kit-workbench";
-import { ItemActions } from "prac-ui-kit-workbench";
-import { ContainerBar } from "prac-ui-kit-workbench";
-import { LayoutIsolation } from "prac-ui-kit-workbench";
+
 import { LayoutItem, type ItemRenderSlot } from "./layoutItem.js";
-import { LayoutRenderer } from "prac-ui-kit-workbench";
-import type { LayoutDecoration, LayoutDecorationContext } from "prac-ui-kit-workbench";
-import { readStackRows, startEntryDrag, type StackContainer } from "prac-ui-kit-workbench";
-import type {
-  ChromeContext,
-  ChromeItemFacts,
-  ChromeRegistry,
-  ChromeSlotFace,
-  LayoutIntents,
-  RenderItemAction,
-} from "prac-ui-kit-workbench";
+
 import { createFrameChrome } from "./frameChrome.js";
-import { createLayoutIntents } from "prac-ui-kit-workbench";
+
 import type { UseSessions } from "@deepseek-ai/dsh-client-ui-session/client";
 import { declaredViewIcon, declaredViewLabel, declaredViewPaneHeader } from "./catalogue.js";
-import type { GroupBarItem, WindowGroupHost } from "prac-ui-kit-workbench";
-import {
-  SASH_SIZE,
-  type Box,
-  type Dir,
-  type LayoutNode,
-  type RegionNode,
-  type StyleObject,
-} from "prac-ui-kit-workbench";
+
 import type { PracWindowActionsFace, WindowAction } from "./contract.js";
-import {
-  entrySashState,
-  edgeRegion,
-  findRegion,
-  isPresent,
-  frontItem,
-  mergeGridCells,
-  place,
-  moveGridCell,
-  resolveSizes,
-  setFront,
-  selectChild,
-  reorderTab,
-  visibleItems,
-  resetStackBoundary,
-  setEntryFolded,
-  setEntryHeight,
-  findNode,
-  drawsRegionBar,
-} from "prac-ui-kit-workbench";
-import { type LayoutStore, useLayout } from "prac-ui-kit-workbench";
-import type { ItemRecord } from "prac-ui-kit-workbench";
 
 /** A minimal pointer event, as the sash drag machine reads it. */
 interface PointerDragEvent {
@@ -1056,7 +1067,7 @@ export function createFrame(
         surface === undefined
           ? {}
           : {
-              attrs: { "data-prac-surface": surface.kind },
+              attrs: { "data-prac-region-content": surface.kind },
             };
       if (ctx.kind === "region") {
         // A selector region renders a child that owns the surface: attaching the

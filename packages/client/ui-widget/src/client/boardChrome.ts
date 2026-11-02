@@ -1,3 +1,30 @@
+import {
+  ItemActions,
+  type ItemActionsProps,
+  type ItemRecord,
+  type WidgetRecord,
+  type LayoutStore,
+  setEntryFolded,
+} from "prac-ui-kit-workbench";
+import {
+  GridCellHandles,
+  GridTrackHandle,
+  LayoutSashDrag,
+  StackHeader,
+  StackRowOverlay,
+  TabStrip,
+  beginStackReorder,
+  createContainerChrome,
+  createLayoutIntents,
+  entrySashState,
+  frontItem,
+  reorderTab,
+  visibleItems,
+  type ChromeContext,
+  type ChromeRegistry,
+  type LayoutIntents,
+} from "prac-ui-kit-content";
+import { findRegion } from "prac-ui-kit-layout";
 /**
  * A board's container chrome.
  *
@@ -17,31 +44,7 @@ import type {
   PointerEvent as ReactPointerEvent,
   ReactNode,
 } from "react";
-import {
-  GridCellHandles,
-  GridTrackHandle,
-  LayoutSashDrag,
-  StackHeader,
-  StackRowOverlay,
-  TabStrip,
-  ItemActions,
-  beginStackReorder,
-  createContainerChrome,
-  createLayoutIntents,
-  entrySashState,
-  findRegion,
-  frontItem,
-  reorderTab,
-  setEntryFolded,
-  visibleItems,
-  type ChromeContext,
-  type ChromeRegistry,
-  type LayoutIntents,
-  type LayoutStore,
-  type ItemActionsProps,
-  type ItemRecord,
-  type WidgetRecord,
-} from "prac-ui-kit-workbench";
+
 import type { BoardContent } from "./boardContent.js";
 import { startWidgetDrag } from "./widgetDrag.js";
 import { createBoardStore } from "./boardStore.js";

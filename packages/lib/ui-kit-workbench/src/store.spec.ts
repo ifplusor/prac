@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { LayoutState } from "./contract.js";
 import { defaultTree } from "./model.js";
-import { createSwitchingStore } from "./switching.js";
+import { createSwitchingStore } from "prac-ui-kit-content";
 import type { LayoutStore } from "./store.js";
 
 /** A minimal layout store whose only meaningful state is its active panel. */

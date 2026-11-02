@@ -1,3 +1,5 @@
+import type { WidgetRecord, LayoutState } from "prac-ui-kit-workbench";
+import { LayoutRenderer, createLayoutIntents, gridNode, regionNode } from "prac-ui-kit-content";
 /**
  * The board's chrome is a container over the generic parts: every anchor is
  * populated, mutations write the board's own state, and widget actions come
@@ -7,14 +9,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { createElement } from "react";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import {
-  LayoutRenderer,
-  createLayoutIntents,
-  gridNode,
-  regionNode,
-  type LayoutState,
-  type WidgetRecord,
-} from "prac-ui-kit-workbench";
+
 import { BoardContent } from "./boardContent.js";
 import { createBoardChrome } from "./boardChrome.js";
 import { createBoardStore } from "./boardStore.js";

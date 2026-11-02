@@ -66,10 +66,10 @@ const read = () =>
         window: board.state.active,
         widgets: typeof board.widgetOrder === "function" ? [...board.widgetOrder()] : [],
       })),
-      surfaces: [...document.querySelectorAll("[data-prac-surface]")].map((element) => ({
+      surfaces: [...document.querySelectorAll("[data-prac-region-content]")].map((element) => ({
         region: element.getAttribute("data-prac-region"),
         split: element.getAttribute("data-prac-split"),
-        kind: element.getAttribute("data-prac-surface"),
+        kind: element.getAttribute("data-prac-region-content"),
       })),
     };
   });

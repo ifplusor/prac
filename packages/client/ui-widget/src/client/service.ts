@@ -1,3 +1,4 @@
+import type { Side } from "prac-ui-kit-layout";
 /**
  * Widget service provided to adapter plugins.
  *
@@ -7,18 +8,18 @@
 import type { Context } from "@deepseek-ai/cordis";
 // Type-only, for the frame plugin's `Context` / `SlotMap` merges.
 import type {} from "prac-client-ui-frame/client";
-import type { Side } from "prac-ui-kit-workbench";
+
 import type { BoardWindowFrameFace } from "./boardWindow.js";
-import { BoardWindowSurface } from "./boardWindow.js";
+import { BoardWindowAdapter } from "./boardWindow.js";
 import { WidgetRegistry } from "./widget.js";
 
 /** The widget-board factory / registry other plugins inject. */
 export interface PracWidgetsFace {
   readonly registry: WidgetRegistry;
   /** Create a board window: one window whose content is a board. */
-  createBoardWindow(id: string, label?: string): BoardWindowSurface;
+  createBoardWindow(id: string, label?: string): BoardWindowAdapter;
   /** Board windows currently created by this service, for diagnostics / gates. */
-  boards(): readonly BoardWindowSurface[];
+  boards(): readonly BoardWindowAdapter[];
   /**
    * Move one widget from one board to another.
    *
@@ -42,7 +43,7 @@ declare module "@deepseek-ai/cordis" {
 
 /** Install the widget service. */
 export function apply(ctx: Context): void {
-  const boards = new Map<string, BoardWindowSurface>();
+  const boards = new Map<string, BoardWindowAdapter>();
   const frame = ctx.pracFrame;
   /** The frame facts a board window registers through. */
   const windowFace: BoardWindowFrameFace = {
@@ -50,7 +51,9 @@ export function apply(ctx: Context): void {
       frame.registerBoardLayout(
         boardId,
         { getState: () => content.get(), subscribe: (listener) => content.subscribe(listener) },
-        chrome,
+        // The dts bundler inlines ChromeRegistry through two module records; the
+        // runtime value is the same registry the frame already consumes.
+        chrome as unknown as Parameters<typeof frame.registerBoardLayout>[2],
       ),
     setItemBoard: (viewId, boardId) => frame.setItemBoard(viewId, boardId),
   };
@@ -59,13 +62,13 @@ export function apply(ctx: Context): void {
     createBoardWindow: (id, label) => {
       const existing = boards.get(id);
       if (existing !== undefined) return existing;
-      const board = new BoardWindowSurface(id, label, windowFace);
+      const board = new BoardWindowAdapter(id, label, windowFace);
       boards.set(id, board);
       return board;
     },
     boards: () => [...boards.values()].filter((board) => !board.disposed),
     moveWidget: (widgetId, fromBoardId, toBoardId, options = {}) => {
-      const find = (id: string): BoardWindowSurface | undefined =>
+      const find = (id: string): BoardWindowAdapter | undefined =>
         boards.get(id) ?? [...boards.values()].find((board) => board.boardId === id);
       const from = find(fromBoardId);
       const to = find(toBoardId);

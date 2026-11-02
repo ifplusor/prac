@@ -1,3 +1,5 @@
+import { createComposedStore, createStageSwitcher } from "prac-ui-kit-workbench";
+import { workspaceScope } from "prac-ui-kit-content";
 /**
  * prac's layout: the frame mechanism — the client half.
  *
@@ -62,11 +64,10 @@ import type {
 } from "./contract.js";
 import { createFrame, ensureStyles } from "./frame.js";
 import { createServices } from "./services.js";
-import { createComposedStore, createStageSwitcher } from "prac-ui-kit-workbench";
+
 import { createFrameStore, createSpaceStore } from "./store.js";
 import { WindowGroupAdapter } from "./windowGroupAdapter.js";
 import { ThemePresenter } from "./theme.js";
-import { workspaceScope } from "prac-ui-kit-workbench";
 
 declare global {
   /**

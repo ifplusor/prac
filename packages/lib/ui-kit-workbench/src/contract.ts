@@ -26,7 +26,6 @@ export type {
   TabMode,
 } from "prac-ui-kit-layout";
 import type { LayoutState as ContentLayoutState, PlacementRecord } from "prac-ui-kit-content";
-export type { ItemFlags } from "prac-ui-kit-content";
 
 // This file is DSH-free on purpose: the kit only speaks layout vocabulary. The
 // `SlotMap` / `Context` merges that bind prac's slots and faces to DSH live in

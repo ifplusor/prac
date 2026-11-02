@@ -6,7 +6,7 @@
  * "view"; the view vocabulary belongs to the source adapters.
  *
  * `WidgetBoardGroup` is gone; a board is the content of one window (`BoardWindow`).
- * `BoardWindowSurface` composes that window with the generic `WindowGroupModel`
+ * `BoardWindowAdapter` composes that window with the generic `WindowGroupModel`
  * when other windows are hosted beside it.
  *
  * @module prac-ui-kit-workbench/windowModel

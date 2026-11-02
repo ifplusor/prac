@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { RegionContentRegistry, type RegionContent } from "./regionContent.js";
 
-const surface = (kind: "window-group" | "widget-board"): RegionContent<{ id: string }> =>
+const content = (kind: "window-group" | "widget-board"): RegionContent<{ id: string }> =>
   ({
     kind,
     group: { id: `${kind}-group` },
@@ -10,7 +10,7 @@ const surface = (kind: "window-group" | "widget-board"): RegionContent<{ id: str
   }) as unknown as RegionContent<{ id: string }>;
 
 describe("RegionContentRegistry", () => {
-  it("creates a surface only after its kind is registered", () => {
+  it("creates content only after its kind is registered", () => {
     const registry = new RegionContentRegistry<{ id: string }>();
     expect(registry.has("window-group")).toBe(false);
     expect(() => registry.create("window-group", { nodeId: "stage" })).toThrow(
@@ -19,7 +19,7 @@ describe("RegionContentRegistry", () => {
 
     const registration = registry.register("window-group", {
       create: ({ nodeId }) => {
-        const created = surface("window-group");
+        const created = content("window-group");
         expect(nodeId).toBe("stage");
         return created;
       },
@@ -35,9 +35,9 @@ describe("RegionContentRegistry", () => {
 
   it("rejects duplicate kinds and keeps the first factory after a stale dispose", () => {
     const registry = new RegionContentRegistry<{ id: string }>();
-    const first = registry.register("widget-board", { create: () => surface("widget-board") });
+    const first = registry.register("widget-board", { create: () => content("widget-board") });
     expect(() =>
-      registry.register("widget-board", { create: () => surface("widget-board") }),
+      registry.register("widget-board", { create: () => content("widget-board") }),
     ).toThrow("content kind already registered");
 
     first.dispose();
@@ -47,9 +47,9 @@ describe("RegionContentRegistry", () => {
 
   it("keeps a newer registration when an older one disposes", () => {
     const registry = new RegionContentRegistry<{ id: string }>();
-    const first = registry.register("window-group", { create: () => surface("window-group") });
+    const first = registry.register("window-group", { create: () => content("window-group") });
     first.dispose();
-    const second = registry.register("window-group", { create: () => surface("window-group") });
+    const second = registry.register("window-group", { create: () => content("window-group") });
     first.dispose();
     expect(registry.has("window-group")).toBe(true);
     second.dispose();

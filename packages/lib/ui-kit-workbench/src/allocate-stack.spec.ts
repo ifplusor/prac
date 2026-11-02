@@ -11,18 +11,13 @@
  */
 import { describe, expect, it } from "vite-plus/test";
 import type { LayoutState } from "./contract.js";
-import { STACK_HEADER_HEIGHT } from "./model.js";
 import {
+  STACK_HEADER_HEIGHT,
   allocateStack,
   altDragTarget,
   ensureStackShape,
   entrySashState,
   regionNode,
-  defaultTree,
-  findNode,
-  setRegionChildren,
-  findRegion,
-  findSplit,
   moveEntry,
   moveItemInRegion,
   place,
@@ -36,9 +31,12 @@ import {
   setItemSize,
   stackDragAnchor,
   stackEntries,
+  setRegionChildren,
   visibleItems,
   type Basis,
-} from "./model.js";
+} from "prac-ui-kit-content";
+import { findNode, findRegion, findSplit } from "prac-ui-kit-layout";
+import { defaultTree } from "./model.js";
 
 /** A state with just the view records the fold helpers read. */
 const stateOf = (

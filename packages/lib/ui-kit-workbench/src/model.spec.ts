@@ -12,15 +12,11 @@ import {
   HEADER_HEIGHT,
   activeChild,
   chosenChild,
-  defaultTree,
-  findRegion,
-  findSplit,
   freshNodeId,
   frontItem,
   isPresent,
   nodeBasis,
   place,
-  pruneEmbedderRegions,
   regionInfos,
   regionNode,
   removeRegion,
@@ -38,7 +34,9 @@ import {
   stackEntries,
   subtreeMin,
   visibleItems,
-} from "./model.js";
+} from "prac-ui-kit-content";
+import { findRegion, findSplit } from "prac-ui-kit-layout";
+import { defaultTree, pruneEmbedderRegions } from "./model.js";
 
 /**
  * The mechanism's pure core, tested without a browser.
