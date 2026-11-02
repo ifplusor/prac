@@ -24,20 +24,20 @@ Widget board --places(0..N)--> Widget
 Window group --contains--> Window
 ```
 
-| 对象             | 是什么                                                                                   | 不是                                |
-| ---------------- | ---------------------------------------------------------------------------------------- | ----------------------------------- |
-| **Application**  | 启动身份；定义 window kind / single-multi / 默认 placement / 默认 composition / launcher | 不是内容容器；不直接进 window group |
-| **Window**       | app 打开的实例；有 placement / lifecycle / active                                        | 不是 tab；不是 widget               |
-| **Widget board** | 一种 **window**：内容是一块摆放 widget 的 board                                           | 不是 app；不是 window group；不是 region |
-| **Widget**       | 可组合内容                                                                               | 不是 window；不直接进 window group  |
-| **Window group** | windows 的容器；tab strip 的 tab 是 window                                               | 不是 editor group；不是 board       |
-| **Space**        | 命名的 stage 布局；状态按 project folder 存                                               | 不是 project folder                 |
+| 对象             | 是什么                                                                                   | 不是                                     |
+| ---------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **Application**  | 启动身份；定义 window kind / single-multi / 默认 placement / 默认 composition / launcher | 不是内容容器；不直接进 window group      |
+| **Window**       | app 打开的实例；有 placement / lifecycle / active                                        | 不是 tab；不是 widget                    |
+| **Widget board** | 一种 **window**：内容是一块摆放 widget 的 board                                          | 不是 app；不是 window group；不是 region |
+| **Widget**       | 可组合内容                                                                               | 不是 window；不直接进 window group       |
+| **Window group** | windows 的容器；tab strip 的 tab 是 window                                               | 不是 editor group；不是 board            |
+| **Space**        | stage 的虚拟桌面；拥有一个 `space root`；状态按 project folder 存                        | 不是 project folder；不是 layout root    |
 
 ### Window 两种
 
-| kind                   | 内容              | 例子                                                        |
-| ---------------------- | ----------------- | ----------------------------------------------------------- |
-| **application window** | app-owned 内容    | editor（一个文件）、chat、diff、terminal、browser、settings |
+| kind                    | 内容              | 例子                                                           |
+| ----------------------- | ----------------- | -------------------------------------------------------------- |
+| **application window**  | app-owned 内容    | editor（一个文件）、chat、diff、terminal、browser、settings    |
 | **widget board window** | 一个 widget board | stage / sidebar / panel 上的 Explorer board、单 Timeline board |
 
 - window 是 frame 权威；每个 stage window 在 adapter 侧有 1:1 `EditorInput` 投影（含 chat / widget）；`EditorWindow` 是它在 adapter 侧的表示；
@@ -59,17 +59,21 @@ Window group --contains--> Window
 ## 二、布局
 
 ```text
-Space
-  split / grid / region
-       └─ surface
-            ├─ window group（stage cell）
-            └─ window group（sidebar / panel，内含 board window）
+Frame shell（frame 级）
+  dock / sidebar / panel / chrome
+  stage
+    └─ Space（stage 的虚拟桌面）
+         └─ space root
+              split / grid / region
+                   └─ surface
+                        └─ window group
 ```
 
 - **split / grid / region** 是几何节点；region 是叶子盒子；
+- **Space** 是 stage 的虚拟桌面，拥有一个 `space root`；**sidebar / panel / dock 是 frame 级，和 stage 平级**，不随 Space 切换；
 - **surface** 是 region 的内容根：
-  - stage cell → window group；
-  - panel / sidebar → window group（内含 board window）；
+  - stage cell → window group（属于当前 Space）；
+  - panel / sidebar → window group（内含 board window，frame 级）；
   - opaque host → 外部内容；
 - **placement 有两条边**：
   - window → window group；
@@ -115,23 +119,23 @@ Space
 
 ## 五、术语
 
-| canonical              | 不要用                         | 说明                                                          |
-| ---------------------- | ------------------------------ | ------------------------------------------------------------- |
-| **application**        | app instance / container       | 启动身份；window 由 app 打开                                  |
-| **window**             | tab / view                     | app 的实例；application window 或 widget window               |
-| **window group**       | editor group / view group      | windows 的容器                                                |
-| **widget board**       | container / view group / panel | 摆放 widget 的布局面                                          |
-| **widget**             | view / tab                     | 可组合内容；在 board 里；是 VS Code view / DSH slot 的落点    |
-| **placement**          | membership                     | window→group；widget→board                                    |
-| **dock / rail**        | dock as surface / stage        | launcher 条；不是 region / surface，不与 stage 同类             |
-| **sidebar / panel**    | dock                           | 内容区域，承载 widget board window；不是 dock rail               |
-| **surface**            | region content                 | region 的内容根                                               |
-| **application window** | editor view / editor group     | editor / chat / diff / terminal 的 window                     |
-| **widget board window** | container window / widget window | 承载 board 的 window；board 是 window，widget 是 view          |
-| **editor group**       | prac window group              | `IEditorGroupView`，adapter runtime                           |
-| **editor window**      | separate window type           | editor application window 的简称                              |
-| **catalogue**          | registry                       | 合并后的 widget / window 目录                                 |
-| **source adapter**     | —                              | 把来源投影成 application / window / widget / action / overlay |
+| canonical               | 不要用                           | 说明                                                          |
+| ----------------------- | -------------------------------- | ------------------------------------------------------------- |
+| **application**         | app instance / container         | 启动身份；window 由 app 打开                                  |
+| **window**              | tab / view                       | app 的实例；application window 或 widget window               |
+| **window group**        | editor group / view group        | windows 的容器                                                |
+| **widget board**        | container / view group / panel   | 摆放 widget 的布局面                                          |
+| **widget**              | view / tab                       | 可组合内容；在 board 里；是 VS Code view / DSH slot 的落点    |
+| **placement**           | membership                       | window→group；widget→board                                    |
+| **dock / rail**         | dock as surface / stage          | launcher 条；不是 region / surface，不与 stage 同类           |
+| **sidebar / panel**     | dock                             | 内容区域，承载 widget board window；不是 dock rail            |
+| **surface**             | region content                   | region 的内容根                                               |
+| **application window**  | editor view / editor group       | editor / chat / diff / terminal 的 window                     |
+| **widget board window** | container window / widget window | 承载 board 的 window；board 是 window，widget 是 view         |
+| **editor group**        | prac window group                | `IEditorGroupView`，adapter runtime                           |
+| **editor window**       | separate window type             | editor application window 的简称                              |
+| **catalogue**           | registry                         | 合并后的 widget / window 目录                                 |
+| **source adapter**      | —                                | 把来源投影成 application / window / widget / action / overlay |
 
 ## 六、已退役
 
@@ -145,7 +149,8 @@ Space
 ## 七、包
 
 ```text
-ui-frame
+prac-ui-kit-layout / prac-ui-kit-content / prac-ui-kit-frame  // libraries
+ui-frame                // DSH plugin row only
 ui-window
 ui-widget
 ui-workbench
@@ -154,7 +159,7 @@ ui-vscode-host / ui-vscode-views / ui-vscode-editor
 bundle/web-app  // composition root only
 ```
 
-完整依赖见 10-20 的 Package architecture。`ui-frame` 是 DSH 插件行，另导出 `./lib` 提供类型。
+完整依赖见 10-20 的 Package architecture。`ui-frame` 是只做插件的 DSH 行，不再导出 `./lib`；共享的 content protocols / placement / store 在 **DSH-free** 的 `prac-ui-kit-content`，model / renderer / content surface 在 **DSH-free** 的 `prac-ui-kit-frame`，而持久化 store、DSH slot catalogue 与 `SlotMap` / `Context` 契约在插件（契约只做 `./client` 的 type-only 入口）。
 
 ## 八、相关
 

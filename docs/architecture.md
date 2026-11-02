@@ -111,20 +111,25 @@ Window group --contains--> Window
 **几何**：
 
 ```text
-Space
-  split / grid / region
-       └─ surface
-            ├─ window group（stage cell）
-            └─ window group（sidebar / panel，内含 board window）
+Frame shell（frame 级）
+  dock / sidebar / panel / chrome
+  stage
+    └─ Space（stage 的虚拟桌面）
+         └─ space root
+              split / grid / region
+                   └─ surface
+                        └─ window group
 ```
 
 - **frame** 是 prac 自己的：Space、split / grid / region、dock rail、sidebar / panel、sash、resize、collapse、frame chrome、持久化；
+- **Space 是 stage 的虚拟桌面**：拥有一个 `space root`，不是 layout root，也不是 project folder；
+- **sidebar / panel / dock 是 frame 级，和 stage 平级**：不随 Space 切换；
 - **几何层不认识 window / widget 的内容**；region 的内容根是 surface；
-- **stage cell** 的 surface 是 window group；**panel / sidebar** 的 surface 是承载 board window 的 window group；board 是 window content，widget 是 board 里的 view；
+- **stage cell** 的 surface 是 window group；**panel / sidebar** 的 surface 是承载 board window 的 window group，frame 级；board 是 window content，widget 是 board 里的 view；
 - **placement 有两条边**：window → window group；widget → board root；
 - **active 有两级**：window group 的 active window；board 的 active widget；
 - **isolated surface**：window 是外层 containment / stacking / theme / focus 边界；混排 VS Code + DSH 保留 per-widget root / source-scoped 子树；webview / iframe 自己的 browsing context。
-- **layout roots**：frame 和 board 共用同一个 LayoutEngine，各自有 `LayoutRoot`（frame root 的 item 是 window，board root 的 item 是 widget）；board root 是 window content 的 layout hole，参与 frame 的 hit-test / 拖拽 / split。
+- **layout roots**：frame shell、Space 和 board 共用同一个 LayoutEngine，各自有 `LayoutRoot`：`frame root`（shell，frame 级）、`space root`（stage 的虚拟桌面，每个 Space 一个）、`board root`（widget）。frame/space root 的 item 是 window（经 window group），board root 的 item 是 widget；board root 是 window content 的 layout hole，参与 frame 的 hit-test / 拖拽 / split。
 - **跨 root 拖拽**：允许 move widget；split 只在目标 board root 内完成，不在 frame 层把两个 window 的 widget 拼成一个 region。
 
 **来源映射**：
@@ -154,8 +159,10 @@ Space
 **包**：
 
 ```text
-prac-ui-kit        // pure library (packages/lib/ui-kit)
-ui-frame
+prac-ui-kit-layout        // L0 pure layout library (packages/lib/ui-kit-layout)
+prac-ui-kit-content       // L1 content protocols / placement / store (packages/lib/ui-kit-content)
+prac-ui-kit-frame         // L2 frame model / renderer library (packages/lib/ui-kit-frame)
+ui-frame                // DSH plugin row only
 ui-window
 ui-widget
 ui-workbench
@@ -164,7 +171,7 @@ ui-vscode-host / ui-vscode-views / ui-vscode-editor
 bundle/web-app  // composition root only
 ```
 
-`prac-ui-kit` 只提供 geometry / surface / binding，不依赖 DSH；`ui-frame` 只认 surface registry；`ui-window` / `ui-widget` 不互相 import；adapters 只做来源翻译；bundle 是叶子，无业务逻辑。`ui-frame` 是 DSH 插件行，另导出 `./lib` 供类型使用。
+`prac-ui-kit-layout` 只提供 geometry / tree / allocation / grid，不依赖 DSH，**也不含 view / view-group 词汇**（那是 source adapter 自己的）；`prac-ui-kit-frame` 在它之上提供 frame 的 model / React renderer / chrome，**也不依赖 DSH**；`ui-frame` 是只做插件的 DSH 行，拥有持久化 store、DSH slot catalogue 和 `SlotMap` / `Context` 契约（`./client` 的 `types` 条件只做 type-only 入口），**不再导出 `./lib`**。`ui-window` / `ui-widget` 的布局代码从 kit 取，DSH 契约类型只从 `prac-client-ui-frame/client` 取；`ui-window` / `ui-widget` 不互相 import；adapters 只做来源翻译；bundle 是叶子，无业务逻辑。
 
 ### 3.3 状态住在哪
 
@@ -193,7 +200,7 @@ bundle/web-app  // composition root only
 
 ### 3.4 持久化
 
-**该持久化的**：window 在哪个 window group、window 顺序 / active、widget 在哪个 board、board 的 widget 顺序 / active、region 几何 / 折叠 / 在屏、区域用的模式。**不该持久化的**：区域内的层序、注意力栈、返回栈——前两者是布局的状态，后者是交互过程。三种 key：**per-window**（frame 布局）、**per-board**（每个 board window 的 widget 顺序 / 行高 / 折叠，按 workspace 分区）与 **per-workspace**（展开项）；key 带版本，恢复时不校验形状。**默认放置只填空缺**——否则每次激活都把 window / widget 拖回出厂位。边界：localStorage 是 per-origin，同源两个 tab 共用一份；layout / Space 的 key 再按 workspace（`?workspace=` 的哈希）分区，不同 project folder 不共享。
+**该持久化的**：window 在哪个 window group、window 顺序 / active、widget 在哪个 board、board 的 widget 顺序 / active、region 几何 / 折叠 / 在屏、区域用的模式。**不该持久化的**：区域内的层序、注意力栈、返回栈——前两者是布局的状态，后者是交互过程。四种 key：**per-frame**（shell 的 sidebar / panel / dock / stage 占位，`prac-frame/v1`）、**per-space**（stage 的 space root，`prac-space/v1`）、**per-board**（每个 board window 的 widget 顺序 / 行高 / 折叠，`prac-board/v1`，按 workspace 分区）与 **per-workspace**（展开项）；key 带版本，恢复时不校验形状。**默认放置只填空缺**——否则每次激活都把 window / widget 拖回出厂位。边界：localStorage 是 per-origin，同源两个 tab 共用一份；layout / Space 的 key 再按 workspace（`?workspace=` 的哈希）分区，不同 project folder 不共享。
 
 ## 4. 能力
 

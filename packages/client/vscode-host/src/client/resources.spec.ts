@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import type { View as FrameView, ViewHost } from "prac-ui-kit";
+import type { VscodeViewHandle, VscodeViewHostSurface } from "./resources.js";
 import {
   VscodeViewDefinition,
   VscodeViewGroupDefinition,
@@ -29,7 +29,7 @@ function viewResource(): VscodeView {
   };
 }
 
-function host(): ViewHost {
+function host(): VscodeViewHostSurface {
   return {
     mount: vi.fn(),
     release: vi.fn(),
@@ -59,15 +59,8 @@ function fakeGroup(id: string, mode: "stack" | "select" = "stack"): VscodeGroupR
   };
 }
 
-function fakeView(id: string): FrameView {
-  return {
-    id,
-    host: undefined,
-    mount: () => {},
-    release: () => {},
-    focus: () => {},
-    dispose: () => {},
-  };
+function fakeView(id: string): VscodeViewHandle {
+  return { id, release: vi.fn() };
 }
 
 describe("VscodeViewGroupDefinition", () => {
@@ -118,7 +111,7 @@ describe("VscodeViewGroupDefinition", () => {
 
 describe("VscodeViewDefinition", () => {
   it("materializes a view and wraps its host", () => {
-    const runtime: FrameView = fakeView("v1");
+    const runtime: VscodeViewHandle = fakeView("v1");
     const hostSpy = host();
     const definition = new VscodeViewDefinition({
       createView: () => runtime,

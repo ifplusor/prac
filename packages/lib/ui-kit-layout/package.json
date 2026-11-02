@@ -1,0 +1,42 @@
+{
+  "name": "prac-ui-kit-layout",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Framework-agnostic layout kernel: geometry, tree, allocation and grid. No React, DOM surface, DSH or product model.",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./geometry": {
+      "types": "./dist/geometry.d.mts",
+      "default": "./dist/geometry.mjs"
+    },
+    "./package.json": "./package.json",
+    "./allocation": {
+      "types": "./dist/allocation.d.mts",
+      "default": "./dist/allocation.mjs"
+    },
+    "./tree": {
+      "types": "./dist/tree.d.mts",
+      "default": "./dist/tree.mjs"
+    },
+    "./grid": {
+      "types": "./dist/grid.d.mts",
+      "default": "./dist/grid.mjs"
+    }
+  },
+  "scripts": {
+    "build": "vp pack",
+    "check": "vp check",
+    "test": "vp test run"
+  }
+}

@@ -11,7 +11,8 @@
  * @module prac-web-app/client/arrangement
  */
 
-import type { PracLayoutFace, ViewRecord } from "prac-client-ui-frame/lib";
+import type { ViewRecord } from "prac-ui-kit-frame";
+import type { PracLayoutFace } from "prac-client-ui-frame/client";
 import { DSH_CONVERSATION_VIEW, DSH_RIGHTBAR_VIEW, DSH_SIDEBAR_VIEW } from "prac-client-ui-dsh/lib";
 import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 

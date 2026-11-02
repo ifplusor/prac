@@ -1,16 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { Context } from "@deepseek-ai/cordis";
 import "./contract.js";
+import { VIEW_SLOT, viewSource } from "prac-ui-kit-frame";
 import {
   DSH_CONVERSATION_KEY,
-  VIEW_SLOT,
   catalogueViewIds,
   isDeclaredView,
   declaredViewLabel,
   declaredViewPaneHeader,
   readDeclaredViewIds,
   viewKind,
-  viewSource,
 } from "./catalogue.js";
 
 /**
@@ -34,8 +32,12 @@ type SlotEntry = {
  *
  * @param entries - slot name → that slot's entries.
  */
-const registry = (entries: Record<string, readonly SlotEntry[]>): Context["slots"] =>
-  ({ entries: (name: string) => entries[name] ?? [] }) as unknown as Context["slots"];
+const registry = (
+  entries: Record<string, readonly SlotEntry[]>,
+): Parameters<typeof readDeclaredViewIds>[0] =>
+  ({
+    entries: (name: string) => entries[name] ?? [],
+  }) as unknown as Parameters<typeof readDeclaredViewIds>[0];
 
 describe("viewSource", () => {
   it("takes the source segment, and nothing when there is none", () => {

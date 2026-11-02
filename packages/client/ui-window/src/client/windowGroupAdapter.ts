@@ -1,31 +1,37 @@
 /**
- * Adapter from the typed `WindowGroup` model to the frame's group interface.
+ * Adapter from the typed `WindowGroup` model to the frame's product
+ * `WindowsGroup` contract.
  *
- * The frame still speaks in `FrameView`s; this adapter keeps one `FrameView` per
- * open window and lets `WindowGroup` own order / active / lifecycle.
+ * The frame no longer speaks in `FrameView`s: a window group is the product
+ * object, and this adapter keeps only a minimal release handle per open window
+ * while `WindowGroup` owns order / active / lifecycle.
  *
  * @module prac-client-ui-window/client/windowGroupAdapter
  */
 
 import type {
-  View as FrameView,
-  ViewGroup as FrameWindowGroup,
-  GroupBinding,
-  Surface,
-  ViewGroupPlacement,
-  ViewGroupRuntime,
-  ViewGroupState,
-} from "prac-ui-kit";
+  FrameWindowGroup,
+  WindowGroupBinding,
+  WindowGroupPlacement,
+  WindowGroupState,
+} from "prac-ui-kit-frame";
+import type { Surface } from "prac-ui-kit-frame";
 
 import { WindowGroup } from "./window.js";
 
+/** The release handle a source hands the adapter for one window. */
+export interface WindowViewHandle {
+  readonly id: string;
+  release?(): void;
+}
+
 /** A window-group-backed frame group (select mode). */
-export class WindowGroupAdapter implements ViewGroupRuntime, Surface {
+export class WindowGroupAdapter implements FrameWindowGroup, Surface<FrameWindowGroup> {
   readonly kind = "window-group" as const;
   #element: HTMLElement | undefined;
   readonly #group: WindowGroup;
-  readonly #views = new Map<string, FrameView>();
-  #binding: GroupBinding | undefined;
+  readonly #views = new Map<string, WindowViewHandle>();
+  #binding: WindowGroupBinding | undefined;
 
   constructor(
     readonly id: string,
@@ -35,7 +41,7 @@ export class WindowGroupAdapter implements ViewGroupRuntime, Surface {
   }
 
   get group(): FrameWindowGroup {
-    return this as unknown as FrameWindowGroup;
+    return this;
   }
 
   get element(): HTMLElement | undefined {
@@ -50,7 +56,7 @@ export class WindowGroupAdapter implements ViewGroupRuntime, Surface {
     if (this.#element === element) this.#element = undefined;
   }
 
-  get state(): ViewGroupState {
+  get state(): WindowGroupState {
     return {
       id: this.id,
       mode: "select",
@@ -60,8 +66,9 @@ export class WindowGroupAdapter implements ViewGroupRuntime, Surface {
     };
   }
 
-  get placements(): readonly ViewGroupPlacement[] {
+  get placements(): readonly WindowGroupPlacement[] {
     return this.#group.state.order.map((viewId, order) => ({
+      itemId: viewId,
       viewId,
       groupId: this.id,
       order,
@@ -70,7 +77,7 @@ export class WindowGroupAdapter implements ViewGroupRuntime, Surface {
     }));
   }
 
-  get binding(): GroupBinding | undefined {
+  get binding(): WindowGroupBinding | undefined {
     return this.#binding;
   }
 
@@ -78,7 +85,7 @@ export class WindowGroupAdapter implements ViewGroupRuntime, Surface {
     return this.#group.onDidChange(listener);
   }
 
-  add(view: FrameView): void {
+  add(view: WindowViewHandle): void {
     this.#views.set(view.id, view);
     try {
       this.#group.open({
@@ -98,7 +105,7 @@ export class WindowGroupAdapter implements ViewGroupRuntime, Surface {
     if (!view) return;
     this.#views.delete(viewId);
     this.#group.close(viewId);
-    view.release();
+    view.release?.();
   }
 
   select(viewId: string | undefined): void {
@@ -109,18 +116,13 @@ export class WindowGroupAdapter implements ViewGroupRuntime, Surface {
     this.#group.reorder(order);
   }
 
-  setBinding(binding: GroupBinding | undefined): void {
+  setBinding(binding: WindowGroupBinding | undefined): void {
     this.#binding?.dispose();
     this.#binding = binding;
   }
 
-  /** The frame view for one open window, if any. */
-  view(viewId: string): FrameView | undefined {
-    return this.#views.get(viewId);
-  }
-
   dispose(): void {
-    for (const view of this.#views.values()) view.release();
+    for (const view of this.#views.values()) view.release?.();
     this.#views.clear();
     this.#binding?.dispose();
     this.#binding = undefined;

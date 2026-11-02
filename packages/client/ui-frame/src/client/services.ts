@@ -30,20 +30,18 @@ import {
   catalogueViewIds,
   declaredViewSlot,
 } from "./catalogue.js";
-import { SurfaceRegistry, type Surface } from "./surface.js";
+import { SurfaceRegistry, type FrameSurface } from "prac-ui-kit-frame";
 import {
   CENTER_REGION,
-  type LayoutFace,
   type LayoutState,
-  type PracLayoutFace,
   type RegionChild,
   type RegionSelector,
-  type RoleBindings,
   type Side,
   type ViewFlags,
   type ViewRecord,
-} from "./contract.js";
-import type { RegionInfo, ViewInfo } from "./catalogue.js";
+} from "prac-ui-kit-frame";
+import type { LayoutFace, PracLayoutFace, RoleBindings } from "./contract.js";
+import type { RegionInfo, ViewInfo } from "prac-ui-kit-frame";
 import {
   activeChild,
   ensureView,
@@ -77,12 +75,11 @@ import {
   selectChild,
   splitRegionWith,
   structuralRegion,
-} from "./model.js";
-import type { LayoutStore } from "./store.js";
-import { View, type FrameView } from "./view.js";
-import { ContentHostRegistry } from "./contentHosts.js";
-import { BoardLayoutRegistry } from "./boardLayouts.js";
-import { WindowGroupHost, type FrameGroup, type FrameWindowGroup } from "./frameGroups.js";
+} from "prac-ui-kit-frame";
+import type { LayoutStore } from "prac-ui-kit-frame";
+import { ContentHostRegistry } from "prac-ui-kit-frame";
+import { BoardLayoutRegistry } from "prac-ui-kit-frame";
+import { WindowGroupHost, type FrameGroup, type FrameWindowGroup } from "prac-ui-kit-frame";
 
 /** Whether a view's region sits inside the subtree a region id names. */
 function inRegionSubtree(region: string, target: string): boolean {
@@ -100,7 +97,7 @@ export interface LayoutServices {
   /** The frame's view-group owner. */
   readonly viewGroups: WindowGroupHost;
   /** Surface factories registered by window / widget plugins. */
-  readonly surfaces: SurfaceRegistry;
+  readonly surfaces: SurfaceRegistry<FrameWindowGroup>;
   /** Runtime content hosts for windows; keyed by `contentId`. */
   readonly contentHosts: ContentHostRegistry;
   /** Board layout roots; keyed by `boardId`. */
@@ -127,7 +124,7 @@ export function createServices(
   // (a stack that falls back to one row melts, an empty leftover holds no space), so the normaliser
   // runs on the way out of each change rather than only on placements.
   const viewGroups = new WindowGroupHost(store);
-  const surfaces = new SurfaceRegistry();
+  const surfaces = new SurfaceRegistry<FrameWindowGroup>();
   const write = store.update.bind(store);
   store.update = (change: Parameters<typeof store.update>[0]) =>
     write((state: LayoutState) => ensureStackShape(change(state)));
@@ -260,8 +257,8 @@ export function createServices(
   const contentHosts = new ContentHostRegistry();
   const boardLayouts = new BoardLayoutRegistry();
   const pracFrame: PracLayoutFace = {
-    getState: store.get,
-    subscribe: store.subscribe,
+    getState: () => store.get(),
+    subscribe: (listener) => store.subscribe(listener),
     /** The union of the slot registry's views and each one's placement. */
     listViews(): ViewInfo[] {
       const state = store.get();
@@ -363,16 +360,16 @@ export function createServices(
     /** Declare the height a view wants as a stack row (see the model's doc). */
     registerContentHost(
       contentId: string,
-      host: import("./windowModel.js").ContentHost,
+      host: import("prac-ui-kit-frame").ContentHost,
     ): () => void {
       return contentHosts.register(contentId, host);
     },
     registerBoardLayout(
       boardId: string,
       source:
-        | import("./boardLayouts.js").BoardLayoutSource
-        | import("./contract.js").LayoutState<import("./contract.js").WidgetRecord>,
-      chrome?: import("./chrome.js").ChromeRegistry<import("./contract.js").WidgetRecord>,
+        | import("prac-ui-kit-frame").BoardLayoutSource
+        | import("prac-ui-kit-frame").LayoutState<import("prac-ui-kit-frame").WidgetRecord>,
+      chrome?: import("prac-ui-kit-frame").ChromeRegistry<import("prac-ui-kit-frame").WidgetRecord>,
     ): () => void {
       return boardLayouts.register(boardId, source, chrome);
     },
@@ -411,13 +408,10 @@ export function createServices(
         return { ...state, views: { ...state.views, [viewId]: { ...view, hidden: true } } };
       });
     },
-    createView(id: string): FrameView {
-      return new View(id);
-    },
     registerWindowGroup(group: FrameWindowGroup, regionId: string): FrameGroup {
       return viewGroups.register(group, regionId);
     },
-    registerSurface(surface: Surface, regionId: string): FrameGroup {
+    registerSurface(surface: FrameSurface, regionId: string): FrameGroup {
       return viewGroups.registerSurface(surface, regionId);
     },
     unregisterWindowGroup(groupId: string): void {

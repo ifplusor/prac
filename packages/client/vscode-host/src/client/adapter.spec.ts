@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import type { View as FrameView } from "prac-ui-kit";
 import { createVscodeResourceDefinitions } from "./adapter.js";
 import {
   VscodeGroupBinding,
@@ -50,14 +49,7 @@ function definitions() {
     reorder: () => {},
     dispose: () => {},
   };
-  const view: FrameView = {
-    id: "v1",
-    host: undefined,
-    mount: () => {},
-    release: () => {},
-    focus: () => {},
-    dispose: () => {},
-  };
+  const view = { id: "v1", release: () => {} };
   return {
     face,
     mountView,

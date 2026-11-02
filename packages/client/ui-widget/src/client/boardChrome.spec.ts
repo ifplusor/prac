@@ -14,7 +14,7 @@ import {
   regionNode,
   type LayoutState,
   type WidgetRecord,
-} from "prac-client-ui-frame/lib";
+} from "prac-ui-kit-frame";
 import { BoardContent } from "./boardContent.js";
 import { createBoardChrome } from "./boardChrome.js";
 import { createBoardStore } from "./boardStore.js";

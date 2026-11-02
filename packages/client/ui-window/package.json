@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
-    "prac-ui-kit": "workspace:*"
+    "prac-ui-kit-frame": "workspace:*"
   },
   "dsh": {
     "client": {

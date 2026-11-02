@@ -8,7 +8,7 @@
  *
  * @module prac-client-ui-widget/client/boardWindowGroup
  */
-import type { Surface } from "prac-ui-kit";
+import type { Surface } from "prac-ui-kit-frame";
 import type {
   ContentHost,
   LayoutState,
@@ -17,7 +17,7 @@ import type {
   WindowGroupPlacement,
   WindowGroupState,
   WidgetRecord,
-} from "prac-client-ui-frame/lib";
+} from "prac-ui-kit-frame";
 import { BoardContent, type WidgetPlacementOptions } from "./boardContent.js";
 import { createBoardChrome } from "./boardChrome.js";
 
@@ -89,6 +89,7 @@ export class BoardWindowGroup implements Surface<FrameWindowGroup> {
 
   get placements(): readonly WindowGroupPlacement[] {
     return this.#order().map((viewId, order) => ({
+      itemId: viewId,
       viewId,
       groupId: this.id,
       order,

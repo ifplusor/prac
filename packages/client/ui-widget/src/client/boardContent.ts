@@ -12,7 +12,7 @@
  * @module prac-client-ui-widget/client/boardContent
  */
 
-import type { LayoutRoot } from "prac-ui-kit";
+import type { LayoutRoot } from "prac-ui-kit-frame";
 import {
   ensureStackShape,
   freshNodeId,
@@ -28,7 +28,7 @@ import {
   type LayoutState,
   type Side,
   type WidgetRecord,
-} from "prac-client-ui-frame/lib";
+} from "prac-ui-kit-frame";
 import { WidgetBoard } from "./board.js";
 
 /** A board child: a widget identity plus its content host. */

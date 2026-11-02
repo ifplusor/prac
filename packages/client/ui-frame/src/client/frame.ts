@@ -31,30 +31,30 @@ import type {
 } from "react";
 import { createPortal } from "react-dom";
 import type { UsePanelInfo } from "@deepseek-ai/dsh-client-ui-layout/client";
-import { TabStrip } from "./layoutTabs.js";
-import { StackHeader, StackRowOverlay } from "./layoutStack.js";
-import { LayoutSashDrag } from "./layoutSashDrag.js";
-import { GridCellHandles, GridTrackHandle } from "./layoutGrid.js";
-import { beginStackReorder } from "./layoutStackDrag.js";
-import { ViewActions } from "./layoutActions.js";
-import { ContainerBar } from "./layoutContainerBar.js";
-import { LayoutIsolation } from "./layoutIsolation.js";
+import { TabStrip } from "prac-ui-kit-frame";
+import { StackHeader, StackRowOverlay } from "prac-ui-kit-frame";
+import { LayoutSashDrag } from "prac-ui-kit-frame";
+import { GridCellHandles, GridTrackHandle } from "prac-ui-kit-frame";
+import { beginStackReorder } from "prac-ui-kit-frame";
+import { ViewActions } from "prac-ui-kit-frame";
+import { ContainerBar } from "prac-ui-kit-frame";
+import { LayoutIsolation } from "prac-ui-kit-frame";
 import { LayoutItem, type ItemRenderSlot } from "./layoutItem.js";
-import { LayoutRenderer } from "./layoutRenderer.js";
-import type { LayoutDecoration, LayoutDecorationContext } from "./layoutRenderer.js";
-import { readStackRows, startEntryDrag, type StackContainer } from "./resizeController.js";
+import { LayoutRenderer } from "prac-ui-kit-frame";
+import type { LayoutDecoration, LayoutDecorationContext } from "prac-ui-kit-frame";
+import { readStackRows, startEntryDrag, type StackContainer } from "prac-ui-kit-frame";
 import type {
   ChromeContext,
   ChromeItemFacts,
   ChromeRegistry,
   ChromeSlotFace,
   LayoutIntents,
-} from "./chrome.js";
+} from "prac-ui-kit-frame";
 import { createFrameChrome } from "./frameChrome.js";
-import { createLayoutIntents } from "./chromeIntents.js";
+import { createLayoutIntents } from "prac-ui-kit-frame";
 import type { UseSessions } from "@deepseek-ai/dsh-client-ui-session/client";
 import { declaredViewIcon, declaredViewLabel, declaredViewPaneHeader } from "./catalogue.js";
-import type { GroupBarItem, WindowGroupHost } from "./frameGroups.js";
+import type { GroupBarItem, WindowGroupHost } from "prac-ui-kit-frame";
 import {
   SASH_SIZE,
   type Box,
@@ -62,9 +62,8 @@ import {
   type LayoutNode,
   type RegionNode,
   type StyleObject,
-  type PracWindowActionsFace,
-  type WindowAction,
-} from "./contract.js";
+} from "prac-ui-kit-frame";
+import type { PracWindowActionsFace, WindowAction } from "./contract.js";
 import {
   entrySashState,
   edgeRegion,
@@ -84,9 +83,9 @@ import {
   setEntryHeight,
   findNode,
   drawsRegionBar,
-} from "./model.js";
-import { type LayoutStore, useLayout } from "./store.js";
-import type { ViewRecord } from "./contract.js";
+} from "prac-ui-kit-frame";
+import { type LayoutStore, useLayout } from "prac-ui-kit-frame";
+import type { ViewRecord } from "prac-ui-kit-frame";
 
 /** A minimal pointer event, as the sash drag machine reads it. */
 interface PointerDragEvent {
@@ -257,7 +256,7 @@ function startEntryBoundaryDrag(
     new Map(rows.map((row) => [row.viewId, row.height])),
   );
   if (state === "disabled") return;
-  startEntryDrag(
+  startEntryDrag<ViewRecord>(
     store,
     container as unknown as StackContainer,
     node.id,
@@ -586,8 +585,8 @@ export function createFrame(
   sources: {
     readonly currentSession: CurrentSessionSource;
     readonly viewGroups?: WindowGroupHost;
-    readonly contentHosts?: import("./contentHosts.js").ContentHostRegistry;
-    readonly boardLayouts?: import("./boardLayouts.js").BoardLayoutRegistry;
+    readonly contentHosts?: import("prac-ui-kit-frame").ContentHostRegistry;
+    readonly boardLayouts?: import("prac-ui-kit-frame").BoardLayoutRegistry;
     readonly chrome?: ChromeRegistry<ViewRecord>;
     readonly windowActions: PracWindowActionsFace;
   },
@@ -685,7 +684,7 @@ export function createFrame(
       down: PointerDragEvent,
       viewId: string,
       containerIn?: HTMLElement | null,
-    ): void => beginStackReorder(store, down, viewId, containerIn);
+    ): void => beginStackReorder<ViewRecord>(store, down, viewId, containerIn);
 
     /**
      * One region's tab strip: the visible views in order, the front one active.
@@ -1031,7 +1030,7 @@ export function createFrame(
       },
       sources.chrome,
     );
-    const intents: LayoutIntents = createLayoutIntents(store);
+    const intents: LayoutIntents = createLayoutIntents<ViewRecord>(store);
 
     /**
      * The frame's node decoration: surfaces, stack-row gestures, grid drops.

@@ -5,7 +5,9 @@
  */
 
 import type { Context } from "@deepseek-ai/cordis";
-import type { Side } from "prac-client-ui-frame/lib";
+// Type-only, for the frame plugin's `Context` / `SlotMap` merges.
+import type {} from "prac-client-ui-frame/client";
+import type { Side } from "prac-ui-kit-frame";
 import type { BoardWindowFrameFace } from "./boardWindowGroup.js";
 import { BoardWindowGroup } from "./boardWindowGroup.js";
 import { WidgetRegistry } from "./widget.js";

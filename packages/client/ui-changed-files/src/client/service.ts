@@ -5,6 +5,9 @@
  */
 
 import type { Context } from "@deepseek-ai/cordis";
+// Type-only, for the `Context.slots` augmentation: this plugin registers into
+// DSH's slot registry, so it names the renderer that owns that service.
+import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "prac-client-vscode-host/client";
 import { PracChangedFiles, type ChangedFilesInjected } from "./changed-files.js";
 import { CHANGED_FILES_CSS } from "./style.js";

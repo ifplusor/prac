@@ -30,7 +30,8 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 // Type-only: brings the frame's slot declarations into this program.
-import type {} from "prac-client-ui-frame/lib";
+// Type-only, for the frame plugin's `Context` / `SlotMap` merges.
+import type {} from "prac-client-ui-frame/client";
 
 /** The slot these views are registered into (checked against the mechanism's key). */
 const SLOT = "prac.widget" as const;

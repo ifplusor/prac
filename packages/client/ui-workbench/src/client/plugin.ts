@@ -41,6 +41,8 @@ import {
 } from "./title-bar.js";
 import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
+// Type-only, for the frame plugin's `Context` / `SlotMap` merges.
+import type {} from "prac-client-ui-frame/client";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
 import type { PracDshFace } from "prac-client-ui-dsh/lib";
 // Type-only, for its declarations: `ui-renderer` owns `Context.slots` (its `SlotRegistry`),
@@ -49,7 +51,7 @@ import type { PracDshFace } from "prac-client-ui-dsh/lib";
 // whichever package owns them (the mechanism declares the `root` children it registers,
 // including `shell.overlay`), so nothing here re-imports a key's owner for comparison.
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
-import type { LayoutState, Side } from "prac-client-ui-frame/lib";
+import type { LayoutState, Side } from "prac-ui-kit-frame";
 import type { PracWidgetsFace } from "prac-client-ui-widget/lib";
 // Types only, for its `Context` merge (`ctx.pracVscode`): the arrangement follows
 // the app's open-file set, and naming the face puts that service in this program.

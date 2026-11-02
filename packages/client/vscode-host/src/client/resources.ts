@@ -9,13 +9,29 @@
  * @module prac-client-vscode-host/client/resources
  */
 
-import type {
-  GroupBinding,
-  MoveIntent,
-  View as FrameView,
-  ViewGroup as FrameWindowGroup,
-  ViewHost,
-} from "prac-ui-kit";
+import type { FrameWindowGroup, WindowGroupBinding } from "prac-ui-kit-frame";
+
+/** The release handle a source hands a group for one view. */
+export interface VscodeViewHandle {
+  readonly id: string;
+  release?(): void;
+}
+
+/** A source-owned hint passed when a view moves. */
+export interface VscodeMoveIntent {
+  readonly fromViewGroupId: string;
+  readonly toViewGroupId: string;
+  readonly reason: "user" | "layout" | "editor-split";
+  readonly preserve?: "auto" | "state" | "never";
+}
+
+/** The source-owned view host boundary. */
+export interface VscodeViewHostSurface {
+  mount(element: HTMLElement): void;
+  release(): void;
+  focus(): void;
+  readonly focusable: boolean;
+}
 
 /** The VS Code resource API group. */
 export const VSCODE_API_VERSION = "vscode.prac/v1";
@@ -64,9 +80,9 @@ export interface VscodeView {
 
 /** The group runtime the adapter's factory must produce. */
 export interface VscodeGroupRuntime extends FrameWindowGroup {
-  readonly binding?: GroupBinding;
-  setBinding(binding: GroupBinding | undefined): void;
-  add(view: FrameView): void;
+  readonly binding?: WindowGroupBinding;
+  setBinding(binding: WindowGroupBinding | undefined): void;
+  add(view: VscodeViewHandle): void;
   remove(viewId: string): void;
   select(viewId: string | undefined): void;
   reorder(order: readonly string[]): void;
@@ -80,19 +96,19 @@ export type VscodeGroupFactory = (
 ) => VscodeGroupRuntime;
 
 /** The adapter's factory for the core view runtime. */
-export type VscodeViewFactory = (id: string) => FrameView;
+export type VscodeViewFactory = (id: string) => VscodeViewHandle;
 
 /** The adapter's factory for a view host. */
 export type VscodeHostFactory = (
   view: VscodeView,
-  options?: { readonly move?: MoveIntent },
-) => ViewHost;
+  options?: { readonly move?: VscodeMoveIntent },
+) => VscodeViewHostSurface;
 
 /** The adapter's optional group-binding factory. */
 export type VscodeBindingFactory = (
   spec: VscodeViewGroupSpec,
   groupId: string,
-) => GroupBinding | undefined;
+) => WindowGroupBinding | undefined;
 
 /** Options for the VS Code view-group definition. */
 export interface VscodeViewGroupDefinitionOptions {
@@ -115,7 +131,7 @@ export interface VscodeGroupBindingRuntime {
 }
 
 /** A source-owned group binding for a VS Code group. */
-export class VscodeGroupBinding implements GroupBinding {
+export class VscodeGroupBinding implements WindowGroupBinding {
   #disposed = false;
 
   constructor(
@@ -148,10 +164,10 @@ export class VscodeGroupBinding implements GroupBinding {
 }
 
 /** A thin source-owned view host wrapper. */
-export class VscodeViewHost implements ViewHost {
+export class VscodeViewHost implements VscodeViewHostSurface {
   constructor(
     readonly viewId: string,
-    private readonly delegate: ViewHost,
+    private readonly delegate: VscodeViewHostSurface,
   ) {}
 
   get focusable(): boolean {
@@ -227,7 +243,7 @@ export class VscodeViewGroupDefinition {
     );
   }
 
-  bindingFactory(decl: VscodeViewGroup): GroupBinding | undefined {
+  bindingFactory(decl: VscodeViewGroup): WindowGroupBinding | undefined {
     const spec = this.validate(decl.spec);
     return this.options.createBinding?.(spec, decl.metadata.id);
   }
@@ -248,11 +264,14 @@ export class VscodeViewDefinition {
     return spec as unknown as VscodeViewSpec;
   }
 
-  materialize(decl: VscodeView): FrameView {
+  materialize(decl: VscodeView): VscodeViewHandle {
     return this.options.createView(decl.metadata.id);
   }
 
-  hostFactory(decl: VscodeView, options?: { readonly move?: MoveIntent }): ViewHost {
+  hostFactory(
+    decl: VscodeView,
+    options?: { readonly move?: VscodeMoveIntent },
+  ): VscodeViewHostSurface {
     return new VscodeViewHost(decl.metadata.id, this.options.createHost(decl, options));
   }
 }

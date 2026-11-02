@@ -8,12 +8,14 @@
  * @module prac-client-vscode-host/client/groups
  */
 
-import type { View as FrameView, ViewGroup as FrameWindowGroup, Surface } from "prac-ui-kit";
+import type { FrameWindowGroup } from "prac-ui-kit-frame";
+import type { FrameSurface } from "prac-ui-kit-frame";
 import type { VscodeCatalogueEntry } from "./public.js";
 import type { VscodeGroupRuntime } from "./resources.js";
 import {
   VSCODE_API_VERSION,
   type VscodeView,
+  type VscodeViewHandle,
   type VscodeViewDefinition,
   type VscodeViewGroup,
   type VscodeViewGroupDefinition,
@@ -22,7 +24,7 @@ import {
 /** The frame operations the group host needs. */
 export interface VscodeGroupLayout {
   registerWindowGroup(group: FrameWindowGroup, regionId: string): unknown;
-  registerSurface?(surface: Surface, regionId: string): unknown;
+  registerSurface?(surface: FrameSurface, regionId: string): unknown;
   unregisterWindowGroup(groupId: string): void;
 }
 
@@ -45,7 +47,7 @@ export interface VscodeGroupHostOptions {
 /** Materializes and registers VS Code view groups. */
 export class VscodeGroupHost {
   readonly #groups = new Map<string, { group: VscodeGroupRuntime; regionId: string }>();
-  readonly #views = new Map<string, { group: VscodeGroupRuntime; view: FrameView }>();
+  readonly #views = new Map<string, { group: VscodeGroupRuntime; view: VscodeViewHandle }>();
 
   constructor(private readonly options: VscodeGroupHostOptions) {}
 
@@ -57,7 +59,7 @@ export class VscodeGroupHost {
     const group = this.options.definition.materialize(resource) as unknown as VscodeGroupRuntime;
     const binding = this.options.definition.bindingFactory?.(resource);
     if (binding !== undefined) group.setBinding(binding);
-    const surface = group as unknown as Surface;
+    const surface = group as unknown as FrameSurface;
     try {
       if (this.options.layout.registerSurface !== undefined && surface.group !== undefined) {
         this.options.layout.registerSurface(surface, regionId);
@@ -127,13 +129,13 @@ export class VscodeGroupHost {
   }
 
   /** Materialize a view and add it to a hosted group. */
-  addView(groupId: string, resource: VscodeView): FrameView {
+  addView(groupId: string, resource: VscodeView): VscodeViewHandle {
     const entry = this.#groups.get(groupId);
     if (!entry) throw new Error(`view group is not hosted: ${groupId}`);
     if (this.#views.has(resource.metadata.id)) {
       throw new Error(`view already hosted: ${resource.metadata.id}`);
     }
-    const view = this.options.viewDefinition.materialize(resource) as unknown as FrameView;
+    const view = this.options.viewDefinition.materialize(resource);
     entry.group.add(view);
     this.#views.set(resource.metadata.id, { group: entry.group, view });
     return view;

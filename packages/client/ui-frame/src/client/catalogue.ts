@@ -1,24 +1,34 @@
 /**
- * The view catalogue: which view ids exist, and where they were declared.
+ * The DSH side of the view catalogue.
  *
- * A view id is `<source>:<name>`. The **place** it renders in comes from the
- * `views` table (filled by the arrangement), and **what** renders it comes from
- * where it was declared: DSH's own slots, or the `prac.view` slot. That is decided
- * by registry membership, never by the id's source name — the frame must not know
- * which producer chose `vscode:`.
+ * Which view ids DSH's own slots declare, which entries the `prac.view` slot
+ * holds, and the DSH id vocabulary (`dsh:sidebar`, `dsh:main:<key>`,
+ * `dsh:rightbar`). This lives in the plugin: `prac-ui-kit-frame` only owns the
+ * view/region shapes and prac's own slot keys.
  *
  * @module prac-client-ui-frame/client/catalogue
  */
 
-import type { Context } from "@deepseek-ai/cordis";
+import { VIEW_SLOT, viewSource, WIDGET_SLOT, WINDOW_SLOT } from "prac-ui-kit-frame";
 
-// ── view catalogue ────────────────────────────────────────────────────
-//
-// A view id is `<source>:<name>`. The **place** it renders in comes from the
-// `views` table (filled by the arrangement), and **what** renders it comes from
-// where it was declared: DSH's own slots, or the `prac.view` slot. That is
-// decided by registry membership, never by the id's source name — the frame must
-// not know which producer chose `vscode:`.
+/**
+ * The slice of DSH's slot registry the catalogue reads.
+ *
+ * Structural on purpose: the plugin must not pull the renderer's service types
+ * (and their module augmentations) into its declaration file. `ctx.slots`
+ * satisfies it because its `entries` accepts a superset of these keys.
+ */
+export interface CatalogueSlots {
+  entries(slot: "main" | "prac.view" | "prac.window" | "prac.widget"): Iterable<{
+    readonly options: {
+      readonly id?: string;
+      readonly key?: string;
+      readonly label?: unknown;
+      readonly icon?: unknown;
+      readonly paneHeader?: unknown;
+    };
+  }>;
+}
 
 /** The `dsh:` source: a slot DSH's own plugins register into. */
 export const DSH_VIEW_SOURCE = "dsh:";
@@ -33,35 +43,14 @@ export const DSH_RIGHTBAR_VIEW = "dsh:rightbar";
 export const DSH_MAIN_PREFIX = "dsh:main:";
 /** DSH's main-slot key for the current conversation (`selectPanel(null)`). */
 export const DSH_CONVERSATION_KEY = "conversation";
-/**
- * The slot prac's own views register into: a `root`-scoped list slot declared
- * by this frame. An entry's view id is what it declares (`vscode:view:<app view id>`).
- */
-export const VIEW_SLOT = "prac.view";
-export const WINDOW_SLOT = "prac.window";
-export const WIDGET_SLOT = "prac.widget";
-
-/**
- * The source segment of a view id (`dsh:`, `vscode:`, …); `""` when there is none.
- *
- * @param viewId - the view identity.
- */
-export function viewSource(viewId: string): string {
-  const colon = viewId.indexOf(":");
-  return colon === -1 ? "" : viewId.slice(0, colon + 1);
-}
 
 /**
  * The view ids the `prac.view` slot currently declares.
  *
- * Membership in the slot's registry **is** what makes a view one this frame renders: the
- * frame then renders the slot's own declaration for it (see {@link View}). A name
- * prefix would not do — the mechanism owns neither the slot's id vocabulary nor
- * the producers that use it.
- *
- * Refreshed wherever the catalogue is re-read or a view registration changes, so
- * a source that starts declaring a view is picked up without the frame knowing
- * who it is.
+ * Membership in the slot's registry **is** what makes a view one this frame
+ * renders: a name prefix would not do — the mechanism owns neither the slot's
+ * id vocabulary nor the producers that use it. Refreshed wherever the catalogue
+ * is re-read or a view registration changes.
  */
 let declaredViewIds: ReadonlySet<string> = new Set<string>();
 /** The content slot each declared view registered into. */
@@ -70,24 +59,16 @@ let declaredViewSlots: ReadonlyMap<string, "window" | "widget" | "legacy"> = new
 let declaredViewLabels: ReadonlyMap<string, string> = new Map<string, string>();
 /** The icon class each `prac.view` entry declares, keyed by view id. */
 let declaredViewIcons: ReadonlyMap<string, string> = new Map<string, string>();
-/**
- * Which declared views bring a **native pane header**.
- *
- * A pane header is the view's own title bar (VS Code's `ViewPane` draws one). The
- * frame still owns the row's title, fold and drag, but it draws them as an overlay
- * over that header instead of as a separate row header, and hides the native
- * title so the two do not compete. Whether a view has one is the **view's** fact,
- * not its source's: the frame must not infer it from a `vscode:` prefix.
- */
+/** Which declared views bring a native pane header. */
 let declaredViewPaneHeaders: ReadonlySet<string> = new Set<string>();
 
 /**
- * Re-read the `prac.view` slot registry into {@link declaredViewIds}.
+ * Re-read the slot registries into {@link declaredViewIds}.
  *
  * @param slots - the slot registry face the frame holds.
  * @returns the slot's current view ids.
  */
-export function readDeclaredViewIds(slots: Context["slots"]): ReadonlySet<string> {
+export function readDeclaredViewIds(slots: CatalogueSlots): ReadonlySet<string> {
   const ids = new Set<string>();
   const labels = new Map<string, string>();
   const icons = new Map<string, string>();
@@ -118,49 +99,22 @@ export function readDeclaredViewIds(slots: Context["slots"]): ReadonlySet<string
   return ids;
 }
 
-/**
- * The display title a `prac.view` entry declared, if any.
- *
- * The frame must not show the raw id when the source already has a title: the
- * VS Code catalogue reports `title` and `ui-vscode-views` carries it here.
- *
- * @param viewId - the view identity.
- * @returns the declared label, or undefined for DSH slots/unknown ids.
- */
 /** The content slot a declared view registered into. */
 export function declaredViewSlot(viewId: string): "window" | "widget" | "legacy" | undefined {
   return declaredViewSlots.get(viewId);
 }
 
+/** The display title a `prac.view` entry declared, if any. */
 export function declaredViewLabel(viewId: string): string | undefined {
   return declaredViewLabels.get(viewId);
 }
 
-/**
- * The icon class a `prac.view` entry declared, if any.
- *
- * The value is an opaque class name the declaring adapter owns (VS Code passes
- * its codicon class; another adapter may pass its own). The frame only renders
- * it, never interprets it.
- *
- * @param viewId - the view identity.
- * @returns the declared icon class, or undefined.
- */
+/** The icon class a `prac.view` entry declared, if any. */
 export function declaredViewIcon(viewId: string): string | undefined {
   return declaredViewIcons.get(viewId);
 }
 
-/**
- * Whether a declared view brings a native pane header of its own.
- *
- * The fact is declared through the `prac.view` entry (`paneHeader: true`), never
- * inferred from the view id's source segment. A stack row for such a view keeps
- * the view's header and draws the frame's fold/drag control as an overlay; a row
- * for any other view is the frame's own header.
- *
- * @param viewId - the view identity.
- * @returns whether the view declares a pane header.
- */
+/** Whether a declared view brings a native pane header of its own. */
 export function declaredViewPaneHeader(viewId: string): boolean {
   return declaredViewPaneHeaders.has(viewId);
 }
@@ -198,76 +152,16 @@ export function isDeclaredView(viewId: string): boolean {
 }
 
 /**
- * One view the frame knows about, together with where it currently sits.
- *
- * This is what lets a UI offer the views that are *not* on screen, not just the
- * ones already placed: `region: null` means nothing has placed it yet, and
- * `order` is only meaningful once a region holds it.
- */
-export interface ViewInfo {
-  /** The view identity (`dsh:*`, `prac:*`, `vscode:*`). */
-  readonly id: string;
-  /** The region currently holding the view, or null while it is unplaced. */
-  readonly region: string | null;
-  /** Whether the view is currently not shown. Unplaced views count as hidden. */
-  readonly hidden: boolean;
-  /** The view's order inside its region (lower renders first), or null. */
-  readonly order: number | null;
-  /** Whether this frame view is a window or a widget. */
-  readonly kind: "window" | "widget";
-}
-
-/** A `ViewInfo` proven to be a window. */
-export interface WindowInfo extends ViewInfo {
-  readonly kind: "window";
-}
-
-/** A `ViewInfo` proven to be a widget. */
-export interface WidgetInfo extends ViewInfo {
-  readonly kind: "widget";
-}
-
-/** The classified view-info union. */
-export type TypedViewInfo = WindowInfo | WidgetInfo;
-
-export function isWindowInfo(view: ViewInfo): view is WindowInfo {
-  return view.kind === "window";
-}
-
-export function isWidgetInfo(view: ViewInfo): view is WidgetInfo {
-  return view.kind === "widget";
-}
-
-/**
- * One region a view can be moved to.
- *
- * The id is what `place` takes; `collapsed` is included because a UI that
- * offers "move to …" and "collapse/expand" needs both without walking the tree.
- */
-export interface RegionInfo {
-  /** The region id. */
-  readonly id: string;
-  /** Whether the region currently renders at 0px. */
-  readonly collapsed: boolean;
-}
-
-/**
  * The view ids the frame can currently offer, in a deterministic order.
  *
  * The catalogue is the union of two live sources, never a hard-coded list:
- *
- * - DSH's own slots — `sidebar`, `rightbar`, and one id per **currently
- *   registered** `main` key. Keys are read through the slot registry on every
- *   call, so a plugin that registers a panel later is picked up.
- * - Every entry of the `prac.view` slot (a `vscode:` part host or a `prac:` view),
- *   whose declared entry id *is* its view id.
- *
- * Sorting each group keeps the offered order stable across re-reads while
- * registrations come and go.
+ * DSH's own slots (`sidebar`, `rightbar`, and one id per currently registered
+ * `main` key) and every entry of the `prac.view` slot. Sorting each group keeps
+ * the offered order stable across re-reads.
  *
  * @param slots - the slot registry face the frame holds.
  */
-export function catalogueViewIds(slots: Context["slots"]): string[] {
+export function catalogueViewIds(slots: CatalogueSlots): string[] {
   const mainKeys = new Set<string>();
   for (const entry of slots.entries("main")) {
     if (entry.options.key !== undefined) mainKeys.add(entry.options.key);

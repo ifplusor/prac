@@ -1,47 +1,48 @@
 /**
- * The layout vocabulary: the region/split tree, the views table's shapes, and the
- * faces this mechanism publishes.
+ * The frame plugin's DSH contract.
  *
- * Layer 0 of the client half — it imports nothing from the other domains, so
- * every module (model, store, frame, services) can speak these types without
- * depending on each other.
+ * Everything that names DSH lives here, not in `prac-ui-kit-frame`: the prac
+ * slots merged into DSH's `SlotMap`, and the `Context` faces the frame
+ * publishes (`ctx.pracFrame`, `ctx.pracSpaces`, `ctx.pracWindowActions`,
+ * `ctx.pracSurfaces`). Consumers name this module (type-only) for the merges;
+ * the layout vocabulary itself stays in the kit.
  *
  * @module prac-client-ui-frame/client/contract
  */
 
-import type { RegionInfo, ViewInfo } from "./catalogue.js";
-import type { FrameGroup, FrameWindowGroup } from "./frameGroups.js";
-import type { Surface } from "./surface.js";
-import type { FrameView } from "./view.js";
-import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
-import type { Box, LayoutNode, RegionChild, RegionSelector, Side } from "prac-ui-kit";
-export type {
-  Box,
-  Dir,
-  GridNode,
-  GridPlacement,
-  LayoutNode,
-  LayoutPriority,
+// Type-only, for the modules whose declaration merges this file augments.
+import type {} from "@deepseek-ai/cordis";
+import type {} from "@deepseek-ai/dsh-client-ui-slots";
+
+// Re-exported so the declaration artifact imports the real modules before it
+// augments them; a bare `declare module` alone lets a consumer see only the
+// merged members (no `ctx.effect` / `ctx.provide`).
+export type { Context } from "@deepseek-ai/cordis";
+export type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
+import type {
+  BoardLayoutSource,
+  ChromeRegistry,
+  ContentHost,
+  FrameGroup,
+  FrameViewKind,
+  FrameWindowGroup,
+  LayoutState,
   RegionChild,
-  RegionNode,
+  RegionInfo,
   RegionSelector,
   Side,
-  Sizing,
-  SplitNode,
-  TabMode,
-} from "prac-ui-kit";
+  FrameSurface,
+  SurfaceRegistry,
+  ViewFlags,
+  ViewInfo,
+  WidgetRecord,
+} from "prac-ui-kit-frame";
 
-export type { SlotMap };
-export type { HostObservable } from "@deepseek-ai/dsh-client-ui-renderer/client";
-
-// DSH's declaration merges reach this program through the **type-only** imports
-// the other modules already make (`PropsRenderSlots` from ui-slots,
-// `HostObservable` from ui-renderer, `PanelInfo`/`UsePanelInfo` from ui-layout,
-// `ThemeSnapshot` from ui-theme, `UseSessions` from ui-session). Do not "make it
-// explicit" with side-effect imports here: a bare `import "@deepseek-ai/…"` in a
-// `.ts` module is a *runtime* import, and the bundler will inline that package
-// into the client artifact (measured: 40 kB → 218 kB, loader check red). Inside a
-// `.d.ts` it is erased; in a module it is not.
+// The merges reach this program through the **type-only** imports above. Do not
+// "make it explicit" with side-effect imports here: a bare `import "@deepseek-ai/…"`
+// in a `.ts` module is a *runtime* import, and the bundler will inline that
+// package into the client artifact. Inside a `.d.ts` it is erased; in a module
+// it is not.
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface SlotMap {
@@ -57,15 +58,12 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
     "prac.windowActions": { kind: "keyed"; scope: "root" };
     /** Widget content actions, keyed by widget id. */
     "prac.widgetActions": { kind: "keyed"; scope: "root" };
-    /** The per-container action surface; keyed by container id. */
-    // The child slots of the `root` slot prac registers — declared by their **owner**, which
-    // is the frame (see the `ui-slots` contract: a slot table is merged by the plugin that
-    // owns the slot, and reading entries stays string-keyed and dynamic). prac owns the frame
-    // here: it publishes `ctx.layout` and makes the one `root` registration, so these four
-    // belong in this package rather than being borrowed from DSH's own `ui-layout` — a
-    // consumer that reads a key owned by another package would have to have that package's
-    // declarations in the same module record, which is exactly the kind of coupling this
-    // ownership split removes.
+    // The child slots of the `root` slot prac registers — declared by their
+    // **owner**, which is the frame (see the `ui-slots` contract: a slot table is
+    // merged by the plugin that owns the slot, and reading entries stays
+    // string-keyed and dynamic). prac owns the frame here: it publishes
+    // `ctx.layout` and makes the one `root` registration, so these four belong to
+    // the plugin rather than being borrowed from DSH's own `ui-layout`.
     sidebar: { kind: "single"; scope: "root" };
     main: { kind: "keyed"; scope: "root" };
     rightbar: { kind: "single"; scope: "root" };
@@ -81,6 +79,8 @@ declare module "@deepseek-ai/cordis" {
     pracSpaces: PracSpacesFace;
     /** The active window's resolved actions, rendered in the tab strip. */
     pracWindowActions: PracWindowActionsFace;
+    /** The frame's surface socket registry. */
+    pracSurfaces: SurfaceRegistry<FrameWindowGroup>;
   }
 }
 
@@ -137,176 +137,12 @@ export interface PracSpacesFace {
   onDidChange(listener: () => void): () => void;
 }
 
-/** Split axis: `row` distributes width, `column` distributes height. */
-/** Where one view sits, and in what order inside its region. */
-/** Whether a frame view is a window or a widget. */
-export type FrameViewKind = "window" | "widget";
-
-interface ViewRecordBase {
-  /**
-   * The height this view **declares** for its row, or the height a lone (melted) view keeps while
-   * it has no row. A row's authoritative height is the leaf's `size`; this field only seeds it and
-   * waits while the view is not a row. Absent means "no claim" (share the remaining height); while
-   * the view is **folded** this is 0/not a height, and what it remembers lives in `cachedSize`
-   * (VS Code keeps `size` and `_cachedVisibleSize` apart, `splitview.ts:221-246`).
-   */
-  size?: number;
-  /**
-   * The height a **folded** row remembers, so unfolding puts it back where it was.
-   *
-   * Upstream's `_cachedVisibleSize`: written when the row hides (`splitview.ts:237`), read back
-   * through `clamp(cached, view.min, view.max)` when it shows again (`:234`), and carried in the
-   * serialized state (`:273-277`).
-   */
-  cachedSize?: number;
-  /**
-   * This view's ceiling in a stack, if it declares one.
-   *
-   * The interface is the design (`IView.maximumWidth/maximumHeight`, `splitview.ts:60`); a hidden
-   * view counts as 0 (`:254-255`). Nothing declares one yet: VS Code's own viewlets do not, so a
-   * row that can grow takes the free room. Without a ceiling the room goes to the last capable row
-   * first — the order `distributeEmptySpace` uses (`splitview.ts:1349-1355`).
-   */
-  max?: number;
-  /** Content host id; when present the frame renders the host, not a slot. */
-  contentId?: string;
-  /** Region id used as this window's nested content. */
-  contentRegion?: string;
-  /** Board id whose LayoutState<WidgetRecord> renders this window. */
-  boardId?: string;
-  region: string;
-  /**
-   * The region's open order.
-   *
-   * A stack stores the same order in its split's children and renumbers this field on a reorder
-   * (F7), so the tab strip and the stack cannot drift when a region changes mode.
-   */
-  order: number;
-  hidden: boolean;
-  /**
-   * Whether the view's body is folded away inside a stack (its header stays).
-   *
-   * A view without a row (the one-view interlude after a melt) keeps the fold here until a second
-   * view turns the region back into a stack.
-   */
-  collapsed?: boolean;
-  /** Chrome the view's declarer set on it (tab dot, preview italic). */
-  flags?: ViewFlags;
-  /**
-   * Whether this view is the one its region renders.
-   *
-   * **Separate from `order` on purpose**: `order` is the region's open order (the tab strip's
-   * position, kept in sync with a stack's rows) and this is what "active" means (changed by
-   * clicking a tab or by placing a view). VS Code keeps the two apart — its tabs do not
-   * move when the active editor changes — and merging them made the strip MRU.
-   */
-  front?: boolean;
-}
-
-/** The whole layout store state (replaced immutably on every update). */
-/** A record proven to be a window. */
-export interface WindowRecord extends ViewRecordBase {
-  kind: "window";
-}
-
-/** A record proven to be a widget. */
-export interface WidgetRecord extends ViewRecordBase {
-  kind: "widget";
-}
-
-/** The discriminated record union. */
-export type ViewRecord = WindowRecord | WidgetRecord;
-/** Compatibility alias for code that only needs the discriminated union. */
-export type TypedViewRecord = ViewRecord;
-
-export function isWindowRecord(record: ViewRecord): record is WindowRecord {
-  return record.kind === "window";
-}
-
-export function isWidgetRecord(record: ViewRecord): record is WidgetRecord {
-  return record.kind === "widget";
-}
-
-export interface LayoutState<TRecord extends ViewRecord = ViewRecord> {
-  /** Measured frame width, in px (0 until the first measurement). */
-  viewportWidth: number;
-  /** Measured frame height, in px. */
-  viewportHeight: number;
-  /** The region tree. */
-  tree: LayoutNode;
-  /** The item table: `itemId → placement`. Frame uses Window/Widget; a board uses widgets. */
-  views: Record<string, TRecord>;
-  /**
-   * Bumped whenever the slot registry's view registrations change. The view
-   * *table* only moves when the arrangement acts; the *catalogue* also moves
-   * when a plugin registers a `main` key or a `prac.view` entry, and this is
-   * how a subscribed UI learns to re-read {@link PracLayoutFace.listViews}.
-   */
-  catalogueVersion: number;
-  /** DSH's selected main key; null means the conversation. */
-  activePanelId: string | null;
-}
-
-/**
- * Decoration a view's **declarer** can set on it, rendered in the region's chrome.
- *
- * The mechanism has no way to know this: whether a view has unsaved changes or is
- * a preview is the view's own fact, and the chrome that shows it (a tab's dot, an
- * italic label) is the frame's. So the declarer pushes flags and the frame renders
- * them — one direction, no second source of truth.
- */
-export interface ViewFlags {
-  /** Unsaved changes: the chrome shows a dot. */
-  readonly dirty?: boolean;
-  /** Preview: the label is italic, the way VS Code marks a preview tab. */
-  readonly preview?: boolean;
-  /**
-   * Whether the view can be closed from its own chrome (a close button on its tab).
-   *
-   * The declarer's word, like the other flags: the mechanism renders the button and
-   * reports the request through {@link PracLayoutFace.onDidRequestCloseView} — it never
-   * closes anything itself, because what "closed" means belongs to whoever declared the
-   * view (for a file, the app's open set).
-   */
-  readonly closable?: boolean;
-}
-
-/** Inline style values this frame emits. */
-export type StyleObject = Record<string, string | number>;
-
-/** A box standing in for a region the resolver has not measured yet. */
-export const ZERO_BOX: Box = { width: 0, height: 0 };
-
-/** Width/height of a sash's hit area in px (VS Code: `--vscode-sash-size` 4). Kept in step with FRAME_STYLES. */
-export const SASH_SIZE = 4;
-/** A region's minimum size in px unless it declares its own. */
-export const DEFAULT_MIN = 120;
-/** The centre work area stays wider than a side track can usefully be. */
-export const CENTER_MIN = 240;
-/**
- * The frame's default centre region.
- *
- * Where a main panel goes when the arrangement placed it nowhere: the centre is
- * the frame's own default, and the arrangement is free to place the same view
- * somewhere else (see {@link PracLayoutFace.selectPanel}).
- */
-export const CENTER_REGION = "center";
-/**
- * The frame's bottom bar.
- *
- * It sits under the whole row of side regions — the home of a terminal, output,
- * problems: things that are about the workspace rather than about one region.
- * It is empty at boot, and an empty region is not rendered at all, so the
- * default layout is exactly the row; the arrangement (or the user) fills it.
- */
-export const BOTTOM_REGION = "bottom";
-
 export interface LayoutFace {
   /**
    * The selected global central panel — the same source the `panelInfo` root hook reads.
    *
    * Upstream's `ILayout` carries it, and its plugins reach for it through `ctx.layout`
-   * (measured: `@deepseek-ai/dsh-client-ui-sidebar-right` reads
+   * (measured: upstream's right-sidebar plugin reads
    * `layout.panelInfo.getSnapshot().activePanelId` while it activates, and this face
    * without it took the whole shell down — 12 entries failed to activate).
    */
@@ -501,33 +337,20 @@ export interface PracLayoutFace {
    * @param viewId - the view identity.
    */
   hide(viewId: string): void;
-  /**
-   * Register a materialized view group in a frame region.
-   *
-   * The caller owns the group runtime (the resource materializer); the frame
-   * owns the projection into the layout store.
-   *
-   * @param group - the materialized group.
-   * @param regionId - the existing frame region.
-   * @returns the registered group/region pair.
-   */
-  createView(id: string): FrameView;
   /** Classify an existing view as a window or a widget (model discriminator). */
   setViewKind(viewId: string, kind: FrameViewKind): void;
   /** Register a content host for a window; returns the unregister function. */
-  registerContentHost(contentId: string, host: import("./windowModel.js").ContentHost): () => void;
+  registerContentHost(contentId: string, host: ContentHost): () => void;
   /** Register a board layout root for a board window; returns the unregister function. */
   registerBoardLayout(
     boardId: string,
-    source:
-      | import("./boardLayouts.js").BoardLayoutSource
-      | import("./contract.js").LayoutState<import("./contract.js").WidgetRecord>,
-    chrome?: import("./chrome.js").ChromeRegistry<import("./contract.js").WidgetRecord>,
+    source: BoardLayoutSource | LayoutState<WidgetRecord>,
+    chrome?: ChromeRegistry<WidgetRecord>,
   ): () => void;
   /** Point a window record at a board layout root (or clear it). */
   setViewBoard(viewId: string, boardId: string | undefined): void;
   registerWindowGroup(group: FrameWindowGroup, regionId: string): FrameGroup;
-  registerSurface(surface: Surface, regionId: string): FrameGroup;
+  registerSurface(surface: FrameSurface, regionId: string): FrameGroup;
   /**
    * Remove a view group's frame projection.
    *
@@ -717,9 +540,3 @@ export interface PracLayoutFace {
    */
   bindTrack(regionId: string): void;
 }
-
-/**
- * Install the frame and its services on the Cordis client context.
- *
- * @param ctx - the Cordis client context.
- */

@@ -21,7 +21,7 @@ WindowGroup
 - **BoardContent** is a window content: it owns widget order, the active widget,
   and a **LayoutRoot** for the board's own split / grid / region tree.
 - **LayoutEngine** is shared by the frame root and each board root. The frame root
-  lays out windows; a board root lays out widgets. A board root is a *layout hole*
+  lays out windows; a board root lays out widgets. A board root is a _layout hole_
   inside a window content: window is the lifecycle / focus / theme boundary, but
   the board root participates in frame hit-testing, drag, resize and split.
 - Cross-root widget drag is **move** only. A split is completed inside the target
@@ -32,10 +32,9 @@ WindowGroup
 
 ## What is legacy
 
-- `FrameView` (`prac-ui-kit` `View`): generic content host + window field union.
-  It remains the stage editor group's runtime member, not a board's widget.
-- `ViewGroup`: still the frame's group **shape**, but the sidebar / panel
-  surface is a `WindowGroup`, not a `ViewGroup`; a board is not a group.
+- `FrameView` / `View`: removed. The product has no view object; a source adapter
+  owns its own view handle.
+- `ViewGroup`: removed. The frame speaks `WindowGroup`; a board is not a group.
 - `WidgetBoardGroup`: removed. A container's board is the content of a **board
   window** (`BoardWindowGroup`, a `WindowGroup` of one board window); widgets are
   its `LayoutState<WidgetRecord>` rows, rendered through the same

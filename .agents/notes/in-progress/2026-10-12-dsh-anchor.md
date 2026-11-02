@@ -4,7 +4,7 @@ status: in-progress
 
 # prac dev 的 DSH 锚点：一个 worktree、一条 pin、一条比较门
 
-> **Package architecture migration（2026-10-28）**：本 note 的 `web-app` / `vscode-host` 是实现期名字。目标划分见 [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md) 的 Package architecture：几何 / surface / isolation → `ui-frame`；window → `ui-window`；board / widget → `ui-widget`；默认工作台 / arrangement → `ui-workbench`；VS Code adaptor → `ui-vscode-host` / `ui-vscode-views` / `ui-vscode-editor`；DSH → `ui-dsh`；`bundle/web-app` 只做 composition root。
+> **Package architecture migration（2026-10-28，2026-11-01 更新）**：本 note 的 `web-app` / `vscode-host` 是实现期名字。目标划分见 [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md) 的 Package architecture：几何 / surface → `prac-ui-kit-core`；frame model / renderer / isolation → `prac-ui-kit-frame`；DSH 插件行 → `ui-frame`；window → `ui-window`；board / widget → `ui-widget`；默认工作台 / arrangement → `ui-workbench`；VS Code adaptor → `ui-vscode-host` / `ui-vscode-views` / `ui-vscode-editor`；DSH → `ui-dsh`；`bundle/web-app` 只做 composition root。
 
 ## Problem
 

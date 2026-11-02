@@ -9,7 +9,7 @@
  *
  * @module prac-client-ui-widget/client/boardStore
  */
-import type { LayoutState, LayoutStore, WidgetRecord } from "prac-client-ui-frame/lib";
+import type { LayoutState, LayoutStore, WidgetRecord } from "prac-ui-kit-frame";
 import type { BoardContent } from "./boardContent.js";
 
 /** Adapt a board content to the frame's shared store face. */

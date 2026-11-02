@@ -1,138 +1,65 @@
 /**
- * The layout store: one immutable state cell, subscribed to with
- * `useSyncExternalStore`.
+ * The frame's persisted stores: one shell state (frame-level) and one stage
+ * state per Space.
  *
- * The cell is DSH's own snapshot store engine (`dsh-client-store`), used with
- * its opt-in persistence: the frame's state — the region tree (sizes, collapse,
- * stack order) and the view table (where each view sits, whether it is hidden,
- * whether it is folded) — survives a reload. Attention (`activePanelId`) and the
- * measured viewport survive too; they are simply overwritten on the next measure
- * or click.
- *
- * The store engine is a **platform word**: DSH's shell seeds it into the
- * loader's module table as a singleton, so the client artifact requires it
- * rather than inlining a second zustand/immer behind its own state (see
- * `clientPack`'s `external` in `vite.config.ts`).
- *
- * The **key is versioned**: the engine rehydrates whatever is under it without
- * validating the shape, so a state shape that changes must move to a new key
- * rather than read a stale one.
- *
- * It knows nothing about placement rules (those are pure functions in `model`)
- * — it only commits their results and wakes subscribers.
+ * This is the DSH half of the kit's `LayoutStore` / `SpaceStore`: the plugin
+ * owns the state engines (`dsh-client-store`, a platform word seeded by the
+ * shell) and the persisted keys. The kit still owns the interfaces and the
+ * React hooks, so a board can implement the same contract over its own
+ * in-memory state.
  *
  * @module prac-client-ui-frame/client/store
  */
 
 import { createSnapshotStore } from "@deepseek-ai/dsh-client-store";
-import { useSyncExternalStore } from "react";
-import { type LayoutState, type ViewRecord } from "./contract.js";
-import { defaultTree, normalizeGrids, normalizeViews } from "./model.js";
+import {
+  createFrameState,
+  createSpaceState,
+  normalizeGrids,
+  normalizeViews,
+  type LayoutState,
+  type LayoutStore,
+  type SpaceState,
+  type SpaceStore,
+  type ViewRecord,
+} from "prac-ui-kit-frame";
 
 /**
- * The persisted state's key: a **generation**, not a schema revision.
+ * The frame shell's key: sidebar / panel / dock / stage placeholder.
  *
- * The engine rehydrates whatever sits under it, so moving to a new generation is a deliberate
- * reset of everybody's layout (track sizes, stack order, fold, bottom bar) under this origin.
- *
- * `v1` (2026-10-13, James's call): the generation that starts after the region work. The payload
- * it replaces could not be migrated — it has no `embedder` marks, so the empty regions a person
- * cannot close are indistinguishable from live regions whose views have not been placed yet —
- * and a reset is acceptable, so the cleanest end state is a generation that begins empty. It is
- * **not** the shape the earliest `v1` had; a browser still holding one of those has its state
- * read as-if current, which is why the model reads defensively.
+ * A generation, not a schema revision: the engine rehydrates whatever sits
+ * under it. The `v1` generation is the split between frame shell and Space
+ * stage; the previous full-layout keys are not migrated (a reset is
+ * acceptable for this split).
  */
-export const STATE_KEY = "prac-layout/v1";
+export const FRAME_STATE_KEY = "prac-frame/v1";
 
-// ── store ─────────────────────────────────────────────────────────────
+/** One Space's stage key: `<space-key>/<workspace>/<space-id>`. */
+export const SPACE_STATE_KEY = "prac-space/v1";
 
-/**
- * The layout store: an immutable state cell with a subscription set.
- *
- * The members are function-typed properties rather than methods: every one is a
- * closure over the store's own state, so they are safe to hand around unbound
- * (`pracLayout.getState`, `useSyncExternalStore`'s subscribe).
- */
-export interface LayoutStore {
-  /** The current state. */
-  get: () => LayoutState;
-  /**
-   * Subscribe to state replacements.
-   *
-   * @param listener - called after every accepted update.
-   * @returns an unsubscribe function.
-   */
+interface StoreCell<T> {
+  get: () => T;
   subscribe: (listener: () => void) => () => void;
-  /**
-   * Replace the state through a pure updater.
-   *
-   * @param updater - returns the next state, or the same reference to skip.
-   */
-  update: (updater: (state: LayoutState) => LayoutState) => void;
-  /**
-   * Report that the person asked to close a view (its tab's close button).
-   *
-   * The store is what the frame holds, so the report travels through it to the face's
-   * subscribers — the frame itself must not decide what closing means.
-   *
-   * @param viewId - the view whose chrome was used.
-   */
-  requestCloseView: (viewId: string) => void;
+  update: (updater: (state: T) => T) => void;
 }
 
-/**
- * Create the layout store.
- *
- * The view table starts empty on purpose: the mechanism ships no default
- * placement, so the arrangement is what puts `dsh:*` and `vscode:*` views into
- * regions.
- */
-export function createStore(
-  onRequestCloseView: (viewId: string) => void = () => {},
-  key: string = STATE_KEY,
-): LayoutStore {
-  const initial: LayoutState = {
-    viewportWidth: 0,
-    viewportHeight: 0,
-    tree: defaultTree(),
-    views: {},
-    catalogueVersion: 0,
-    activePanelId: null,
-  };
+/** A persisted state cell whose hydrated value passes through `heal` once. */
+function createCell<T>(initial: T, key: string, heal: (state: T) => T): StoreCell<T> {
   // `flush: "raf"` batches a burst of updates into one frame; persistence writes
   // on every committed state. The caller supplies the key: the frame scopes it
   // by workspace (`?workspace=`, the same identity the page boots from), so two
   // folders on one origin do not share a layout.
-  const snapshot = createSnapshotStore<LayoutState>(initial, {
+  const snapshot = createSnapshotStore<T>(initial, {
     flush: "raf",
     persist: { name: key },
   });
-  // The engine rehydrates a persisted tree as-is. A build that removed a grid
-  // cell without pruning its placement (or a merge that left a stale split id)
-  // would otherwise keep the empty track forever; heal it once, before anyone
-  // subscribes, so the fix reaches a layout that already exists.
   const hydrated = snapshot.getSnapshot();
-  const rawViews = hydrated.views as Record<string, ViewRecord & { kind?: "window" | "widget" }>;
-  const views = Object.fromEntries(
-    Object.entries(rawViews).map(([id, record]) => [
-      id,
-      { ...record, kind: record.kind ?? "window" } as ViewRecord,
-    ]),
-  );
-  const hydratedWithKind = { ...hydrated, views };
-  const healedTree = normalizeGrids(hydratedWithKind.tree);
-  const healed = normalizeViews(
-    healedTree === hydratedWithKind.tree
-      ? hydratedWithKind
-      : { ...hydratedWithKind, tree: healedTree },
-  );
+  const healed = heal(hydrated);
   if (healed !== hydrated) snapshot.set(healed);
   return {
-    requestCloseView: onRequestCloseView,
     get: () => snapshot.getSnapshot(),
-    subscribe: (listener: () => void): (() => void) => snapshot.subscribe(listener),
-    /** Replace the state through a pure updater. */
-    update: (updater: (current: LayoutState) => LayoutState): void => {
+    subscribe: (listener) => snapshot.subscribe(listener),
+    update: (updater) => {
       const current = snapshot.getSnapshot();
       const next = updater(current);
       if (next === current) return;
@@ -141,28 +68,48 @@ export function createStore(
   };
 }
 
-/**
- * Subscribe a component to a slice of the layout store.
- *
- * @param store - the layout store.
- */
-export function useLayout(store: LayoutStore): LayoutState;
-/**
- * Subscribe a component to a slice of the layout store.
- *
- * @param store - the layout store.
- * @param selector - projects the state to the subscribed slice.
- */
-export function useLayout<T>(store: LayoutStore, selector: (state: LayoutState) => T): T;
-export function useLayout<T>(
-  store: LayoutStore,
-  selector: (state: LayoutState) => T = (state) => state as unknown as T,
-): T {
-  return useSyncExternalStore(
-    store.subscribe,
-    () => selector(store.get()),
-    () => selector(store.get()),
+/** Default old records to `kind: "window"` and heal stale placements. */
+function healState(state: LayoutState): LayoutState {
+  const rawViews = state.views as Record<string, ViewRecord & { kind?: "window" | "widget" }>;
+  const views = Object.fromEntries(
+    Object.entries(rawViews).map(([id, record]) => [
+      id,
+      { ...record, kind: record.kind ?? "window" } as ViewRecord,
+    ]),
+  );
+  const withKind = { ...state, views };
+  const healedTree = normalizeGrids(withKind.tree);
+  return normalizeViews(
+    healedTree === withKind.tree ? withKind : { ...withKind, tree: healedTree },
   );
 }
 
-export { createSwitchingStore, type SwitchingStore } from "./switching.js";
+/** A stage state has no frame-level fields; normalize its tree and placements. */
+function healSpace(state: SpaceState): SpaceState {
+  const withKind: LayoutState = {
+    viewportWidth: 0,
+    viewportHeight: 0,
+    tree: state.tree,
+    views: state.views,
+    catalogueVersion: 0,
+    activePanelId: null,
+  };
+  const healed = healState(withKind);
+  return { tree: healed.tree, views: healed.views };
+}
+
+/** Create the frame shell's store. */
+export function createFrameStore(
+  onRequestCloseView: (viewId: string) => void = () => {},
+  key: string = FRAME_STATE_KEY,
+): LayoutStore {
+  return {
+    ...createCell(createFrameState(), key, healState),
+    requestCloseView: onRequestCloseView,
+  };
+}
+
+/** Create one Space's stage store. */
+export function createSpaceStore(key: string = SPACE_STATE_KEY): SpaceStore {
+  return createCell(createSpaceState(), key, healSpace);
+}

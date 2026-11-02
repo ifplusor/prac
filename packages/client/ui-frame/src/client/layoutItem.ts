@@ -5,27 +5,29 @@
  * or a DSH slot. This module owns that decision; the frame only supplies the
  * record, the box and the slot face.
  *
+ * It lives in the plugin, not in `prac-ui-kit-frame`: the DSH slot vocabulary
+ * (`dsh:sidebar`, `dsh:main:<key>`, `dsh:rightbar`) and the board-drop global
+ * are the plugin's business.
+ *
  * @module prac-client-ui-frame/client/layoutItem
  */
 import { createElement, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
-import type { Box } from "./contract.js";
-import type { WidgetRecord } from "./contract.js";
-import type { BoardLayout } from "./boardLayouts.js";
-import type { ChromeItemFacts } from "./chrome.js";
 import {
-  DSH_MAIN_PREFIX,
-  DSH_RIGHTBAR_VIEW,
-  DSH_SIDEBAR_VIEW,
+  boardDropSide,
+  type BoardLayout,
+  type Box,
+  type ChromeItemFacts,
+  ContentHostView,
+  type ContentHost,
+  type LayoutDecoration,
+  LayoutRenderer,
+  readBoardDrop,
   WIDGET_SLOT,
   WINDOW_SLOT,
-  viewKind,
-} from "./catalogue.js";
-import type { ContentHost } from "./windowModel.js";
-import { ContentHostView } from "./layoutContentHost.js";
-import { LayoutRenderer } from "./layoutRenderer.js";
-import type { LayoutDecoration } from "./layoutRenderer.js";
-import { boardDropSide, readBoardDrop } from "./layoutDrop.js";
+  type WidgetRecord,
+} from "prac-ui-kit-frame";
+import { DSH_MAIN_PREFIX, DSH_RIGHTBAR_VIEW, DSH_SIDEBAR_VIEW, viewKind } from "./catalogue.js";
 
 /** The slot face an item needs; frame and board can both satisfy it. */
 export type ItemRenderSlot = (

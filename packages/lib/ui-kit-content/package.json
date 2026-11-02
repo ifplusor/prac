@@ -1,0 +1,128 @@
+{
+  "name": "prac-ui-kit-content",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Generic content composition kernel: content roots/groups/items, placement store, snapshot and isolated mounting. DSH-free.",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json",
+    "./content": {
+      "types": "./dist/content.d.mts",
+      "default": "./dist/content.mjs"
+    },
+    "./placement": {
+      "types": "./dist/placement.d.mts",
+      "default": "./dist/placement.mjs"
+    },
+    "./store": {
+      "types": "./dist/store.d.mts",
+      "default": "./dist/store.mjs"
+    },
+    "./switching": {
+      "types": "./dist/switching.d.mts",
+      "default": "./dist/switching.mjs"
+    },
+    "./snapshot": {
+      "types": "./dist/snapshot.d.mts",
+      "default": "./dist/snapshot.mjs"
+    },
+    "./workspace-scope": {
+      "types": "./dist/workspace-scope.d.mts",
+      "default": "./dist/workspace-scope.mjs"
+    },
+    "./isolation": {
+      "types": "./dist/isolation.d.mts",
+      "default": "./dist/isolation.mjs"
+    },
+    "./chrome": {
+      "types": "./dist/chrome.d.mts",
+      "default": "./dist/chrome.mjs"
+    },
+    "./renderModel": {
+      "types": "./dist/renderModel.d.mts",
+      "default": "./dist/renderModel.mjs"
+    },
+    "./renderer": {
+      "types": "./dist/renderer.d.mts",
+      "default": "./dist/renderer.mjs"
+    },
+    "./model": {
+      "types": "./dist/model.d.mts",
+      "default": "./dist/model.mjs"
+    },
+    "./tabs": {
+      "types": "./dist/tabs.d.mts",
+      "default": "./dist/tabs.mjs"
+    },
+    "./stack": {
+      "types": "./dist/stack.d.mts",
+      "default": "./dist/stack.mjs"
+    },
+    "./sash": {
+      "types": "./dist/sash.d.mts",
+      "default": "./dist/sash.mjs"
+    },
+    "./containerBar": {
+      "types": "./dist/containerBar.d.mts",
+      "default": "./dist/containerBar.mjs"
+    },
+    "./grid": {
+      "types": "./dist/grid.d.mts",
+      "default": "./dist/grid.mjs"
+    },
+    "./chromeIntents": {
+      "types": "./dist/chromeIntents.d.mts",
+      "default": "./dist/chromeIntents.mjs"
+    },
+    "./containerChrome": {
+      "types": "./dist/containerChrome.d.mts",
+      "default": "./dist/containerChrome.mjs"
+    },
+    "./resize": {
+      "types": "./dist/resize.d.mts",
+      "default": "./dist/resize.mjs"
+    },
+    "./sashDrag": {
+      "types": "./dist/sashDrag.d.mts",
+      "default": "./dist/sashDrag.mjs"
+    },
+    "./stackDrag": {
+      "types": "./dist/stackDrag.d.mts",
+      "default": "./dist/stackDrag.mjs"
+    },
+    "./layoutIsolation": {
+      "types": "./dist/layoutIsolation.d.mts",
+      "default": "./dist/layoutIsolation.mjs"
+    },
+    "./mount": {
+      "types": "./dist/mount.d.mts",
+      "default": "./dist/mount.mjs"
+    },
+    "./react": {
+      "types": "./dist/react.d.mts",
+      "default": "./dist/react.mjs"
+    }
+  },
+  "scripts": {
+    "build": "vp pack",
+    "check": "vp check",
+    "test": "vp test run"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "prac-ui-kit-layout": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  }
+}

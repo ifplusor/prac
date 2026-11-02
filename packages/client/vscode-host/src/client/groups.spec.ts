@@ -47,14 +47,7 @@ function fakeGroup(id: string, mode: "stack" | "select" = "stack"): VscodeGroupR
 
 function viewDefinition(): VscodeViewDefinition {
   return new VscodeViewDefinition({
-    createView: (id) => ({
-      id,
-      host: undefined,
-      mount: () => {},
-      release: () => {},
-      focus: () => {},
-      dispose: () => {},
-    }),
+    createView: (id) => ({ id }),
     createHost: () => ({
       mount: () => {},
       release: () => {},

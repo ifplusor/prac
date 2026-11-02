@@ -3,9 +3,18 @@ import { defineConfig } from "vite-plus";
 import { clientPack } from "../../../scripts/pack-client.ts";
 
 /**
- * `ui-frame` has two client outputs:
- * - `./lib` is the library surface other plugins may import (types / pure code).
- * - `./client` is the DSH loader artifact for the frame plugin row.
+ * `ui-frame` is a DSH plugin row, not a library:
+ * - `.` is the host half (`apply` only);
+ * - `./client` is the loader artifact for the row, with its own `types`
+ *   condition generated from `src/client/contract.ts` (the `SlotMap` /
+ *   `Context` merges and the face types).
+ *
+ * The layout model / renderer / chrome live in `prac-ui-kit-frame`; the DSH
+ * store, slot catalogue and contract merges live here.
+ *
+ * Every declaration artifact keeps cordis / ui-slots / the frame kit external:
+ * inlining their types gives the consumer a second module record, and the
+ * `declare module './context.ts'` merges stop landing on the real cordis.
  */
 export default defineConfig({
   pack: [
@@ -14,21 +23,24 @@ export default defineConfig({
       format: ["esm"],
       platform: "node",
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
-    },
-    {
-      entry: { lib: "src/client/lib.ts" },
-      format: ["esm"],
-      platform: "browser",
-      outExtensions: () => ({ js: ".js", dts: ".d.mts" }),
       deps: {
         neverBundle: [
-          "react",
-          "react-dom",
           "@deepseek-ai/cordis",
-          "@deepseek-ai/dsh-client-store",
           "@deepseek-ai/dsh-client-ui-slots",
-          "@deepseek-ai/dsh-client-ui-primitives",
-          "@deepseek-ai/dsh-client-ui-dockkit",
+          "prac-ui-kit-frame",
+        ],
+      },
+    },
+    {
+      entry: { "client-types": "src/client/contract.ts" },
+      format: ["esm"],
+      platform: "browser",
+      outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
+      deps: {
+        neverBundle: [
+          "@deepseek-ai/cordis",
+          "@deepseek-ai/dsh-client-ui-slots",
+          "prac-ui-kit-frame",
         ],
       },
     },

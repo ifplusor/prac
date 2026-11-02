@@ -81,6 +81,10 @@ export async function clearLayoutState(page) {
       if (
         key === "prac-layout/v1" ||
         key.startsWith("prac-layout/v1/") ||
+        key === "prac-frame/v1" ||
+        key.startsWith("prac-frame/v1/") ||
+        key === "prac-space/v1" ||
+        key.startsWith("prac-space/v1/") ||
         key === "prac-spaces/v1" ||
         key.startsWith("prac-spaces/v1/") ||
         key === "prac-board/v1" ||
@@ -101,7 +105,13 @@ export async function clearLayoutState(page) {
 export async function hasLayoutState(page) {
   return page.evaluate(() =>
     Object.keys(localStorage).some(
-      (key) => key === "prac-layout/v1" || key.startsWith("prac-layout/v1/"),
+      (key) =>
+        key === "prac-layout/v1" ||
+        key.startsWith("prac-layout/v1/") ||
+        key === "prac-frame/v1" ||
+        key.startsWith("prac-frame/v1/") ||
+        key === "prac-space/v1" ||
+        key.startsWith("prac-space/v1/"),
     ),
   );
 }

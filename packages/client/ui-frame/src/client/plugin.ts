@@ -62,9 +62,10 @@ import type {
 } from "./contract.js";
 import { createFrame, ensureStyles } from "./frame.js";
 import { createServices } from "./services.js";
-import { createStore, createSwitchingStore } from "./store.js";
+import { createComposedStore, createStageSwitcher } from "prac-ui-kit-frame";
+import { createFrameStore, createSpaceStore } from "./store.js";
 import { ThemePresenter } from "./theme.js";
-import { workspaceScope } from "./workspace-scope.js";
+import { workspaceScope } from "prac-ui-kit-frame";
 
 declare global {
   /**
@@ -76,9 +77,12 @@ declare global {
    */
   var __pracFrame: PracLayoutFace | undefined;
   /** The board layout registry, for the live gates / a page-level probe. */
-  var __pracBoardLayouts: import("./boardLayouts.js").BoardLayoutRegistry | undefined;
+  var __pracBoardLayouts: import("prac-ui-kit-frame").BoardLayoutRegistry | undefined;
+  /** The Space registry, for the live gates / a page-level probe. */
+  var __pracSpaces: PracSpacesFace | undefined;
 }
-import { VIEW_SLOT, WIDGET_SLOT, WINDOW_SLOT, readDeclaredViewIds } from "./catalogue.js";
+import { VIEW_SLOT, WIDGET_SLOT, WINDOW_SLOT } from "prac-ui-kit-frame";
+import { readDeclaredViewIds } from "./catalogue.js";
 
 /**
  * Install the mechanism: declare the frame's slots, publish the faces, keep the
@@ -109,46 +113,73 @@ export function apply(ctx: Context): void {
     id: string;
     name: string;
   }
-  const loadSpaces = (): PersistedSpace[] => {
+  interface PersistedSpaces {
+    spaces: PersistedSpace[];
+    activeId?: string;
+  }
+  const parseSpaces = (value: unknown): PersistedSpaces | undefined => {
+    const entries = Array.isArray(value)
+      ? value
+      : typeof value === "object" && value !== null
+        ? (value as { spaces?: unknown }).spaces
+        : undefined;
+    if (!Array.isArray(entries)) return undefined;
+    const spaces = entries.filter(
+      (entry): entry is PersistedSpace =>
+        typeof entry === "object" &&
+        entry !== null &&
+        typeof (entry as PersistedSpace).id === "string" &&
+        typeof (entry as PersistedSpace).name === "string",
+    );
+    if (spaces.length === 0) return undefined;
+    const activeId =
+      typeof value === "object" &&
+      value !== null &&
+      typeof (value as PersistedSpaces).activeId === "string"
+        ? (value as PersistedSpaces).activeId
+        : undefined;
+    return { spaces, activeId };
+  };
+  const loadSpaces = (): PersistedSpaces => {
     try {
       const raw = localStorage.getItem(SPACES_KEY);
       if (raw !== null) {
-        const value: unknown = JSON.parse(raw);
-        if (Array.isArray(value)) {
-          const spaces = value.filter(
-            (entry): entry is PersistedSpace =>
-              typeof entry === "object" &&
-              entry !== null &&
-              typeof (entry as PersistedSpace).id === "string" &&
-              typeof (entry as PersistedSpace).name === "string",
-          );
-          if (spaces.length > 0) return spaces;
-        }
+        const parsed = parseSpaces(JSON.parse(raw));
+        if (parsed !== undefined) return parsed;
       }
     } catch {
       // fall through to the default
     }
-    return [{ id: "space-1", name: "Space 1" }];
+    return { spaces: [{ id: "space-1", name: "Space 1" }], activeId: "space-1" };
   };
-  const saveSpaces = (spaces: readonly PersistedSpace[]): void => {
+  const saveSpaces = (spaces: readonly PersistedSpace[], activeId: string): void => {
     try {
-      localStorage.setItem(SPACES_KEY, JSON.stringify(spaces));
+      localStorage.setItem(
+        SPACES_KEY,
+        JSON.stringify({ version: 1, spaces: [...spaces], activeId }),
+      );
     } catch {
       // persistence is best-effort
     }
   };
-  let spaces = loadSpaces();
-  let activeId = spaces[0]?.id ?? "space-1";
-  const spaceStores = new Map<string, ReturnType<typeof createStore>>();
-  const storeFor = (id: string): ReturnType<typeof createStore> => {
+  const loaded = loadSpaces();
+  let spaces = loaded.spaces;
+  let activeId =
+    loaded.activeId !== undefined && spaces.some((space) => space.id === loaded.activeId)
+      ? loaded.activeId
+      : (spaces[0]?.id ?? "space-1");
+  const frameStore = createFrameStore(close, `prac-frame/v1/${scope}`);
+  const spaceStores = new Map<string, ReturnType<typeof createSpaceStore>>();
+  const spaceStoreFor = (id: string): ReturnType<typeof createSpaceStore> => {
     let store = spaceStores.get(id);
     if (store === undefined) {
-      store = createStore(close, `prac-layout/v1/${scope}/${id}`);
+      store = createSpaceStore(`prac-space/v1/${scope}/${id}`);
       spaceStores.set(id, store);
     }
     return store;
   };
-  const store = createSwitchingStore(storeFor(activeId));
+  const stage = createStageSwitcher(spaceStoreFor(activeId));
+  const store = createComposedStore(frameStore, stage);
   const spaceListeners = new Set<() => void>();
   const notifySpaces = (): void => {
     for (const listener of Array.from(spaceListeners)) listener();
@@ -160,32 +191,32 @@ export function apply(ctx: Context): void {
       if (id === activeId) return;
       if (!spaces.some((space) => space.id === id)) return;
       activeId = id;
-      store.switchTo(storeFor(id));
+      saveSpaces(spaces, activeId);
+      stage.switchTo(spaceStoreFor(id));
       notifySpaces();
     },
     create: (name) => {
       const id = `space-${Date.now().toString(36)}`;
       spaces = [...spaces, { id, name: name ?? `Space ${spaces.length + 1}` }];
-      saveSpaces(spaces);
       activeId = id;
-      store.switchTo(storeFor(id));
+      saveSpaces(spaces, activeId);
+      stage.switchTo(spaceStoreFor(id));
       notifySpaces();
       return id;
     },
     rename: (id, name) => {
       spaces = spaces.map((space) => (space.id === id ? { ...space, name } : space));
-      saveSpaces(spaces);
+      saveSpaces(spaces, activeId);
       notifySpaces();
     },
     remove: (id) => {
       if (spaces.length <= 1) return;
       if (!spaces.some((space) => space.id === id)) return;
+      const wasActive = activeId === id;
       spaces = spaces.filter((space) => space.id !== id);
-      saveSpaces(spaces);
-      if (activeId === id) {
-        activeId = spaces[0]?.id ?? "space-1";
-        store.switchTo(storeFor(activeId));
-      }
+      if (wasActive) activeId = spaces[0]?.id ?? "space-1";
+      saveSpaces(spaces, activeId);
+      if (wasActive) stage.switchTo(spaceStoreFor(activeId));
       notifySpaces();
     },
     onDidChange: (listener) => {
@@ -300,9 +331,11 @@ export function apply(ctx: Context): void {
     // The board layout registry, published for the live gates (a board's state is not
     // reachable through the frame's view table).
     globalThis.__pracBoardLayouts = boardLayouts;
+    globalThis.__pracSpaces = pracSpaces;
     return () => {
       if (globalThis.__pracFrame === pracFrame) delete globalThis.__pracFrame;
       if (globalThis.__pracBoardLayouts === boardLayouts) delete globalThis.__pracBoardLayouts;
+      if (globalThis.__pracSpaces === pracSpaces) delete globalThis.__pracSpaces;
       for (const stop of stopSlots) stop();
       offMain();
       disposeWindowActions();

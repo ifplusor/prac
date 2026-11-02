@@ -56,7 +56,11 @@ const sample = () =>
                 ?.collapsed === true
             : undefined,
         hasFrameKey: Object.keys(localStorage).some(
-          (key) => key === "prac-layout/v1" || key.startsWith("prac-layout/v1/"),
+          (key) =>
+            key === "prac-frame/v1" ||
+            key.startsWith("prac-frame/v1/") ||
+            key === "prac-space/v1" ||
+            key.startsWith("prac-space/v1/"),
         ),
         hasBoardKey: Object.keys(localStorage).some((key) => key.startsWith("prac-board/v1/")),
       };

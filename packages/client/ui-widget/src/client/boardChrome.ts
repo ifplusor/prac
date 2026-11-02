@@ -39,8 +39,9 @@ import {
   type LayoutIntents,
   type LayoutStore,
   type ViewActionsProps,
+  type ViewRecord,
   type WidgetRecord,
-} from "prac-client-ui-frame/lib";
+} from "prac-ui-kit-frame";
 import type { BoardContent } from "./boardContent.js";
 import { startWidgetDrag } from "./widgetDrag.js";
 import { createBoardStore } from "./boardStore.js";
@@ -68,7 +69,7 @@ export function createBoardChrome(
   options: BoardChromeOptions = {},
 ): ChromeRegistry<WidgetRecord> {
   const store = options.store ?? createBoardStore(content);
-  const intents = options.intents ?? createLayoutIntents(store);
+  const intents = options.intents ?? createLayoutIntents<ViewRecord>(store);
 
   /** The title the container declared for a widget, else the id tail. */
   const labelFor = (ctx: ChromeContext<WidgetRecord>, viewId: string): string =>
@@ -137,7 +138,7 @@ export function createBoardChrome(
       onReorder: (event) => {
         if (event.button !== 0) return;
         const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
-        beginStackReorder(store, event, node.id, row?.parentElement ?? null);
+        beginStackReorder<ViewRecord>(store, event, node.id, row?.parentElement ?? null);
       },
       renderActions: renderActions(ctx, viewId),
       onDragStart: (event) => startWidgetDrag(event, { boardId: content.id, widgetId: viewId }),
@@ -168,7 +169,7 @@ export function createBoardChrome(
       onReorder: (event: ReactPointerEvent<HTMLElement>) => {
         if (event.button !== 0) return;
         const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
-        beginStackReorder(store, event, node.id, row?.parentElement ?? null);
+        beginStackReorder<ViewRecord>(store, event, node.id, row?.parentElement ?? null);
       },
     });
   };

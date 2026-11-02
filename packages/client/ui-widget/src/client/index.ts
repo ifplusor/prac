@@ -7,7 +7,6 @@
 export * from "./widget.js";
 export * from "./board.js";
 export * from "./boardContent.js";
-export * from "./boardWindow.js";
 export * from "./boardWindowGroup.js";
 export * from "./boardChrome.js";
 export * from "./widgetDrag.js";

@@ -53,6 +53,8 @@ Space
 完整划分见 10-20 的 Package architecture：
 
 ```text
+prac-ui-kit-core
+prac-ui-kit-frame
 ui-frame
 ui-application
 ui-window

@@ -27,6 +27,8 @@
  */
 
 import type { Context } from "@deepseek-ai/cordis";
+// Type-only, for the frame plugin's `Context` / `SlotMap` merges.
+import type {} from "prac-client-ui-frame/client";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {
   PracVscodeAction,
@@ -36,10 +38,10 @@ import type {
 import type {
   PracLayoutFace,
   PracWindowActionsFace,
-  ViewSlotKey,
   WindowAction,
   WindowActionModel,
-} from "prac-client-ui-frame/lib";
+} from "prac-client-ui-frame/client";
+import type { ViewSlotKey } from "prac-ui-kit-frame";
 
 /** The slot these views are registered into (checked against the mechanism's key). */
 const SLOT: ViewSlotKey = "prac.window";

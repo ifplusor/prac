@@ -2,8 +2,10 @@
 /**
  * Static dependency gate for the planned UI package split.
  *
- * Every client package is a DSH plugin (or a bundle). The gate checks that each
- * plugin stays within its service boundary and that the bundle stays a leaf.
+ * Every client package is a DSH plugin (or a bundle); the `lib/` packages are
+ * the layers those plugins build on. The gate checks that each plugin stays
+ * within its service boundary, that a library never reaches back into a plugin,
+ * and that the bundle stays a leaf.
  */
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -11,11 +13,61 @@ import { join } from "node:path";
 const root = process.cwd();
 const clientDir = join(root, "packages/client");
 const bundleDir = join(root, "packages/bundle");
+const libDir = join(root, "packages/lib");
 
 /** @typedef {{ forbidden?: readonly string[], why?: string }} Rule */
 
 /** @type {Record<string, Rule>} */
 const RULES = {
+  "prac-ui-kit-layout": {
+    forbidden: [
+      "prac-ui-kit-content",
+      "prac-ui-kit-frame",
+      "prac-client-ui-frame",
+      "prac-client-ui-window",
+      "prac-client-ui-widget",
+      "prac-client-ui-workbench",
+      "prac-client-ui-dsh",
+      "prac-client-vscode-host",
+      "prac-client-ui-vscode-views",
+      "prac-client-ui-vscode-editor",
+      "prac-client-ui-changed-files",
+      "prac-web-app",
+    ],
+    why: "the core is a framework-agnostic kernel; it depends on nothing",
+  },
+  "prac-ui-kit-content": {
+    forbidden: [
+      "prac-ui-kit-frame",
+      "prac-client-ui-frame",
+      "prac-client-ui-window",
+      "prac-client-ui-widget",
+      "prac-client-ui-workbench",
+      "prac-client-ui-dsh",
+      "prac-client-vscode-host",
+      "prac-client-ui-vscode-views",
+      "prac-client-ui-vscode-editor",
+      "prac-client-ui-changed-files",
+      "prac-web-app",
+    ],
+    why: "L1 content is independent of the workbench frame; frame depends on content",
+  },
+  "prac-ui-kit-frame": {
+    forbidden: [
+      "prac-client-ui-frame",
+      "prac-client-ui-window",
+      "prac-client-ui-widget",
+      "prac-client-ui-workbench",
+      "prac-client-ui-dsh",
+      "prac-client-vscode-host",
+      "prac-client-ui-vscode-views",
+      "prac-client-ui-vscode-editor",
+      "prac-client-ui-changed-files",
+      "prac-web-app",
+    ],
+    why: "a library must never import a DSH plugin; the plugin imports the library",
+  },
+
   "prac-client-ui-frame": {
     forbidden: [
       "prac-client-ui-window",
@@ -95,7 +147,7 @@ function depsOf(pkg) {
 }
 
 const packages = [];
-for (const parent of [clientDir, bundleDir]) {
+for (const parent of [libDir, clientDir, bundleDir]) {
   if (!existsSync(parent)) continue;
   for (const name of readdirSync(parent)) {
     const pkg = readPackage(join(parent, name));
@@ -122,6 +174,19 @@ for (const [name, rule] of Object.entries(RULES)) {
       console.error(
         `✗ ${name} must not depend on ${forbidden} (${rule.why ?? "package boundary"})`,
       );
+    }
+  }
+}
+
+// The kit layers are DSH-free: a `@deepseek-ai/*` dependency would put the DSH
+// runtime (or its declaration records) back into the library.
+for (const name of ["prac-ui-kit-layout", "prac-ui-kit-content", "prac-ui-kit-frame"]) {
+  const pkg = byName.get(name);
+  if (!pkg) continue;
+  for (const dep of depsOf(pkg)) {
+    if (dep.startsWith("@deepseek-ai/")) {
+      failed = true;
+      console.error(`✗ ${name} must not depend on ${dep} (the kit is DSH-free)`);
     }
   }
 }

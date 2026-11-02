@@ -35,8 +35,8 @@ import type { Context } from "@deepseek-ai/cordis";
 import type {} from "@deepseek-ai/dsh-client-ui-session/client";
 // Type-only, for prac's own Context merge (`ctx.pracFrame`), which is the face that owns
 // the region tree `addGroup` asks about.
-import type {} from "prac-client-ui-frame/lib";
-import type {} from "prac-client-ui-frame/lib";
+// Type-only, for the frame plugin's `Context` / `SlotMap` merges.
+import type {} from "prac-client-ui-frame/client";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { ILayout } from "@deepseek-ai/dsh-client-ui-layout/client";
@@ -351,7 +351,7 @@ export function apply(ctx: Context): void {
       ctx.pracSurfaces.create(mode === "stack" ? "widget-board" : "window-group", {
         nodeId: id,
       }).group as unknown as VscodeGroupRuntime,
-    createView: (id) => ctx.pracFrame.createView(id),
+    createView: (id) => ({ id }),
   });
   const groupHost = new VscodeGroupHost({
     layout: ctx.pracFrame,

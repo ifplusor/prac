@@ -38,6 +38,7 @@ const gates = [
   ["grid:free", "tests/gates/verify-grid-free-resize.mjs"],
   ["resize", "tests/gates/verify-resize.mjs"],
   ["persistence", "tests/gates/verify-persistence.mjs"],
+  ["space", "tests/gates/verify-space.mjs"],
   ["bottom", "tests/gates/verify-bottom.mjs"],
   ["views", "tests/gates/verify-views.mjs"],
   ["file", "vendor/vscode/scripts/verify-file.mjs"],

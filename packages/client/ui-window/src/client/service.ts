@@ -5,7 +5,8 @@
  */
 
 import type { Context } from "@deepseek-ai/cordis";
-import type { SurfaceRegistry, ViewGroup } from "prac-ui-kit";
+import type { SurfaceRegistry } from "prac-ui-kit-frame";
+import type { FrameWindowGroup } from "prac-ui-kit-frame";
 import { WindowGroupAdapter } from "./windowGroupAdapter.js";
 
 /** The window-group factory other plugins inject. */
@@ -21,7 +22,7 @@ declare module "@deepseek-ai/cordis" {
 
 /** Install the window service. */
 export function apply(ctx: Context): void {
-  const surfaces = ctx as unknown as { pracSurfaces: SurfaceRegistry<ViewGroup> };
+  const surfaces = ctx as unknown as { pracSurfaces: SurfaceRegistry<FrameWindowGroup> };
   const face: PracWindowsFace = {
     createGroup: (id, label) => new WindowGroupAdapter(id, label),
   };

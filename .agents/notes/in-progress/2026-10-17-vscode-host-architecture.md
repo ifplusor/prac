@@ -20,7 +20,7 @@ status: in-progress
 
 | 层 | 负责 | 不负责 |
 |---|---|---|
-| **frame / ui-frame** | Space、region、surface、dock rail、sidebar / panel、window group / board 的布局 | VS Code 的 part / container / pane / editor 语义 |
+| **frame**（`prac-ui-kit-frame` + `ui-frame`） | Space、region、surface、dock rail、sidebar / panel、window group / board 的布局 | VS Code 的 part / container / pane / editor 语义 |
 | **ui-window** | window、window group、tab strip、active window | VS Code 的 editor input / ViewPane |
 | **ui-widget** | widget、board、`prac.view` / `prac.viewActions` | VS Code 的 container / view 生命周期 |
 | **vscode-host（adaptor）** | VS Code 的 editor / container / view / action / overlay / webview 语义；catalogue；binding；host；生命周期 | prac 的 layout / window / widget placement |
@@ -153,7 +153,7 @@ board lifecycle：board 创建 → binding 挂到内容组；widget mount → `V
 - actions 在 window group tab strip 右端，跟随 active window，不与 breadcrumbs 抢行；group header 没有 editor actions。
 - ViewPane / EditorPane 的 lifecycle 与 upstream 一致；webview secure-context 失败可见。
 - frame 没有 VS Code 分支；adaptor 没有 frame / window / widget placement 逻辑。
-- 包依赖 gate：`ui-vscode-host` 不 import `ui-frame` / `ui-window` / `ui-widget` 的布局实现；adapters 只翻译。
+- 包依赖 gate：`ui-vscode-host` 不 import `prac-ui-kit-frame` / `ui-frame` / `ui-window` / `ui-widget` 的布局实现；adapters 只翻译。
 
 ## 9. Related
 
