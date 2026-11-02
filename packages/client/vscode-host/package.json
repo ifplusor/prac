@@ -15,7 +15,7 @@
       "default": "./dist/index.mjs"
     },
     "./client": {
-      "types": "./dist/client.d.mts",
+      "types": "./dist/client-types.d.mts",
       "default": "./dist/client.js"
     },
     "./package.json": "./package.json",

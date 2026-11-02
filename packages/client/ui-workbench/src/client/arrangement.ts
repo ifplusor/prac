@@ -9,17 +9,15 @@ import type { ItemRecord } from "prac-ui-kit-workbench";
  * recall surface, the keybindings) imports the constants and the functions from
  * here and never restates a placement rule.
  *
- * @module prac-web-app/client/arrangement
+ * @module prac-client-ui-workbench/client/arrangement
  */
 
+import type { PracDshFace } from "prac-client-ui-dsh/client";
 import type { PracLayoutFace } from "prac-client-ui-frame/client";
-import { DSH_CONVERSATION_VIEW, DSH_RIGHTBAR_VIEW, DSH_SIDEBAR_VIEW } from "prac-client-ui-dsh/lib";
 import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 
 /** The mechanism's placement face, named once for this module's signatures. */
 export type PracLayout = PracLayoutFace;
-
-export { DSH_CONVERSATION_VIEW, DSH_RIGHTBAR_VIEW, DSH_SIDEBAR_VIEW } from "prac-client-ui-dsh/lib";
 
 /** The mechanism's default regions (`ui-frame`'s default region tree). */
 export const LEFT = "left";
@@ -34,16 +32,24 @@ export const BOTTOM = "bottom";
  * `place` is "put it here and show it"; `hidden` entries are placed but not
  * shown (DSH's right panel is a view like any other and starts out of the way,
  * so the `right` region belongs to the editor).
+ *
+ * The DSH view ids come from the `ctx.pracDsh` service rather than a build-time
+ * import: the vocabulary belongs to the DSH adapter plugin, and a value import
+ * across plugin packages would give the same id two module records.
+ *
+ * @param dsh - the DSH adapter's face.
  */
-export const DEFAULT_PLACEMENTS: readonly {
+export function defaultPlacements(dsh: PracDshFace): readonly {
   readonly view: string;
   readonly region: string;
   readonly hidden?: boolean;
-}[] = [
-  { view: DSH_SIDEBAR_VIEW, region: LEFT },
-  { view: DSH_CONVERSATION_VIEW, region: CENTER },
-  { view: DSH_RIGHTBAR_VIEW, region: RIGHT, hidden: true },
-];
+}[] {
+  return [
+    { view: dsh.sidebar, region: LEFT },
+    { view: dsh.conversation, region: CENTER },
+    { view: dsh.rightbar, region: RIGHT, hidden: true },
+  ];
+}
 // No default for the centre's editor: since decision 17 a file is a view that
 // exists because the *app* opened it, so there is nothing to place until one is
 // open (see `trackCatalogue`).
@@ -159,6 +165,7 @@ const viewLabel = (viewId: string): string =>
  * container, and the selector keeps whatever the person last chose.
  *
  * @param layout - the mechanism's placement face.
+ * @param dsh - the DSH adapter's face (view ids).
  * @param entries - the app's catalogue.
  */
 /**
@@ -176,6 +183,7 @@ export const VIEW_DEFAULTS: Readonly<Record<string, { size?: number; folded?: bo
 
 export function placeCatalogue(
   layout: PracLayout,
+  dsh: PracDshFace,
   entries: readonly VscodeCatalogueEntry[],
   placeContainerView?: (
     view: string,
@@ -202,7 +210,7 @@ export function placeCatalogue(
       // The DSH sidebar is hidden (the title bar owns session navigation), so it
       // must not stay the left selector's first/active child: that kept the
       // Explorer child selected-but-never-shown beside a 280px blank region.
-      if (child.id === `${LEFT}/${DSH_SIDEBAR_VIEW}`) continue;
+      if (child.id === `${LEFT}/${dsh.sidebar}`) continue;
       if (!child.id.startsWith(containerChildPrefix(region))) children.set(child.id, child);
     }
     // Views still sitting directly in the region (placed before it became a
@@ -306,11 +314,15 @@ function placeFileEntries(layout: PracLayout, entries: readonly VscodeCatalogueE
  * The roles DSH's borrowed `ctx.layout` vocabulary resolves through. The
  * mechanism names no view; this table is what makes `toggleSidebar()` mean
  * "collapse the region holding `dsh:sidebar`".
+ *
+ * @param dsh - the DSH adapter's face.
  */
-export const ROLES = {
-  primarySidebar: DSH_SIDEBAR_VIEW,
-  secondarySidebar: DSH_RIGHTBAR_VIEW,
-} as const;
+export function roles(dsh: PracDshFace): {
+  readonly primarySidebar: string;
+  readonly secondarySidebar: string;
+} {
+  return { primarySidebar: dsh.sidebar, secondarySidebar: dsh.rightbar };
+}
 
 /**
  * Put a newly opened file in the centre.
@@ -363,9 +375,9 @@ export function staleFileViews(
  * @param layout - the mechanism's placement face.
  * @returns whether the conversation had to be moved.
  */
-export function restoreCentre(layout: PracLayout): boolean {
-  if (layout.getState().items[DSH_CONVERSATION_VIEW]?.region === CENTER) return false;
-  layout.place(DSH_CONVERSATION_VIEW, CENTER);
+export function restoreCentre(layout: PracLayout, dsh: PracDshFace): boolean {
+  if (layout.getState().items[dsh.conversation]?.region === CENTER) return false;
+  layout.place(dsh.conversation, CENTER);
   return true;
 }
 
@@ -380,9 +392,10 @@ export function restoreCentre(layout: PracLayout): boolean {
  * view this table just gained) still gets its default.
  *
  * @param layout - the mechanism's placement face.
+ * @param dsh - the DSH adapter's face (view ids).
  */
-export function arrange(layout: PracLayout): void {
-  layout.bindRoles(ROLES);
+export function arrange(layout: PracLayout, dsh: PracDshFace): void {
+  layout.bindRoles(roles(dsh));
   // Where a view parks when it gives up the centre: the right track, which is
   // what the arrangement already uses for the window group it is *not* on.
   layout.bindTrack(RIGHT);
@@ -393,14 +406,14 @@ export function arrange(layout: PracLayout): void {
   layout.setRegionSelector(RIGHT, "rail");
   layout.setRegionSelector(BOTTOM, "title");
   const known = layout.getState().items;
-  for (const entry of DEFAULT_PLACEMENTS) {
+  for (const entry of defaultPlacements(dsh)) {
     if (known[entry.view] !== undefined) continue;
     layout.place(entry.view, entry.region);
     if (entry.hidden === true) layout.hide(entry.view);
   }
   // The title bar owns session/workspace selection; the DSH sidebar remains
   // registered (the recall surface can still reach it) but starts hidden.
-  layout.hide(DSH_SIDEBAR_VIEW);
+  layout.hide(dsh.sidebar);
   // The left region's content is the container **board window** the catalogue sync creates;
   // placing a bare Explorer view here would be a second, empty home for the same container.
 }

@@ -9,7 +9,7 @@ import type { WindowGroup, GroupRegionContent } from "prac-ui-kit-workbench";
  * @module prac-client-vscode-host/client/groups
  */
 
-import type { VscodeCatalogueEntry } from "./public.js";
+import type { VscodeCatalogueEntry } from "./contract.js";
 import type { VscodeGroupRuntime } from "./resources.js";
 import {
   VSCODE_API_VERSION,

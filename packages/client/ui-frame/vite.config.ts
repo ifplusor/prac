@@ -1,6 +1,6 @@
 import { defineConfig } from "vite-plus";
 
-import { clientPack } from "../../../scripts/pack-client.ts";
+import { PLATFORM_MODULES, clientPack } from "../../../scripts/pack-client.ts";
 
 /**
  "* `ui-frame` is a DSH plugin row, not a library":
@@ -45,8 +45,18 @@ export default defineConfig({
       },
     },
     clientPack("prac-client-ui-frame", {
-      entry: "src/client/plugin.ts",
+      entry: "src/client/index.ts",
       external: ["react-dom", "@deepseek-ai/dsh-client-store"],
     }),
   ],
+  run: {
+    tasks: {
+      "check:client": {
+        command:
+          "node ../../../scripts/bundle-client.mjs --artifact dist/client.js --id prac-client-ui-frame" +
+          ` --allow ${PLATFORM_MODULES.join(" --allow ")} --exports apply,name,inject`,
+        dependsOn: ["build"],
+      },
+    },
+  },
 });

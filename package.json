@@ -24,6 +24,7 @@
     "verify:grid-tab": "node tests/gates/verify-grid-tab.mjs",
     "verify:grid-free": "node tests/gates/verify-grid-free-resize.mjs",
     "verify:packages": "node scripts/verify-ui-packages.mjs",
+    "verify:entries": "node scripts/verify-client-entries.mjs",
     "profile:link": "node scripts/link-profile.mjs"
   },
   "devDependencies": {

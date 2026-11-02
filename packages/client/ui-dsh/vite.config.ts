@@ -1,8 +1,8 @@
 import { defineConfig } from "vite-plus";
 
-import { clientPack } from "../../../scripts/pack-client.ts";
+import { PLATFORM_MODULES, clientPack } from "../../../scripts/pack-client.ts";
 
-/** `ui-dsh` is a DSH plugin; `./lib` exposes the pure slot helpers. */
+/** `ui-dsh` is a DSH plugin: the vocabulary is internal, `ctx.pracDsh` is the shared surface. */
 export default defineConfig({
   pack: [
     {
@@ -12,11 +12,22 @@ export default defineConfig({
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
     },
     {
-      entry: { lib: "src/client/index.ts" },
+      entry: { "client-types": "src/client/contract.ts" },
       format: ["esm"],
       platform: "browser",
-      outExtensions: () => ({ js: ".js", dts: ".d.mts" }),
+      outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
+      deps: { neverBundle: ["@deepseek-ai/cordis"] },
     },
-    clientPack("prac-client-ui-dsh", { entry: "src/client/plugin.ts" }),
+    clientPack("prac-client-ui-dsh", { entry: "src/client/index.ts" }),
   ],
+  run: {
+    tasks: {
+      "check:client": {
+        command:
+          "node ../../../scripts/bundle-client.mjs --artifact dist/client.js --id prac-client-ui-dsh" +
+          ` --allow ${PLATFORM_MODULES.join(" --allow ")} --exports apply,name,inject`,
+        dependsOn: ["build"],
+      },
+    },
+  },
 });

@@ -13,22 +13,7 @@ import {
   dshMainKey,
   dshMainView,
 } from "./dsh.js";
-
-/** DSH slot ids and keyed-main helpers, provided to the workbench. */
-export interface PracDshFace {
-  readonly sidebar: string;
-  readonly rightbar: string;
-  readonly conversation: string;
-  readonly mainPrefix: string;
-  mainView(key: string): string;
-  mainKey(viewId: string): string | undefined;
-}
-
-declare module "@deepseek-ai/cordis" {
-  interface Context {
-    pracDsh: PracDshFace;
-  }
-}
+import type { PracDshFace } from "./contract.js";
 
 /** Install the DSH adapter service. */
 export function apply(ctx: Context): void {

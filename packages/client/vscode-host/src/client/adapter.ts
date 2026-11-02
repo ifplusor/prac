@@ -8,7 +8,7 @@
  * @module prac-client-vscode-host/client/adapter
  */
 
-import type { PracVscodeAction } from "./public.js";
+import type { PracVscodeAction } from "./contract.js";
 import {
   VscodeGroupBinding,
   VscodeViewDefinition,

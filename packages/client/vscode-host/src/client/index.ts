@@ -42,7 +42,7 @@ import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { ILayout } from "@deepseek-ai/dsh-client-ui-layout/client";
 import { createVscodeEmbed } from "prac-vscode-embed/client";
 import { EXTENSIONS_GALLERY } from "prac-vscode";
-import type { PracVscodeFace, VscodeCatalogueEntry } from "./public.js";
+import type { PracVscodeFace, VscodeCatalogueEntry } from "./contract.js";
 import { createVscodeResourceDefinitions } from "./adapter.js";
 import { regionHoldsOtherWindow } from "./editor-group.js";
 import { VscodeGroupHost, editorGroupId } from "./groups.js";

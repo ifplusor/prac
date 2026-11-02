@@ -1,23 +1,33 @@
 import type { ItemRecord, LayoutState } from "prac-ui-kit-workbench";
 import { describe, expect, it } from "vite-plus/test";
 
+import type { PracDshFace } from "prac-client-ui-dsh/client";
 import type { ItemInfo } from "prac-client-ui-frame/client";
 import type { PracLayoutFace, RoleBindings } from "prac-client-ui-frame/client";
 import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 import {
   BOTTOM,
-  DEFAULT_PLACEMENTS,
-  DSH_CONVERSATION_VIEW,
-  DSH_SIDEBAR_VIEW,
   LEFT,
   RIGHT,
   CENTER,
   arrange,
+  defaultPlacements,
   openFileInto,
   placeCatalogue,
   restoreCentre,
   staleFileViews,
 } from "./arrangement.js";
+
+/** The DSH view vocabulary, as `ctx.pracDsh` supplies it at runtime. */
+const DSH: PracDshFace = {
+  sidebar: "dsh:sidebar",
+  rightbar: "dsh:rightbar",
+  conversation: "dsh:main:conversation",
+  mainPrefix: "dsh:main:",
+  mainView: (key) => `dsh:main:${key}`,
+  mainKey: (viewId) =>
+    viewId.startsWith("dsh:main:") ? viewId.slice("dsh:main:".length) : undefined,
+};
 
 /**
  * The arrangement's placement policy, tested as calls rather than pixels.
@@ -162,7 +172,7 @@ describe("staleFileViews", () => {
       hidden: false,
       kind: "window",
     },
-    [DSH_CONVERSATION_VIEW]: { region: CENTER, order: 2, hidden: false, kind: "window" },
+    [DSH.conversation]: { region: CENTER, order: 2, hidden: false, kind: "window" },
     "vscode:view:workbench.view.search": { region: LEFT, order: 3, hidden: false, kind: "window" },
   } satisfies Record<string, ItemRecord>;
   const resourceOf = (view: string): string | undefined =>
@@ -191,17 +201,17 @@ describe("staleFileViews", () => {
 describe("restoreCentre", () => {
   it("moves the conversation back when the centre holds something else", () => {
     const { face, calls } = recordingFace({
-      [DSH_CONVERSATION_VIEW]: { region: RIGHT, order: 0, hidden: false, kind: "window" },
+      [DSH.conversation]: { region: RIGHT, order: 0, hidden: false, kind: "window" },
     });
-    expect(restoreCentre(face)).toBe(true);
-    expect(shapes(calls)).toEqual([["place", DSH_CONVERSATION_VIEW, CENTER]]);
+    expect(restoreCentre(face, DSH)).toBe(true);
+    expect(shapes(calls)).toEqual([["place", DSH.conversation, CENTER]]);
   });
 
   it("leaves it where it is when the centre is already its", () => {
     const { face, calls } = recordingFace({
-      [DSH_CONVERSATION_VIEW]: { region: CENTER, order: 0, hidden: false, kind: "window" },
+      [DSH.conversation]: { region: CENTER, order: 0, hidden: false, kind: "window" },
     });
-    expect(restoreCentre(face)).toBe(false);
+    expect(restoreCentre(face, DSH)).toBe(false);
     expect(shapes(calls)).toEqual([]);
   });
 });
@@ -220,12 +230,12 @@ describe("openFileInto", () => {
 describe("arrange", () => {
   it("binds the roles and the parking track the borrowed vocabulary resolves through", () => {
     const { face, calls } = recordingFace();
-    arrange(face);
+    arrange(face, DSH);
     expect(calls[0]).toEqual({
       method: "bindRoles",
       args: [
         {
-          primarySidebar: DSH_SIDEBAR_VIEW,
+          primarySidebar: DSH.sidebar,
           secondarySidebar: "dsh:rightbar",
         } satisfies RoleBindings,
       ],
@@ -235,17 +245,17 @@ describe("arrange", () => {
 
   it("places every default, and hides the ones that are placed out of the way", () => {
     const { face, calls } = recordingFace();
-    arrange(face);
+    arrange(face, DSH);
     expect(shapes(calls.slice(2))).toEqual([
       ["setRegionSelector", LEFT, "rail"],
       ["setRegionSelector", RIGHT, "rail"],
       ["setRegionSelector", BOTTOM, "title"],
-      ["place", DSH_SIDEBAR_VIEW, LEFT],
-      ["place", DSH_CONVERSATION_VIEW, CENTER],
+      ["place", DSH.sidebar, LEFT],
+      ["place", DSH.conversation, CENTER],
       ["place", "dsh:rightbar", RIGHT],
       ["hide", "dsh:rightbar"],
       // The title bar owns session navigation: the sidebar stays registered but off screen.
-      ["hide", DSH_SIDEBAR_VIEW],
+      ["hide", DSH.sidebar],
     ]);
   });
 
@@ -253,36 +263,36 @@ describe("arrange", () => {
     // A previous session moved the conversation into the bottom bar and the DSH
     // sidebar to the right. Re-asserting the defaults would undo both.
     const { face, calls } = recordingFace({
-      [DSH_CONVERSATION_VIEW]: { region: "bottom", order: -2, hidden: false, kind: "window" },
-      [DSH_SIDEBAR_VIEW]: { region: RIGHT, order: -1, hidden: false, kind: "window" },
+      [DSH.conversation]: { region: "bottom", order: -2, hidden: false, kind: "window" },
+      [DSH.sidebar]: { region: RIGHT, order: -1, hidden: false, kind: "window" },
     });
-    arrange(face);
+    arrange(face, DSH);
     expect(shapes(calls.slice(2))).toEqual([
       ["setRegionSelector", LEFT, "rail"],
       ["setRegionSelector", RIGHT, "rail"],
       ["setRegionSelector", BOTTOM, "title"],
       ["place", "dsh:rightbar", RIGHT],
       ["hide", "dsh:rightbar"],
-      ["hide", DSH_SIDEBAR_VIEW],
+      ["hide", DSH.sidebar],
     ]);
   });
 
   it("still places a view the state has never seen", () => {
-    const known = DEFAULT_PLACEMENTS.map((entry) => entry.view).filter(
-      (view) => view !== DSH_SIDEBAR_VIEW,
-    );
+    const known = defaultPlacements(DSH)
+      .map((entry) => entry.view)
+      .filter((view) => view !== DSH.sidebar);
     const { face, calls } = recordingFace(
       Object.fromEntries(
         known.map((view) => [view, { region: LEFT, order: 0, hidden: false, kind: "window" }]),
       ),
     );
-    arrange(face);
+    arrange(face, DSH);
     expect(shapes(calls.slice(2))).toEqual([
       ["setRegionSelector", LEFT, "rail"],
       ["setRegionSelector", RIGHT, "rail"],
       ["setRegionSelector", BOTTOM, "title"],
-      ["place", DSH_SIDEBAR_VIEW, LEFT],
-      ["hide", DSH_SIDEBAR_VIEW],
+      ["place", DSH.sidebar, LEFT],
+      ["hide", DSH.sidebar],
     ]);
   });
 });
@@ -302,7 +312,7 @@ describe("placeCatalogue", () => {
 
   it("gives the region one named child per container", () => {
     const { face, calls } = recordingFace();
-    placeCatalogue(face, [
+    placeCatalogue(face, DSH, [
       entry({}),
       entry({ view: "vscode:view:outline", appId: "outline", title: "Outline" }),
       entry({
@@ -337,7 +347,7 @@ describe("placeCatalogue", () => {
 
   it("maps each app location to its region", () => {
     const { face, calls } = recordingFace();
-    placeCatalogue(face, [
+    placeCatalogue(face, DSH, [
       entry({ view: "vscode:view:a", appId: "a", location: "sidebar", containerId: "c.a" }),
       entry({ view: "vscode:view:b", appId: "b", location: "panel", containerId: "c.b" }),
       entry({ view: "vscode:view:c", appId: "c", location: "auxiliarybar", containerId: "c.c" }),
@@ -351,7 +361,7 @@ describe("placeCatalogue", () => {
 
   it("gives a view with no container a child of its own", () => {
     const { face, calls } = recordingFace();
-    placeCatalogue(face, [
+    placeCatalogue(face, DSH, [
       entry({
         view: "vscode:view:loose",
         appId: "loose",
@@ -368,7 +378,7 @@ describe("placeCatalogue", () => {
 
   it("places a file placement in the region the app says it is shown in", () => {
     const { face, calls } = recordingFace();
-    placeCatalogue(face, [
+    placeCatalogue(face, DSH, [
       entry({
         view: "vscode:file:p1:x",
         appId: "x",
@@ -382,7 +392,7 @@ describe("placeCatalogue", () => {
 
   it("gives a file placement the app has not shown yet the centre", () => {
     const { face, calls } = recordingFace();
-    placeCatalogue(face, [
+    placeCatalogue(face, DSH, [
       entry({
         view: "vscode:file:p1:x",
         appId: "x",
@@ -400,7 +410,7 @@ describe("placeCatalogue", () => {
     const { face, calls } = recordingFace({
       "vscode:file:p1:x": { region: CENTER, order: 0, hidden: false, kind: "window" },
     });
-    placeCatalogue(face, [
+    placeCatalogue(face, DSH, [
       entry({
         view: "vscode:file:p1:x",
         appId: "x",
@@ -428,7 +438,7 @@ describe("placeCatalogue", () => {
     const { face, calls } = recordingFace({
       "vscode:file:p1:x": { region: "right", order: 0, hidden: false, kind: "window" },
     });
-    placeCatalogue(face, [
+    placeCatalogue(face, DSH, [
       entry({
         view: "vscode:file:p1:x",
         appId: "x",
@@ -442,7 +452,7 @@ describe("placeCatalogue", () => {
 
   it("leaves the arrangement's exclusions off screen", () => {
     const { face, calls } = recordingFace();
-    placeCatalogue(face, [
+    placeCatalogue(face, DSH, [
       entry({
         view: "vscode:view:workbench.panel.chat.view.copilot",
         appId: "workbench.panel.chat.view.copilot",
@@ -457,7 +467,7 @@ describe("placeCatalogue", () => {
     const { face, calls } = recordingFace();
     face.setRegionChildren(LEFT, [{ id: "left/notes", label: "Notes" }]);
     calls.length = 0;
-    placeCatalogue(face, [entry({})]);
+    placeCatalogue(face, DSH, [entry({})]);
     expect(shapes(calls)[0]).toEqual([
       "setRegionChildren",
       LEFT,
@@ -471,7 +481,7 @@ describe("placeCatalogue", () => {
   it("places the app's panel items in the bottom track", () => {
     // `panel` maps to `bottom`, which is a visible track again: placing the view there is enough.
     const { face, calls } = recordingFace();
-    placeCatalogue(face, [entry({ location: "panel", containerId: "c.panel" })]);
+    placeCatalogue(face, DSH, [entry({ location: "panel", containerId: "c.panel" })]);
     expect(shapes(calls)).toEqual([
       ["setRegionChildren", BOTTOM, [{ id: "bottom/container:c.panel", label: "Explorer" }]],
       ["placeQuietly", "vscode:view:workbench.explorer.fileView", "bottom/container:c.panel"],

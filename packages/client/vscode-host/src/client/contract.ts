@@ -10,7 +10,7 @@
  * The type surface below, and the DSH merges it needs, reach a consumer through
  * this single import.
  *
- * @module prac-client-vscode-host/client/public
+ * @module prac-client-vscode-host/client/contract
  */
 
 import type { ReactElement } from "react";

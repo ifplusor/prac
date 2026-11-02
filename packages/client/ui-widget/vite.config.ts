@@ -1,8 +1,8 @@
 import { defineConfig } from "vite-plus";
 
-import { clientPack } from "../../../scripts/pack-client.ts";
+import { PLATFORM_MODULES, clientPack } from "../../../scripts/pack-client.ts";
 
-/** `ui-widget` is a DSH plugin; `./lib` exposes its types / model. */
+/** `ui-widget` is a DSH plugin: the board model is internal, `ctx.pracWidgets` is the shared surface. */
 export default defineConfig({
   pack: [
     {
@@ -12,25 +12,33 @@ export default defineConfig({
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
     },
     {
-      entry: { lib: "src/client/index.ts" },
+      entry: { "client-types": "src/client/contract.ts" },
       format: ["esm"],
       platform: "browser",
-      outExtensions: () => ({ js: ".js", dts: ".d.mts" }),
+      outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
       deps: {
         neverBundle: [
-          "react",
-          "react-dom",
-          "@deepseek-ai/cordis",
-          "@deepseek-ai/dsh-client-store",
-          "@deepseek-ai/dsh-client-ui-slots",
-          "@deepseek-ai/dsh-client-ui-primitives",
-          "@deepseek-ai/dsh-client-ui-dockkit",
+          ...PLATFORM_MODULES,
+          "prac-client-ui-frame",
+          "prac-ui-kit-workbench",
+          "prac-ui-kit-content",
+          "prac-ui-kit-layout",
         ],
       },
     },
     clientPack("prac-client-ui-widget", {
-      entry: "src/client/plugin.ts",
+      entry: "src/client/index.ts",
       external: ["react-dom", "@deepseek-ai/dsh-client-store"],
     }),
   ],
+  run: {
+    tasks: {
+      "check:client": {
+        command:
+          "node ../../../scripts/bundle-client.mjs --artifact dist/client.js --id prac-client-ui-widget" +
+          ` --allow ${PLATFORM_MODULES.join(" --allow ")} --exports apply,name,inject`,
+        dependsOn: ["build"],
+      },
+    },
+  },
 });

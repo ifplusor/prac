@@ -14,10 +14,6 @@
       "types": "./dist/index.d.mts",
       "default": "./dist/index.mjs"
     },
-    "./lib": {
-      "types": "./dist/lib.d.mts",
-      "default": "./dist/lib.js"
-    },
     "./client": {
       "default": "./dist/client.js"
     },

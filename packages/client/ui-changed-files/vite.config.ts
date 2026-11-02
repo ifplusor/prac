@@ -1,8 +1,8 @@
 import { defineConfig } from "vite-plus";
 
-import { clientPack } from "../../../scripts/pack-client.ts";
+import { PLATFORM_MODULES, clientPack } from "../../../scripts/pack-client.ts";
 
-/** `ui-changed-files` is a DSH plugin; `./lib` is its component library. */
+/** `ui-changed-files` is a DSH plugin: the card is internal, its slot registration is the surface. */
 export default defineConfig({
   pack: [
     {
@@ -11,13 +11,16 @@ export default defineConfig({
       platform: "node",
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
     },
-    {
-      entry: { lib: "src/client/index.ts" },
-      format: ["esm"],
-      platform: "browser",
-      outExtensions: () => ({ js: ".js", dts: ".d.mts" }),
-      deps: { neverBundle: ["react"] },
-    },
-    clientPack("prac-client-ui-changed-files", { entry: "src/client/plugin.ts" }),
+    clientPack("prac-client-ui-changed-files", { entry: "src/client/index.ts" }),
   ],
+  run: {
+    tasks: {
+      "check:client": {
+        command:
+          "node ../../../scripts/bundle-client.mjs --artifact dist/client.js --id prac-client-ui-changed-files" +
+          ` --allow ${PLATFORM_MODULES.join(" --allow ")} --exports apply,name,inject`,
+        dependsOn: ["build"],
+      },
+    },
+  },
 });

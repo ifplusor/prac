@@ -29,9 +29,9 @@ export default defineConfig({
     },
     clientPack("prac-client-vscode-host", { entry: "src/client/index.ts" }),
     // The client half's published types, emitted from a type-only entry (see
-    // `src/client/public.ts`); the `.mjs` is a stub.
+    // `src/client/contract.ts`); the `.mjs` is a stub.
     {
-      entry: { client: "src/client/public.ts" },
+      entry: { "client-types": "src/client/contract.ts" },
       format: ["esm"],
       platform: "browser",
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),

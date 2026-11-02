@@ -124,7 +124,7 @@ export interface VscodeViewDefinitionOptions {
 /** Runtime hooks behind one VS Code group binding. */
 export interface VscodeGroupBindingRuntime {
   readonly containerId?: string;
-  actions?(): readonly import("./public.js").PracVscodeAction[];
+  actions?(): readonly import("./contract.js").PracVscodeAction[];
   runAction?(actionId: string): void;
   dispose?(): void;
 }
@@ -145,7 +145,7 @@ export class VscodeGroupBinding implements WindowGroupBinding {
   }
 
   /** Container title actions the frame may render. */
-  actions(): readonly import("./public.js").PracVscodeAction[] {
+  actions(): readonly import("./contract.js").PracVscodeAction[] {
     return this.#disposed ? [] : (this.runtime?.actions?.() ?? []);
   }
 
