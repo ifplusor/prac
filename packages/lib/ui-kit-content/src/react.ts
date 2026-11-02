@@ -7,6 +7,7 @@
  */
 
 export * from "./layoutRenderer.js";
+export * from "./contentHostMount.js";
 export * from "./chrome.js";
 export * from "./layoutTabs.js";
 export * from "./layoutStack.js";

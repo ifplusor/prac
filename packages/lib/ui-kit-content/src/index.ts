@@ -1,4 +1,5 @@
 export * from "./content.js";
+export * from "./contentHostMount.js";
 export * from "./placement.js";
 export * from "./model.js";
 export * from "./store.js";

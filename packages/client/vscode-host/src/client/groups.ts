@@ -1,4 +1,4 @@
-import type { FrameWindowGroup, GroupRegionContent } from "prac-ui-kit-workbench";
+import type { WindowGroup, GroupRegionContent } from "prac-ui-kit-workbench";
 /**
  * The VS Code group host.
  *
@@ -22,8 +22,8 @@ import {
 
 /** The frame operations the group host needs. */
 export interface VscodeGroupLayout {
-  registerWindowGroup(group: FrameWindowGroup, regionId: string): unknown;
-  registerContent?(content: GroupRegionContent<FrameWindowGroup>, regionId: string): unknown;
+  registerWindowGroup(group: WindowGroup, regionId: string): unknown;
+  registerContent?(content: GroupRegionContent<WindowGroup>, regionId: string): unknown;
   unregisterWindowGroup(groupId: string): void;
 }
 
@@ -58,7 +58,7 @@ export class VscodeGroupHost {
     const group = this.options.definition.materialize(resource) as unknown as VscodeGroupRuntime;
     const binding = this.options.definition.bindingFactory?.(resource);
     if (binding !== undefined) group.setBinding(binding);
-    const content = group as unknown as GroupRegionContent<FrameWindowGroup>;
+    const content = group as unknown as GroupRegionContent<WindowGroup>;
     try {
       if (this.options.layout.registerContent !== undefined && content.group !== undefined) {
         this.options.layout.registerContent(content, regionId);

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
-import { drawsRegionBar, regionNode, resolveSizes, setRegionSelector } from "prac-ui-kit-content";
+import { drawsRegionBar, regionNode, resolveSizes, setRegionSelector } from "./model.js";
 import { findRegion } from "prac-ui-kit-layout";
-import type { LayoutState, RegionSelector } from "./contract.js";
+import type { RegionSelector } from "prac-ui-kit-layout";
+import type { LayoutState } from "./placement.js";
 
 /**
  * How a region presents its **choice among its children**.

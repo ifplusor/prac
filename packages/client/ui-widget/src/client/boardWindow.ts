@@ -1,8 +1,8 @@
+import type { ContentHost } from "prac-ui-kit-content";
 import {
-  type ContentHost,
   type RegionContent,
   type Window,
-  type WindowGroup as FrameWindowGroup,
+  type WindowGroup as WindowGroup,
   type WidgetRecord,
   type LayoutState,
   WindowGroupModel,
@@ -49,7 +49,7 @@ export class BoardWindow implements Window {
 }
 
 /** A board window hosted as a surface with a generic window group. */
-export class BoardWindowAdapter implements RegionContent<FrameWindowGroup> {
+export class BoardWindowAdapter implements RegionContent<WindowGroup> {
   readonly kind = "window-group";
   readonly boardWindow: BoardWindow;
   readonly group: WindowGroupModel;
@@ -75,15 +75,15 @@ export class BoardWindowAdapter implements RegionContent<FrameWindowGroup> {
       (() => {});
   }
 
-  get state(): FrameWindowGroup["state"] {
+  get state(): WindowGroup["state"] {
     return this.group.state;
   }
 
-  get placements(): FrameWindowGroup["placements"] {
+  get placements(): WindowGroup["placements"] {
     return this.group.placements;
   }
 
-  get windows(): FrameWindowGroup["windows"] {
+  get windows(): WindowGroup["windows"] {
     return this.group.windows;
   }
 

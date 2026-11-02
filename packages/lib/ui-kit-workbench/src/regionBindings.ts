@@ -6,7 +6,7 @@
  * (the resource materializer does) and it does not create regions (the
  * arrangement does).
  *
- * @module prac-ui-kit-workbench/frameGroups
+ * @module prac-ui-kit-workbench/regionBindings
  */
 
 import { findNode } from "prac-ui-kit-layout";
@@ -14,13 +14,10 @@ import type {
   WindowGroup,
   WindowGroupAction as GroupAction,
   WindowGroupActionBinding as GroupActionBinding,
-} from "./windowModel.js";
+} from "./workbenchModel.js";
 import type { LayoutStore } from "./store.js";
-import { WindowGroupLayoutBridge } from "./frameBridge.js";
+import { WindowGroupLayoutBridge } from "./groupBridge.js";
 import type { GroupRegionContent } from "./regionContent.js";
-
-/** The structural group shape the frame consumes. */
-export type FrameWindowGroup = WindowGroup;
 
 /** One bar entry projected from a hosted group. */
 export interface GroupBarItem {
@@ -35,15 +32,15 @@ export interface GroupBarItem {
 /** One registered group and its frame region. */
 export interface RegionBinding {
   /** The region content registered for this region. */
-  readonly content: GroupRegionContent<FrameWindowGroup>;
+  readonly content: GroupRegionContent<WindowGroup>;
   /** Convenience view of `content.group`. */
-  readonly group: FrameWindowGroup;
+  readonly group: WindowGroup;
   readonly regionId: string;
   readonly bridge: WindowGroupLayoutBridge;
 }
 
 /** Owns the group → region bindings for one frame store. */
-export class WindowGroupHost {
+export class WindowGroupBindings {
   readonly #groups = new Map<string, RegionBinding>();
   readonly #regions = new Map<string, string>();
   readonly #stop: () => void;
@@ -54,9 +51,9 @@ export class WindowGroupHost {
 
   /** Register a group in an existing region. */
   register(
-    group: FrameWindowGroup,
+    group: WindowGroup,
     regionId: string,
-    content?: GroupRegionContent<FrameWindowGroup>,
+    content?: GroupRegionContent<WindowGroup>,
   ): RegionBinding {
     if (this.#groups.has(group.id)) throw new Error(`view group already registered: ${group.id}`);
     if (this.#regions.has(regionId)) {
@@ -67,7 +64,7 @@ export class WindowGroupHost {
       throw new Error(`unknown region: ${regionId}`);
     }
     const bridge = new WindowGroupLayoutBridge(group, this.store, regionId);
-    const owningContent: GroupRegionContent<FrameWindowGroup> = content ?? {
+    const owningContent: GroupRegionContent<WindowGroup> = content ?? {
       kind: group.state.mode === "select" ? "window-group" : "widget-board",
       group,
       dispose: () => group.dispose(),
@@ -86,7 +83,7 @@ export class WindowGroupHost {
   }
 
   /** Register a region content's group in a region. */
-  registerContent(content: GroupRegionContent<FrameWindowGroup>, regionId: string): RegionBinding {
+  registerContent(content: GroupRegionContent<WindowGroup>, regionId: string): RegionBinding {
     return this.register(content.group, regionId, content);
   }
 
@@ -133,7 +130,7 @@ export class WindowGroupHost {
   }
 
   /** The region content registered for a region, if any. */
-  contentFor(regionId: string): GroupRegionContent<FrameWindowGroup> | undefined {
+  contentFor(regionId: string): GroupRegionContent<WindowGroup> | undefined {
     return [...this.#groups.values()].find(
       (entry) => entry.regionId === regionId || entry.regionId.startsWith(`${regionId}/`),
     )?.content;

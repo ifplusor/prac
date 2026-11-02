@@ -1,15 +1,15 @@
 import {
   boardDropSide,
   type BoardLayout,
-  ContentHostMount,
-  type ContentHost,
   readBoardDrop,
   type WidgetRecord,
 } from "prac-ui-kit-workbench";
 import {
-  type ChromeItemFacts,
-  type LayoutDecoration,
+  ContentHostMount,
   LayoutRenderer,
+  type ChromeItemFacts,
+  type ContentHost,
+  type LayoutDecoration,
   type LayoutRendererProps,
 } from "prac-ui-kit-content";
 import type { Box } from "prac-ui-kit-layout";

@@ -3,7 +3,7 @@ import { defaultTree, place } from "./model.js";
 import type { LayoutState } from "./contract.js";
 import type { LayoutStore } from "./store.js";
 import { TestGroup } from "./testGroup.js";
-import { WindowGroupLayoutBridge } from "./frameBridge.js";
+import { WindowGroupLayoutBridge } from "./groupBridge.js";
 
 function memoryStore(): LayoutStore {
   let state: LayoutState = {

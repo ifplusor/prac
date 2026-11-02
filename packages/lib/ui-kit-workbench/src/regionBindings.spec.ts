@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { defaultTree } from "./model.js";
 import type { LayoutState } from "./contract.js";
 import type { LayoutStore } from "./store.js";
-import type { WindowGroupActionBinding } from "./windowModel.js";
+import type { WindowGroupActionBinding } from "./workbenchModel.js";
 import { TestGroup } from "./testGroup.js";
-import { WindowGroupHost } from "./frameGroups.js";
+import { WindowGroupBindings } from "./regionBindings.js";
 
 function memoryStore(): LayoutStore {
   let state: LayoutState = {
@@ -30,10 +30,10 @@ function memoryStore(): LayoutStore {
   };
 }
 
-describe("WindowGroupHost", () => {
+describe("WindowGroupBindings", () => {
   it("registers one group in one region and projects its items", () => {
     const store = memoryStore();
-    const host = new WindowGroupHost(store);
+    const host = new WindowGroupBindings(store);
     const group = new TestGroup("g1");
     group.add({ id: "v1" });
 
@@ -45,7 +45,7 @@ describe("WindowGroupHost", () => {
   });
 
   it("rejects duplicate groups and regions", () => {
-    const host = new WindowGroupHost(memoryStore());
+    const host = new WindowGroupBindings(memoryStore());
     host.register(new TestGroup("g1"), "left");
 
     expect(() => host.register(new TestGroup("g1"), "right")).toThrow(/already registered/);
@@ -55,7 +55,7 @@ describe("WindowGroupHost", () => {
 
   it("projects group bar items with label and active view", () => {
     const store = memoryStore();
-    const host = new WindowGroupHost(store);
+    const host = new WindowGroupBindings(store);
     const group = new TestGroup("g1", "select", "Explorer");
     group.add({ id: "v1" });
     host.register(group, "left");
@@ -67,7 +67,7 @@ describe("WindowGroupHost", () => {
 
   it("projects binding actions into the bar item", () => {
     const store = memoryStore();
-    const host = new WindowGroupHost(store);
+    const host = new WindowGroupBindings(store);
     const group = new TestGroup("g1", "select", "Explorer");
     const runAction = vi.fn();
     const binding: WindowGroupActionBinding = {
@@ -86,7 +86,7 @@ describe("WindowGroupHost", () => {
 
   it("writes a frame reorder back into the group", () => {
     const store = memoryStore();
-    const host = new WindowGroupHost(store);
+    const host = new WindowGroupBindings(store);
     const group = new TestGroup("g1", "stack");
     group.add({ id: "v1" });
     group.add({ id: "v2" });
@@ -106,7 +106,7 @@ describe("WindowGroupHost", () => {
 
   it("can register a fresh group after the old one leaves", () => {
     const store = memoryStore();
-    const host = new WindowGroupHost(store);
+    const host = new WindowGroupBindings(store);
     host.register(new TestGroup("g1"), "left");
     host.unregister("g1");
 
@@ -120,7 +120,7 @@ describe("WindowGroupHost", () => {
 
   it("unregisters without disposing the group", () => {
     const store = memoryStore();
-    const host = new WindowGroupHost(store);
+    const host = new WindowGroupBindings(store);
     const group = new TestGroup("g1");
     group.add({ id: "v1" });
     host.register(group, "left");

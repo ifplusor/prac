@@ -74,6 +74,15 @@ export interface ContentGroup<
   dispose(): void;
 }
 
+/** A content endpoint that mounts itself into a frame-provided element. */
+export interface ContentHost {
+  /** Stable identity, matching the window / widget / content id. */
+  readonly id: string;
+  mount(element: HTMLElement): void;
+  release(): void;
+  focus?(): void;
+}
+
 /** A region's content root. `content` is deliberately not a group by default. */
 export interface ContentRoot<TContent = unknown> {
   readonly kind: ContentRootKind;

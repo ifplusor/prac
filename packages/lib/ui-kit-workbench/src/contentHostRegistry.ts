@@ -5,9 +5,9 @@
  * registered here. Windows can own editor / chat / board content without going
  * through the generic slot path.
  *
- * @module prac-ui-kit-workbench/contentHosts
+ * @module prac-ui-kit-workbench/contentHostRegistry
  */
-import type { ContentHost } from "./windowModel.js";
+import type { ContentHost } from "prac-ui-kit-content";
 
 /** Content-id → host registry for one frame. */
 export class ContentHostRegistry {

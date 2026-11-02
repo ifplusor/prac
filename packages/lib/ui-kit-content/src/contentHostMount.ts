@@ -1,15 +1,12 @@
 /**
- * Imperative content host adapter.
+ * Mount a `ContentHost` into a layout item's element.
  *
- * Window content that is not a React slot (editor / chat / board host) mounts
- * itself into this element. The frame only supplies the element; the source owns
- * the host lifecycle.
- *
- * @module prac-ui-kit-workbench/layoutContentHost
+ * @module prac-ui-kit-content/contentHostMount
  */
+
 import { createElement, useLayoutEffect, useRef } from "react";
 import type { ReactNode } from "react";
-import type { ContentHost } from "./windowModel.js";
+import type { ContentHost } from "./content.js";
 
 /** Mount one `ContentHost` into the layout item's box. */
 export function ContentHostMount({

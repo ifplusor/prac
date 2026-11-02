@@ -1,4 +1,4 @@
-import type { FrameWindowGroup, WindowGroupBinding } from "prac-ui-kit-workbench";
+import type { WindowGroup, WindowGroupBinding } from "prac-ui-kit-workbench";
 /**
  * VS Code's concrete CRD-lite resources.
  *
@@ -78,7 +78,7 @@ export interface VscodeView {
 }
 
 /** The group runtime the adapter's factory must produce. */
-export interface VscodeGroupRuntime extends FrameWindowGroup {
+export interface VscodeGroupRuntime extends WindowGroup {
   readonly binding?: WindowGroupBinding;
   setBinding(binding: WindowGroupBinding | undefined): void;
   add(view: VscodeViewHandle): void;

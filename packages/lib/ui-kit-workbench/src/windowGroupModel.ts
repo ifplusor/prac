@@ -8,7 +8,12 @@
  * @module prac-ui-kit-workbench/windowGroupModel
  */
 
-import type { Window, WindowGroup, WindowGroupPlacement, WindowGroupState } from "./windowModel.js";
+import type {
+  Window,
+  WindowGroup,
+  WindowGroupPlacement,
+  WindowGroupState,
+} from "./workbenchModel.js";
 
 /** A window group with one owned primary window and any hosted windows. */
 export class WindowGroupModel implements WindowGroup {

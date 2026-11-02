@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import type { ContentHost, Window } from "./windowModel.js";
+import type { ContentHost } from "prac-ui-kit-content";
+import type { Window } from "./workbenchModel.js";
 import { WindowGroupModel } from "./windowGroupModel.js";
 
 function window(id: string): Window {

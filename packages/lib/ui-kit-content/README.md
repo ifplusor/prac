@@ -12,6 +12,7 @@ layer. A headless consumer can use the model / store subpaths.
 
 ```text
 content        ContentRoot / ContentGroup / ContentItem / ContentHost
+hostMount      ContentHostMount (React)
 placement      PlacementRecord / LayoutState
 store          LayoutStore / useLayout
 switching      active-store switcher
@@ -26,7 +27,7 @@ grid/resize/drag  grid handles, resize controller, sash / stack drag
 ```
 
 Subpaths: `./content`, `./placement`, `./store`, `./switching`, `./snapshot`,
-`./workspace-scope`, `./react`, `./isolation`, `./chrome`, `./renderModel`, `./renderer`, `./tabs`, `./stack`, `./sash`, `./containerBar`, `./grid`, `./resize`, `./sashDrag`, `./stackDrag`, `./chromeIntents`, `./containerChrome`, `./layoutIsolation`.
+`./workspace-scope`, `./contentHostMount`, `./react`, `./isolation`, `./chrome`, `./renderModel`, `./renderer`, `./tabs`, `./stack`, `./sash`, `./containerBar`, `./grid`, `./resize`, `./sashDrag`, `./stackDrag`, `./chromeIntents`, `./containerChrome`, `./layoutIsolation`.
 
 Not in scope: window / board / widget / Space / frame shell, DSH slots, source
 adapters.

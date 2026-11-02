@@ -5,12 +5,12 @@
  * membership, order and active; the frame store is the rendering projection. It
  * never reads the store back into the group.
  *
- * @module prac-ui-kit-workbench/frameBridge
+ * @module prac-ui-kit-workbench/groupBridge
  */
 
 import { ensureStackShape, placeQuietly, removeItem } from "prac-ui-kit-content";
 import type { LayoutStore } from "./store.js";
-import type { FrameWindowGroup } from "./frameGroups.js";
+import type { WindowGroup } from "./workbenchModel.js";
 
 /** One group projected into one frame region. */
 export class WindowGroupLayoutBridge {
@@ -19,7 +19,7 @@ export class WindowGroupLayoutBridge {
   #disposed = false;
 
   constructor(
-    private readonly group: FrameWindowGroup,
+    private readonly group: WindowGroup,
     private readonly store: LayoutStore,
     readonly regionId: string,
   ) {

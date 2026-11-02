@@ -1,5 +1,5 @@
 import type {
-  FrameWindowGroup,
+  WindowGroup as KitWindowGroup,
   WindowGroupBinding,
   WindowGroupPlacement,
   WindowGroupState,
@@ -25,7 +25,7 @@ export interface WindowViewHandle {
 }
 
 /** A window-group-backed frame group (select mode). */
-export class WindowGroupAdapter implements FrameWindowGroup, RegionContent<FrameWindowGroup> {
+export class WindowGroupAdapter implements KitWindowGroup, RegionContent<KitWindowGroup> {
   readonly kind = "window-group" as const;
   #element: HTMLElement | undefined;
   readonly #group: WindowGroup;
@@ -39,7 +39,7 @@ export class WindowGroupAdapter implements FrameWindowGroup, RegionContent<Frame
     this.#group = new WindowGroup(id);
   }
 
-  get group(): FrameWindowGroup {
+  get group(): KitWindowGroup {
     return this;
   }
 

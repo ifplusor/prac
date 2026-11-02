@@ -2,7 +2,7 @@ import {
   ItemActions,
   type RenderItemAction,
   type GroupBarItem,
-  type WindowGroupHost,
+  type WindowGroupBindings,
   SASH_SIZE,
   type StyleObject,
   setEntryFolded,
@@ -596,7 +596,7 @@ export function createFrame(
   store: LayoutStore,
   sources: {
     readonly currentSession: CurrentSessionSource;
-    readonly viewGroups?: WindowGroupHost;
+    readonly viewGroups?: WindowGroupBindings;
     readonly contentHosts?: import("prac-ui-kit-workbench").ContentHostRegistry;
     readonly boardLayouts?: import("prac-ui-kit-workbench").BoardLayoutRegistry;
     readonly chrome?: ChromeRegistry<ItemRecord>;

@@ -11,15 +11,15 @@ import {
   resizeGridCell,
   resizeGridTrack,
   unmergeGridCell,
-  isPresent,
   regionInfos,
   regionNode,
   removeRegion,
   resolveSizes,
   splitRegionWith,
-} from "prac-ui-kit-content";
+} from "./model.js";
 import { findRegion } from "prac-ui-kit-layout";
-import type { LayoutState } from "./contract.js";
+import type { LayoutState } from "./placement.js";
+import { isPresent } from "./renderModel.js";
 
 function state(): LayoutState {
   return {

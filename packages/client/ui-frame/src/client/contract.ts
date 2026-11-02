@@ -1,15 +1,20 @@
 import type {
   BoardLayoutSource,
-  ContentHost,
   RegionBinding,
   ItemKind,
-  FrameWindowGroup,
+  WindowGroup,
   GroupRegionContent,
   RegionContentRegistry,
   WidgetRecord,
   LayoutState,
 } from "prac-ui-kit-workbench";
-import type { ChromeRegistry, ContentInfo, RegionInfo, ItemFlags } from "prac-ui-kit-content";
+import type {
+  ChromeRegistry,
+  ContentHost,
+  ContentInfo,
+  ItemFlags,
+  RegionInfo,
+} from "prac-ui-kit-content";
 import type { RegionChild, RegionSelector, Side } from "prac-ui-kit-layout";
 /**
  * The frame plugin's DSH contract.
@@ -84,7 +89,7 @@ declare module "@deepseek-ai/cordis" {
     /** The active window's resolved actions, rendered in the tab strip. */
     pracWindowActions: PracWindowActionsFace;
     /** The frame's surface socket registry. */
-    pracSurfaces: RegionContentRegistry<FrameWindowGroup>;
+    pracSurfaces: RegionContentRegistry<WindowGroup>;
   }
 }
 
@@ -353,8 +358,8 @@ export interface PracLayoutFace {
   ): () => void;
   /** Point a window record at a board layout root (or clear it). */
   setItemBoard(viewId: string, boardId: string | undefined): void;
-  registerWindowGroup(group: FrameWindowGroup, regionId: string): RegionBinding;
-  registerContent(content: GroupRegionContent<FrameWindowGroup>, regionId: string): RegionBinding;
+  registerWindowGroup(group: WindowGroup, regionId: string): RegionBinding;
+  registerContent(content: GroupRegionContent<WindowGroup>, regionId: string): RegionBinding;
   /**
    * Remove a view group's frame projection.
    *

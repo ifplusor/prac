@@ -352,8 +352,8 @@ type GroupRegionContent<TGroup> =
 
 ```ts
 interface RegionBinding {
-  readonly content: GroupRegionContent<FrameWindowGroup>;
-  readonly group: FrameWindowGroup; // getter，派生自 content.group
+  readonly content: GroupRegionContent<WindowGroup>;
+  readonly group: WindowGroup; // getter，派生自 content.group
   readonly regionId: string;
   readonly bridge: WindowGroupLayoutBridge;
 }
@@ -483,8 +483,8 @@ UI 按**层**拆包，不按 window / board 领域拆；每一层都能独立使
 | 包 | 职责 | 依赖 |
 |---|---|---|
 | `prac-ui-kit-layout` | **L0**：纯 geometry / tree / allocation / grid；无 DSH / React / DOM / 内容根；无 view / viewGroup（source adapter 词汇） | 无 |
-| `prac-ui-kit-content` | **L1**（partial）：`ContentRoot` / `ContentGroup` / `ContentItem` / `ContentHost`、`PlacementRecord` / `LayoutState`、`LayoutStore` / `useLayout`、switching / snapshot / workspace / isolation、chrome / renderModel / `LayoutRenderer` / tabs / stack / sash / containerBar / grid / resize / drag / isolation、generic `model`；已出 `./content` / `./placement` / `./model` / `./store` / `./react` / `./renderer` / `./grid` 等 subpath；无 window / space / frame shell / DSH；`layoutDrop` / `layoutActions` / `layoutContentHost` 是泛型 L2 primitive，留在 workbench | `prac-ui-kit-layout` |
-| `prac-ui-kit-workbench` | **L2**：Space（stage 虚拟桌面）、Window / WindowGroup、Board / Widget、frame shell（sidebar / panel / dock）、`RegionContent` / `RegionBinding`、frame state / board layout；不重新导出 content 的 renderer / chrome / tabs / store hook；无 DSH、无 prac 内容种类 / catalogue / 默认 arrangement | `prac-ui-kit-layout`、`prac-ui-kit-content` |
+| `prac-ui-kit-content` | **L1**（partial）：`ContentRoot` / `ContentGroup` / `ContentItem` / `ContentHost`、`PlacementRecord` / `LayoutState`、`LayoutStore` / `useLayout`、switching / snapshot / workspace / isolation、chrome / renderModel / `LayoutRenderer` / tabs / stack / sash / containerBar / grid / resize / drag / isolation、generic `model`；已出 `./content` / `./placement` / `./model` / `./store` / `./react` / `./renderer` / `./grid` 等 subpath；无 window / space / frame shell / DSH；`layoutDrop` / `layoutActions` 是泛型 L2 primitive，留在 workbench | `prac-ui-kit-layout` |
+| `prac-ui-kit-workbench` | **L2**：Space（stage 虚拟桌面）、Window / WindowGroup、Board / Widget、frame shell（sidebar / panel / dock）、`RegionContent` / `RegionBinding`、workbench model / frame state / board layout；不重新导出 content 的 renderer / chrome / tabs / store hook；无 DSH、无 prac 内容种类 / catalogue / 默认 arrangement | `prac-ui-kit-layout`、`prac-ui-kit-content` |
 | `prac-client-ui-frame` | **核心 DSH host**：持久化 store、DSH slot catalogue、`SlotMap` / `Context` 契约（`./client` 的 types 入口）、slot 声明、`ctx.pracFrame` / `ctx.pracSpaces` / `ctx.layout`、theme presenter；同时注册 `window-group` surface 工厂；window / window-group 小模型也在本包 | `prac-ui-kit-workbench`、DSH store / renderer / slots |
 | `prac-client-ui-widget` | **prac 的 board / widget 适配器**：`BoardWindow` / `BoardWindowAdapter` / `BoardContent`、widget registry、DSH / VS Code widget source；通用 `Board` / `Widget` 在 kit | `prac-ui-kit-workbench` |
 | `prac-client-ui-workbench` | 默认 Space / window / board 放置、arrangement、recall、持久化 defaults、open policy | 核心 + adapters |
@@ -530,7 +530,7 @@ prac-ui-kit-content/react    renderer / React mount / chrome
 - adapters 只做来源翻译，不拥有 frame / window / widget 机制；
 - **bundle 是叶子**：其它包不能 import bundle；bundle 内不出现默认布局、默认 placement、业务 action、DSH / VS Code 映射；只做包选择、启动顺序、provider / 根组件装配；
 - `prac-client-ui-workbench` 承接 arrangement / recall / 默认落位 / open policy，不是 bundle 的业务逻辑；
-- `prac-ui-kit-content` 已抽出 content protocols / placement / store / switching / snapshot / isolation / chrome / renderModel / `LayoutRenderer` / tabs / stack / sash / containerBar / grid / resize / drag / containerChrome / chromeIntents / generic `model`；`Window` 实现 `ContentItem`、`WindowGroup` 实现 `ContentGroup`（`itemId` 已进入 placement）；workbench 的 `model` 只保留 defaultTree / window-widget record factory / prune，`layoutDrop` / `layoutActions` / `layoutContentHost` 是泛型 L2 primitive。
+- `prac-ui-kit-content` 已抽出 content protocols / placement / store / switching / snapshot / isolation / chrome / renderModel / `LayoutRenderer` / tabs / stack / sash / containerBar / grid / resize / drag / containerChrome / chromeIntents / generic `model`；`Window` 实现 `ContentItem`、`WindowGroup` 实现 `ContentGroup`（`itemId` 已进入 placement）；workbench 的 `model` 只保留 defaultTree / window-widget record factory / prune，`layoutDrop` / `layoutActions` 是泛型 L2 primitive。
 - `Surface` / `FrameSurface` / `FrameGroup` / `SurfaceRegistry` 已删除，收敛为 `RegionContent` / `GroupRegionContent` / `RegionContentRegistry` / `RegionBinding`；`ContentMount` 已删除，host 只剩 `ContentHost`。
 - `prac-client-ui-window` 已删除；`prac-client-ui-widget` 仍含 board 具体模型。
 - `FrameState` / `SpaceState` 已拆（`prac-frame/v1` + `prac-space/v1`），renderer 通过 composed state 消费。
@@ -601,7 +601,7 @@ ctx.layout           // DSH compat shim（放 ui-frame）
 - window / board / widget / space 是通用 UI 原语，属于 kit；prac 只提供内容种类、来源、catalogue、默认 arrangement、faces。
 - 拆包按层，不按 window / board 领域；`prac-ui-kit-content`（L1）已立包，先抽出 content protocols / placement / store / snapshot / isolation；renderer / model 随后迁入。
 - 包名保持 `prac-ui-kit-*`：暂不引入独立的 `@prac-ui` scope；等框架真的要对外发布时再讨论。
-- `defaultTree` 仍是 kit 的通用默认 topology，但 `createFrameState(tree?)` / `createSpaceState(stage?)` / `createFrameStore(..., tree?)` / `createSpaceStore(..., stage?)` 允许 app 注入；prac 的默认 arrangement 不必改 kit。`layoutDrop` / `layoutActions` / `layoutContentHost` 是泛型 L2 primitive，留在 frame。
+- `defaultTree` 仍是 kit 的通用默认 topology，但 `createFrameState(tree?)` / `createSpaceState(stage?)` / `createFrameStore(..., tree?)` / `createSpaceStore(..., stage?)` 允许 app 注入；prac 的默认 arrangement 不必改 kit。`layoutDrop` / `layoutActions` 是泛型 L2 primitive，留在 workbench。
 - kit 的 “view” 词汇已清：`ItemRecord` / `ItemFlags` / `ItemKind` / `itemId` / `items`；`prac.view` 等 source slot 留在 plugin。持久化不升 v2，旧 `views` 字段由 store heal 时读成 `items`。
 - plugin face 也改用 `Item*`：`listItems` / `activeItem` / `splitItem` / `setItemKind` / `setItemBoard` / `onDidRequestCloseItem`；source adapter 的 `viewId` 仍保留。
 - 包入口按层：`prac-ui-kit-*` 是库，只出 `.`，且不 import DSH；`prac-client-*` 是 DSH 插件行，出 `./client`。`ui-frame` 的 `./client` 出 loader artifact，其 `types` 条件承载 DSH 契约类型；root 是 host 半。

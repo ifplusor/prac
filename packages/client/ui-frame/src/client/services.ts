@@ -18,9 +18,9 @@ import {
   type LayoutStore,
   ContentHostRegistry,
   BoardLayoutRegistry,
-  WindowGroupHost,
+  WindowGroupBindings,
   type RegionBinding,
-  type FrameWindowGroup,
+  type WindowGroup,
 } from "prac-ui-kit-workbench";
 import {
   type ChromeRegistry,
@@ -104,9 +104,9 @@ export interface LayoutServices {
   /** The `panelInfo` root hook's observable. */
   readonly panelInfo: HostObservable<PanelInfo>;
   /** The frame's view-group owner. */
-  readonly viewGroups: WindowGroupHost;
+  readonly viewGroups: WindowGroupBindings;
   /** Region-content factories registered by window / widget plugins. */
-  readonly surfaces: RegionContentRegistry<FrameWindowGroup>;
+  readonly surfaces: RegionContentRegistry<WindowGroup>;
   /** Runtime content hosts for windows; keyed by `contentId`. */
   readonly contentHosts: ContentHostRegistry;
   /** Board layout roots; keyed by `boardId`. */
@@ -132,8 +132,8 @@ export function createServices(
   // one-view rows. Hiding the last visible view, placing one, folding one — they all change the shape
   // (a stack that falls back to one row melts, an empty leftover holds no space), so the normaliser
   // runs on the way out of each change rather than only on placements.
-  const viewGroups = new WindowGroupHost(store);
-  const surfaces = new RegionContentRegistry<FrameWindowGroup>();
+  const viewGroups = new WindowGroupBindings(store);
+  const surfaces = new RegionContentRegistry<WindowGroup>();
   const originalUpdate = store.update;
   const write = (change: Parameters<typeof store.update>[0]): void => originalUpdate(change);
   store.update = (change: Parameters<typeof store.update>[0]) =>
@@ -370,7 +370,7 @@ export function createServices(
     /** Declare the height a view wants as a stack row (see the model's doc). */
     registerContentHost(
       contentId: string,
-      host: import("prac-ui-kit-workbench").ContentHost,
+      host: import("prac-ui-kit-content").ContentHost,
     ): () => void {
       return contentHosts.register(contentId, host);
     },
@@ -418,13 +418,10 @@ export function createServices(
         return { ...state, items: { ...state.items, [viewId]: { ...view, hidden: true } } };
       });
     },
-    registerWindowGroup(group: FrameWindowGroup, regionId: string): RegionBinding {
+    registerWindowGroup(group: WindowGroup, regionId: string): RegionBinding {
       return viewGroups.register(group, regionId);
     },
-    registerContent(
-      content: GroupRegionContent<FrameWindowGroup>,
-      regionId: string,
-    ): RegionBinding {
+    registerContent(content: GroupRegionContent<WindowGroup>, regionId: string): RegionBinding {
       return viewGroups.registerContent(content, regionId);
     },
     unregisterWindowGroup(groupId: string): void {

@@ -107,6 +107,10 @@
     "./react": {
       "types": "./dist/react.d.mts",
       "default": "./dist/react.mjs"
+    },
+    "./contentHostMount": {
+      "types": "./dist/contentHostMount.d.mts",
+      "default": "./dist/contentHostMount.mjs"
     }
   },
   "scripts": {

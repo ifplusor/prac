@@ -8,6 +8,7 @@ export default defineConfig({
         index: "src/index.ts",
         react: "src/react.ts",
         content: "src/content.ts",
+        contentHostMount: "src/contentHostMount.ts",
         placement: "src/placement.ts",
         model: "src/model.ts",
         store: "src/store.ts",

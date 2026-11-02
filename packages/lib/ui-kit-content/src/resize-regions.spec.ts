@@ -20,9 +20,10 @@ import {
   resolveSizes,
   setCollapsed,
   snapTargets,
-} from "prac-ui-kit-content";
+} from "./model.js";
 import { findRegion } from "prac-ui-kit-layout";
-import type { Dir, LayoutNode, LayoutState, RegionNode, SplitNode } from "./contract.js";
+import type { Dir, LayoutNode, RegionNode, SplitNode } from "prac-ui-kit-layout";
+import type { LayoutState } from "./placement.js";
 
 const claim = (size: number, extra: Partial<Basis> = {}): Basis => ({
   flex: true,

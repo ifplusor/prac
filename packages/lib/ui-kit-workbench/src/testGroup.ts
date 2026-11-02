@@ -1,6 +1,6 @@
 /** Test-only frame group; production groups are owned by prac-client-ui-frame / prac-client-ui-widget. */
-import type { WindowGroupBinding } from "./windowModel.js";
-import type { WindowGroupMode, WindowGroupPlacement, WindowGroupState } from "./windowModel.js";
+import type { WindowGroupBinding } from "./workbenchModel.js";
+import type { WindowGroupMode, WindowGroupPlacement, WindowGroupState } from "./workbenchModel.js";
 
 export class TestGroup {
   readonly #items = new Map<string, { readonly id: string; release?(): void }>();

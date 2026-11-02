@@ -9,31 +9,20 @@
  * `BoardWindowAdapter` composes that window with the generic `WindowGroupModel`
  * when other windows are hosted beside it.
  *
- * @module prac-ui-kit-workbench/windowModel
+ * @module prac-ui-kit-workbench/workbenchModel
  */
 
 export type { LayoutRoot, LayoutRootKind } from "./layoutRoot.js";
 import type {
   ContentGroup,
   ContentGroupState,
+  ContentHost,
   ContentItem,
   ContentPlacement,
 } from "prac-ui-kit-content";
 
 /** What a window renders: product-defined string. */
 export type WindowContentKind = string;
-
-/** A mounted content host. The frame owns the element; the source owns the content. */
-export interface ContentHost {
-  /** Stable identity, matching the window / widget id. */
-  readonly id: string;
-  /** Mount into the frame-provided element. */
-  mount(element: HTMLElement): void;
-  /** Release the host without disposing its source-owned identity. */
-  release(): void;
-  /** Ask the host to take focus when it supports it. */
-  focus?(): void;
-}
 
 /** One child of a board. */
 export interface WidgetHost extends ContentHost {
