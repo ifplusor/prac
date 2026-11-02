@@ -31,18 +31,18 @@ import type {
 } from "react";
 import { createPortal } from "react-dom";
 import type { UsePanelInfo } from "@deepseek-ai/dsh-client-ui-layout/client";
-import { TabStrip } from "prac-ui-kit-frame";
-import { StackHeader, StackRowOverlay } from "prac-ui-kit-frame";
-import { LayoutSashDrag } from "prac-ui-kit-frame";
-import { GridCellHandles, GridTrackHandle } from "prac-ui-kit-frame";
-import { beginStackReorder } from "prac-ui-kit-frame";
-import { ItemActions } from "prac-ui-kit-frame";
-import { ContainerBar } from "prac-ui-kit-frame";
-import { LayoutIsolation } from "prac-ui-kit-frame";
+import { TabStrip } from "prac-ui-kit-workbench";
+import { StackHeader, StackRowOverlay } from "prac-ui-kit-workbench";
+import { LayoutSashDrag } from "prac-ui-kit-workbench";
+import { GridCellHandles, GridTrackHandle } from "prac-ui-kit-workbench";
+import { beginStackReorder } from "prac-ui-kit-workbench";
+import { ItemActions } from "prac-ui-kit-workbench";
+import { ContainerBar } from "prac-ui-kit-workbench";
+import { LayoutIsolation } from "prac-ui-kit-workbench";
 import { LayoutItem, type ItemRenderSlot } from "./layoutItem.js";
-import { LayoutRenderer } from "prac-ui-kit-frame";
-import type { LayoutDecoration, LayoutDecorationContext } from "prac-ui-kit-frame";
-import { readStackRows, startEntryDrag, type StackContainer } from "prac-ui-kit-frame";
+import { LayoutRenderer } from "prac-ui-kit-workbench";
+import type { LayoutDecoration, LayoutDecorationContext } from "prac-ui-kit-workbench";
+import { readStackRows, startEntryDrag, type StackContainer } from "prac-ui-kit-workbench";
 import type {
   ChromeContext,
   ChromeItemFacts,
@@ -50,12 +50,12 @@ import type {
   ChromeSlotFace,
   LayoutIntents,
   RenderItemAction,
-} from "prac-ui-kit-frame";
+} from "prac-ui-kit-workbench";
 import { createFrameChrome } from "./frameChrome.js";
-import { createLayoutIntents } from "prac-ui-kit-frame";
+import { createLayoutIntents } from "prac-ui-kit-workbench";
 import type { UseSessions } from "@deepseek-ai/dsh-client-ui-session/client";
 import { declaredViewIcon, declaredViewLabel, declaredViewPaneHeader } from "./catalogue.js";
-import type { GroupBarItem, WindowGroupHost } from "prac-ui-kit-frame";
+import type { GroupBarItem, WindowGroupHost } from "prac-ui-kit-workbench";
 import {
   SASH_SIZE,
   type Box,
@@ -63,7 +63,7 @@ import {
   type LayoutNode,
   type RegionNode,
   type StyleObject,
-} from "prac-ui-kit-frame";
+} from "prac-ui-kit-workbench";
 import type { PracWindowActionsFace, WindowAction } from "./contract.js";
 import {
   entrySashState,
@@ -84,9 +84,9 @@ import {
   setEntryHeight,
   findNode,
   drawsRegionBar,
-} from "prac-ui-kit-frame";
-import { type LayoutStore, useLayout } from "prac-ui-kit-frame";
-import type { ItemRecord } from "prac-ui-kit-frame";
+} from "prac-ui-kit-workbench";
+import { type LayoutStore, useLayout } from "prac-ui-kit-workbench";
+import type { ItemRecord } from "prac-ui-kit-workbench";
 
 /** A minimal pointer event, as the sash drag machine reads it. */
 interface PointerDragEvent {
@@ -586,8 +586,8 @@ export function createFrame(
   sources: {
     readonly currentSession: CurrentSessionSource;
     readonly viewGroups?: WindowGroupHost;
-    readonly contentHosts?: import("prac-ui-kit-frame").ContentHostRegistry;
-    readonly boardLayouts?: import("prac-ui-kit-frame").BoardLayoutRegistry;
+    readonly contentHosts?: import("prac-ui-kit-workbench").ContentHostRegistry;
+    readonly boardLayouts?: import("prac-ui-kit-workbench").BoardLayoutRegistry;
     readonly chrome?: ChromeRegistry<ItemRecord>;
     readonly windowActions: PracWindowActionsFace;
   },
@@ -1051,15 +1051,12 @@ export function createFrame(
       ctx: LayoutDecorationContext<ItemRecord>,
     ): LayoutDecoration | undefined => {
       const node = ctx.node;
-      const surface = sources.viewGroups?.surfaceFor(node.id);
+      const surface = sources.viewGroups?.contentFor(node.id);
       const surfacePart: LayoutDecoration =
         surface === undefined
           ? {}
           : {
               attrs: { "data-prac-surface": surface.kind },
-              ref: (element: HTMLDivElement | null): void => {
-                if (element !== null) surface.attach?.(element);
-              },
             };
       if (ctx.kind === "region") {
         // A selector region renders a child that owns the surface: attaching the

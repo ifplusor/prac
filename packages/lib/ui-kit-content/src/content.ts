@@ -3,8 +3,8 @@
  *
  * A `ContentRoot` is a region's content root; its `content` is a group, a single
  * item, a nested layout root or an opaque host. A `ContentGroup` is one content
- * type (tabs / stack); `ContentItem` is one member. `ContentMount` is the
- * optional host binding — the model never holds DOM.
+ * type (tabs / stack); `ContentItem` is one member. a content host is the
+ * optional mount endpoint — the model never holds DOM.
  *
  * @module prac-ui-kit-content/content
  */
@@ -79,12 +79,4 @@ export interface ContentRoot<TContent = unknown> {
   readonly kind: ContentRootKind;
   readonly content?: TContent;
   dispose(): void;
-}
-
-/** The optional host binding for a content root. */
-export interface ContentMount<THost = HTMLElement> {
-  readonly host?: THost;
-  attach?(host: THost): void;
-  detach?(host: THost): void;
-  measure?(): ContentConstraints;
 }

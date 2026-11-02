@@ -3,7 +3,7 @@
  *
  * Which view ids DSH's own slots declare, which entries the `prac.view` slot
  * holds, and the DSH id vocabulary (`dsh:sidebar`, `dsh:main:<key>`,
- * `dsh:rightbar`). This lives in the plugin: `prac-ui-kit-frame` only owns the
+ * `dsh:rightbar`). This lives in the plugin: `prac-ui-kit-workbench` only owns the
  * view/region shapes and prac's own slot keys.
  *
  * @module prac-client-ui-frame/client/catalogue

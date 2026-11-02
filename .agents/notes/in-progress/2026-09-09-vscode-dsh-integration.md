@@ -54,7 +54,7 @@ Space
 
 ```text
 prac-ui-kit-core
-prac-ui-kit-frame
+prac-ui-kit-workbench
 ui-frame
 ui-application
 ui-window

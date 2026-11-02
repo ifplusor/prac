@@ -223,9 +223,6 @@ importers:
       prac-client-ui-widget:
         specifier: workspace:*
         version: link:../../client/ui-widget
-      prac-client-ui-window:
-        specifier: workspace:*
-        version: link:../../client/ui-window
       prac-client-ui-workbench:
         specifier: workspace:*
         version: link:../../client/ui-workbench
@@ -304,9 +301,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 18.3.7(@types/react@18.3.31)
-      prac-ui-kit-frame:
+      prac-ui-kit-workbench:
         specifier: workspace:*
-        version: link:../../lib/ui-kit-frame
+        version: link:../../lib/ui-kit-workbench
       react:
         specifier: 'catalog:'
         version: 18.3.1
@@ -334,9 +331,9 @@ importers:
       prac-client-vscode-host:
         specifier: workspace:*
         version: link:../vscode-host
-      prac-ui-kit-frame:
+      prac-ui-kit-workbench:
         specifier: workspace:*
-        version: link:../../lib/ui-kit-frame
+        version: link:../../lib/ui-kit-workbench
       react:
         specifier: 'catalog:'
         version: 18.3.1
@@ -361,9 +358,9 @@ importers:
       prac-client-vscode-host:
         specifier: workspace:*
         version: link:../vscode-host
-      prac-ui-kit-frame:
+      prac-ui-kit-workbench:
         specifier: workspace:*
-        version: link:../../lib/ui-kit-frame
+        version: link:../../lib/ui-kit-workbench
       react:
         specifier: 'catalog:'
         version: 18.3.1
@@ -388,9 +385,9 @@ importers:
       prac-client-ui-frame:
         specifier: workspace:*
         version: link:../ui-frame
-      prac-ui-kit-frame:
+      prac-ui-kit-workbench:
         specifier: workspace:*
-        version: link:../../lib/ui-kit-frame
+        version: link:../../lib/ui-kit-workbench
       react:
         specifier: 'catalog:'
         version: 18.3.1
@@ -400,15 +397,6 @@ importers:
       zustand:
         specifier: ~4.5.7
         version: 4.5.7(@types/react@18.3.31)(immer@10.2.0)(react@18.3.1)
-
-  packages/client/ui-window:
-    devDependencies:
-      '@deepseek-ai/cordis':
-        specifier: 'catalog:'
-        version: 4.0.5-alpha.1
-      prac-ui-kit-frame:
-        specifier: workspace:*
-        version: link:../../lib/ui-kit-frame
 
   packages/client/ui-workbench:
     devDependencies:
@@ -439,9 +427,9 @@ importers:
       prac-client-vscode-host:
         specifier: workspace:*
         version: link:../vscode-host
-      prac-ui-kit-frame:
+      prac-ui-kit-workbench:
         specifier: workspace:*
-        version: link:../../lib/ui-kit-frame
+        version: link:../../lib/ui-kit-workbench
       react:
         specifier: 'catalog:'
         version: 18.3.1
@@ -481,12 +469,9 @@ importers:
       prac-client-ui-widget:
         specifier: workspace:*
         version: link:../ui-widget
-      prac-client-ui-window:
+      prac-ui-kit-workbench:
         specifier: workspace:*
-        version: link:../ui-window
-      prac-ui-kit-frame:
-        specifier: workspace:*
-        version: link:../../lib/ui-kit-frame
+        version: link:../../lib/ui-kit-workbench
       prac-vscode:
         specifier: workspace:*
         version: link:../../../vendor/vscode
@@ -542,7 +527,9 @@ importers:
         specifier: 'catalog:'
         version: 18.3.1(react@18.3.1)
 
-  packages/lib/ui-kit-frame:
+  packages/lib/ui-kit-layout: {}
+
+  packages/lib/ui-kit-workbench:
     devDependencies:
       '@types/react':
         specifier: 'catalog:'
@@ -562,8 +549,6 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 18.3.1(react@18.3.1)
-
-  packages/lib/ui-kit-layout: {}
 
   vendor/vscode:
     devDependencies:

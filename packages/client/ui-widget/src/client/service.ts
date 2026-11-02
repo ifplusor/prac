@@ -7,18 +7,18 @@
 import type { Context } from "@deepseek-ai/cordis";
 // Type-only, for the frame plugin's `Context` / `SlotMap` merges.
 import type {} from "prac-client-ui-frame/client";
-import type { Side } from "prac-ui-kit-frame";
-import type { BoardWindowFrameFace } from "./boardWindowGroup.js";
-import { BoardWindowGroup } from "./boardWindowGroup.js";
+import type { Side } from "prac-ui-kit-workbench";
+import type { BoardWindowFrameFace } from "./boardWindow.js";
+import { BoardWindowSurface } from "./boardWindow.js";
 import { WidgetRegistry } from "./widget.js";
 
 /** The widget-board factory / registry other plugins inject. */
 export interface PracWidgetsFace {
   readonly registry: WidgetRegistry;
   /** Create a board window: one window whose content is a board. */
-  createBoardWindow(id: string, label?: string): BoardWindowGroup;
+  createBoardWindow(id: string, label?: string): BoardWindowSurface;
   /** Board windows currently created by this service, for diagnostics / gates. */
-  boards(): readonly BoardWindowGroup[];
+  boards(): readonly BoardWindowSurface[];
   /**
    * Move one widget from one board to another.
    *
@@ -42,7 +42,7 @@ declare module "@deepseek-ai/cordis" {
 
 /** Install the widget service. */
 export function apply(ctx: Context): void {
-  const boards = new Map<string, BoardWindowGroup>();
+  const boards = new Map<string, BoardWindowSurface>();
   const frame = ctx.pracFrame;
   /** The frame facts a board window registers through. */
   const windowFace: BoardWindowFrameFace = {
@@ -59,13 +59,13 @@ export function apply(ctx: Context): void {
     createBoardWindow: (id, label) => {
       const existing = boards.get(id);
       if (existing !== undefined) return existing;
-      const board = new BoardWindowGroup(id, label, windowFace);
+      const board = new BoardWindowSurface(id, label, windowFace);
       boards.set(id, board);
       return board;
     },
     boards: () => [...boards.values()].filter((board) => !board.disposed),
     moveWidget: (widgetId, fromBoardId, toBoardId, options = {}) => {
-      const find = (id: string): BoardWindowGroup | undefined =>
+      const find = (id: string): BoardWindowSurface | undefined =>
         boards.get(id) ?? [...boards.values()].find((board) => board.boardId === id);
       const from = find(fromBoardId);
       const to = find(toBoardId);

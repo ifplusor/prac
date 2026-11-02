@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { LayoutState, ItemRecord } from "prac-ui-kit-frame";
+import type { LayoutState, ItemRecord } from "prac-ui-kit-workbench";
 import type { ItemInfo } from "prac-client-ui-frame/client";
 import type { PracLayoutFace, RoleBindings } from "prac-client-ui-frame/client";
 import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
@@ -48,7 +48,7 @@ const stateWith = (items: LayoutState["items"] = {}): LayoutState => ({
 /**
  * A recording stand-in for the mechanism's face.
  *
- * The real face cannot be imported here — `prac-ui-kit-frame` publishes
+ * The real face cannot be imported here — `prac-ui-kit-workbench` publishes
  * types only — and it should not be: the policy's contract is *which calls it
  * makes*, so a stub that records them is the honest test double, and every
  * member is written out so a face that grows a method fails to compile here.
@@ -144,7 +144,7 @@ function recordingFace(items: LayoutState["items"] = {}): {
       throw new Error("not used by this test double");
     }) as PracLayoutFace["registerWindowGroup"],
     unregisterWindowGroup: () => {},
-    registerSurface: () => ({}) as never,
+    registerContent: () => ({}) as never,
   } satisfies PracLayoutFace;
   return { face, calls, children };
 }

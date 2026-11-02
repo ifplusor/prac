@@ -88,7 +88,7 @@ Frame shell（frame 级）
 
 ## 三、Chrome / isolation
 
-- window group tab strip / actions → frame + `ui-window`；
+- window group tab strip / actions → frame + `prac-client-ui-frame`；
 - widget header / actions → board / `ui-widget`；
 - breadcrumbs → editor application window；不是 group tab strip；
 - overlay：
@@ -149,9 +149,9 @@ Frame shell（frame 级）
 ## 七、包
 
 ```text
-prac-ui-kit-layout / prac-ui-kit-content / prac-ui-kit-frame  // libraries
+prac-ui-kit-layout / prac-ui-kit-content / prac-ui-kit-workbench  // libraries
 ui-frame                // DSH plugin row only
-ui-window
+prac-client-ui-frame
 ui-widget
 ui-workbench
 ui-dsh
@@ -159,7 +159,7 @@ ui-vscode-host / ui-vscode-views / ui-vscode-editor
 bundle/web-app  // composition root only
 ```
 
-完整依赖见 10-20 的 Package architecture。`ui-frame` 是只做插件的 DSH 行，不再导出 `./lib`；共享的 content protocols / placement / store 在 **DSH-free** 的 `prac-ui-kit-content`，model / renderer / content surface 在 **DSH-free** 的 `prac-ui-kit-frame`，而持久化 store、DSH slot catalogue 与 `SlotMap` / `Context` 契约在插件（契约只做 `./client` 的 type-only 入口）。
+完整依赖见 10-20 的 Package architecture。`ui-frame` 是只做插件的 DSH 行，不再导出 `./lib`；共享的 content protocols / placement / store 在 **DSH-free** 的 `prac-ui-kit-content`，model / renderer / content surface 在 **DSH-free** 的 `prac-ui-kit-workbench`，而持久化 store、DSH slot catalogue 与 `SlotMap` / `Context` 契约在插件（契约只做 `./client` 的 type-only 入口）。
 
 ## 八、相关
 

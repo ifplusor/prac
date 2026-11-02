@@ -104,10 +104,6 @@
       "types": "./dist/layoutIsolation.d.mts",
       "default": "./dist/layoutIsolation.mjs"
     },
-    "./mount": {
-      "types": "./dist/mount.d.mts",
-      "default": "./dist/mount.mjs"
-    },
     "./react": {
       "types": "./dist/react.d.mts",
       "default": "./dist/react.mjs"

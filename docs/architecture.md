@@ -161,9 +161,9 @@ Frame shell（frame 级）
 ```text
 prac-ui-kit-layout        // L0 pure layout library (packages/lib/ui-kit-layout)
 prac-ui-kit-content       // L1 content protocols / placement / store (packages/lib/ui-kit-content)
-prac-ui-kit-frame         // L2 frame model / renderer library (packages/lib/ui-kit-frame)
+prac-ui-kit-workbench         // L2 frame model / renderer library (packages/lib/ui-kit-workbench)
 ui-frame                // DSH plugin row only
-ui-window
+prac-client-ui-frame (window groups)
 ui-widget
 ui-workbench
 ui-dsh
@@ -171,7 +171,7 @@ ui-vscode-host / ui-vscode-views / ui-vscode-editor
 bundle/web-app  // composition root only
 ```
 
-`prac-ui-kit-layout` 只提供 geometry / tree / allocation / grid，不依赖 DSH，**也不含 view / view-group 词汇**（那是 source adapter 自己的）；`prac-ui-kit-frame` 在它之上提供 frame 的 model / React renderer / chrome，**也不依赖 DSH**；`ui-frame` 是只做插件的 DSH 行，拥有持久化 store、DSH slot catalogue 和 `SlotMap` / `Context` 契约（`./client` 的 `types` 条件只做 type-only 入口），**不再导出 `./lib`**。`ui-window` / `ui-widget` 的布局代码从 kit 取，DSH 契约类型只从 `prac-client-ui-frame/client` 取；`ui-window` / `ui-widget` 不互相 import；adapters 只做来源翻译；bundle 是叶子，无业务逻辑。
+`prac-ui-kit-layout` 只提供 geometry / tree / allocation / grid，不依赖 DSH，**也不含 view / view-group 词汇**（那是 source adapter 自己的）；`prac-ui-kit-workbench` 在它之上提供 frame 的 model / React renderer / chrome，**也不依赖 DSH**；`ui-frame` 是只做插件的 DSH 行，拥有持久化 store、DSH slot catalogue 和 `SlotMap` / `Context` 契约（`./client` 的 `types` 条件只做 type-only 入口），**不再导出 `./lib`**。`prac-client-ui-widget` 的布局代码从 kit 取，DSH 契约类型只从 `prac-client-ui-frame/client` 取；window group 适配器与核心 host 同包；adapters 只做来源翻译；bundle 是叶子，无业务逻辑。
 
 ### 3.3 状态住在哪
 

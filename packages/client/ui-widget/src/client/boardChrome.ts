@@ -41,7 +41,7 @@ import {
   type ItemActionsProps,
   type ItemRecord,
   type WidgetRecord,
-} from "prac-ui-kit-frame";
+} from "prac-ui-kit-workbench";
 import type { BoardContent } from "./boardContent.js";
 import { startWidgetDrag } from "./widgetDrag.js";
 import { createBoardStore } from "./boardStore.js";

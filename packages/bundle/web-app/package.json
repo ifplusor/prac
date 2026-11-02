@@ -1,7 +1,7 @@
 {
   "name": "prac-web-app",
   "version": "0.0.0",
-  "description": "The prac bundle: its cordis.patch.yml is the composition (frame mechanism + VS Code side), and its client half is the arrangement — the default views and their placements, the role binding, the window groups and the keybindings.",
+  "description": "The prac bundle: its cordis.patch.yml is the composition (frame mechanism + VS Code side), and its client half is the arrangement \u2014 the default views and their placements, the role binding, the window groups and the keybindings.",
   "license": "MIT",
   "files": [
     "dist",
@@ -36,7 +36,6 @@
     "prac-client-ui-vscode-editor": "workspace:*",
     "prac-client-ui-vscode-views": "workspace:*",
     "prac-client-ui-widget": "workspace:*",
-    "prac-client-ui-window": "workspace:*",
     "prac-client-ui-workbench": "workspace:*",
     "prac-client-vscode-host": "workspace:*",
     "prac-host-vscode": "workspace:*",
@@ -52,5 +51,6 @@
     "bundle": {
       "patch": "./cordis.patch.yml"
     }
-  }
+  },
+  "dependencies": {}
 }

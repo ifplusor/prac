@@ -11,7 +11,7 @@ consumer can use the model / store subpaths.
 ## Scope
 
 ```text
-content        ContentRoot / ContentGroup / ContentItem / ContentMount
+content        ContentRoot / ContentGroup / ContentItem / ContentHost
 placement      PlacementRecord / LayoutState
 store          LayoutStore / useLayout
 switching      active-store switcher
@@ -26,7 +26,7 @@ grid/resize/drag  grid handles, resize controller, sash / stack drag
 ```
 
 Subpaths: `./content`, `./placement`, `./store`, `./switching`, `./snapshot`,
-`./workspace-scope`, `./mount`, `./react`, `./isolation`, `./chrome`, `./renderModel`, `./renderer`, `./tabs`, `./stack`, `./sash`, `./containerBar`, `./grid`, `./resize`, `./sashDrag`, `./stackDrag`, `./chromeIntents`, `./containerChrome`, `./layoutIsolation`.
+`./workspace-scope`, `./react`, `./isolation`, `./chrome`, `./renderModel`, `./renderer`, `./tabs`, `./stack`, `./sash`, `./containerBar`, `./grid`, `./resize`, `./sashDrag`, `./stackDrag`, `./chromeIntents`, `./containerChrome`, `./layoutIsolation`.
 
 Not in scope: window / board / widget / Space / frame shell, DSH slots, source
 adapters.

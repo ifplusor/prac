@@ -97,7 +97,6 @@ Space
 | 包                 | 职责                                              |
 | ------------------ | ------------------------------------------------- |
 | `ui-frame`         | Space / split / grid / region / dock rail / sidebar / panel |
-| `ui-window`        | window / window group / tab strip / active        |
 | `ui-widget`        | widget / board / `prac.view` / `prac.viewActions` |
 | `ui-workbench`     | 默认放置 / arrangement / recall                   |
 | `ui-dsh`           | DSH slot → application / window / widget / action |

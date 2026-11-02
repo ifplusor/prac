@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import type {
-  ContentGroup,
-  ContentItem,
-  ContentMount,
-  ContentPlacement,
-  ContentRoot,
-} from "./content.js";
+import type { ContentGroup, ContentItem, ContentPlacement, ContentRoot } from "./content.js";
 import type { LayoutState } from "./placement.js";
 import { createSwitchingStore } from "./switching.js";
 import type { LayoutStore } from "./store.js";
@@ -50,23 +44,6 @@ describe("content protocols", () => {
     expect(single.content?.id).toBe("note-1");
     expect(grouped.content?.placements).toHaveLength(1);
     expect(empty.content).toBeUndefined();
-  });
-
-  it("mount is separate from the content model", () => {
-    const host = { attached: false };
-    const mount: ContentMount<typeof host> = {
-      host,
-      attach: () => {
-        host.attached = true;
-      },
-      detach: () => {
-        host.attached = false;
-      },
-    };
-    mount.attach?.(host);
-    expect(host.attached).toBe(true);
-    mount.detach?.(host);
-    expect(host.attached).toBe(false);
   });
 });
 

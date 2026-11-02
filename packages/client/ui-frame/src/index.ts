@@ -5,7 +5,7 @@
  * loader artifact (`./client`), whose `types` condition is generated from
  * `src/client/contract.ts`. Consumers name `prac-client-ui-frame/client`
  * type-only for the `SlotMap` / `Context` merges. The layout model / renderer
- * itself lives in `prac-ui-kit-frame`.
+ * itself lives in `prac-ui-kit-workbench`.
  *
  * @module prac-client-ui-frame
  */

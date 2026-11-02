@@ -38,8 +38,7 @@
     "@types/react": "catalog:",
     "prac-client-ui-frame": "workspace:*",
     "prac-client-ui-widget": "workspace:*",
-    "prac-client-ui-window": "workspace:*",
-    "prac-ui-kit-frame": "workspace:*",
+    "prac-ui-kit-workbench": "workspace:*",
     "prac-vscode": "workspace:*",
     "prac-vscode-embed": "workspace:*",
     "react": "catalog:"

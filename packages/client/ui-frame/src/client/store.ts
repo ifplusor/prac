@@ -12,7 +12,7 @@
  */
 
 import { createSnapshotStore } from "@deepseek-ai/dsh-client-store";
-import type { LayoutNode, SplitNode } from "prac-ui-kit-frame";
+import type { LayoutNode, SplitNode } from "prac-ui-kit-workbench";
 import {
   createFrameState,
   createSpaceState,
@@ -24,7 +24,7 @@ import {
   type SpaceState,
   type SpaceStore,
   type ItemRecord,
-} from "prac-ui-kit-frame";
+} from "prac-ui-kit-workbench";
 
 /**
  * The frame shell's key: sidebar / panel / dock / stage placeholder.

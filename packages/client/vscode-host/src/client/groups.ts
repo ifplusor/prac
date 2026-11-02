@@ -8,8 +8,7 @@
  * @module prac-client-vscode-host/client/groups
  */
 
-import type { FrameWindowGroup } from "prac-ui-kit-frame";
-import type { FrameSurface } from "prac-ui-kit-frame";
+import type { FrameWindowGroup, GroupRegionContent } from "prac-ui-kit-workbench";
 import type { VscodeCatalogueEntry } from "./public.js";
 import type { VscodeGroupRuntime } from "./resources.js";
 import {
@@ -24,7 +23,7 @@ import {
 /** The frame operations the group host needs. */
 export interface VscodeGroupLayout {
   registerWindowGroup(group: FrameWindowGroup, regionId: string): unknown;
-  registerSurface?(surface: FrameSurface, regionId: string): unknown;
+  registerContent?(content: GroupRegionContent<FrameWindowGroup>, regionId: string): unknown;
   unregisterWindowGroup(groupId: string): void;
 }
 
@@ -59,10 +58,10 @@ export class VscodeGroupHost {
     const group = this.options.definition.materialize(resource) as unknown as VscodeGroupRuntime;
     const binding = this.options.definition.bindingFactory?.(resource);
     if (binding !== undefined) group.setBinding(binding);
-    const surface = group as unknown as FrameSurface;
+    const content = group as unknown as GroupRegionContent<FrameWindowGroup>;
     try {
-      if (this.options.layout.registerSurface !== undefined && surface.group !== undefined) {
-        this.options.layout.registerSurface(surface, regionId);
+      if (this.options.layout.registerContent !== undefined && content.group !== undefined) {
+        this.options.layout.registerContent(content, regionId);
       } else {
         this.options.layout.registerWindowGroup(group, regionId);
       }

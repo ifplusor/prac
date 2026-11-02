@@ -51,7 +51,7 @@ import type { PracDshFace } from "prac-client-ui-dsh/lib";
 // whichever package owns them (the mechanism declares the `root` children it registers,
 // including `shell.overlay`), so nothing here re-imports a key's owner for comparison.
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
-import type { LayoutState, Side } from "prac-ui-kit-frame";
+import type { LayoutState, Side } from "prac-ui-kit-workbench";
 import type { PracWidgetsFace } from "prac-client-ui-widget/lib";
 // Types only, for its `Context` merge (`ctx.pracVscode`): the arrangement follows
 // the app's open-file set, and naming the face puts that service in this program.
@@ -642,7 +642,7 @@ export function apply(ctx: Context): void {
     }
     if (entry.registered) return entry.board;
     try {
-      layout.registerSurface(entry.board, region);
+      layout.registerContent(entry.board, region);
       layout.setItemBoard(entry.board.windowId, entry.board.boardId);
       entry.registered = true;
       return entry.board;
@@ -1044,7 +1044,7 @@ export function apply(ctx: Context): void {
         entry.registered = false;
         containerBoards.delete(sourceChild);
         try {
-          layout.registerSurface(entry.board, targetChild);
+          layout.registerContent(entry.board, targetChild);
           layout.setItemBoard(entry.board.windowId, entry.board.boardId);
           entry.registered = true;
           containerBoards.set(targetChild, entry);

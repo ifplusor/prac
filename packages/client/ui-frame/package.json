@@ -2,7 +2,7 @@
   "name": "prac-client-ui-frame",
   "version": "0.0.0",
   "private": true,
-  "description": "DSH frame plugin row: wires the frame engine (prac-ui-kit-frame) to slots, services and theme.",
+  "description": "DSH frame plugin row: wires the frame engine (prac-ui-kit-workbench) to slots, services and theme.",
   "files": [
     "dist"
   ],
@@ -35,7 +35,7 @@
     "@deepseek-ai/dsh-client-ui-theme": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "prac-ui-kit-frame": "workspace:*",
+    "prac-ui-kit-workbench": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

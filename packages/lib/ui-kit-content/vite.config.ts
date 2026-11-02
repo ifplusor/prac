@@ -6,7 +6,6 @@ export default defineConfig({
     {
       entry: {
         index: "src/index.ts",
-        mount: "src/mount.ts",
         react: "src/react.ts",
         content: "src/content.ts",
         placement: "src/placement.ts",

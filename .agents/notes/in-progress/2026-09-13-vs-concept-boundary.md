@@ -58,7 +58,7 @@ prac 同时使用 DSH、VS Code 和自己的工作台词汇。边界原则只有
 - `ui-frame` / `ui-window` / `ui-widget` 源码无 `vscode:` / `dsh:` 分支。
 - frame 只按注册表成员识别 view / widget。
 - `ui-vscode-*` / `ui-dsh` 的 API 不泄漏上游内部类型到核心包。
-- `prac-ui-kit-frame` 不导出 `part` 类型。
+- `prac-ui-kit-workbench` 不导出 `part` 类型。
 - `prac.view` 只注册 widget；window / board 通过各自注册面。
 
 ## 6. Related

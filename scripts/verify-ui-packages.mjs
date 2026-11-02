@@ -22,9 +22,8 @@ const RULES = {
   "prac-ui-kit-layout": {
     forbidden: [
       "prac-ui-kit-content",
-      "prac-ui-kit-frame",
+      "prac-ui-kit-workbench",
       "prac-client-ui-frame",
-      "prac-client-ui-window",
       "prac-client-ui-widget",
       "prac-client-ui-workbench",
       "prac-client-ui-dsh",
@@ -38,9 +37,8 @@ const RULES = {
   },
   "prac-ui-kit-content": {
     forbidden: [
-      "prac-ui-kit-frame",
+      "prac-ui-kit-workbench",
       "prac-client-ui-frame",
-      "prac-client-ui-window",
       "prac-client-ui-widget",
       "prac-client-ui-workbench",
       "prac-client-ui-dsh",
@@ -52,10 +50,9 @@ const RULES = {
     ],
     why: "L1 content is independent of the workbench frame; frame depends on content",
   },
-  "prac-ui-kit-frame": {
+  "prac-ui-kit-workbench": {
     forbidden: [
       "prac-client-ui-frame",
-      "prac-client-ui-window",
       "prac-client-ui-widget",
       "prac-client-ui-workbench",
       "prac-client-ui-dsh",
@@ -70,7 +67,6 @@ const RULES = {
 
   "prac-client-ui-frame": {
     forbidden: [
-      "prac-client-ui-window",
       "prac-client-ui-widget",
       "prac-client-ui-workbench",
       "prac-client-ui-dsh",
@@ -81,21 +77,8 @@ const RULES = {
     ],
     why: "frame only knows the surface registry",
   },
-  "prac-client-ui-window": {
-    forbidden: [
-      "prac-client-ui-widget",
-      "prac-client-ui-workbench",
-      "prac-client-ui-dsh",
-      "prac-client-vscode-host",
-      "prac-client-ui-vscode-views",
-      "prac-client-ui-vscode-editor",
-      "prac-web-app",
-    ],
-    why: "window must not import widget; adapters are consumers, not dependencies",
-  },
   "prac-client-ui-widget": {
     forbidden: [
-      "prac-client-ui-window",
       "prac-client-ui-workbench",
       "prac-client-ui-dsh",
       "prac-client-vscode-host",
@@ -180,7 +163,7 @@ for (const [name, rule] of Object.entries(RULES)) {
 
 // The kit layers are DSH-free: a `@deepseek-ai/*` dependency would put the DSH
 // runtime (or its declaration records) back into the library.
-for (const name of ["prac-ui-kit-layout", "prac-ui-kit-content", "prac-ui-kit-frame"]) {
+for (const name of ["prac-ui-kit-layout", "prac-ui-kit-content", "prac-ui-kit-workbench"]) {
   const pkg = byName.get(name);
   if (!pkg) continue;
   for (const dep of depsOf(pkg)) {
@@ -193,14 +176,14 @@ for (const name of ["prac-ui-kit-layout", "prac-ui-kit-content", "prac-ui-kit-fr
 
 // The frame layer must not know prac's slot keys or content kinds: those are
 // the plugin / application vocabulary. A static literal check is enough here.
-const frameSrc = join(libDir, "ui-kit-frame/src");
+const frameSrc = join(libDir, "ui-kit-workbench/src");
 if (existsSync(frameSrc)) {
   for (const file of readdirSync(frameSrc)) {
     if (!file.endsWith(".ts")) continue;
     const source = readFileSync(join(frameSrc, file), "utf8");
     if (/["'`]prac\.(view|window|widget)/.test(source)) {
       failed = true;
-      console.error(`✗ prac-ui-kit-frame must not name prac slots (${file})`);
+      console.error(`✗ prac-ui-kit-workbench must not name prac slots (${file})`);
     }
   }
 }

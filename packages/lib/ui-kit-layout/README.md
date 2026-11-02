@@ -21,7 +21,7 @@ grid         placements, tracks, move / resize / merge
 
 Not in scope:
 
-- content surfaces / bindings / snapshot / layout roots (in `prac-ui-kit-frame`)
+- content surfaces / bindings / snapshot / layout roots (in `prac-ui-kit-workbench`)
 - source adapters' view / view-group vocabulary
 - React components
 - CSS / theme
@@ -78,15 +78,15 @@ touches the DOM.
 
 ```text
 prac-ui-kit-layout   pure layout kernel (private)
-prac-ui-kit-frame    prac's frame engine: product model / content surface / React renderer
+prac-ui-kit-workbench    prac's frame engine: product model / content surface / React renderer
 prac client          DSH plugins
 prac bundle          composition only
 ```
 
 `prac-ui-kit-layout` is the only layer that stays host- and product-agnostic.
-`prac-ui-kit-frame` builds the frame model, the content surface and the renderer
+`prac-ui-kit-workbench` builds the frame model, the content surface and the renderer
 on top of it; `ui-frame` is the DSH plugin row that owns the store, the slot
-catalogue and the DSH contract types, and `ui-window` / `ui-widget` are the
+catalogue and the DSH contract types, and `prac-client-ui-frame` / `prac-client-ui-widget` are the
 consumers.
 
 The package is not released from this repository yet.

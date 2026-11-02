@@ -32,7 +32,7 @@ prac 同时把 VS Code 和 DSH 的 UI 放进同一个桌面：
 
 ## 1. Surface
 
-`prac-ui-kit-frame` 定义 host / surface 契约：
+`prac-ui-kit-workbench` 定义 host / surface 契约：
 
 ```text
 window

@@ -5,7 +5,7 @@
  * `setCollapsed` and `splitRegionWith` are ordinary tree rewrites that the store
  * commits and the frame renders.
  *
- * @module prac-ui-kit-frame/model
+ * @module prac-ui-kit-workbench/model
  */
 
 import type {

@@ -62,10 +62,11 @@ import type {
 } from "./contract.js";
 import { createFrame, ensureStyles } from "./frame.js";
 import { createServices } from "./services.js";
-import { createComposedStore, createStageSwitcher } from "prac-ui-kit-frame";
+import { createComposedStore, createStageSwitcher } from "prac-ui-kit-workbench";
 import { createFrameStore, createSpaceStore } from "./store.js";
+import { WindowGroupAdapter } from "./windowGroupAdapter.js";
 import { ThemePresenter } from "./theme.js";
-import { workspaceScope } from "prac-ui-kit-frame";
+import { workspaceScope } from "prac-ui-kit-workbench";
 
 declare global {
   /**
@@ -77,7 +78,7 @@ declare global {
    */
   var __pracFrame: PracLayoutFace | undefined;
   /** The board layout registry, for the live gates / a page-level probe. */
-  var __pracBoardLayouts: import("prac-ui-kit-frame").BoardLayoutRegistry | undefined;
+  var __pracBoardLayouts: import("prac-ui-kit-workbench").BoardLayoutRegistry | undefined;
   /** The Space registry, for the live gates / a page-level probe. */
   var __pracSpaces: PracSpacesFace | undefined;
 }
@@ -225,6 +226,9 @@ export function apply(ctx: Context): void {
   };
   const { layout, pracFrame, panelInfo, viewGroups, surfaces, contentHosts, boardLayouts } =
     createServices(ctx, store, closeListeners);
+  const disposeWindowGroupRegionContent = surfaces.register("window-group", {
+    create: ({ nodeId }) => new WindowGroupAdapter(nodeId),
+  });
 
   // The active window's resolved actions: the adapter pushes a model, the frame
   // renders it at the tab strip's right end. The entry is keyed by **view id**
@@ -340,6 +344,7 @@ export function apply(ctx: Context): void {
       disposeWindowActions();
       windowActionEntries.clear();
       disposePracSpaces();
+      disposeWindowGroupRegionContent.dispose();
       disposePracSurfaces();
       disposePracFrame();
       disposeLayout();

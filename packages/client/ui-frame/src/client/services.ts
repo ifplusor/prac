@@ -30,7 +30,7 @@ import {
   catalogueViewIds,
   declaredViewSlot,
 } from "./catalogue.js";
-import { SurfaceRegistry, type FrameSurface } from "prac-ui-kit-frame";
+import { RegionContentRegistry, type GroupRegionContent } from "prac-ui-kit-workbench";
 import {
   CENTER_REGION,
   type LayoutState,
@@ -39,9 +39,9 @@ import {
   type Side,
   type ItemFlags,
   type ItemRecord,
-} from "prac-ui-kit-frame";
+} from "prac-ui-kit-workbench";
 import type { LayoutFace, PracLayoutFace, RoleBindings } from "./contract.js";
-import type { RegionInfo } from "prac-ui-kit-frame";
+import type { RegionInfo } from "prac-ui-kit-workbench";
 import type { ItemInfo } from "./contract.js";
 import {
   activeChild,
@@ -76,11 +76,11 @@ import {
   selectChild,
   splitRegionWith,
   structuralRegion,
-} from "prac-ui-kit-frame";
-import type { LayoutStore } from "prac-ui-kit-frame";
-import { ContentHostRegistry } from "prac-ui-kit-frame";
-import { BoardLayoutRegistry } from "prac-ui-kit-frame";
-import { WindowGroupHost, type FrameGroup, type FrameWindowGroup } from "prac-ui-kit-frame";
+} from "prac-ui-kit-workbench";
+import type { LayoutStore } from "prac-ui-kit-workbench";
+import { ContentHostRegistry } from "prac-ui-kit-workbench";
+import { BoardLayoutRegistry } from "prac-ui-kit-workbench";
+import { WindowGroupHost, type RegionBinding, type FrameWindowGroup } from "prac-ui-kit-workbench";
 
 /** Whether a view's region sits inside the subtree a region id names. */
 function inRegionSubtree(region: string, target: string): boolean {
@@ -97,8 +97,8 @@ export interface LayoutServices {
   readonly panelInfo: HostObservable<PanelInfo>;
   /** The frame's view-group owner. */
   readonly viewGroups: WindowGroupHost;
-  /** Surface factories registered by window / widget plugins. */
-  readonly surfaces: SurfaceRegistry<FrameWindowGroup>;
+  /** Region-content factories registered by window / widget plugins. */
+  readonly surfaces: RegionContentRegistry<FrameWindowGroup>;
   /** Runtime content hosts for windows; keyed by `contentId`. */
   readonly contentHosts: ContentHostRegistry;
   /** Board layout roots; keyed by `boardId`. */
@@ -125,7 +125,7 @@ export function createServices(
   // (a stack that falls back to one row melts, an empty leftover holds no space), so the normaliser
   // runs on the way out of each change rather than only on placements.
   const viewGroups = new WindowGroupHost(store);
-  const surfaces = new SurfaceRegistry<FrameWindowGroup>();
+  const surfaces = new RegionContentRegistry<FrameWindowGroup>();
   const originalUpdate = store.update;
   const write = (change: Parameters<typeof store.update>[0]): void => originalUpdate(change);
   store.update = (change: Parameters<typeof store.update>[0]) =>
@@ -362,16 +362,18 @@ export function createServices(
     /** Declare the height a view wants as a stack row (see the model's doc). */
     registerContentHost(
       contentId: string,
-      host: import("prac-ui-kit-frame").ContentHost,
+      host: import("prac-ui-kit-workbench").ContentHost,
     ): () => void {
       return contentHosts.register(contentId, host);
     },
     registerBoardLayout(
       boardId: string,
       source:
-        | import("prac-ui-kit-frame").BoardLayoutSource
-        | import("prac-ui-kit-frame").LayoutState<import("prac-ui-kit-frame").WidgetRecord>,
-      chrome?: import("prac-ui-kit-frame").ChromeRegistry<import("prac-ui-kit-frame").WidgetRecord>,
+        | import("prac-ui-kit-workbench").BoardLayoutSource
+        | import("prac-ui-kit-workbench").LayoutState<import("prac-ui-kit-workbench").WidgetRecord>,
+      chrome?: import("prac-ui-kit-workbench").ChromeRegistry<
+        import("prac-ui-kit-workbench").WidgetRecord
+      >,
     ): () => void {
       return boardLayouts.register(boardId, source, chrome);
     },
@@ -410,11 +412,14 @@ export function createServices(
         return { ...state, items: { ...state.items, [viewId]: { ...view, hidden: true } } };
       });
     },
-    registerWindowGroup(group: FrameWindowGroup, regionId: string): FrameGroup {
+    registerWindowGroup(group: FrameWindowGroup, regionId: string): RegionBinding {
       return viewGroups.register(group, regionId);
     },
-    registerSurface(surface: FrameSurface, regionId: string): FrameGroup {
-      return viewGroups.registerSurface(surface, regionId);
+    registerContent(
+      content: GroupRegionContent<FrameWindowGroup>,
+      regionId: string,
+    ): RegionBinding {
+      return viewGroups.registerContent(content, regionId);
     },
     unregisterWindowGroup(groupId: string): void {
       viewGroups.unregister(groupId);

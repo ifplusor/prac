@@ -36,9 +36,9 @@ WindowGroup
   owns its own view handle.
 - `ViewGroup`: removed. The frame speaks `WindowGroup`; a board is not a group.
 - `WidgetBoardGroup`: removed. A container's board is the content of a **board
-  window** (`BoardWindowGroup`, a `WindowGroup` of one board window); widgets are
-  its `LayoutState<WidgetRecord>` rows, rendered through the same
-  `LayoutRenderer` as the frame.
+  window** (`BoardWindow`); `BoardWindowSurface` composes it with the generic
+  `WindowGroupModel`. Widgets are its `LayoutState<WidgetRecord>` rows, rendered
+  through the same `LayoutRenderer` as the frame.
 
 ## Migration order
 
@@ -47,9 +47,9 @@ WindowGroup
 2. `BoardContent` mounts the board surface directly — **done**: the frame's
    `BoardItem` renders the board root and subscribes to the board's store;
 3. sidebar / panel surfaces become `WindowGroup` — **done**:
-   `BoardWindowGroup` is the surface; the region holds one board-window record;
+   `BoardWindowSurface` is the surface; the region holds one board-window record;
 4. a single editor window can live in a sidebar window group — **done**: a file view
-   placed in a container region is hosted by that region's `BoardWindowGroup`
+   placed in a container region is hosted by that region's `BoardWindowSurface`
    (`syncWindows`); the workbench owns its record, the group only lists it
    (`WindowGroupPlacement.owned: false`);
 5. board window gets a `PracWindowInput` identity projection (empty pane) — **done

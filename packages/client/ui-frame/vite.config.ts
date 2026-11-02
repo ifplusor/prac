@@ -9,7 +9,7 @@ import { clientPack } from "../../../scripts/pack-client.ts";
  *   condition generated from `src/client/contract.ts` (the `SlotMap` /
  *   `Context` merges and the face types).
  *
- * The layout model / renderer / chrome live in `prac-ui-kit-frame`; the DSH
+ * The layout model / renderer / chrome live in `prac-ui-kit-workbench`; the DSH
  * store, slot catalogue and contract merges live here.
  *
  * Every declaration artifact keeps cordis / ui-slots / the frame kit external:
@@ -27,7 +27,7 @@ export default defineConfig({
         neverBundle: [
           "@deepseek-ai/cordis",
           "@deepseek-ai/dsh-client-ui-slots",
-          "prac-ui-kit-frame",
+          "prac-ui-kit-workbench",
         ],
       },
     },
@@ -40,7 +40,7 @@ export default defineConfig({
         neverBundle: [
           "@deepseek-ai/cordis",
           "@deepseek-ai/dsh-client-ui-slots",
-          "prac-ui-kit-frame",
+          "prac-ui-kit-workbench",
         ],
       },
     },

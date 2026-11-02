@@ -9,7 +9,7 @@
  * @module prac-client-vscode-host/client/resources
  */
 
-import type { FrameWindowGroup, WindowGroupBinding } from "prac-ui-kit-frame";
+import type { FrameWindowGroup, WindowGroupBinding } from "prac-ui-kit-workbench";
 
 /** The release handle a source hands a group for one view. */
 export interface VscodeViewHandle {

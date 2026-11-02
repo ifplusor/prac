@@ -11,13 +11,10 @@
 
 - insert:
     # The frame mechanism: region tree, sashes, collapse, surfaces and the
-    # `prac.view` seat; provides `ctx.pracFrame` and `ctx.layout` (compat shim).
+    # `prac.view` seat; provides `ctx.pracFrame`, `ctx.layout` and the
+    # window-group surface factory.
     - id: prac-client-ui-frame
       name: "prac-client-ui-frame"
-
-    # The window plugin: window groups, tab strip / active and the window service.
-    - id: prac-client-ui-window
-      name: "prac-client-ui-window"
 
     # The widget plugin: widget boards / placement and the widget service.
     - id: prac-client-ui-widget

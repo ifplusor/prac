@@ -7,9 +7,9 @@
  *
  * @module prac-client-ui-frame/client/frameChrome
  */
-import type { ChromeRegistry } from "prac-ui-kit-frame";
-import type { ItemRecord } from "prac-ui-kit-frame";
-import { createContainerChrome, type ContainerChromeParts } from "prac-ui-kit-frame";
+import type { ChromeRegistry } from "prac-ui-kit-workbench";
+import type { ItemRecord } from "prac-ui-kit-workbench";
+import { createContainerChrome, type ContainerChromeParts } from "prac-ui-kit-workbench";
 
 /** The control surfaces the frame renders into the renderer's anchors. */
 export type FrameChromeParts = ContainerChromeParts<ItemRecord>;

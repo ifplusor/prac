@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { BoardContent } from "./boardContent.js";
-import { structuralRegion } from "prac-ui-kit-frame";
+import { structuralRegion } from "prac-ui-kit-workbench";
 
 describe("BoardContent place", () => {
   it("moves an existing widget to another region id", () => {

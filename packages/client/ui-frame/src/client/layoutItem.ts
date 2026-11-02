@@ -5,7 +5,7 @@
  * or a DSH slot. This module owns that decision; the frame only supplies the
  * record, the box and the slot face.
  *
- * It lives in the plugin, not in `prac-ui-kit-frame`: the DSH slot vocabulary
+ * It lives in the plugin, not in `prac-ui-kit-workbench`: the DSH slot vocabulary
  * (`dsh:sidebar`, `dsh:main:<key>`, `dsh:rightbar`) and the board-drop global
  * are the plugin's business.
  *
@@ -24,7 +24,7 @@ import {
   LayoutRenderer,
   readBoardDrop,
   type WidgetRecord,
-} from "prac-ui-kit-frame";
+} from "prac-ui-kit-workbench";
 import { WIDGET_SLOT, WINDOW_SLOT } from "./catalogue.js";
 import { DSH_MAIN_PREFIX, DSH_RIGHTBAR_VIEW, DSH_SIDEBAR_VIEW, viewKind } from "./catalogue.js";
 
