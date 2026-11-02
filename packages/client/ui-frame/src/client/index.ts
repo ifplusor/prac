@@ -1,5 +1,3 @@
-import { createComposedStore, createStageSwitcher } from "prac-ui-kit-workbench";
-import { workspaceScope } from "prac-ui-kit-content";
 /**
  * prac's layout: the frame mechanism — the client half.
  *
@@ -18,8 +16,9 @@ import { workspaceScope } from "prac-ui-kit-content";
  *    view some surface declares into the `prac.view` slot and names with its own
  *    source tag (`vscode:view:<app view id>` is a VS Code part host); which ids those are is read
  *    from the registry, never assumed from the tag. The mechanism ships **no concrete
- *    view name and no default placement**: the bundle's arrangement says what
- *    goes where through {@link PracLayoutFace}. The catalogue itself is
+ *    view name and no default placement**: the workbench's arrangement
+ *    (`prac-client-ui-workbench`) says what goes where through
+ *    {@link PracLayoutFace}. The catalogue itself is
  *    *queryable* — {@link PracLayoutFace.listItems} enumerates the slot
  *    registry live (so a later `main` key or `prac.view` entry appears) and
  *    joins it with each view's placement, which is what lets a UI offer the
@@ -27,32 +26,41 @@ import { workspaceScope } from "prac-ui-kit-content";
  * 3. **Sashes and collapse are frame-owned.** Dragging a sash adjusts the two
  *    regions beside it; collapsing a region remembers its width so expanding
  *    restores it. This is the (b) option from the integration note: the frame
- *    stays React-owned (DSH-style), and VS Code content remains *hosted* — a
- *    region renders a view, and the `vscode:view:<app view id>` view renders the
- *    host component the client mechanism publishes (`ctx.pracVscode.hostFor(view)`).
- *    The host component re-parents the existing pane while it stays in one place;
- *    **a move across regions currently remounts it** (the editor uses that mount as
- *    its activation), which is the stable-host gap tracked in the UI architecture
- *    note. The host mechanism is never bypassed.
+ *    stays React-owned (DSH-style), and VS Code content remains *hosted* — the
+ *    frame renders whatever was declared into a slot. A VS Code view is declared
+ *    by its adapter (`prac-client-ui-vscode-views`), which resolves the pane
+ *    component once through the mechanism's `ctx.pracVscode.hostFor(view)` and
+ *    registers a React wrapper around it. That wrapper re-parents the existing
+ *    pane while it stays in one place; **a move across regions currently
+ *    remounts it** (the editor uses that mount as its activation), which is the
+ *    stable-host gap tracked in the UI architecture note. The host mechanism is
+ *    never bypassed.
  * 4. **Roles, not positions, are what the borrowed face speaks.** DSH's
  *    plugins still call `ctx.layout`; that compat shim translates positional
  *    vocabulary into placements using the roles the arrangement binds
  *    (`bindRoles({ primarySidebar: 'dsh:sidebar', secondarySidebar: 'dsh:rightbar' })`). The
  *    mechanism never hard-codes which view plays a role.
  *
- * It keeps the contracts the rest of DSH registers against: the four region slot
- * declarations plus the `prac.view` slot, `ctx.layout`, `ctx.pracFrame`, the
- * `panelInfo` root hook, theme presentation and the document title.
+ * It keeps the contracts the rest of DSH registers against: the four frame slots
+ * (`sidebar` / `main` / `rightbar` / `shell.overlay`), the `prac.view` /
+ * `prac.window` / `prac.widget` surfaces and their action slots, `ctx.layout`,
+ * `ctx.pracFrame`, `ctx.pracSurfaces`, `ctx.pracSpaces`,
+ * `ctx.pracWindowActions`, the `panelInfo` root hook, theme presentation and the
+ * document title.
  *
- * This file is the plugin body as an ordinary ESM module (`name`, `inject`,
- * `apply`). DSH's closure-factory artifact (`window.__ModuleLoader__.load`) is
- * produced by the `pack` config in `vite.config.ts` (`scripts/pack-client.ts`);
- * because the loader's
- * `require` resolves only platform seeds and materialized bundle ids, the module
- * is deliberately self-contained (only `react` stays external).
+ * This file is the package's client entry: the plugin body as an ordinary ESM
+ * module (`name`, `inject`, `apply`). DSH's closure-factory artifact
+ * (`window.__ModuleLoader__.load`) is produced by the `pack` config in
+ * `vite.config.ts` (`scripts/pack-client.ts`); because the loader's `require`
+ * resolves only platform seeds and materialized bundle ids, the module is
+ * deliberately self-contained — `react`, `react-dom` and the DSH store are the
+ * only externals.
  *
  * @module prac-client-ui-frame/client
  */
+
+import { createComposedStore, createStageSwitcher } from "prac-ui-kit-workbench";
+import { workspaceScope } from "prac-ui-kit-content";
 
 import type { Context } from "@deepseek-ai/cordis";
 import type { ThemeSnapshot } from "@deepseek-ai/dsh-client-ui-theme/client";
