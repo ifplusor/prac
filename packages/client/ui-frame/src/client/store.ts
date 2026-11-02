@@ -12,9 +12,11 @@
  */
 
 import { createSnapshotStore } from "@deepseek-ai/dsh-client-store";
+import type { LayoutNode, SplitNode } from "prac-ui-kit-frame";
 import {
   createFrameState,
   createSpaceState,
+  defaultTree,
   normalizeGrids,
   normalizeItems,
   type LayoutState,
@@ -110,14 +112,15 @@ function healSpace(state: SpaceState): SpaceState {
 export function createFrameStore(
   onRequestCloseView: (viewId: string) => void = () => {},
   key: string = FRAME_STATE_KEY,
+  tree: SplitNode = defaultTree(),
 ): LayoutStore {
   return {
-    ...createCell(createFrameState(), key, healState),
+    ...createCell(createFrameState(tree), key, healState),
     requestCloseItem: onRequestCloseView,
   };
 }
 
 /** Create one Space's stage store. */
-export function createSpaceStore(key: string = SPACE_STATE_KEY): SpaceStore {
-  return createCell(createSpaceState(), key, healSpace);
+export function createSpaceStore(key: string = SPACE_STATE_KEY, stage?: LayoutNode): SpaceStore {
+  return createCell(createSpaceState(stage), key, healSpace);
 }

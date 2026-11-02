@@ -9,7 +9,7 @@
  * @module prac-ui-kit-frame/frameState
  */
 
-import type { LayoutNode, RegionNode } from "prac-ui-kit-layout";
+import type { LayoutNode, RegionNode, SplitNode } from "prac-ui-kit-layout";
 import type { LayoutState, ItemRecord } from "./contract.js";
 import { defaultTree, findNode, replaceNode } from "./model.js";
 import { CENTER_MIN } from "./contract.js";
@@ -65,9 +65,8 @@ function nodeIds(node: LayoutNode): Set<string> {
   return ids;
 }
 
-/** The shell state: the default tree with the stage replaced by its placeholder. */
-export function createFrameState(): FrameState {
-  const tree = defaultTree();
+/** The shell state: the given tree with the stage replaced by its placeholder. */
+export function createFrameState(tree: SplitNode = defaultTree()): FrameState {
   if (findNode(tree, STAGE_REGION) === null) {
     throw new Error(`default tree has no ${STAGE_REGION} node`);
   }
@@ -81,11 +80,16 @@ export function createFrameState(): FrameState {
   };
 }
 
-/** A new Space's stage: the default stage root, empty placements. */
-export function createSpaceState(): SpaceState {
+/** A new Space's stage: the given stage root, empty placements. */
+export function createSpaceState(stage: LayoutNode = defaultStage()): SpaceState {
+  return { tree: stage, items: {} };
+}
+
+/** The stage root of the kit's default tree. */
+function defaultStage(): LayoutNode {
   const stage = findNode(defaultTree(), STAGE_REGION);
   if (stage === null) throw new Error(`default tree has no ${STAGE_REGION} node`);
-  return { tree: stage, items: {} };
+  return stage;
 }
 
 /** Compose the renderer's single state from the shell and the active Space. */

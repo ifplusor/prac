@@ -529,6 +529,7 @@ ctx.layout           // DSH compat shim（放 ui-frame）
 - window / board / widget / space 是通用 UI 原语，属于 kit；prac 只提供内容种类、来源、catalogue、默认 arrangement、faces。
 - 拆包按层，不按 window / board 领域；`prac-ui-kit-content`（L1）已立包，先抽出 content protocols / placement / store / snapshot / isolation；renderer / model 随后迁入。
 - 包名保持 `prac-ui-kit-*`：暂不引入独立的 `@prac-ui` scope；等框架真的要对外发布时再讨论。
+- `defaultTree` 仍是 kit 的通用默认 topology，但 `createFrameState(tree?)` / `createSpaceState(stage?)` / `createFrameStore(..., tree?)` / `createSpaceStore(..., stage?)` 允许 app 注入；prac 的默认 arrangement 不必改 kit。`layoutDrop` / `layoutActions` / `layoutContentHost` 是泛型 L2 primitive，留在 frame。
 - kit 的 “view” 词汇已清：`ItemRecord` / `ItemFlags` / `ItemKind` / `itemId` / `items`；`prac.view` 等 source slot 留在 plugin。持久化不升 v2，旧 `views` 字段由 store heal 时读成 `items`。
 - plugin face 也改用 `Item*`：`listItems` / `activeItem` / `splitItem` / `setItemKind` / `setItemBoard` / `onDidRequestCloseItem`；source adapter 的 `viewId` 仍保留。
 - 包入口按层：`prac-ui-kit-*` 是库，只出 `.`，且不 import DSH；`prac-client-*` 是 DSH 插件行，出 `./client`。`ui-frame` 的 `./client` 出 loader artifact，其 `types` 条件承载 DSH 契约类型；root 是 host 半。

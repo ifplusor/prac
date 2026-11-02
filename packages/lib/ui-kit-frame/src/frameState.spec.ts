@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { findNode, findRegion } from "prac-ui-kit-layout";
+import type { SplitNode } from "prac-ui-kit-layout";
+import { regionNode } from "prac-ui-kit-content";
 import type { LayoutState, ItemRecord } from "./contract.js";
 import {
   STAGE_REGION,
@@ -61,6 +63,22 @@ describe("frame / space state", () => {
     expect(findNode(space.tree, STAGE_REGION)?.type).toBe("grid");
     expect(findRegion(frame.tree, "left")?.id).toBe("left");
     expect(findRegion(space.tree, "center")?.id).toBe("center");
+  });
+
+  it("accepts an injected shell tree and stage", () => {
+    const shell: SplitNode = {
+      type: "split",
+      id: "root",
+      dir: "row",
+      children: [regionNode("left", 120), regionNode(STAGE_REGION, 0, { flex: true })],
+    };
+    const frame = createFrameState(shell);
+    expect(findRegion(frame.tree, "left")?.id).toBe("left");
+    expect(findRegion(frame.tree, "bottom")).toBeNull();
+
+    const stage = regionNode(STAGE_REGION, 0, { flex: true });
+    const space = createSpaceState(stage);
+    expect(space.tree).toBe(stage);
   });
 
   it("composes one tree from shell + Space and keeps their items apart", () => {
