@@ -9,7 +9,18 @@
  * @module prac-client-ui-frame/client/catalogue
  */
 
-import { VIEW_SLOT, viewSource, WIDGET_SLOT, WINDOW_SLOT } from "prac-ui-kit-frame";
+/** The slot prac's own items register into. */
+export const VIEW_SLOT = "prac.view";
+/** Window content slot. */
+export const WINDOW_SLOT = "prac.window";
+/** Widget content slot. */
+export const WIDGET_SLOT = "prac.widget";
+
+/** The source segment of a view id (`<source>:`); `""` when there is none. */
+export function viewSource(viewId: string): string {
+  const colon = viewId.indexOf(":");
+  return colon === -1 ? "" : viewId.slice(0, colon + 1);
+}
 
 /**
  * The slice of DSH's slot registry the catalogue reads.
@@ -59,7 +70,7 @@ let declaredViewSlots: ReadonlyMap<string, "window" | "widget" | "legacy"> = new
 let declaredViewLabels: ReadonlyMap<string, string> = new Map<string, string>();
 /** The icon class each `prac.view` entry declares, keyed by view id. */
 let declaredViewIcons: ReadonlyMap<string, string> = new Map<string, string>();
-/** Which declared views bring a native pane header. */
+/** Which declared items bring a native pane header. */
 let declaredViewPaneHeaders: ReadonlySet<string> = new Set<string>();
 
 /**

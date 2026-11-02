@@ -112,17 +112,17 @@ export class WindowGroupHost {
     const state = this.store.get();
     for (const entry of this.#groups.values()) {
       const order = entry.group.state.order;
-      const records = order.map((viewId) => state.views[viewId]);
+      const records = order.map((itemId) => state.items[itemId]);
       if (records.some((record) => record === undefined || record.hidden === true)) continue;
       const visible = order
-        .map((viewId) => [viewId, state.views[viewId]] as const)
+        .map((itemId) => [itemId, state.items[itemId]] as const)
         .filter(
           (entry): entry is readonly [string, NonNullable<(typeof entry)[1]>] =>
             entry[1] !== undefined,
         )
         .sort((a, b) => a[1].order - b[1].order)
-        .map(([viewId]) => viewId);
-      if (visible.some((viewId, index) => viewId !== order[index])) {
+        .map(([itemId]) => itemId);
+      if (visible.some((itemId, index) => itemId !== order[index])) {
         entry.group.reorder(visible);
       }
     }

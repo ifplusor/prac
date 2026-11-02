@@ -4,8 +4,8 @@
  * This is the **arrangement**, not the mechanism. It answers one question —
  * *what is on screen, and where* — and nothing else:
  *
- * - **default views and their placements**: which of DSH's slots and prac's own
- *   views start in which region ({@link DEFAULT_PLACEMENTS});
+ * - **default items and their placements**: which of DSH's slots and prac's own
+ *   items start in which region ({@link DEFAULT_PLACEMENTS});
  * - **role binding**: which view plays the `sidebar` / `rightbar` role, so the
  *   borrowed `ctx.layout` vocabulary reaches a concrete view
  *   ({@link bindRoles});
@@ -16,7 +16,7 @@
  * It has no region rendering and no sash mechanics: the frame, the region tree
  * and the drag/collapse behaviour are `ui-frame`'s. Every placement goes
  * through `ctx.pracFrame`; every view is rendered by the mechanism, including the
- * file views the editor package (`prac-client-ui-vscode-editor`) registers through
+ * file items the editor package (`prac-client-ui-vscode-editor`) registers through
  * the `prac.view` slot.
  *
  * This file is the plugin body as an ordinary ESM module (`name`, `inject`,
@@ -202,9 +202,9 @@ function RecallSurface({ layout, onFocus }: RecallSurfaceProps): ReactElement | 
   // Widgets live on their board now, not in the frame's view table. The recall surface is
   // the mechanism's window catalogue; widget recall (cross-board move / hide) moves with the
   // board model instead of minting a second frame record for a widget.
-  const views = layout.listViews().filter((view) => view.kind !== "widget");
+  const items = layout.listViews().filter((view) => view.kind !== "widget");
   const regions = layout.listRegions();
-  const active = views.length === 0 ? 0 : Math.min(cursor, views.length - 1);
+  const active = items.length === 0 ? 0 : Math.min(cursor, items.length - 1);
 
   // Toggle and dismiss are document-wide, so the surface can be summoned
   // without a mouse. `event.code` is what makes Cmd/Ctrl+Alt+V work on macOS,
@@ -262,12 +262,12 @@ function RecallSurface({ layout, onFocus }: RecallSurfaceProps): ReactElement | 
     if (interactive) return;
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setCursor(Math.min(active + 1, Math.max(views.length - 1, 0)));
+      setCursor(Math.min(active + 1, Math.max(items.length - 1, 0)));
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       setCursor(Math.max(active - 1, 0));
     } else if (event.key === "Enter") {
-      const row = views[active];
+      const row = items[active];
       if (!row) return;
       event.preventDefault();
       onFocus(row.id);
@@ -294,7 +294,7 @@ function RecallSurface({ layout, onFocus }: RecallSurfaceProps): ReactElement | 
     ),
   );
 
-  const rows = views.map((view, index) =>
+  const rows = items.map((view, index) =>
     createElement(
       "div",
       {
@@ -664,7 +664,7 @@ export function apply(ctx: Context): void {
     view: string,
     declared?: { readonly size?: number; readonly folded?: boolean },
   ): void => {
-    if (layout.getState().views[view] !== undefined) layout.removeView(view);
+    if (layout.getState().items[view] !== undefined) layout.removeItem(view);
     if (board.hasWidget(view)) return;
     try {
       board.addWidget(view, declared);
@@ -702,7 +702,7 @@ export function apply(ctx: Context): void {
       // group that already hosts this group's other windows.
       const hostedRegion = entry.board.hostedWindows
         .filter((windowId) => windowId !== id)
-        .map((windowId) => layout.getState().views[windowId]?.region)
+        .map((windowId) => layout.getState().items[windowId]?.region)
         .find((region) => typeof region === "string");
       if (hostedRegion === undefined) continue;
       vscode.mapWindow(id, entry.board.label ?? "Board", hostedRegion);
@@ -725,7 +725,7 @@ export function apply(ctx: Context): void {
     // A contributed view that leaves the catalogue has no subject left on its board: the
     // board's widget record is forgotten (the source owns what closing means, and the
     // catalogue **is** that source's statement of what exists).
-    const offered = new Set([...wanted.values()].flatMap((target) => target.views));
+    const offered = new Set([...wanted.values()].flatMap((target) => target.items));
     for (const [region, entry] of containerBoards) {
       if (wanted.has(region)) continue;
       if (entry.registered) layout.unregisterWindowGroup(entry.board.id);
@@ -737,7 +737,7 @@ export function apply(ctx: Context): void {
       if (board === undefined) continue;
       // New widgets append in catalogue order; an order the person set (or one restored
       // from the board's own persistence) is theirs and is not overwritten.
-      for (const view of target.views) addBoardWidget(board, view, VIEW_DEFAULTS[view]);
+      for (const view of target.items) addBoardWidget(board, view, VIEW_DEFAULTS[view]);
     }
     for (const entry of containerBoards.values()) {
       if (!entry.registered) continue;
@@ -753,7 +753,7 @@ export function apply(ctx: Context): void {
     // A single editor window can live in the sidebar's WindowGroup: a file the frame
     // placed in a container's region is a **window** of that group (the workbench owns
     // its record; the group hosts it).
-    const records = layout.getState().views;
+    const records = layout.getState().items;
     for (const [region, entry] of containerBoards) {
       if (!entry.registered) continue;
       const hosted = Object.entries(records)
@@ -803,7 +803,7 @@ export function apply(ctx: Context): void {
     let chatRegion: string | undefined;
     let chatMapped = false;
     const syncChat = (): void => {
-      const record = layout.getState().views[conversation];
+      const record = layout.getState().items[conversation];
       if (record === undefined || record.hidden === true) {
         if (chatMapped) vscode.unmapWindow(conversation);
         chatMapped = false;
@@ -816,7 +816,7 @@ export function apply(ctx: Context): void {
         chatMapped = true;
         vscode.mapWindow(conversation, "Chat", region);
       }
-      layout.setViewFlags(conversation, { closable: true });
+      layout.setItemFlags(conversation, { closable: true });
       if (layout.activeView() === conversation) vscode.activateWindow(conversation);
     };
     scope.effect(() => {
@@ -847,7 +847,7 @@ export function apply(ctx: Context): void {
       syncBoardWindowProjection(vscode);
       // Model discriminator: a file view is a window; a contributed view is a
       // widget. Board windows are not classified yet; dsh:* stays the default window.
-      for (const id of Object.keys(layout.getState().views)) {
+      for (const id of Object.keys(layout.getState().items)) {
         if (id.startsWith("vscode:file:")) layout.setViewKind(id, "window");
         else if (id.startsWith("vscode:view:")) layout.setViewKind(id, "widget");
       }
@@ -861,11 +861,11 @@ export function apply(ctx: Context): void {
       // frame persists, a placement is named by the host (so the next open mints a fresh
       // name), and a record left behind would both render a tab for a file nobody has open
       // and block the new placement from being shown.
-      const records = layout.getState().views;
+      const records = layout.getState().items;
       let leftTheScreen = false;
       for (const view of staleFileViews(records, fileViews, (id) => vscode.fileResource(id))) {
         if (records[view]?.hidden !== true) leftTheScreen = true;
-        layout.removeView(view);
+        layout.removeItem(view);
       }
       if (files.length === 0) {
         if (leftTheScreen) {
@@ -927,7 +927,7 @@ export function apply(ctx: Context): void {
       items: () => {
         // A container moved to the right dock is the right rail's item now; listing it on the left
         // too would be a dead button. (An unplaced container such as Run and Debug stays: it has no
-        // views anywhere, so moving it is not a state the left rail can lose it in.)
+        // items anywhere, so moving it is not a state the left rail can lose it in.)
         const placedRight = new Set(
           layout
             .listViews()
@@ -964,7 +964,7 @@ export function apply(ctx: Context): void {
     const rightRail: PracRailFace = {
       items: (): PracRailItem[] => {
         const items: PracRailItem[] = [];
-        const chatView = layout.getState().views[conversation];
+        const chatView = layout.getState().items[conversation];
         const region = chatView?.region ?? null;
         const inDock = region === RIGHT || (region !== null && region.startsWith(`${RIGHT}/`));
         const maximized = region === CENTER || (region !== null && region.startsWith(`${CENTER}/`));
@@ -990,7 +990,7 @@ export function apply(ctx: Context): void {
           // Showing it must not drag it out of the editor area: maximize is a placement the app
           // chooses (no file → editor area), not something a rail click undoes. When it is docked,
           // select its child (a sibling tool window may be the visible one) and reveal the dock.
-          const region = layout.getState().views[conversation]?.region ?? null;
+          const region = layout.getState().items[conversation]?.region ?? null;
           if (region === RIGHT || (region !== null && region.startsWith(`${RIGHT}/`))) {
             if (region !== RIGHT) layout.selectContainer(RIGHT, region);
             layout.setCollapsed(RIGHT, false);
@@ -1008,21 +1008,21 @@ export function apply(ctx: Context): void {
      *
      * The container's **board window** is what moves: its surface is re-registered in the
      * target child region (the record follows the surface), so the widgets, their order and
-     * their layout stay on the same board. Copying the views across as frame records would
+     * their layout stay on the same board. Copying the items across as frame records would
      * split a widget's home in two.
      */
     const moveContainer = (containerId: string, from: "left" | "right"): void => {
       const target = from === "left" ? RIGHT : LEFT;
-      const views = vscode
+      const items = vscode
         .catalogue()
         .filter((entry) => entry.source === "view" && entry.containerId === containerId);
-      if (views.length === 0) return;
-      const label = views[0]?.containerTitle ?? views[0]?.title ?? containerId;
+      if (items.length === 0) return;
+      const label = items[0]?.containerTitle ?? items[0]?.title ?? containerId;
       const sourceChild = `${from}/container:${containerId}`;
       const targetChild = `${target}/container:${containerId}`;
       // A direct view in the target (chat parked in the right dock) must get a child of its own
       // before the region becomes a selector, or the new child would hide it.
-      const chat = layout.getState().views[conversation];
+      const chat = layout.getState().items[conversation];
       const chatChild = `${RIGHT}/${conversation}`;
       if (
         target === RIGHT &&

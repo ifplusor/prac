@@ -11,7 +11,7 @@ function memoryStore(): LayoutStore {
     viewportWidth: 0,
     viewportHeight: 0,
     tree: defaultTree(),
-    views: {},
+    items: {},
     catalogueVersion: 0,
     activePanelId: null,
   };
@@ -26,12 +26,12 @@ function memoryStore(): LayoutStore {
       state = updater(state);
       for (const listener of listeners) listener();
     },
-    requestCloseView: () => {},
+    requestCloseItem: () => {},
   };
 }
 
 describe("WindowGroupHost", () => {
-  it("registers one group in one region and projects its views", () => {
+  it("registers one group in one region and projects its items", () => {
     const store = memoryStore();
     const host = new WindowGroupHost(store);
     const group = new TestGroup("g1");
@@ -40,7 +40,7 @@ describe("WindowGroupHost", () => {
     const frameGroup = host.register(group, "left");
 
     expect(frameGroup.regionId).toBe("left");
-    expect(store.get().views["v1"]).toBeDefined();
+    expect(store.get().items["v1"]).toBeDefined();
     expect(host.get("g1")).toBe(frameGroup);
   });
 
@@ -94,10 +94,10 @@ describe("WindowGroupHost", () => {
 
     store.update((state) => ({
       ...state,
-      views: {
-        ...state.views,
-        v1: { ...state.views["v1"]!, order: 1 },
-        v2: { ...state.views["v2"]!, order: 0 },
+      items: {
+        ...state.items,
+        v1: { ...state.items["v1"]!, order: 1 },
+        v2: { ...state.items["v2"]!, order: 0 },
       },
     }));
 
@@ -114,7 +114,7 @@ describe("WindowGroupHost", () => {
     next.add({ id: "v2" });
     host.register(next, "left");
 
-    expect(store.get().views["v2"]).toBeDefined();
+    expect(store.get().items["v2"]).toBeDefined();
     expect(host.get("g1")?.group).toBe(next);
   });
 
@@ -128,7 +128,7 @@ describe("WindowGroupHost", () => {
     host.unregister("g1");
 
     expect(host.get("g1")).toBeUndefined();
-    expect(store.get().views["v1"]).toBeUndefined();
+    expect(store.get().items["v1"]).toBeUndefined();
     expect(group.state.order).toEqual(["v1"]);
   });
 });

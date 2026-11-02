@@ -8,7 +8,7 @@
  * @module prac-ui-kit-frame/frameBridge
  */
 
-import { ensureStackShape, placeQuietly, removeView } from "./model.js";
+import { ensureStackShape, placeQuietly, removeItem } from "./model.js";
 import type { LayoutStore } from "./store.js";
 import type { FrameWindowGroup } from "./frameGroups.js";
 
@@ -31,44 +31,44 @@ export class WindowGroupLayoutBridge {
   sync(): void {
     if (this.#disposed) return;
     const placements = this.group.placements;
-    const current = new Set(placements.map((placement) => placement.viewId));
+    const current = new Set(placements.map((placement) => placement.itemId));
     this.store.update((state) => {
       let next = state;
-      for (const [viewId, owned] of this.#known) {
+      for (const [itemId, owned] of this.#known) {
         // A hosted window the group does not own leaves the group, not the frame: the
         // owner still has it (an editor the workbench placed elsewhere).
-        if (current.has(viewId) || !owned) continue;
-        next = removeView(next, viewId);
+        if (current.has(itemId) || !owned) continue;
+        next = removeItem(next, itemId);
       }
       for (const placement of placements) {
         // A person may have hidden this view through the frame's chrome. Group
         // membership is not a reason to bring it back; only an explicit show is.
-        if (next.views[placement.viewId]?.hidden === true) continue;
+        if (next.items[placement.itemId]?.hidden === true) continue;
         // A hosted window belongs to another owner: project it while it exists,
         // never mint a record for it.
-        if (placement.owned === false && next.views[placement.viewId] === undefined) continue;
-        const target = this.#targetFor(placement.viewId);
+        if (placement.owned === false && next.items[placement.itemId] === undefined) continue;
+        const target = this.#targetFor(placement.itemId);
         if (target === undefined) continue;
-        next = placeQuietly(next, placement.viewId, target);
+        next = placeQuietly(next, placement.itemId, target);
       }
       const frontId =
-        placements.find((placement) => placement.active)?.viewId ??
-        (this.group.state.mode === "stack" ? placements[0]?.viewId : undefined);
-      const views = { ...next.views };
+        placements.find((placement) => placement.active)?.itemId ??
+        (this.group.state.mode === "stack" ? placements[0]?.itemId : undefined);
+      const items = { ...next.items };
       for (const placement of placements) {
-        const record = views[placement.viewId];
+        const record = items[placement.itemId];
         if (record === undefined) continue;
-        views[placement.viewId] = {
+        items[placement.itemId] = {
           ...record,
           order: placement.order,
-          front: placement.viewId === frontId,
+          front: placement.itemId === frontId,
         };
       }
-      return ensureStackShape({ ...next, views });
+      return ensureStackShape({ ...next, items });
     });
     this.#known.clear();
     for (const placement of placements) {
-      this.#known.set(placement.viewId, placement.owned !== false);
+      this.#known.set(placement.itemId, placement.owned !== false);
     }
   }
 
@@ -76,7 +76,7 @@ export class WindowGroupLayoutBridge {
    * A placement always addresses the registered node. `placeQuietly` already
    * routes a split id to its existing row and creates a row when there is none.
    */
-  #targetFor(_viewId: string): string {
+  #targetFor(_itemId: string): string {
     return this.regionId;
   }
 
@@ -87,8 +87,8 @@ export class WindowGroupLayoutBridge {
     this.#stop();
     this.store.update((state) => {
       let next = state;
-      for (const [viewId, owned] of this.#known) {
-        if (owned) next = removeView(next, viewId);
+      for (const [itemId, owned] of this.#known) {
+        if (owned) next = removeItem(next, itemId);
       }
       return ensureStackShape(next);
     });

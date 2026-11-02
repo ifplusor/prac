@@ -122,7 +122,7 @@ async function sample() {
       // The conversation's own region, from the layout probe: it is a view like
       // any other, so it moves with attention and the gate reads it here.
       conversationRegion:
-        globalThis.__pracFrame?.getState?.().views?.["dsh:main:conversation"]?.region ?? null,
+        globalThis.__pracFrame?.getState?.().items?.["dsh:main:conversation"]?.region ?? null,
       hosts,
     };
   });

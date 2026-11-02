@@ -39,7 +39,7 @@ const HEADER: CSSProperties = {
 /** Inputs for one stack row's header. */
 export interface StackHeaderProps {
   readonly nodeId: string;
-  readonly viewId: string;
+  readonly itemId: string;
   readonly folded: boolean;
   readonly label: ReactNode;
   readonly icon?: ReactNode;
@@ -53,7 +53,7 @@ export interface StackHeaderProps {
 /** Render a stack row's header. */
 export function StackHeader({
   nodeId,
-  viewId,
+  itemId,
   folded,
   label,
   icon,
@@ -72,7 +72,7 @@ export function StackHeader({
       "button",
       {
         type: "button",
-        "data-prac-stack-toggle": viewId,
+        "data-prac-stack-toggle": itemId,
         "aria-expanded": folded ? "false" : "true",
         title: folded ? "Expand" : "Collapse",
         onClick: onToggle,
@@ -118,7 +118,7 @@ export function StackHeader({
 /** Inputs for the overlay a row draws over an item's own pane header. */
 export interface StackRowOverlayProps {
   readonly nodeId: string;
-  readonly viewId: string;
+  readonly itemId: string;
   readonly folded: boolean;
   readonly label: ReactNode;
   readonly onToggle: (event: MouseEvent<HTMLElement>) => void;
@@ -135,7 +135,7 @@ export interface StackRowOverlayProps {
  */
 export function StackRowOverlay({
   nodeId,
-  viewId,
+  itemId,
   folded,
   label,
   onToggle,
@@ -163,7 +163,7 @@ export function StackRowOverlay({
       "button",
       {
         type: "button",
-        "data-prac-stack-toggle": viewId,
+        "data-prac-stack-toggle": itemId,
         "aria-expanded": folded ? "false" : "true",
         title: folded ? "Expand" : "Collapse",
         onClick: onToggle,

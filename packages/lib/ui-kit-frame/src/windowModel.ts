@@ -19,8 +19,8 @@ import type {
   ContentPlacement,
 } from "prac-ui-kit-content";
 
-/** What a window renders. */
-export type WindowContentKind = "editor" | "chat" | "board";
+/** What a window renders: product-defined string. */
+export type WindowContentKind = string;
 
 /** A mounted content host. The frame owns the element; the source owns the content. */
 export interface ContentHost {
@@ -62,7 +62,7 @@ export type WindowGroupMode = "stack" | "select";
 
 /** One member's placement as the group sees it. */
 export interface WindowGroupPlacement extends ContentPlacement {
-  readonly viewId: string;
+  readonly itemId: string;
   readonly groupId: string;
   readonly order: number;
   readonly active: boolean;

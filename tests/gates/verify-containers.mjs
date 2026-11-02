@@ -95,7 +95,7 @@ const [fixture] = writeFixtures("containers-editor", url, [
 const openedFile = await page.evaluate(async (uri) => {
   await globalThis.__vscodeEmbed.face.openFile(uri);
   for (let attempt = 0; attempt < 80; attempt += 1) {
-    const fileId = Object.keys(globalThis.__pracFrame.getState().views).find((id) =>
+    const fileId = Object.keys(globalThis.__pracFrame.getState().items).find((id) =>
       id.startsWith("vscode:file:"),
     );
     if (fileId !== undefined) return { fileId };
@@ -131,13 +131,13 @@ const sidebarWindow = await page.evaluate((boardId) => {
   const editors = deep(".monaco-editor")
     .map((element) => element.getBoundingClientRect())
     .filter((box) => box.width > 40 && box.height > 40 && box.left < 400 && box.top > 40);
-  const fileIds = Object.keys(globalThis.__pracFrame.getState().views).filter((id) =>
+  const fileIds = Object.keys(globalThis.__pracFrame.getState().items).filter((id) =>
     id.startsWith("vscode:file:"),
   );
   return {
     hosted: typeof board?.hostedWindows === "object" ? [...board.hostedWindows] : [],
     fileIds,
-    fileRegions: fileIds.map((id) => globalThis.__pracFrame.getState().views[id]?.region ?? null),
+    fileRegions: fileIds.map((id) => globalThis.__pracFrame.getState().items[id]?.region ?? null),
     editorsInSidebar: editors.length,
   };
 }, "left/container:workbench.view.explorer");

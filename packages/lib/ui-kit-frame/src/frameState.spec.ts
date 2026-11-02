@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { findNode, findRegion } from "prac-ui-kit-layout";
-import type { LayoutState, ViewRecord } from "./contract.js";
+import type { LayoutState, ItemRecord } from "./contract.js";
 import {
   STAGE_REGION,
   composeLayoutState,
@@ -15,7 +15,7 @@ import {
 } from "./frameState.js";
 import type { LayoutStore } from "./store.js";
 
-const view = (region: string, order = 0): ViewRecord => ({
+const view = (region: string, order = 0): ItemRecord => ({
   kind: "window",
   region,
   order,
@@ -46,7 +46,7 @@ function memory<T>(initial: T): {
 
 function frameStore(initial: LayoutState = createFrameState()): LayoutStore {
   const cell = memory(initial);
-  return { ...cell, requestCloseView: () => undefined };
+  return { ...cell, requestCloseItem: () => undefined };
 }
 
 function spaceStore(initial: SpaceState = createSpaceState()): SpaceStore {
@@ -63,22 +63,22 @@ describe("frame / space state", () => {
     expect(findRegion(space.tree, "center")?.id).toBe("center");
   });
 
-  it("composes one tree from shell + Space and keeps their views apart", () => {
+  it("composes one tree from shell + Space and keeps their items apart", () => {
     const frame = createFrameState();
     const space = createSpaceState();
-    frame.views["shell-view"] = view("left");
-    space.views["stage-view"] = view("center");
+    frame.items["shell-view"] = view("left");
+    space.items["stage-view"] = view("center");
     const composed = composeLayoutState(frame, space);
     expect(findNode(composed.tree, STAGE_REGION)?.type).toBe("grid");
-    expect(composed.views["shell-view"]).toBeDefined();
-    expect(composed.views["stage-view"]).toBeDefined();
+    expect(composed.items["shell-view"]).toBeDefined();
+    expect(composed.items["stage-view"]).toBeDefined();
 
     const split = splitLayoutState(composed);
     expect(findNode(split.frame.tree, STAGE_REGION)?.type).toBe("region");
-    expect(split.frame.views["shell-view"]).toBeDefined();
-    expect(split.frame.views["stage-view"]).toBeUndefined();
-    expect(split.space.views["stage-view"]).toBeDefined();
-    expect(split.space.views["shell-view"]).toBeUndefined();
+    expect(split.frame.items["shell-view"]).toBeDefined();
+    expect(split.frame.items["stage-view"]).toBeUndefined();
+    expect(split.space.items["stage-view"]).toBeDefined();
+    expect(split.space.items["shell-view"]).toBeUndefined();
   });
 
   it("routes an update to the owner of the region it changes", () => {
@@ -88,13 +88,13 @@ describe("frame / space state", () => {
 
     store.update((state) => ({
       ...state,
-      views: { ...state.views, shell: view("left"), stage: view("center") },
+      items: { ...state.items, shell: view("left"), stage: view("center") },
     }));
 
-    expect(frame.get().views.shell).toBeDefined();
-    expect(frame.get().views.stage).toBeUndefined();
-    expect(stage.get().views.stage).toBeDefined();
-    expect(stage.get().views.shell).toBeUndefined();
+    expect(frame.get().items.shell).toBeDefined();
+    expect(frame.get().items.stage).toBeUndefined();
+    expect(stage.get().items.stage).toBeDefined();
+    expect(stage.get().items.shell).toBeUndefined();
   });
 
   it("caches the composed snapshot until an owner changes", () => {
@@ -108,16 +108,16 @@ describe("frame / space state", () => {
 
   it("switches the stage without touching the shell", () => {
     const frame = frameStore();
-    frame.get().views.shell = view("left");
+    frame.get().items.shell = view("left");
     const first = spaceStore();
     const second = spaceStore();
-    second.update((state) => ({ ...state, views: { other: view("center") } }));
+    second.update((state) => ({ ...state, items: { other: view("center") } }));
     const stage = createStageSwitcher(first);
     const store = createComposedStore(frame, stage);
 
     stage.switchTo(second);
-    expect(store.get().views.shell).toBeDefined();
-    expect(store.get().views.other).toBeDefined();
-    expect(store.get().views.shell).toBe(frame.get().views.shell);
+    expect(store.get().items.shell).toBeDefined();
+    expect(store.get().items.other).toBeDefined();
+    expect(store.get().items.shell).toBe(frame.get().items.shell);
   });
 });

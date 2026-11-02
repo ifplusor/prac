@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import "./contract.js";
-import { VIEW_SLOT, viewSource } from "prac-ui-kit-frame";
+import { VIEW_SLOT, viewSource } from "./catalogue.js";
 import {
   DSH_CONVERSATION_KEY,
   catalogueViewIds,
@@ -48,7 +48,7 @@ describe("viewSource", () => {
 });
 
 describe("catalogueViewIds", () => {
-  it("lists DSH's own slots around the live main keys, then the declared views", () => {
+  it("lists DSH's own slots around the live main keys, then the declared items", () => {
     const slots = registry({
       main: [
         { options: { key: DSH_CONVERSATION_KEY } },
@@ -63,7 +63,7 @@ describe("catalogueViewIds", () => {
       "dsh:main:alpha",
       `dsh:main:${DSH_CONVERSATION_KEY}`,
       "dsh:rightbar",
-      // Declared views come last, sorted — not in registration order.
+      // Declared items come last, sorted — not in registration order.
       "vscode:view:a",
       "vscode:view:b",
     ]);

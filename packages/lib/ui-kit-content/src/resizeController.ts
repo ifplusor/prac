@@ -35,9 +35,9 @@ export type StackContainer = Parameters<typeof readStackRows>[0];
 
 export function readStackRows(
   container: { querySelectorAll(selectors: string): readonly StackEntryNode[] } | null,
-): { viewId: string; height: number; folded: boolean }[] {
+): { itemId: string; height: number; folded: boolean }[] {
   return [...(container?.querySelectorAll("[data-prac-stack-entry]") ?? [])].map((node) => ({
-    viewId:
+    itemId:
       node.getAttribute("data-prac-stack-row") ?? node.getAttribute("data-prac-stack-entry") ?? "",
     height: Math.round(node.getBoundingClientRect().height),
     folded: node.getAttribute("data-prac-stack-collapsed") === "true",
@@ -56,7 +56,7 @@ interface EntryDragState {
   pointerId: number;
   draggedId: string;
   container: StackContainer;
-  rows: { viewId: string; height: number; folded: boolean }[];
+  rows: { itemId: string; height: number; folded: boolean }[];
   start: number;
   origin: number;
   limit: number;
@@ -81,7 +81,7 @@ export function startEntryDrag<TRecord extends PlacementRecord>(
   // folded row itself made every move a no-op (`stackDragAnchor`).
   const anchor = stackDragAnchor(rows, rowId);
   if (anchor === undefined) return;
-  const index = rows.findIndex((row) => row.viewId === anchor.viewId);
+  const index = rows.findIndex((row) => row.itemId === anchor.itemId);
   if (index < 0) return;
   const below = rows.slice(index + 1);
   // The drag is computed from the rows **as drawn**: seed every open row with that number before
@@ -91,13 +91,13 @@ export function startEntryDrag<TRecord extends PlacementRecord>(
   store.update((state) => {
     let next = state;
     for (const row of rows) {
-      if (!row.folded && row.height > 0) next = setEntryHeight(next, row.viewId, row.height);
+      if (!row.folded && row.height > 0) next = setEntryHeight(next, row.itemId, row.height);
     }
     return next;
   });
   const drag: EntryDragState = {
     pointerId,
-    draggedId: anchor.viewId,
+    draggedId: anchor.itemId,
     container,
     rows,
     start: anchor.height,
@@ -147,7 +147,7 @@ export function startEntryDrag<TRecord extends PlacementRecord>(
       for (const row of settled) {
         // A folded row is a header, not a height (J3): writing its 20px back would clamp it to the
         // floor and leave a misleading `size` behind.
-        if (row.height > 0 && !row.folded) next = setEntryHeight(next, row.viewId, row.height);
+        if (row.height > 0 && !row.folded) next = setEntryHeight(next, row.itemId, row.height);
       }
       return next;
     });

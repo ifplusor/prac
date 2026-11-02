@@ -191,6 +191,20 @@ for (const name of ["prac-ui-kit-layout", "prac-ui-kit-content", "prac-ui-kit-fr
   }
 }
 
+// The frame layer must not know prac's slot keys or content kinds: those are
+// the plugin / application vocabulary. A static literal check is enough here.
+const frameSrc = join(libDir, "ui-kit-frame/src");
+if (existsSync(frameSrc)) {
+  for (const file of readdirSync(frameSrc)) {
+    if (!file.endsWith(".ts")) continue;
+    const source = readFileSync(join(frameSrc, file), "utf8");
+    if (/["'`]prac\.(view|window|widget)/.test(source)) {
+      failed = true;
+      console.error(`✗ prac-ui-kit-frame must not name prac slots (${file})`);
+    }
+  }
+}
+
 // bundle is a leaf: no package other than the bundle itself may depend on it.
 for (const pkg of packages) {
   const name = pkg.json.name;

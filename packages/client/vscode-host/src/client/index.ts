@@ -175,7 +175,7 @@ export function apply(ctx: Context): void {
   // to close a group / region it does not own alone. `hasOtherWindows` is what lets
   // the host refuse to remove the group before the region is touched.
   const hasOtherWindows = (region: string): boolean =>
-    regionHoldsOtherWindow(ctx.pracFrame.getState().views, region, (id) =>
+    regionHoldsOtherWindow(ctx.pracFrame.getState().items, region, (id) =>
       id.startsWith(FILE_VIEW_PREFIX),
     );
   embed.setGroupRegionChannel({

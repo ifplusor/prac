@@ -2,7 +2,7 @@
  * Generic placement: one item's position in a layout tree.
  *
  * Content types extend `PlacementRecord`; the store and tree functions only see
- * this base. The frame's `ViewRecord` (window / widget) is one such extension.
+ * this base. The frame's `ItemRecord` (window / widget) is one such extension.
  *
  * @module prac-ui-kit-content/placement
  */
@@ -10,7 +10,7 @@
 import type { LayoutNode } from "prac-ui-kit-layout";
 
 /** Decoration a content declarer can set on its placement. */
-export interface ViewFlags {
+export interface ItemFlags {
   readonly dirty?: boolean;
   readonly preview?: boolean;
   readonly closable?: boolean;
@@ -30,7 +30,7 @@ export interface PlacementRecord {
   order: number;
   hidden: boolean;
   collapsed?: boolean;
-  flags?: ViewFlags;
+  flags?: ItemFlags;
   /** Whether this is the item its region renders. */
   front?: boolean;
 }
@@ -44,7 +44,7 @@ export interface LayoutState<TRecord extends PlacementRecord = PlacementRecord> 
   /** The region tree. */
   tree: LayoutNode;
   /** The item table: `itemId → placement`. */
-  views: Record<string, TRecord>;
+  items: Record<string, TRecord>;
   /** Bumped when the content catalogue changes. */
   catalogueVersion: number;
   /** Source-selected main entry; null means the default. */

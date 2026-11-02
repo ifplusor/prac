@@ -85,7 +85,7 @@ function memory(panel: string | null): LayoutStore {
     viewportWidth: 0,
     viewportHeight: 0,
     tree,
-    views: {},
+    items: {},
     catalogueVersion: 0,
     activePanelId: panel,
   };
@@ -95,7 +95,7 @@ function memory(panel: string | null): LayoutStore {
     update: (updater) => {
       state = updater(state);
     },
-    requestCloseView: () => undefined,
+    requestCloseItem: () => undefined,
   };
 }
 

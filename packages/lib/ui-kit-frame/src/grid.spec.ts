@@ -7,7 +7,7 @@ import {
   mergeGridCells,
   moveGridCell,
   normalizeGrids,
-  normalizeViews,
+  normalizeItems,
   place,
   resizeGridCell,
   resizeGridTrack,
@@ -31,7 +31,7 @@ function state(): LayoutState {
       regionNode("c", 0, { flex: true }),
       regionNode("d", 0, { flex: true }),
     ]),
-    views: {},
+    items: {},
     catalogueVersion: 0,
     activePanelId: null,
   };
@@ -183,7 +183,7 @@ describe("grid node", () => {
       }),
     };
     const placed = place(layout, "vscode:main:conversation", "center");
-    expect(placed.views["vscode:main:conversation"]?.region).toBe("region-2");
+    expect(placed.items["vscode:main:conversation"]?.region).toBe("region-2");
   });
 
   it("re-homes a visible view whose region no longer exists", () => {
@@ -192,7 +192,7 @@ describe("grid node", () => {
       tree: gridNode("stage", 1, 1, [regionNode("region-2", 0, { flex: true })], {
         placements: { "region-2": { row: 0, column: 0 } },
       }),
-      views: {
+      items: {
         "vscode:main:conversation": {
           region: "center",
           order: 0,
@@ -210,11 +210,11 @@ describe("grid node", () => {
         "vscode:sidebar": { region: "left", order: 0, hidden: true, kind: "window" },
       },
     };
-    const normalized = normalizeViews(layout);
-    expect(normalized.views["vscode:main:conversation"]?.region).toBe("region-2");
-    expect(normalized.views["vscode:file:p1:file:///a.ts"]?.region).toBe("region-2");
-    // Hidden views are not on screen; their next `place` overwrites the region.
-    expect(normalized.views["vscode:sidebar"]?.region).toBe("left");
+    const normalized = normalizeItems(layout);
+    expect(normalized.items["vscode:main:conversation"]?.region).toBe("region-2");
+    expect(normalized.items["vscode:file:p1:file:///a.ts"]?.region).toBe("region-2");
+    // Hidden items are not on screen; their next `place` overwrites the region.
+    expect(normalized.items["vscode:sidebar"]?.region).toBe("left");
   });
 
   it("does not rewrite a grid that is already tight", () => {
@@ -295,7 +295,7 @@ describe("grid node", () => {
       viewportWidth: 1000,
       viewportHeight: 800,
       tree,
-      views: {},
+      items: {},
       catalogueVersion: 0,
       activePanelId: null,
     };

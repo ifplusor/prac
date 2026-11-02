@@ -3,7 +3,7 @@ import type { WindowGroupBinding } from "./windowModel.js";
 import type { WindowGroupMode, WindowGroupPlacement, WindowGroupState } from "./windowModel.js";
 
 export class TestGroup {
-  readonly #views = new Map<string, { readonly id: string; release?(): void }>();
+  readonly #items = new Map<string, { readonly id: string; release?(): void }>();
   readonly #order: string[] = [];
   readonly #listeners = new Set<() => void>();
   #active: string | undefined;
@@ -26,12 +26,11 @@ export class TestGroup {
   }
 
   get placements(): readonly WindowGroupPlacement[] {
-    return this.#order.map((viewId, order) => ({
-      itemId: viewId,
-      viewId,
+    return this.#order.map((itemId, order) => ({
+      itemId,
       groupId: this.id,
       order,
-      active: this.#active === viewId,
+      active: this.#active === itemId,
       visible: true,
     }));
   }
@@ -46,26 +45,26 @@ export class TestGroup {
   }
 
   add(view: { readonly id: string; release?(): void }): void {
-    if (this.#views.has(view.id)) throw new Error(`view already in group: ${view.id}`);
-    this.#views.set(view.id, view);
+    if (this.#items.has(view.id)) throw new Error(`view already in group: ${view.id}`);
+    this.#items.set(view.id, view);
     this.#order.push(view.id);
     if (this.mode === "select" && this.#active === undefined) this.#active = view.id;
     this.#emit();
   }
 
-  remove(viewId: string): void {
-    if (!this.#views.delete(viewId)) return;
-    const index = this.#order.indexOf(viewId);
+  remove(itemId: string): void {
+    if (!this.#items.delete(itemId)) return;
+    const index = this.#order.indexOf(itemId);
     if (index !== -1) this.#order.splice(index, 1);
-    if (this.#active === viewId) this.#active = this.#order[0];
+    if (this.#active === itemId) this.#active = this.#order[0];
     this.#emit();
   }
 
-  select(viewId: string | undefined): void {
+  select(itemId: string | undefined): void {
     if (this.mode !== "select") return;
-    if (viewId !== undefined && !this.#views.has(viewId))
-      throw new Error(`unknown view: ${viewId}`);
-    this.#active = viewId;
+    if (itemId !== undefined && !this.#items.has(itemId))
+      throw new Error(`unknown view: ${itemId}`);
+    this.#active = itemId;
     this.#emit();
   }
 
@@ -81,8 +80,8 @@ export class TestGroup {
   }
 
   dispose(): void {
-    for (const view of this.#views.values()) view.release?.();
-    this.#views.clear();
+    for (const view of this.#items.values()) view.release?.();
+    this.#items.clear();
     this.#order.length = 0;
     this.#binding?.dispose();
     this.#binding = undefined;

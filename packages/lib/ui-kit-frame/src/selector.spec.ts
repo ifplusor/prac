@@ -26,7 +26,7 @@ function state(selector?: RegionSelector): LayoutState {
     viewportWidth: 1000,
     viewportHeight: 800,
     tree: { type: "split", id: "root", dir: "row", children: [left] },
-    views: {},
+    items: {},
     catalogueVersion: 0,
     activePanelId: null,
   };

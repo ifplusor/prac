@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { LayoutState, ViewInfo, ViewRecord } from "prac-ui-kit-frame";
+import type { LayoutState, ItemRecord } from "prac-ui-kit-frame";
+import type { ItemInfo } from "prac-client-ui-frame/client";
 import type { PracLayoutFace, RoleBindings } from "prac-client-ui-frame/client";
 import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 import {
@@ -34,12 +35,12 @@ interface Call {
 /** A file view, as the host names them (`vscode:file:<placement>:<resource>`). */
 const FILE_VIEW = "vscode:file:vscode-remote://127.0.0.1:3084/workspace/file.ts";
 
-/** The state the policy reads; `arrange` only ever looks at `views`. */
-const stateWith = (views: LayoutState["views"] = {}): LayoutState => ({
+/** The state the policy reads; `arrange` only ever looks at `items`. */
+const stateWith = (items: LayoutState["items"] = {}): LayoutState => ({
   viewportWidth: 1600,
   viewportHeight: 1000,
   tree: { type: "split", id: "root", dir: "row", children: [] },
-  views,
+  items,
   catalogueVersion: 0,
   activePanelId: null,
 });
@@ -52,9 +53,9 @@ const stateWith = (views: LayoutState["views"] = {}): LayoutState => ({
  * makes*, so a stub that records them is the honest test double, and every
  * member is written out so a face that grows a method fails to compile here.
  *
- * @param views - the view table the policy will read.
+ * @param items - the view table the policy will read.
  */
-function recordingFace(views: LayoutState["views"] = {}): {
+function recordingFace(items: LayoutState["items"] = {}): {
   face: PracLayoutFace;
   calls: Call[];
   children: Map<string, { id: string; label?: string }[]>;
@@ -63,7 +64,7 @@ function recordingFace(views: LayoutState["views"] = {}): {
   const children = new Map<string, { id: string; label?: string }[]>();
   // The face is a **mutable** table, like the real one: a policy that places and then reads back
   // (the off-screen sweep does exactly that) must see what it just wrote.
-  const live: LayoutState["views"] = { ...views };
+  const live: LayoutState["items"] = { ...items };
   const record =
     (method: string) =>
     (...args: readonly unknown[]): void => {
@@ -78,7 +79,7 @@ function recordingFace(views: LayoutState["views"] = {}): {
   const face = {
     getState: () => stateWith(live),
     subscribe: () => () => {},
-    listViews: (): ViewInfo[] =>
+    listViews: (): ItemInfo[] =>
       Object.entries(live).map(([id, record]) => ({
         id,
         region: record.region ?? null,
@@ -90,8 +91,8 @@ function recordingFace(views: LayoutState["views"] = {}): {
     removeRegion: () => undefined,
     place: place("place"),
     placeQuietly: place("placeQuietly"),
-    removeView: (id: string): void => {
-      calls.push({ method: "removeView", args: [id] });
+    removeItem: (id: string): void => {
+      calls.push({ method: "removeItem", args: [id] });
       delete live[id];
     },
     setRegionChildren: (
@@ -114,8 +115,8 @@ function recordingFace(views: LayoutState["views"] = {}): {
       calls.push({ method: "hide", args: [id] });
       if (live[id] !== undefined) live[id] = { ...live[id], hidden: true, kind: "window" };
     },
-    setViewCollapsed: record("setViewCollapsed"),
-    setViewSize: record("setViewSize"),
+    setItemCollapsed: record("setItemCollapsed"),
+    setItemSize: record("setItemSize"),
     setViewKind: record("setViewKind"),
     registerContentHost: () => () => {},
     registerBoardLayout: () => () => {},
@@ -125,7 +126,7 @@ function recordingFace(views: LayoutState["views"] = {}): {
     splitView: record("splitView"),
     bindRoles: record("bindRoles"),
     bindTrack: record("bindTrack"),
-    setViewFlags: record("setViewFlags"),
+    setItemFlags: record("setItemFlags"),
     activeView: () => null,
     onDidRequestCloseView: () => () => {},
     // The frame owns the region tree: `addGroup` asks it for a region and binds the group to
@@ -162,11 +163,11 @@ describe("staleFileViews", () => {
     },
     [DSH_CONVERSATION_VIEW]: { region: CENTER, order: 2, hidden: false, kind: "window" },
     "vscode:view:workbench.view.search": { region: LEFT, order: 3, hidden: false, kind: "window" },
-  } satisfies Record<string, ViewRecord>;
+  } satisfies Record<string, ItemRecord>;
   const resourceOf = (view: string): string | undefined =>
     view.startsWith("vscode:file:") ? view.slice("vscode:file:".length) : undefined;
 
-  it("names the file views the app no longer has open", () => {
+  it("names the file items the app no longer has open", () => {
     expect(staleFileViews(records, new Set([FILE_VIEW]), resourceOf)).toEqual([
       "vscode:file:vscode-remote://127.0.0.1:3084/workspace/closed.ts",
     ]);
@@ -328,7 +329,7 @@ describe("placeCatalogue", () => {
       ["placeQuietly", "vscode:view:outline", "left/container:workbench.view.explorer"],
       // Outline starts folded, the way VS Code's Explorer shows it — the declaration is applied where
       // the view lands (`VIEW_DEFAULTS`).
-      ["setViewCollapsed", "vscode:view:outline", true],
+      ["setItemCollapsed", "vscode:view:outline", true],
       ["placeQuietly", "vscode:view:workbench.view.search", "left/container:workbench.view.search"],
     ]);
   });
@@ -466,7 +467,7 @@ describe("placeCatalogue", () => {
     ]);
   });
 
-  it("places the app's panel views in the bottom track", () => {
+  it("places the app's panel items in the bottom track", () => {
     // `panel` maps to `bottom`, which is a visible track again: placing the view there is enough.
     const { face, calls } = recordingFace();
     placeCatalogue(face, [entry({ location: "panel", containerId: "c.panel" })]);

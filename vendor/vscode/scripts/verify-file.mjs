@@ -261,12 +261,12 @@ step("first file");
 const mounted = await measure(uriOf(FILE_A));
 const oneSurface = await liveSurfaces();
 const viewKinds = await page.evaluate(() => {
-  const views = globalThis.__pracFrame.getState().views;
+  const views = globalThis.__pracFrame.getState().items;
   const file = Object.entries(views).find(([id]) => id.startsWith("vscode:file:"));
   // A contributed view lives on its container's **board** now, not in the frame's view table.
   const boards = globalThis.__pracWidgets?.boards?.() ?? [];
   const widget = boards
-    .map((board) => Object.entries(board.boardState?.views ?? {}))
+    .map((board) => Object.entries(board.boardState?.items ?? {}))
     .flat()
     .find(([id]) => id.startsWith("vscode:view:"));
   return { file: file?.[1].kind ?? null, widget: widget?.[1].kind ?? null };
@@ -464,7 +464,7 @@ if (surfaceResource === null) {
       children: element.children.length,
       monaco: element.querySelectorAll(".monaco-editor").length,
     })),
-    records: Object.entries(globalThis.__pracFrame.getState().views)
+    records: Object.entries(globalThis.__pracFrame.getState().items)
       .filter(([id]) => id.startsWith("vscode:file:"))
       .map(([id, view]) => `${id.split("/").pop()}@${view.region}${view.hidden ? "(hidden)" : ""}`),
     open: globalThis.__vscodeEmbed.face.listOpenFiles().map((r) => r.split("/").pop()),
@@ -558,7 +558,7 @@ const reloaded = await page.evaluate(() => ({
     .map((element) => element.getAttribute("data-prac-tab"))
     .filter((id) => id !== null && id.startsWith("vscode:file:")),
   conversationRegion:
-    globalThis.__pracFrame.getState().views["dsh:main:conversation"]?.region ?? null,
+    globalThis.__pracFrame.getState().items["dsh:main:conversation"]?.region ?? null,
 }));
 
 // The unit of a view is the **placement** — a file in one of the app's editor groups
@@ -724,7 +724,7 @@ const projectionAudit = await page.evaluate(async () => {
 
 step("close the conversation tab");
 const closedChat = await page.evaluate(async (conversation) => {
-  if (globalThis.__pracFrame.getState().views[conversation]?.region !== "center") {
+  if (globalThis.__pracFrame.getState().items[conversation]?.region !== "center") {
     globalThis.__pracFrame.place(conversation, "center");
     await new Promise((resolve) => setTimeout(resolve, 1200));
   }
@@ -735,7 +735,7 @@ const closedChat = await page.evaluate(async (conversation) => {
   return {
     clicked: true,
     mapped: globalThis.__vscodeEmbed.face.mappedWindows(),
-    hidden: globalThis.__pracFrame.getState().views[conversation]?.hidden === true,
+    hidden: globalThis.__pracFrame.getState().items[conversation]?.hidden === true,
   };
 }, "dsh:main:conversation");
 step("preview survives close/reopen conversation");

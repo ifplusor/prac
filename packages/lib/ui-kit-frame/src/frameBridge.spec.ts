@@ -10,7 +10,7 @@ function memoryStore(): LayoutStore {
     viewportWidth: 0,
     viewportHeight: 0,
     tree: defaultTree(),
-    views: {},
+    items: {},
     catalogueVersion: 0,
     activePanelId: null,
   };
@@ -20,7 +20,7 @@ function memoryStore(): LayoutStore {
     update: (updater) => {
       state = updater(state);
     },
-    requestCloseView: () => {},
+    requestCloseItem: () => {},
   };
 }
 
@@ -33,17 +33,17 @@ describe("WindowGroupLayoutBridge", () => {
     const bridge = new WindowGroupLayoutBridge(group, store, "left");
 
     expect(bridge.regionId).toBe("left");
-    expect(store.get().views["v1"]?.region).toMatch(/^left/);
-    expect(store.get().views["v2"]?.region).toMatch(/^left/);
-    expect(store.get().views["v1"]?.front).toBe(true);
+    expect(store.get().items["v1"]?.region).toMatch(/^left/);
+    expect(store.get().items["v2"]?.region).toMatch(/^left/);
+    expect(store.get().items["v1"]?.front).toBe(true);
 
     group.select("v2");
-    expect(store.get().views["v1"]?.front).toBe(false);
-    expect(store.get().views["v2"]?.front).toBe(true);
+    expect(store.get().items["v1"]?.front).toBe(false);
+    expect(store.get().items["v2"]?.front).toBe(true);
 
     group.reorder(["v2", "v1"]);
-    expect(store.get().views["v2"]?.order).toBe(0);
-    expect(store.get().views["v1"]?.order).toBe(1);
+    expect(store.get().items["v2"]?.order).toBe(0);
+    expect(store.get().items["v1"]?.order).toBe(1);
   });
 
   it("moves an existing placement instead of creating a second record", () => {
@@ -53,8 +53,8 @@ describe("WindowGroupLayoutBridge", () => {
     group.add({ id: "v1" });
     new WindowGroupLayoutBridge(group, store, "left");
 
-    expect(Object.keys(store.get().views)).toEqual(["v1"]);
-    expect(store.get().views["v1"]?.region).toMatch(/^left/);
+    expect(Object.keys(store.get().items)).toEqual(["v1"]);
+    expect(store.get().items["v1"]?.region).toMatch(/^left/);
   });
 
   it("does not unhide a view when the group changes", () => {
@@ -64,27 +64,27 @@ describe("WindowGroupLayoutBridge", () => {
     const bridge = new WindowGroupLayoutBridge(group, store, "left");
     store.update((state) => ({
       ...state,
-      views: { ...state.views, v1: { ...state.views["v1"]!, hidden: true } },
+      items: { ...state.items, v1: { ...state.items["v1"]!, hidden: true } },
     }));
 
     group.add({ id: "v2" });
     bridge.sync();
 
-    expect(store.get().views["v1"]?.hidden).toBe(true);
+    expect(store.get().items["v1"]?.hidden).toBe(true);
   });
 
-  it("removes views that leave the group and on dispose", () => {
+  it("removes items that leave the group and on dispose", () => {
     const store = memoryStore();
     const group = new TestGroup("g1");
     group.add({ id: "v1" });
     const bridge = new WindowGroupLayoutBridge(group, store, "left");
 
     group.remove("v1");
-    expect(store.get().views["v1"]).toBeUndefined();
+    expect(store.get().items["v1"]).toBeUndefined();
 
     group.add({ id: "v2" });
-    expect(store.get().views["v2"]).toBeDefined();
+    expect(store.get().items["v2"]).toBeDefined();
     bridge.dispose();
-    expect(store.get().views["v2"]).toBeUndefined();
+    expect(store.get().items["v2"]).toBeUndefined();
   });
 });

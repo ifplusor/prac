@@ -1,5 +1,5 @@
 /**
- * The layout vocabulary: the region/split tree, the views table's shapes, and the
+ * The layout vocabulary: the region/split tree, the items table's shapes, and the
  * faces this mechanism publishes.
  *
  * Layer 0 of the client half — it imports nothing from the other domains, so
@@ -26,7 +26,7 @@ export type {
   TabMode,
 } from "prac-ui-kit-layout";
 import type { LayoutState as ContentLayoutState, PlacementRecord } from "prac-ui-kit-content";
-export type { ViewFlags } from "prac-ui-kit-content";
+export type { ItemFlags } from "prac-ui-kit-content";
 
 // This file is DSH-free on purpose: the kit only speaks layout vocabulary. The
 // `SlotMap` / `Context` merges that bind prac's slots and faces to DSH live in
@@ -35,9 +35,9 @@ export type { ViewFlags } from "prac-ui-kit-content";
 /** Split axis: `row` distributes width, `column` distributes height. */
 /** Where one view sits, and in what order inside its region. */
 /** Whether a frame view is a window or a widget. */
-export type FrameViewKind = "window" | "widget";
+export type ItemKind = "window" | "widget";
 
-interface ViewRecordBase extends PlacementRecord {
+interface ItemRecordBase extends PlacementRecord {
   /** Content host id; when present the frame renders the host, not a slot. */
   contentId?: string;
   /** Region id used as this window's nested content. */
@@ -47,30 +47,30 @@ interface ViewRecordBase extends PlacementRecord {
 }
 
 /** A record proven to be a window. */
-export interface WindowRecord extends ViewRecordBase {
+export interface WindowRecord extends ItemRecordBase {
   kind: "window";
 }
 
 /** A record proven to be a widget. */
-export interface WidgetRecord extends ViewRecordBase {
+export interface WidgetRecord extends ItemRecordBase {
   kind: "widget";
 }
 
 /** The discriminated record union. */
-export type ViewRecord = WindowRecord | WidgetRecord;
+export type ItemRecord = WindowRecord | WidgetRecord;
 /** Compatibility alias for code that only needs the discriminated union. */
-export type TypedViewRecord = ViewRecord;
+export type TypedItemRecord = ItemRecord;
 
-export function isWindowRecord(record: ViewRecord): record is WindowRecord {
+export function isWindowRecord(record: ItemRecord): record is WindowRecord {
   return record.kind === "window";
 }
 
-export function isWidgetRecord(record: ViewRecord): record is WidgetRecord {
+export function isWidgetRecord(record: ItemRecord): record is WidgetRecord {
   return record.kind === "widget";
 }
 
 export interface LayoutState<
-  TRecord extends ViewRecord = ViewRecord,
+  TRecord extends ItemRecord = ItemRecord,
 > extends ContentLayoutState<TRecord> {}
 
 /** Inline style values this frame emits. */

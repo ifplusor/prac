@@ -16,7 +16,7 @@ export interface LayoutStore<TRecord extends PlacementRecord = PlacementRecord> 
   get(this: void): LayoutState<TRecord>;
   subscribe(this: void, listener: () => void): () => void;
   update(this: void, updater: (state: LayoutState<TRecord>) => LayoutState<TRecord>): void;
-  requestCloseView(this: void, itemId: string): void;
+  requestCloseItem(this: void, itemId: string): void;
 }
 
 /** Subscribe a component to the whole layout state. */

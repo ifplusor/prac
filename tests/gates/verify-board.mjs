@@ -32,7 +32,7 @@ const read = () =>
     const root = host?.shadowRoot;
     return {
       window: board === undefined ? null : board.state.active,
-      record: globalThis.__pracFrame.getState().views[`${boardId}/board`] ?? null,
+      record: globalThis.__pracFrame.getState().items[`${boardId}/board`] ?? null,
       order: board === undefined ? [] : [...board.widgetOrder()],
       active: board === undefined ? undefined : board.content.activeWidget,
       rows:
@@ -91,8 +91,8 @@ const dragBoard = await page.evaluate(async () => {
   const zones = root === null || root === undefined
     ? []
     : [...root.querySelectorAll("[data-prac-widget-drop]")];
-  const before = board.content.get().views["gate:drag-b"]?.region ?? null;
-  const beforeOrder = board.content.get().views["gate:drag-b"]?.order ?? null;
+  const before = board.content.get().items["gate:drag-b"]?.region ?? null;
+  const beforeOrder = board.content.get().items["gate:drag-b"]?.order ?? null;
   const target = zones.find((zone) => zone.getAttribute("data-prac-widget-drop") !== before);
   const targetRegion = target?.getAttribute("data-prac-widget-drop") ?? null;
   let after = before;
@@ -119,7 +119,7 @@ const dragBoard = await page.evaluate(async () => {
     target.dispatchEvent(drop);
     await new Promise((resolve) => setTimeout(resolve, 300));
     dragPrevented = { over: over.defaultPrevented, drop: drop.defaultPrevented };
-    after = board.content.get().views["gate:drag-b"]?.region ?? null;
+    after = board.content.get().items["gate:drag-b"]?.region ?? null;
   }
   const result = {
     zones: zones.length,
@@ -127,11 +127,11 @@ const dragBoard = await page.evaluate(async () => {
     targetRegion,
     after,
     beforeOrder,
-    afterOrder: board.content.get().views["gate:drag-b"]?.order ?? null,
+    afterOrder: board.content.get().items["gate:drag-b"]?.order ?? null,
     hasWidget: board.hasWidget("gate:drag-b"),
     prevented: dragPrevented,
   };
-  globalThis.__pracFrame.removeView(board.windowId);
+  globalThis.__pracFrame.removeItem(board.windowId);
   board.dispose();
   return result;
 });
@@ -177,7 +177,7 @@ const crossDrag = await page.evaluate(async (targetBoardId) => {
     sourceHas = source.hasWidget("gate:cross-a");
     target.removeWidget("gate:cross-a");
   }
-  globalThis.__pracFrame.removeView(source.windowId);
+  globalThis.__pracFrame.removeItem(source.windowId);
   source.dispose();
   return { targetHas, sourceHas };
 }, BOARD);
@@ -191,14 +191,14 @@ const moved = await page.evaluate(() => {
   const ok = globalThis.__pracWidgets.moveWidget("gate:w1", "gate:move-a", "gate:move-b", {
     split: "right",
   });
-  const record = b.boardState.views["gate:w1"];
+  const record = b.boardState.items["gate:w1"];
   const result = {
     ok,
     sourceHas: a.hasWidget("gate:w1"),
     targetHas: b.hasWidget("gate:w1"),
     contentId: record?.contentId ?? null,
     region: record?.region ?? null,
-    otherRegion: b.boardState.views["gate:w2"]?.region ?? null,
+    otherRegion: b.boardState.items["gate:w2"]?.region ?? null,
     treeType: b.boardState.tree.type,
     sourceRoot: a.boardState.tree.id,
     targetRoot: b.boardState.tree.id,
@@ -217,7 +217,7 @@ const [stageFixture] = writeFixtures("board-stage", url, [
 const stage = await page.evaluate(async ({ uri }) => {
   await globalThis.__vscodeEmbed.face.openFile(uri);
   for (let attempt = 0; attempt < 80; attempt += 1) {
-    const fileId = Object.keys(globalThis.__pracFrame.getState().views).find((id) =>
+    const fileId = Object.keys(globalThis.__pracFrame.getState().items).find((id) =>
       id.startsWith("vscode:file:"),
     );
     if (fileId !== undefined) break;
@@ -231,10 +231,10 @@ const stage = await page.evaluate(async ({ uri }) => {
   await new Promise((resolve) => setTimeout(resolve, 1200));
   const result = {
     mapped: globalThis.__pracVscodeFace.mappedWindows().includes(board.windowId),
-    record: globalThis.__pracFrame.getState().views[board.windowId] ?? null,
+    record: globalThis.__pracFrame.getState().items[board.windowId] ?? null,
   };
   globalThis.__pracVscodeFace.unmapWindow(board.windowId);
-  globalThis.__pracFrame.removeView(board.windowId);
+  globalThis.__pracFrame.removeItem(board.windowId);
   board.dispose();
   return result;
 }, { uri: stageFixture.uri });

@@ -22,11 +22,11 @@ import { createBoardStore } from "./boardStore.js";
 const widget = (region: string, order: number, extra: Partial<WidgetRecord> = {}): WidgetRecord =>
   ({ kind: "widget", region, order, hidden: false, ...extra }) as WidgetRecord;
 
-const state = (tree: LayoutState<WidgetRecord>["tree"], views: Record<string, WidgetRecord>) => ({
+const state = (tree: LayoutState<WidgetRecord>["tree"], items: Record<string, WidgetRecord>) => ({
   viewportWidth: 1000,
   viewportHeight: 700,
   tree,
-  views,
+  items,
   catalogueVersion: 0,
   activePanelId: null,
 });
@@ -59,7 +59,7 @@ describe("createBoardChrome", () => {
         state: {
           ...content.state,
           tree: { ...regionNode("board", 0), tabs: "multiple" as const },
-          views: {
+          items: {
             w1: widget("board", 0),
             w2: widget("board", 1),
           },
@@ -119,8 +119,8 @@ describe("createBoardStore", () => {
     const store = createBoardStore(content);
     const intents = createLayoutIntents(store);
     intents.activate("b");
-    expect(content.get().views["b"]?.front).toBe(true);
+    expect(content.get().items["b"]?.front).toBe(true);
     intents.close("b");
-    expect(content.get().views["b"]).toBeUndefined();
+    expect(content.get().items["b"]).toBeUndefined();
   });
 });

@@ -24,26 +24,26 @@ import {
   findRegion,
   findSplit,
   moveEntry,
-  moveViewInRegion,
+  moveItemInRegion,
   place,
   redistributeOnDrag,
   regionInfos,
-  removeView,
+  removeItem,
   resetStackBoundary,
   setEntryFolded,
   setEntryHeight,
-  setViewCollapsed,
-  setViewSize,
+  setItemCollapsed,
+  setItemSize,
   stackDragAnchor,
   stackEntries,
-  visibleViews,
+  visibleItems,
   type Basis,
 } from "./model.js";
 
 /** A state with just the view records the fold helpers read. */
 const stateOf = (
-  views: Record<string, { size?: number; collapsed?: boolean; max?: number; cachedSize?: number }>,
-): LayoutState => ({ views }) as unknown as LayoutState;
+  items: Record<string, { size?: number; collapsed?: boolean; max?: number; cachedSize?: number }>,
+): LayoutState => ({ items }) as unknown as LayoutState;
 
 describe("entrySashState (B2/B4/B7: SashState of a row boundary)", () => {
   const shaped = (folded: readonly string[] = []) =>
@@ -51,7 +51,7 @@ describe("entrySashState (B2/B4/B7: SashState of a row boundary)", () => {
       tree: setRegionChildren(defaultTree(), "left", [
         regionNode("left.explorer", 0, { label: "Explorer", stack: true }),
       ]),
-      views: Object.fromEntries(
+      items: Object.fromEntries(
         ["a", "b", "c"].map((id, order) => [
           id,
           { region: "left.explorer", order, hidden: false, collapsed: folded.includes(id) },
@@ -153,20 +153,20 @@ describe("entrySashState (B2/B4/B7: SashState of a row boundary)", () => {
 
 describe("stackDragAnchor (a boundary below a folded row)", () => {
   const rows = (...spec: [string, number, boolean][]) =>
-    spec.map(([viewId, height, folded]) => ({ viewId, height, folded }));
+    spec.map(([itemId, height, folded]) => ({ itemId, height, folded }));
 
   it("resizes the nearest open row above the pressed folded row", () => {
     const anchor = stackDragAnchor(
       rows(["a", 200, false], ["b", 20, true], ["c", 200, false]),
       "b",
     );
-    expect(anchor?.viewId).toBe("a");
+    expect(anchor?.itemId).toBe("a");
     expect(anchor?.height).toBe(200);
   });
 
   it("returns the pressed row when it is open", () => {
     expect(
-      stackDragAnchor(rows(["a", 200, false], ["b", 20, true], ["c", 200, false]), "c")?.viewId,
+      stackDragAnchor(rows(["a", 200, false], ["b", 20, true], ["c", 200, false]), "c")?.itemId,
     ).toBe("c");
   });
 
@@ -177,8 +177,8 @@ describe("stackDragAnchor (a boundary below a folded row)", () => {
   it("resizes an open row across a folded header", () => {
     const rowList = rows(["v0", 200, false], ["v1", 20, true], ["v2", 200, false]);
     const anchor = stackDragAnchor(rowList, "v1");
-    expect(anchor?.viewId).toBe("v0");
-    const sizes = redistributeOnDrag(rowList, anchor!.viewId, anchor!.height + 100);
+    expect(anchor?.itemId).toBe("v0");
+    const sizes = redistributeOnDrag(rowList, anchor!.itemId, anchor!.height + 100);
     expect(sizes.get("v0")).toBe(300);
     expect(sizes.get("v2")).toBe(100);
     // The folded header is not written; it moves with the boundary.
@@ -193,7 +193,7 @@ describe("a stack keeps the name of the region it stands in for", () => {
     ]);
     const shaped = ensureStackShape({
       tree,
-      views: {
+      items: {
         a: { region: "left.explorer", order: 0, hidden: false },
         b: { region: "left.explorer", order: 1, hidden: false },
       },
@@ -282,7 +282,7 @@ describe("allocateStack (C1/C5/C6/C8: the stack shares, one row at a time)", () 
 
 describe("redistributeOnDrag (SplitView.resize, splitview.ts:1308-1325)", () => {
   const entries = (...rows: [number, boolean][]) =>
-    rows.map(([height, folded], index) => ({ viewId: `v${index}`, height, folded }));
+    rows.map(([height, folded], index) => ({ itemId: `v${index}`, height, folded }));
 
   it("takes the room from the entries below, nearest first", () => {
     const drawn = redistributeOnDrag(entries([100, false], [200, false], [300, false]), "v1", 300);
@@ -331,85 +331,85 @@ describe("redistributeOnDrag (SplitView.resize, splitview.ts:1308-1325)", () => 
     expect(lastEntry.has("v0")).toBe(false);
   });
 });
-describe("setViewCollapsed (SplitView.setVisible's cached size, splitview.ts:228)", () => {
+describe("setItemCollapsed (SplitView.setVisible's cached size, splitview.ts:228)", () => {
   it("remembers what an unsized entry was drawn at, in its own field", () => {
     const state = stateOf({ a: {}, b: {} });
-    const folded = setViewCollapsed(state, "a", true, 173);
-    expect(folded.views.a?.collapsed).toBe(true);
+    const folded = setItemCollapsed(state, "a", true, 173);
+    expect(folded.items.a?.collapsed).toBe(true);
     // A folded row is a header: `size` is not its height any more, the memory is separate.
-    expect(folded.views.a?.size).toBeUndefined();
-    expect(folded.views.a?.cachedSize).toBe(173);
-    const opened = setViewCollapsed(folded, "a", false, 20);
-    expect(opened.views.a?.size).toBe(173);
-    expect(opened.views.a?.cachedSize).toBeUndefined();
+    expect(folded.items.a?.size).toBeUndefined();
+    expect(folded.items.a?.cachedSize).toBe(173);
+    const opened = setItemCollapsed(folded, "a", false, 20);
+    expect(opened.items.a?.size).toBe(173);
+    expect(opened.items.a?.cachedSize).toBeUndefined();
   });
 
   it("remembers what the caller hands over, and falls back to the size it already had", () => {
     // The caller's value wins (SplitView: `_cachedVisibleSize = typeof size === 'number' ? size : this.size`).
-    const told = setViewCollapsed(stateOf({ a: { size: 300 } }), "a", true, 173);
-    expect(told.views.a?.cachedSize).toBe(173);
-    expect(told.views.a?.size).toBeUndefined();
+    const told = setItemCollapsed(stateOf({ a: { size: 300 } }), "a", true, 173);
+    expect(told.items.a?.cachedSize).toBe(173);
+    expect(told.items.a?.size).toBeUndefined();
     // With nothing handed over, the height it already held is what it remembers.
-    const fellBack = setViewCollapsed(stateOf({ a: { size: 300 } }), "a", true);
-    expect(fellBack.views.a?.cachedSize).toBe(300);
-    expect(fellBack.views.a?.size).toBeUndefined();
+    const fellBack = setItemCollapsed(stateOf({ a: { size: 300 } }), "a", true);
+    expect(fellBack.items.a?.cachedSize).toBe(300);
+    expect(fellBack.items.a?.size).toBeUndefined();
   });
 
   it("shares the height again when nothing was remembered", () => {
     // Showing reads the memory alone (splitview.ts:234); the measurement a folded row reports is its
     // header, so opening at that would leave a body of a few pixels.
-    const opened = setViewCollapsed(stateOf({ a: { collapsed: true } }), "a", false, 147);
-    expect(opened.views.a?.size).toBeUndefined();
+    const opened = setItemCollapsed(stateOf({ a: { collapsed: true } }), "a", false, 147);
+    expect(opened.items.a?.size).toBeUndefined();
   });
 
   it("lifts a header-sized memory to the floor when unfolding, and invents nothing without one", () => {
-    const lifted = setViewCollapsed(
+    const lifted = setItemCollapsed(
       stateOf({ a: { cachedSize: 18, collapsed: true } }),
       "a",
       false,
     );
-    expect(lifted.views.a?.size).toBe(48);
-    const unmeasured = setViewCollapsed(stateOf({ a: {} }), "a", true);
-    expect(unmeasured.views.a?.size).toBeUndefined();
-    expect(unmeasured.views.a?.cachedSize).toBeUndefined();
+    expect(lifted.items.a?.size).toBe(48);
+    const unmeasured = setItemCollapsed(stateOf({ a: {} }), "a", true);
+    expect(unmeasured.items.a?.size).toBeUndefined();
+    expect(unmeasured.items.a?.cachedSize).toBeUndefined();
   });
 
   it("clamps an unfolded memory at the view's ceiling (E2)", () => {
-    const opened = setViewCollapsed(
+    const opened = setItemCollapsed(
       stateOf({ a: { cachedSize: 400, collapsed: true, max: 300 } }),
       "a",
       false,
     );
-    expect(opened.views.a?.size).toBe(300);
+    expect(opened.items.a?.size).toBe(300);
   });
 });
 
-describe("setViewSize (a declaration, C3/C6)", () => {
+describe("setItemSize (a declaration, C3/C6)", () => {
   const state = (max?: number): LayoutState =>
     ({
       tree: defaultTree(),
-      views: {
+      items: {
         a: { region: "left", order: 0, hidden: false, ...(max === undefined ? {} : { max }) },
       },
     }) as unknown as LayoutState;
 
   it("clamps a declared height to the floor and the view's ceiling", () => {
-    const below = setViewSize(state(300), "a", 20);
-    expect(below.views.a?.size).toBe(48);
-    const above = setViewSize(state(300), "a", 400);
-    expect(above.views.a?.size).toBe(300);
-    expect(setViewSize(above, "a", 300)).toBe(above);
+    const below = setItemSize(state(300), "a", 20);
+    expect(below.items.a?.size).toBe(48);
+    const above = setItemSize(state(300), "a", 400);
+    expect(above.items.a?.size).toBe(300);
+    expect(setItemSize(above, "a", 300)).toBe(above);
   });
 });
 
-describe("moveViewInRegion (Grid.moveView within one parent, grid.ts:480-495)", () => {
-  const strip = (state: LayoutState) => visibleViews(state, "r");
+describe("moveItemInRegion (Grid.moveView within one parent, grid.ts:480-495)", () => {
+  const strip = (state: LayoutState) => visibleItems(state, "r");
   const regionOf = (
     orders: Record<string, number>,
     extra: Record<string, { region?: string; hidden?: boolean }> = {},
   ): LayoutState =>
     ({
-      views: Object.fromEntries(
+      items: Object.fromEntries(
         Object.entries(orders).map(([id, order]) => [
           id,
           { region: "r", order, hidden: false, ...extra[id] },
@@ -419,45 +419,45 @@ describe("moveViewInRegion (Grid.moveView within one parent, grid.ts:480-495)", 
 
   it("lands a view before or after its reference", () => {
     const state = regionOf({ a: 0, b: 1, c: 2 });
-    expect(strip(moveViewInRegion(state, "c", "a", "up"))).toEqual(["c", "a", "b"]);
-    expect(strip(moveViewInRegion(state, "a", "c", "down"))).toEqual(["b", "c", "a"]);
-    expect(strip(moveViewInRegion(state, "a", "b", "down"))).toEqual(["b", "a", "c"]);
+    expect(strip(moveItemInRegion(state, "c", "a", "up"))).toEqual(["c", "a", "b"]);
+    expect(strip(moveItemInRegion(state, "a", "c", "down"))).toEqual(["b", "c", "a"]);
+    expect(strip(moveItemInRegion(state, "a", "b", "down"))).toEqual(["b", "a", "c"]);
   });
 
   it("changes nothing when the view is already where it is dropped", () => {
     const state = regionOf({ a: 0, b: 1, c: 2 });
-    expect(moveViewInRegion(state, "b", "a", "down")).toBe(state);
-    expect(moveViewInRegion(state, "b", "b", "up")).toBe(state);
+    expect(moveItemInRegion(state, "b", "a", "down")).toBe(state);
+    expect(moveItemInRegion(state, "b", "b", "up")).toBe(state);
   });
 
-  it("keeps hidden views of the region in their relative places", () => {
+  it("keeps hidden items of the region in their relative places", () => {
     const state = regionOf({ a: 0, b: 1, c: 2 }, { b: { hidden: true } });
-    const moved = moveViewInRegion(state, "c", "a", "up");
+    const moved = moveItemInRegion(state, "c", "a", "up");
     expect(strip(moved)).toEqual(["c", "a"]);
-    expect(moved.views.b?.order).toBe(2);
+    expect(moved.items.b?.order).toBe(2);
   });
 
   it("refuses to move across regions, or with an unknown view", () => {
     const state = regionOf({ a: 0, b: 1 }, { b: { region: "other" } });
-    expect(moveViewInRegion(state, "a", "b", "down")).toBe(state);
-    expect(moveViewInRegion(state, "nope", "a", "down")).toBe(state);
+    expect(moveItemInRegion(state, "a", "b", "down")).toBe(state);
+    expect(moveItemInRegion(state, "nope", "a", "down")).toBe(state);
   });
 
   it("leaves the moved view's own size and fold state alone", () => {
     const state = regionOf({ a: 0, b: 1 });
     const sized = {
       ...state,
-      views: { ...state.views, b: { ...state.views.b!, size: 300, collapsed: true } },
+      items: { ...state.items, b: { ...state.items.b!, size: 300, collapsed: true } },
     };
-    const moved = moveViewInRegion(sized, "b", "a", "up");
-    expect(moved.views.b?.size).toBe(300);
-    expect(moved.views.b?.collapsed).toBe(true);
+    const moved = moveItemInRegion(sized, "b", "a", "up");
+    expect(moved.items.b?.size).toBe(300);
+    expect(moved.items.b?.collapsed).toBe(true);
   });
 });
 
 describe("altDragTarget (B6: the adjacent view's half)", () => {
   const entries = (...rows: [number, boolean][]) =>
-    rows.map(([height, folded], index) => ({ viewId: `v${index}`, height, folded }));
+    rows.map(([height, folded], index) => ({ itemId: `v${index}`, height, folded }));
 
   it("limits a non-last boundary to half the next view's headroom", () => {
     // v1 is 200, floor 48: maxDelta = (200 − 48) / 2 = 76; a +100 request becomes +76.
@@ -487,21 +487,21 @@ describe("altDragTarget (B6: the adjacent view's half)", () => {
 
 describe("resetStackBoundary (SplitView's sash reset, splitview.ts:1186)", () => {
   const rows = (...spec: [number, boolean][]) =>
-    spec.map(([height, folded], index) => ({ viewId: `v${index}`, height, folded }));
+    spec.map(([height, folded], index) => ({ itemId: `v${index}`, height, folded }));
 
   it("evens out the nearest rows above and below", () => {
     const reset = resetStackBoundary(rows([300, false], [100, false], [200, false]), "v0");
     expect(reset).toEqual([
-      { viewId: "v0", height: 200 },
-      { viewId: "v1", height: 200 },
+      { itemId: "v0", height: 200 },
+      { itemId: "v1", height: 200 },
     ]);
   });
 
   it("looks past folded rows for the pair, and refuses when a whole side is folded", () => {
     // The boundary at v1's bottom edge: v1 itself is folded, so the pair is v0 with v2.
     expect(resetStackBoundary(rows([100, false], [50, true], [300, false]), "v1")).toEqual([
-      { viewId: "v0", height: 200 },
-      { viewId: "v2", height: 200 },
+      { itemId: "v0", height: 200 },
+      { itemId: "v2", height: 200 },
     ]);
     // Every row above the boundary is folded: nothing to even out with (upstream returns early).
     expect(resetStackBoundary(rows([50, true], [50, true], [300, false]), "v1")).toEqual([]);
@@ -512,8 +512,8 @@ describe("resetStackBoundary (SplitView's sash reset, splitview.ts:1186)", () =>
   it("never evens a pair below the floor", () => {
     const reset = resetStackBoundary(rows([10, false], [10, false]), "v0");
     expect(reset).toEqual([
-      { viewId: "v0", height: 48 },
-      { viewId: "v1", height: 48 },
+      { itemId: "v0", height: 48 },
+      { itemId: "v1", height: 48 },
     ]);
   });
 
@@ -523,8 +523,8 @@ describe("resetStackBoundary (SplitView's sash reset, splitview.ts:1186)", () =>
 });
 
 describe("ensureStackShape (S2 step 1: a stack becomes a column split of one-view leaves)", () => {
-  const stateWith = (tree: unknown, views: Record<string, unknown>): LayoutState =>
-    ({ tree, views }) as unknown as LayoutState;
+  const stateWith = (tree: unknown, items: Record<string, unknown>): LayoutState =>
+    ({ tree, items }) as unknown as LayoutState;
   const region = (id: string, size: number, extra: Record<string, unknown> = {}) => ({
     type: "region",
     id,
@@ -542,7 +542,7 @@ describe("ensureStackShape (S2 step 1: a stack becomes a column split of one-vie
     ...extra,
   });
 
-  it("turns a stack of two visible views into a column split of leaves, keeping the region's id", () => {
+  it("turns a stack of two visible items into a column split of leaves, keeping the region's id", () => {
     const state = stateWith(region("left", 300, { stack: true }), {
       a: view("left", 0, { size: 120 }),
       b: view("left", 1, { collapsed: true, cachedSize: 80 }),
@@ -559,9 +559,9 @@ describe("ensureStackShape (S2 step 1: a stack becomes a column split of one-vie
       ["left/stack/c", 0, false, true],
     ]);
     // the height and the fold live in the tree now; the records do not carry them
-    expect(shaped.views.a?.region).toBe("left/stack/a");
-    expect(shaped.views.a?.size).toBeUndefined();
-    expect(shaped.views.c?.size).toBeUndefined();
+    expect(shaped.items.a?.region).toBe("left/stack/a");
+    expect(shaped.items.a?.size).toBeUndefined();
+    expect(shaped.items.c?.size).toBeUndefined();
   });
 
   it("normalises to itself, and leaves one-view stacks and tabs regions alone", () => {
@@ -578,7 +578,7 @@ describe("ensureStackShape (S2 step 1: a stack becomes a column split of one-vie
       b: view("left", 1),
     });
     expect(ensureStackShape(tabs)).toBe(tabs);
-    // hidden views are not rows, so they do not become leaves
+    // hidden items are not rows, so they do not become leaves
     const hidden = stateWith(region("left", 300, { stack: true }), {
       a: view("left", 0),
       b: view("left", 1, { hidden: true }),
@@ -600,7 +600,7 @@ describe("stack entries (S2: the rows are leaf regions)", () => {
         min: 40,
         stack: true,
       },
-      views: {
+      items: {
         a: { region: "left", order: 0, hidden: false, size: 120 },
         b: { region: "left", order: 1, hidden: false, size: 80 },
       },
@@ -642,7 +642,7 @@ describe("stack entries (S2: the rows are leaf regions)", () => {
         min: 40,
         stack: true,
       },
-      views: {
+      items: {
         a: { region: "left", order: 0, hidden: false, max: 150 },
         b: { region: "left", order: 1, hidden: false },
       },
@@ -668,7 +668,7 @@ describe("addressing a stack that lives under a region", () => {
       tree: setRegionChildren(defaultTree(), "left", [
         regionNode("left.explorer", 0, { stack: true, flex: true }),
       ]),
-      views: {
+      items: {
         a: { region: "left.explorer", order: 0, hidden: false },
         b: { region: "left.explorer", order: 1, hidden: false },
         c: { region: "left.explorer", order: 2, hidden: false },
@@ -682,7 +682,7 @@ describe("addressing a stack that lives under a region", () => {
   it("finds the split through the region, and lists its rows", () => {
     const state = nested();
     expect(findSplit(state.tree, "left.explorer")?.id).toBe("left.explorer");
-    expect(visibleViews(state, "left.explorer")).toEqual(["a", "b", "c"]);
+    expect(visibleItems(state, "left.explorer")).toEqual(["a", "b", "c"]);
   });
 
   it("lists a stack as one movable position, not as its internal rows", () => {
@@ -701,37 +701,37 @@ describe("addressing a stack that lives under a region", () => {
     expect(place(once, "b", "left.explorer")).toBe(once);
   });
 
-  it("reorders a nested stack and syncs the views' order", () => {
+  it("reorders a nested stack and syncs the items' order", () => {
     const state = nested();
     const next = moveEntry(state, "left.explorer/stack/b", "left.explorer/stack/a", "up");
     expect(rows(next)).toEqual(["b", "a", "c"]);
-    expect(next.views["b"]?.order).toBe(0);
-    expect(next.views["a"]?.order).toBe(1);
-    expect(next.views["c"]?.order).toBe(2);
+    expect(next.items["b"]?.order).toBe(0);
+    expect(next.items["a"]?.order).toBe(1);
+    expect(next.items["c"]?.order).toBe(2);
   });
 
-  const setHidden = (state: LayoutState, viewId: string, hidden: boolean): LayoutState => {
-    const record = state.views[viewId];
+  const setHidden = (state: LayoutState, itemId: string, hidden: boolean): LayoutState => {
+    const record = state.items[itemId];
     return record === undefined
       ? state
-      : { ...state, views: { ...state.views, [viewId]: { ...record, hidden } } };
+      : { ...state, items: { ...state.items, [itemId]: { ...record, hidden } } };
   };
 
   it("drops a hidden view's row and writes its place back to the record", () => {
     const state = ensureStackShape(setHidden(nested(), "b", true));
     expect(rows(state)).toEqual(["a", "c"]);
-    expect(state.views["b"]?.region).toBe("left.explorer");
-    expect(state.views["b"]?.hidden).toBe(true);
+    expect(state.items["b"]?.region).toBe("left.explorer");
+    expect(state.items["b"]?.hidden).toBe(true);
   });
 
   it("round-trips a stack through one visible view and shows a hidden view back", () => {
     let state = ensureStackShape(setHidden(nested(), "b", true));
     state = ensureStackShape(setHidden(state, "c", true));
     expect(findNode(state.tree, "left.explorer")?.type).toBe("region");
-    expect(state.views["a"]?.region).toBe("left.explorer");
+    expect(state.items["a"]?.region).toBe("left.explorer");
     state = ensureStackShape(setHidden(state, "b", false));
     expect(rows(state)).toEqual(["a", "b"]);
-    expect(state.views["b"]?.region).toBe("left.explorer/stack/b");
+    expect(state.items["b"]?.region).toBe("left.explorer/stack/b");
   });
 
   it("keeps a folded row's memory through the melt and back", () => {
@@ -741,8 +741,8 @@ describe("addressing a stack that lives under a region", () => {
     const melted = findRegion(state.tree, "left.explorer");
     expect(melted?.type).toBe("region");
     expect(melted?.collapsed).toBe(false);
-    expect(state.views["c"]?.collapsed).toBe(true);
-    expect(state.views["c"]?.cachedSize).toBe(200);
+    expect(state.items["c"]?.collapsed).toBe(true);
+    expect(state.items["c"]?.cachedSize).toBe(200);
     state = ensureStackShape(setHidden(state, "a", false));
     expect(rows(state)).toEqual(["a", "c"]);
     const c = findRegion(state.tree, "left.explorer/stack/c");
@@ -752,7 +752,7 @@ describe("addressing a stack that lives under a region", () => {
   });
 
   it("drops a removed view's row without leaving a blank", () => {
-    expect(rows(ensureStackShape(removeView(nested(), "b")))).toEqual(["a", "c"]);
+    expect(rows(ensureStackShape(removeItem(nested(), "b")))).toEqual(["a", "c"]);
   });
 });
 
@@ -769,7 +769,7 @@ describe("setEntryFolded routes the difference (design C5/C6)", () => {
         min: 40,
         stack: true,
       },
-      views: Object.fromEntries(
+      items: Object.fromEntries(
         Object.entries(sizes).map(([id, size], order) => [
           id,
           { region: "left", order, hidden: false, size },
@@ -821,7 +821,7 @@ describe("setEntryFolded routes the difference (design C5/C6)", () => {
         min: 40,
         stack: true,
       },
-      views: {
+      items: {
         a: {
           region: "left",
           order: 0,

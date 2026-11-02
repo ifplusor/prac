@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import type { ContentHost } from "./windowModel.js";
 
 /** Mount one `ContentHost` into the layout item's box. */
-export function ContentHostView({
+export function ContentHostMount({
   host,
   contentId,
 }: {

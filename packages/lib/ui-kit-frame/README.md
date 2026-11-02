@@ -31,10 +31,9 @@ The kit exports no `apply` / `inject` / `name` and cannot be composed as a row.
 ## Scope
 
 ```text
-contract / windowModel  LayoutState / ViewRecord / WidgetRecord, WindowGroup, ContentHost
+contract / windowModel  LayoutState / ItemRecord / WidgetRecord, WindowGroup, ContentHost
 surface / layoutRoot / snapshot  content root, frame / board root, serializable shape
 frameState             FrameState / SpaceState / composed LayoutStore
-catalogue              view / region shapes + prac's own slot keys
 model                  placement, split, stack, grid, tab reorder
 store                  LayoutStore / SpaceStore interface + React hook (re-export of content)
 switching              LayoutStore switcher (re-export of content)
@@ -53,7 +52,7 @@ Not in scope:
 ## Usage
 
 ```ts
-import { LayoutRenderer, type LayoutStore, type ViewRecord } from "prac-ui-kit-frame";
+import { LayoutRenderer, type LayoutStore, type ItemRecord } from "prac-ui-kit-frame";
 ```
 
 The plugin supplies the persisted `LayoutStore`; this package is for code that

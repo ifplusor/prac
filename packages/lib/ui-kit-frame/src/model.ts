@@ -7,29 +7,29 @@
 
 import type { LayoutNode, Sizing, SplitNode } from "prac-ui-kit-layout";
 import {
-  ensureView as genericEnsureView,
+  ensureItem as genericEnsureItem,
   gridNode,
   distributeSplitEvenly as genericDistributeSplitEvenly,
   moveEntry as genericMoveEntry,
-  moveViewInRegion as genericMoveViewInRegion,
-  normalizeViews as genericNormalizeViews,
+  moveItemInRegion as genericMoveItemInRegion,
+  normalizeItems as genericNormalizeItems,
   place as genericPlace,
   placeQuietly as genericPlaceQuietly,
   regionNode,
   removeRegion as genericRemoveRegion,
-  removeView as genericRemoveView,
+  removeItem as genericRemoveItem,
   resizeBoundary as genericResizeBoundary,
   setCollapsed as genericSetCollapsed,
   setEntryFolded as genericSetEntryFolded,
   setEntryHeight as genericSetEntryHeight,
   setFront as genericSetFront,
-  setViewCollapsed as genericSetViewCollapsed,
-  setViewSize as genericSetViewSize,
+  setItemCollapsed as genericSetItemCollapsed,
+  setItemSize as genericSetItemSize,
   splitRegionWith as genericSplitRegionWith,
 } from "prac-ui-kit-content";
 import type { LayoutState } from "./contract.js";
 import { BOTTOM_REGION, CENTER_MIN, CENTER_REGION } from "./contract.js";
-import type { FrameViewKind, ViewRecord } from "./contract.js";
+import type { ItemKind, ItemRecord } from "./contract.js";
 
 export * from "prac-ui-kit-content/model";
 export {
@@ -39,11 +39,11 @@ export {
   edgeRegion,
   entrySashState,
   findParentSplit,
-  frontView,
+  frontItem,
   isPresent,
   showsTabStrip,
   stackEntries,
-  visibleViews,
+  visibleItems,
   type EntrySashState,
 } from "prac-ui-kit-content";
 
@@ -84,55 +84,55 @@ export function defaultTree(): SplitNode {
 }
 
 /** Ensure a window / widget record exists in a frame state. */
-export function ensureView(state: LayoutState, viewId: string, kind?: FrameViewKind): ViewRecord;
-export function ensureView<TRecord extends ViewRecord>(
+export function ensureItem(state: LayoutState, itemId: string, kind?: ItemKind): ItemRecord;
+export function ensureItem<TRecord extends ItemRecord>(
   state: LayoutState<TRecord>,
-  viewId: string,
-  create: (viewId: string) => TRecord,
+  itemId: string,
+  create: (itemId: string) => TRecord,
 ): TRecord;
-export function ensureView<TRecord extends ViewRecord>(
+export function ensureItem<TRecord extends ItemRecord>(
   state: LayoutState<TRecord>,
-  viewId: string,
-  kindOrCreate: FrameViewKind | ((viewId: string) => TRecord) = "window",
-): TRecord | ViewRecord {
-  const ensure = genericEnsureView as unknown as (
+  itemId: string,
+  kindOrCreate: ItemKind | ((itemId: string) => TRecord) = "window",
+): TRecord | ItemRecord {
+  const ensure = genericEnsureItem as unknown as (
     state: LayoutState,
-    viewId: string,
-    kindOrCreate?: string | ((id: string) => ViewRecord),
-  ) => ViewRecord;
-  return ensure(state, viewId, kindOrCreate) as TRecord | ViewRecord;
+    itemId: string,
+    kindOrCreate?: string | ((id: string) => ItemRecord),
+  ) => ItemRecord;
+  return ensure(state, itemId, kindOrCreate) as TRecord | ItemRecord;
 }
 
 /**
  * Place a window / widget in a region, creating the record with the frame's
  * default kind when the caller did not supply a factory.
  */
-export function place<TRecord extends ViewRecord = ViewRecord>(
+export function place<TRecord extends ItemRecord = ItemRecord>(
   state: LayoutState<TRecord>,
-  viewId: string,
+  itemId: string,
   regionId: string,
-  create?: (viewId: string) => TRecord,
+  create?: (itemId: string) => TRecord,
 ): LayoutState<TRecord> {
-  return genericPlace(state, viewId, regionId, create ?? ((id) => frameRecord<TRecord>(state, id)));
+  return genericPlace(state, itemId, regionId, create ?? ((id) => frameRecord<TRecord>(state, id)));
 }
 
 /** Place without changing the selector's chosen child. */
-export function placeQuietly<TRecord extends ViewRecord = ViewRecord>(
+export function placeQuietly<TRecord extends ItemRecord = ItemRecord>(
   state: LayoutState<TRecord>,
-  viewId: string,
+  itemId: string,
   regionId: string,
-  create?: (viewId: string) => TRecord,
+  create?: (itemId: string) => TRecord,
 ): LayoutState<TRecord> {
   return genericPlaceQuietly(
     state,
-    viewId,
+    itemId,
     regionId,
     create ?? ((id) => frameRecord<TRecord>(state, id)),
   );
 }
 
-function frameRecord<TRecord extends ViewRecord>(state: LayoutState, viewId: string): TRecord {
-  return genericEnsureView(state, viewId, "window") as TRecord;
+function frameRecord<TRecord extends ItemRecord>(state: LayoutState, itemId: string): TRecord {
+  return genericEnsureItem(state, itemId, "window") as TRecord;
 }
 
 /**
@@ -142,7 +142,7 @@ function frameRecord<TRecord extends ViewRecord>(state: LayoutState, viewId: str
  * group can close. Unmarked regions are the app's own shape and are never pruned.
  */
 export function pruneEmbedderRegions(state: LayoutState): LayoutState {
-  const occupied = new Set(Object.values(state.views).map((view) => view.region));
+  const occupied = new Set(Object.values(state.items).map((view) => view.region));
   const holdsSomething = (id: string): boolean =>
     occupied.has(id) || [...occupied].some((region) => region.startsWith(`${id}/`));
   const stale: string[] = [];
@@ -161,24 +161,24 @@ export function pruneEmbedderRegions(state: LayoutState): LayoutState {
 }
 
 /** Record-preserving aliases over the generic content model. */
-export function moveViewInRegion<TRecord extends ViewRecord>(
+export function moveItemInRegion<TRecord extends ItemRecord>(
   state: LayoutState<TRecord>,
-  viewId: string,
-  referenceViewId: string,
+  itemId: string,
+  referenceItemId: string,
   direction: "up" | "down",
 ): LayoutState<TRecord> {
-  return genericMoveViewInRegion(state, viewId, referenceViewId, direction) as LayoutState<TRecord>;
+  return genericMoveItemInRegion(state, itemId, referenceItemId, direction) as LayoutState<TRecord>;
 }
 
 /** Record-preserving wrappers: the frame's state always carries window / widget records. */
-export function removeView(state: LayoutState, viewId: string): LayoutState {
-  return genericRemoveView(state, viewId) as LayoutState;
+export function removeItem(state: LayoutState, itemId: string): LayoutState {
+  return genericRemoveItem(state, itemId) as LayoutState;
 }
-export function setFront(state: LayoutState, viewId: string): LayoutState {
-  return genericSetFront(state, viewId) as LayoutState;
+export function setFront(state: LayoutState, itemId: string): LayoutState {
+  return genericSetFront(state, itemId) as LayoutState;
 }
-export function normalizeViews(state: LayoutState): LayoutState {
-  return genericNormalizeViews(state) as LayoutState;
+export function normalizeItems(state: LayoutState): LayoutState {
+  return genericNormalizeItems(state) as LayoutState;
 }
 export function resizeBoundary(
   state: LayoutState,
@@ -244,14 +244,14 @@ export function moveEntry(
 ): LayoutState {
   return genericMoveEntry(state, entryId, referenceId, direction) as LayoutState;
 }
-export function setViewSize(state: LayoutState, viewId: string, size: number): LayoutState {
-  return genericSetViewSize(state, viewId, size) as LayoutState;
+export function setItemSize(state: LayoutState, itemId: string, size: number): LayoutState {
+  return genericSetItemSize(state, itemId, size) as LayoutState;
 }
-export function setViewCollapsed(
+export function setItemCollapsed(
   state: LayoutState,
-  viewId: string,
+  itemId: string,
   collapsed: boolean,
   measuredHeight?: number,
 ): LayoutState {
-  return genericSetViewCollapsed(state, viewId, collapsed, measuredHeight) as LayoutState;
+  return genericSetItemCollapsed(state, itemId, collapsed, measuredHeight) as LayoutState;
 }

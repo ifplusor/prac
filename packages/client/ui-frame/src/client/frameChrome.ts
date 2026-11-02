@@ -8,11 +8,11 @@
  * @module prac-client-ui-frame/client/frameChrome
  */
 import type { ChromeRegistry } from "prac-ui-kit-frame";
-import type { ViewRecord } from "prac-ui-kit-frame";
+import type { ItemRecord } from "prac-ui-kit-frame";
 import { createContainerChrome, type ContainerChromeParts } from "prac-ui-kit-frame";
 
 /** The control surfaces the frame renders into the renderer's anchors. */
-export type FrameChromeParts = ContainerChromeParts<ViewRecord>;
+export type FrameChromeParts = ContainerChromeParts<ItemRecord>;
 
 /**
  * Assemble the frame's chrome.
@@ -23,7 +23,7 @@ export type FrameChromeParts = ContainerChromeParts<ViewRecord>;
  */
 export function createFrameChrome(
   parts: FrameChromeParts,
-  base?: ChromeRegistry<ViewRecord>,
-): ChromeRegistry<ViewRecord> {
+  base?: ChromeRegistry<ItemRecord>,
+): ChromeRegistry<ItemRecord> {
   return createContainerChrome(parts, base);
 }

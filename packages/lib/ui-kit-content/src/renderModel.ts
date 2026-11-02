@@ -44,25 +44,25 @@ export function activeChild(state: LayoutState, node: RegionNode): LayoutNode | 
 }
 
 /** The region's visible items, in order. */
-export function visibleViews<TRecord extends PlacementRecord>(
+export function visibleItems<TRecord extends PlacementRecord>(
   state: LayoutState<TRecord>,
   regionId: string,
 ): string[] {
   const split = state.tree === undefined ? null : findSplit(state.tree, regionId);
   const inRows = new Set(split === null ? [] : stackEntries(split).map((entry) => entry.id));
-  return Object.entries(state.views)
+  return Object.entries(state.items)
     .filter(([, view]) => !view.hidden && (view.region === regionId || inRows.has(view.region)))
     .sort((a, b) => a[1].order - b[1].order)
     .map(([id]) => id);
 }
 
 /** The item a region currently shows. */
-export function frontView<TRecord extends PlacementRecord>(
+export function frontItem<TRecord extends PlacementRecord>(
   state: LayoutState<TRecord>,
   regionId: string,
 ): string | undefined {
-  const views = visibleViews(state, regionId);
-  return views.find((id) => state.views[id]?.front === true) ?? views[0];
+  const items = visibleItems(state, regionId);
+  return items.find((id) => state.items[id]?.front === true) ?? items[0];
 }
 
 /** Whether a region takes part in the layout at all. */
@@ -70,19 +70,19 @@ export function isPresent(state: LayoutState, node: LayoutNode): boolean {
   if (node.type === "grid" || node.type === "split") {
     return node.children.some((child) => isPresent(state, child));
   }
-  if (node.entry === true) return visibleViews(state, node.id).length > 0;
+  if (node.entry === true) return visibleItems(state, node.id).length > 0;
   if (node.collapsed) return true;
   const children = node.children;
   if (children !== undefined && children.length > 0) {
     return node.flex || children.some((child) => isPresent(state, child));
   }
-  return node.flex || visibleViews(state, node.id).length > 0;
+  return node.flex || visibleItems(state, node.id).length > 0;
 }
 
 /** Whether a region renders a tab strip. */
 export function showsTabStrip(state: LayoutState, node: LayoutNode): boolean {
   if (node.type !== "region") return false;
-  const count = visibleViews(state, node.id).length;
+  const count = visibleItems(state, node.id).length;
   if (node.tabs === "multiple") return count >= 1;
   if (node.tabs === "single") return count > 1;
   return false;

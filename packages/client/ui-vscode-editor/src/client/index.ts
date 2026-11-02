@@ -41,10 +41,10 @@ import type {
   WindowAction,
   WindowActionModel,
 } from "prac-client-ui-frame/client";
-import type { ViewSlotKey } from "prac-ui-kit-frame";
+import type { PracSlotKey } from "prac-client-ui-frame/client";
 
 /** The slot these views are registered into (checked against the mechanism's key). */
-const SLOT: ViewSlotKey = "prac.window";
+const SLOT: PracSlotKey = "prac.window";
 
 /**
  * Declare one view entry per open file, and keep that set in sync with the app.
@@ -120,7 +120,7 @@ export function apply(ctx: Context): void {
       const active = layout.activeView();
       for (const { view } of files) {
         const entry = entries.get(placementOfView(view) ?? "");
-        layout.setViewFlags(view, {
+        layout.setItemFlags(view, {
           dirty: entry?.dirty === true,
           preview: entry?.preview === true,
           // A file can be closed from its tab: this package owns what that means (the

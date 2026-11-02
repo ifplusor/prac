@@ -70,7 +70,7 @@ const CLOSE: CSSProperties = {
 export interface TabStripProps<TRecord extends PlacementRecord> {
   readonly state: LayoutState<TRecord>;
   readonly regionId: string;
-  readonly views: readonly string[];
+  readonly items: readonly string[];
   readonly active: string | undefined;
   readonly label: (itemId: string) => ReactNode;
   readonly onActivate: (itemId: string) => void;
@@ -85,7 +85,7 @@ export interface TabStripProps<TRecord extends PlacementRecord> {
 export function TabStrip<TRecord extends PlacementRecord>({
   state,
   regionId,
-  views,
+  items,
   active,
   label,
   onActivate,
@@ -97,24 +97,24 @@ export function TabStrip<TRecord extends PlacementRecord>({
   return createElement(
     "div",
     { key: "tabs", "data-prac-tab-strip": "", style: STRIP },
-    views.map((viewId) => {
-      const record = state.views[viewId];
+    items.map((itemId) => {
+      const record = state.items[itemId];
       const dirty = record?.flags?.dirty === true;
       const preview = record?.flags?.preview === true;
       return createElement(
         "button",
         {
-          key: viewId,
+          key: itemId,
           type: "button",
-          "data-prac-tab": viewId,
-          "data-prac-tab-active": viewId === active ? "true" : "false",
+          "data-prac-tab": itemId,
+          "data-prac-tab-active": itemId === active ? "true" : "false",
           draggable: true,
           onDragStart: (event: DragEvent) => {
             if (onItemDragStart !== undefined) {
-              onItemDragStart(event, viewId);
+              onItemDragStart(event, itemId);
               return;
             }
-            event.dataTransfer?.setData("text/prac-view", viewId);
+            event.dataTransfer?.setData("text/prac-view", itemId);
             event.dataTransfer?.setData("text/plain", "");
             if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = "move";
           },
@@ -124,31 +124,31 @@ export function TabStrip<TRecord extends PlacementRecord>({
             const dragged =
               event.dataTransfer?.getData("text/prac-view") ||
               event.dataTransfer?.getData("text/plain");
-            if (dragged !== "") onReorder(regionId, dragged, viewId);
+            if (dragged !== "") onReorder(regionId, dragged, itemId);
           },
-          onClick: () => onActivate(viewId),
+          onClick: () => onActivate(itemId),
           "data-prac-tab-dirty": dirty ? "true" : "false",
           "data-prac-tab-preview": preview ? "true" : "false",
           style: {
             ...TAB,
-            ...(viewId === active ? ACTIVE : {}),
+            ...(itemId === active ? ACTIVE : {}),
             ...(preview ? { fontStyle: "italic" } : {}),
           },
         },
         ...(dirty ? [createElement("span", { key: "dirty", style: DIRTY }, "\u25cf")] : []),
-        label(viewId),
+        label(itemId),
         ...(record?.flags?.closable === true
           ? [
               createElement(
                 "span",
                 {
                   key: "close",
-                  "data-prac-tab-close": viewId,
+                  "data-prac-tab-close": itemId,
                   title: "Close",
                   style: CLOSE,
                   onClick: (event: MouseEvent) => {
                     event.stopPropagation();
-                    onClose(viewId);
+                    onClose(itemId);
                   },
                 },
                 "\u00d7",

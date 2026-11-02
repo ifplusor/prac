@@ -10,7 +10,7 @@
  */
 
 import type { LayoutNode, RegionNode } from "prac-ui-kit-layout";
-import type { LayoutState, ViewRecord } from "./contract.js";
+import type { LayoutState, ItemRecord } from "./contract.js";
 import { defaultTree, findNode, replaceNode } from "./model.js";
 import { CENTER_MIN } from "./contract.js";
 import type { LayoutStore } from "./store.js";
@@ -21,7 +21,7 @@ export const STAGE_REGION = "stage";
 /** One Space's stage: its tree and the placements inside that tree. */
 export interface SpaceState {
   readonly tree: LayoutNode;
-  readonly views: Record<string, ViewRecord>;
+  readonly items: Record<string, ItemRecord>;
 }
 
 /** The frame shell's layout: everything outside the stage. */
@@ -75,7 +75,7 @@ export function createFrameState(): FrameState {
     viewportWidth: 0,
     viewportHeight: 0,
     tree: replaceNode(tree, STAGE_REGION, stagePlaceholder),
-    views: {},
+    items: {},
     catalogueVersion: 0,
     activePanelId: null,
   };
@@ -85,7 +85,7 @@ export function createFrameState(): FrameState {
 export function createSpaceState(): SpaceState {
   const stage = findNode(defaultTree(), STAGE_REGION);
   if (stage === null) throw new Error(`default tree has no ${STAGE_REGION} node`);
-  return { tree: stage, views: {} };
+  return { tree: stage, items: {} };
 }
 
 /** Compose the renderer's single state from the shell and the active Space. */
@@ -96,7 +96,7 @@ export function composeLayoutState(frame: FrameState, space: SpaceState): Layout
   return {
     ...frame,
     tree: replaceNode(frame.tree, STAGE_REGION, () => space.tree),
-    views: { ...frame.views, ...space.views },
+    items: { ...frame.items, ...space.items },
   };
 }
 
@@ -108,21 +108,21 @@ export function splitLayoutState(state: FrameState): {
   const stage = findNode(state.tree, STAGE_REGION);
   if (stage === null) throw new Error(`layout tree has no ${STAGE_REGION} node`);
   const stageIds = nodeIds(stage);
-  const frameViews: Record<string, ViewRecord> = {};
-  const spaceViews: Record<string, ViewRecord> = {};
-  for (const [id, record] of Object.entries(state.views)) {
-    if (stageIds.has(record.region)) spaceViews[id] = record;
-    else frameViews[id] = record;
+  const frameItems: Record<string, ItemRecord> = {};
+  const spaceItems: Record<string, ItemRecord> = {};
+  for (const [id, record] of Object.entries(state.items)) {
+    if (stageIds.has(record.region)) spaceItems[id] = record;
+    else frameItems[id] = record;
   }
   return {
     frame: {
       ...state,
       tree: replaceNode(state.tree, STAGE_REGION, stagePlaceholder),
-      views: frameViews,
+      items: frameItems,
     },
     space: {
       tree: stage.type === "region" ? createSpaceState().tree : stage,
-      views: spaceViews,
+      items: spaceItems,
     },
   };
 }
@@ -156,7 +156,7 @@ export function createStageSwitcher(initial: SpaceStore): StageSwitcher {
 function sameFrame(left: FrameState, right: FrameState): boolean {
   return (
     left.tree === right.tree &&
-    left.views === right.views &&
+    left.items === right.items &&
     left.viewportWidth === right.viewportWidth &&
     left.viewportHeight === right.viewportHeight &&
     left.catalogueVersion === right.catalogueVersion &&
@@ -165,7 +165,7 @@ function sameFrame(left: FrameState, right: FrameState): boolean {
 }
 
 function sameSpace(left: SpaceState, right: SpaceState): boolean {
-  return left.tree === right.tree && left.views === right.views;
+  return left.tree === right.tree && left.items === right.items;
 }
 
 /**
@@ -206,6 +206,6 @@ export function createComposedStore(frameStore: LayoutStore, stage: StageSwitche
       if (!sameFrame(frameStore.get(), split.frame)) frameStore.update(() => split.frame);
       invalidate();
     },
-    requestCloseView: (viewId) => frameStore.requestCloseView(viewId),
+    requestCloseItem: (itemId) => frameStore.requestCloseItem(itemId),
   };
 }

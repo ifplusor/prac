@@ -3,7 +3,7 @@
  *
  * This is the target model's sidebar / panel shape — a region's surface is a
  * window group, and the board is the content of its one window, not a group of
- * its own. The frame projects the group's single window as a `ViewRecord`; the
+ * its own. The frame projects the group's single window as a `ItemRecord`; the
  * board's own `LayoutState<WidgetRecord>` lays out the widgets inside it.
  *
  * @module prac-client-ui-widget/client/boardWindowGroup
@@ -207,7 +207,7 @@ export class BoardWindowGroup implements Surface<FrameWindowGroup> {
 
   /** Whether the board currently holds a widget. */
   hasWidget(widgetId: string): boolean {
-    return this.content.get().views[widgetId] !== undefined;
+    return this.content.get().items[widgetId] !== undefined;
   }
 
   /** Make one widget the board's active widget. */
@@ -230,7 +230,7 @@ export class BoardWindowGroup implements Surface<FrameWindowGroup> {
 
   /** The board's widget ids in layout order. */
   widgetOrder(): readonly string[] {
-    return Object.entries(this.content.get().views)
+    return Object.entries(this.content.get().items)
       .sort((a, b) => a[1].order - b[1].order)
       .map(([id]) => id);
   }

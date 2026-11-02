@@ -10,6 +10,7 @@
  * @module prac-client-ui-frame/client/contract
  */
 
+import { VIEW_SLOT, WIDGET_SLOT, WINDOW_SLOT } from "./catalogue.js";
 // Type-only, for the modules whose declaration merges this file augments.
 import type {} from "@deepseek-ai/cordis";
 import type {} from "@deepseek-ai/dsh-client-ui-slots";
@@ -23,8 +24,9 @@ import type {
   BoardLayoutSource,
   ChromeRegistry,
   ContentHost,
+  ContentInfo,
   FrameGroup,
-  FrameViewKind,
+  ItemKind,
   FrameWindowGroup,
   LayoutState,
   RegionChild,
@@ -33,10 +35,17 @@ import type {
   Side,
   FrameSurface,
   SurfaceRegistry,
-  ViewFlags,
-  ViewInfo,
+  ItemFlags,
   WidgetRecord,
 } from "prac-ui-kit-frame";
+
+/** One view and where it currently sits. */
+export interface ItemInfo extends ContentInfo {
+  readonly kind: "window" | "widget";
+}
+
+/** A slot key a prac surface registers its content into. */
+export type PracSlotKey = typeof VIEW_SLOT | typeof WINDOW_SLOT | typeof WIDGET_SLOT;
 
 // The merges reach this program through the **type-only** imports above. Do not
 // "make it explicit" with side-effect imports here: a bare `import "@deepseek-ai/…"`
@@ -226,7 +235,7 @@ export interface PracLayoutFace {
    *
    * @returns one entry per known view (placed or not).
    */
-  listViews(): ViewInfo[];
+  listViews(): ItemInfo[];
   /**
    * The region ids a view can be moved to, in tree order.
    *
@@ -261,7 +270,7 @@ export interface PracLayoutFace {
    *
    * @param viewId - the view identity.
    */
-  removeView(viewId: string): void;
+  removeItem(viewId: string): void;
   /**
    * Give a region its child regions — the **container** shape.
    *
@@ -280,8 +289,8 @@ export interface PracLayoutFace {
   /**
    * The child regions a region currently selects among.
    *
-   * Empty for a region that holds views; the arrangement uses this to keep the
-   * children it does not own (prac's own views) when it rebuilds the containers.
+   * Empty for a region that holds items; the arrangement uses this to keep the
+   * children it does not own (prac's own items) when it rebuilds the containers.
    *
    * @param regionId - the region to inspect.
    */
@@ -338,7 +347,7 @@ export interface PracLayoutFace {
    */
   hide(viewId: string): void;
   /** Classify an existing view as a window or a widget (model discriminator). */
-  setViewKind(viewId: string, kind: FrameViewKind): void;
+  setViewKind(viewId: string, kind: ItemKind): void;
   /** Register a content host for a window; returns the unregister function. */
   registerContentHost(contentId: string, host: ContentHost): () => void;
   /** Register a board layout root for a board window; returns the unregister function. */
@@ -366,9 +375,9 @@ export interface PracLayoutFace {
    * @param viewId - the view identity.
    * @param collapsed - the requested state.
    */
-  setViewCollapsed(viewId: string, collapsed: boolean): void;
+  setItemCollapsed(viewId: string, collapsed: boolean): void;
   /** Declare the height a view wants as a stack row; the layout only reads it. */
-  setViewSize(viewId: string, size: number): void;
+  setItemSize(viewId: string, size: number): void;
   /**
    * Collapse a region to nothing (remembering its size) or restore it.
    *
@@ -392,7 +401,7 @@ export interface PracLayoutFace {
    * is a no-op rather than an error — the caller is a user action, not a
    * programming contract.
    *
-   * The source region keeps its size when it is fixed and its remaining views;
+   * The source region keeps its size when it is fixed and its remaining items;
    * when it is flexible both regions share the split evenly.
    *
    * @param viewId - the view to move into the new region.
@@ -500,7 +509,7 @@ export interface PracLayoutFace {
    * @param viewId - the view identity.
    * @param flags - the flags to merge into the view's record.
    */
-  setViewFlags(viewId: string, flags: ViewFlags): void;
+  setItemFlags(viewId: string, flags: ItemFlags): void;
   /**
    * Subscribe to "the person asked to close this view".
    *

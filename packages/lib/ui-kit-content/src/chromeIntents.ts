@@ -28,7 +28,7 @@ export function createLayoutIntents<TRecord extends PlacementRecord>(
       store.update((state) => setFront(state, itemId));
     },
     close(itemId: string): void {
-      store.requestCloseView(itemId);
+      store.requestCloseItem(itemId);
     },
     fold(nodeId: string, folded: boolean): void {
       store.update((state) => {

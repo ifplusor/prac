@@ -19,7 +19,7 @@ export interface LayoutIsolationProps {
   /** When the frame owns the row title, hide the view's own duplicate collapse affordance. */
   readonly chrome?: "frame";
   /** The item this boundary hosts, for diagnostics and gates. */
-  readonly viewId?: string;
+  readonly itemId?: string;
 }
 
 /** Render one item behind its own isolation boundary. */
@@ -27,7 +27,7 @@ export function LayoutIsolation({
   children,
   clickThrough = false,
   chrome,
-  viewId,
+  itemId,
 }: LayoutIsolationProps): ReactElement {
   const host = useRef<HTMLDivElement | null>(null);
   const [content, setContent] = useState<HTMLElement | null>(null);
@@ -45,7 +45,7 @@ export function LayoutIsolation({
     {
       ref: host,
       "data-prac-view-host": "",
-      ...(viewId === undefined ? {} : { "data-prac-view-id": viewId }),
+      ...(itemId === undefined ? {} : { "data-prac-view-id": itemId }),
       ...(chrome === "frame" ? { "data-prac-view-chrome": "frame" } : {}),
       style: {
         display: "flex",

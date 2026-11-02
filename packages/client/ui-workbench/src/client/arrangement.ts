@@ -1,5 +1,5 @@
 /**
- * The arrangement's **placement policy** — the part that decides where views
+ * The arrangement's **placement policy** — the part that decides where items
  * go, with no React and no DOM.
  *
  * It lives apart from the plugin body (`index.ts`) for the same reason the
@@ -11,7 +11,7 @@
  * @module prac-web-app/client/arrangement
  */
 
-import type { ViewRecord } from "prac-ui-kit-frame";
+import type { ItemRecord } from "prac-ui-kit-frame";
 import type { PracLayoutFace } from "prac-client-ui-frame/client";
 import { DSH_CONVERSATION_VIEW, DSH_RIGHTBAR_VIEW, DSH_SIDEBAR_VIEW } from "prac-client-ui-dsh/lib";
 import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
@@ -47,7 +47,7 @@ export const DEFAULT_PLACEMENTS: readonly {
 // No default for the centre's editor: since decision 17 a file is a view that
 // exists because the *app* opened it, so there is nothing to place until one is
 // open (see `trackCatalogue`).
-// No default for the app's own views either: they are placed from the catalogue's
+// No default for the app's own items either: they are placed from the catalogue's
 // own location (see `placeCatalogue`), which is the same table the app orders its
 // containers by — restating them here would be a second source of truth.
 
@@ -79,10 +79,10 @@ const LOCATION_REGION: Readonly<Record<VscodeCatalogueEntry["location"], string>
 };
 
 /**
- * The app's views this arrangement leaves **off screen**.
+ * The app's items this arrangement leaves **off screen**.
  *
  * Named in the app's own vocabulary (`VscodeCatalogueEntry.appId`), so the policy
- * does not restate the mechanism's id convention. Both are real views prac
+ * does not restate the mechanism's id convention. Both are real items prac
  * deliberately does not show at startup:
  *
  * - Copilot's chat — another agent's UI (kept installed, not surfaced);
@@ -109,30 +109,30 @@ const entryKey = (entry: VscodeCatalogueEntry): string =>
 /** The region id of one container child. */
 const childRegionId = (region: string, key: string): string => `${region}/${key}`;
 
-/** One container board target: the geometry node, its label and member views. */
+/** One container board target: the geometry node, its label and member items. */
 export interface ContainerBoardTarget {
   readonly region: string;
   readonly label: string;
-  readonly views: readonly string[];
+  readonly items: readonly string[];
 }
 
 /** The container boards the app catalogue implies. */
 export function containerBoardTargets(
   entries: readonly VscodeCatalogueEntry[],
 ): readonly ContainerBoardTarget[] {
-  const groups = new Map<string, { label: string; views: string[] }>();
+  const groups = new Map<string, { label: string; items: string[] }>();
   for (const entry of entries) {
     if (entry.source !== "view") continue;
     if (EXCLUDED_VIEWS.has(entry.appId)) continue;
     const region = childRegionId(LOCATION_REGION[entry.location], entryKey(entry));
-    const bucket = groups.get(region) ?? { label: containerLabel(entry), views: [] };
-    bucket.views.push(entry.view);
+    const bucket = groups.get(region) ?? { label: containerLabel(entry), items: [] };
+    bucket.items.push(entry.view);
     groups.set(region, bucket);
   }
   return [...groups].map(([region, bucket]) => ({
     region,
     label: bucket.label,
-    views: bucket.views,
+    items: bucket.items,
   }));
 }
 
@@ -144,13 +144,13 @@ const viewLabel = (viewId: string): string =>
   (viewId.split(":").pop() ?? viewId).replace(/[-_]/g, " ");
 
 /**
- * Place the app's views into **named container children**, by their own location, and
+ * Place the app's items into **named container children**, by their own location, and
  * its **file placements** into the region the app reports.
  *
  * This is where a borrowed *container* becomes a prac shape: the region stops
- * holding views directly and instead **selects among** one child per container
+ * holding items directly and instead **selects among** one child per container
  * (see `RegionChild`), so a location shows one container at a time the way an
- * activity bar would — without inheriting its chrome. prac's own views in the
+ * activity bar would — without inheriting its chrome. prac's own items in the
  * same region get a child each and stay first in the bar, so the default screen
  * is unchanged and the borrowed containers are additions.
  *
@@ -162,7 +162,7 @@ const viewLabel = (viewId: string): string =>
  * @param entries - the app's catalogue.
  */
 /**
- * The heights VS Code's own Explorer starts its views at.
+ * The heights VS Code's own Explorer starts its items at.
  *
  * The Explorer is a stack of sections there: **Open Editors** is a short list, the **file tree** takes
  * what is left, and **Outline** / **Timeline** start **folded** — headers you click to open. prac reads
@@ -184,15 +184,15 @@ export function placeCatalogue(
     declared?: { readonly size?: number; readonly folded?: boolean },
   ) => boolean,
 ): void {
-  const groups = new Map<string, Map<string, { label: string; views: string[] }>>();
+  const groups = new Map<string, Map<string, { label: string; items: string[] }>>();
   for (const entry of entries) {
     if (entry.source !== "view") continue;
     if (EXCLUDED_VIEWS.has(entry.appId)) continue;
     const region = LOCATION_REGION[entry.location];
-    const byKey = groups.get(region) ?? new Map<string, { label: string; views: string[] }>();
+    const byKey = groups.get(region) ?? new Map<string, { label: string; items: string[] }>();
     const key = entryKey(entry);
-    const bucket = byKey.get(key) ?? { label: containerLabel(entry), views: [] };
-    bucket.views.push(entry.view);
+    const bucket = byKey.get(key) ?? { label: containerLabel(entry), items: [] };
+    bucket.items.push(entry.view);
     byKey.set(key, bucket);
     groups.set(region, byKey);
   }
@@ -230,9 +230,9 @@ export function placeCatalogue(
     // Views the app newly offers go into their container — **filling gaps only**:
     // a view that already has a record keeps its placement (and its visibility),
     // so the catalogue can grow without undoing what the person did.
-    const known = layout.getState().views;
+    const known = layout.getState().items;
     for (const [key, bucket] of byKey) {
-      for (const view of bucket.views) {
+      for (const view of bucket.items) {
         if (known[view] !== undefined) continue;
         const child = childRegionId(region, key);
         // What this view declares about its height — the layout only reads it (see `VIEW_DEFAULTS`).
@@ -245,8 +245,8 @@ export function placeCatalogue(
           continue;
         }
         layout.placeQuietly(view, child);
-        if (declared?.size !== undefined) layout.setViewSize(view, declared.size);
-        if (declared?.folded === true) layout.setViewCollapsed(view, true);
+        if (declared?.size !== undefined) layout.setItemSize(view, declared.size);
+        if (declared?.folded === true) layout.setItemCollapsed(view, true);
       }
     }
   }
@@ -257,7 +257,7 @@ export function placeCatalogue(
  * Place the app's **file placements**.
  *
  * A file view exists because the app has that file open in one of its editor groups,
- * and each placement is a view of its own — so one file can hold two views in two
+ * and each placement is a view of its own — so one file can hold two items in two
  * regions, each showing its own surface. Two rules, in this order:
  *
  * - **the app's region wins** when it reports one: the group's home is where the file
@@ -283,7 +283,7 @@ function placeFileEntries(layout: PracLayout, entries: readonly VscodeCatalogueE
     siblings.set(entry.appId, [...(siblings.get(entry.appId) ?? []), entry.view]);
   }
   for (const entry of files) {
-    const known = layout.getState().views;
+    const known = layout.getState().items;
     if (known[entry.view] !== undefined) continue;
     const shown = (siblings.get(entry.appId) ?? [])
       .filter((view) => view !== entry.view)
@@ -327,7 +327,7 @@ export function openFileInto(layout: PracLayout, view: string): void {
 }
 
 /**
- * The file views the frame should stop showing.
+ * The file items the frame should stop showing.
  *
  * A file view exists because the **app** has that file open. When it no longer does — a
  * closed editor, or a page reload whose app state is gone — the view has no subject left.
@@ -339,12 +339,12 @@ export function openFileInto(layout: PracLayout, view: string): void {
  * placement from being shown.
  *
  * @param records - the frame's view table.
- * @param openFiles - the file views the app currently reports.
+ * @param openFiles - the file items the app currently reports.
  * @param resourceOf - the host's file-view test (`undefined` for anything else).
- * @returns the file views with no subject left.
+ * @returns the file items with no subject left.
  */
 export function staleFileViews(
-  records: Readonly<Record<string, ViewRecord>>,
+  records: Readonly<Record<string, ItemRecord>>,
   openFiles: ReadonlySet<string>,
   resourceOf: (view: string) => string | undefined,
 ): string[] {
@@ -364,7 +364,7 @@ export function staleFileViews(
  * @returns whether the conversation had to be moved.
  */
 export function restoreCentre(layout: PracLayout): boolean {
-  if (layout.getState().views[DSH_CONVERSATION_VIEW]?.region === CENTER) return false;
+  if (layout.getState().items[DSH_CONVERSATION_VIEW]?.region === CENTER) return false;
   layout.place(DSH_CONVERSATION_VIEW, CENTER);
   return true;
 }
@@ -373,7 +373,7 @@ export function restoreCentre(layout: PracLayout): boolean {
  * Lay out prac's default arrangement and bind the roles the compat shim uses.
  *
  * The defaults **fill gaps instead of re-asserting themselves**: the frame's
- * state is persisted per origin, so on the next load most of these views already
+ * state is persisted per origin, so on the next load most of these items already
  * have a placement, and re-placing them would silently drag the arrangement back
  * to its factory shape — `place(conversation, 'bottom')` would survive until the
  * next reload and then undo itself. A view with no record (a fresh window, or a
@@ -392,7 +392,7 @@ export function arrange(layout: PracLayout): void {
   layout.setRegionSelector(LEFT, "rail");
   layout.setRegionSelector(RIGHT, "rail");
   layout.setRegionSelector(BOTTOM, "title");
-  const known = layout.getState().views;
+  const known = layout.getState().items;
   for (const entry of DEFAULT_PLACEMENTS) {
     if (known[entry.view] !== undefined) continue;
     layout.place(entry.view, entry.region);

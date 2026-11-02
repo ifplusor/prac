@@ -7,15 +7,15 @@ describe("BoardContent place", () => {
     const board = new BoardContent("b");
     board.placeWidget("a");
     board.placeWidget("b");
-    const target = board.get().views["a"]?.region;
-    const source = board.get().views["b"]?.region;
+    const target = board.get().items["a"]?.region;
+    const source = board.get().items["b"]?.region;
     expect(source).toBeDefined();
     expect(structuralRegion(board.get().tree, source!)).toBe(
       structuralRegion(board.get().tree, target!),
     );
-    expect(board.get().views["b"]?.order).toBe(1);
+    expect(board.get().items["b"]?.order).toBe(1);
     board.moveWidgetTo("b", target!);
-    expect(board.get().views["b"]?.order).toBe(0);
-    expect(board.get().views["a"]?.order).toBe(1);
+    expect(board.get().items["b"]?.order).toBe(0);
+    expect(board.get().items["a"]?.order).toBe(1);
   });
 });

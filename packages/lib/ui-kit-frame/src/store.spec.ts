@@ -10,7 +10,7 @@ function make(panel: string | null): { store: LayoutStore; listeners: Set<() => 
     viewportWidth: 0,
     viewportHeight: 0,
     tree: defaultTree(),
-    views: {},
+    items: {},
     catalogueVersion: 0,
     activePanelId: panel,
   };
@@ -27,7 +27,7 @@ function make(panel: string | null): { store: LayoutStore; listeners: Set<() => 
         state = updater(state);
         for (const listener of listeners) listener();
       },
-      requestCloseView: () => {},
+      requestCloseItem: () => {},
     },
   };
 }

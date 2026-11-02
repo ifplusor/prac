@@ -16,12 +16,12 @@ import {
   createFrameState,
   createSpaceState,
   normalizeGrids,
-  normalizeViews,
+  normalizeItems,
   type LayoutState,
   type LayoutStore,
   type SpaceState,
   type SpaceStore,
-  type ViewRecord,
+  type ItemRecord,
 } from "prac-ui-kit-frame";
 
 /**
@@ -70,16 +70,24 @@ function createCell<T>(initial: T, key: string, heal: (state: T) => T): StoreCel
 
 /** Default old records to `kind: "window"` and heal stale placements. */
 function healState(state: LayoutState): LayoutState {
-  const rawViews = state.views as Record<string, ViewRecord & { kind?: "window" | "widget" }>;
-  const views = Object.fromEntries(
+  // Old generations wrote the table under `views`; keep them readable without a
+  // key bump. The next write persists the new `items` shape.
+  const legacy = state as unknown as {
+    views?: Record<string, ItemRecord & { kind?: "window" | "widget" }>;
+  };
+  const rawViews = (state.items ?? legacy.views) as Record<
+    string,
+    ItemRecord & { kind?: "window" | "widget" }
+  >;
+  const items = Object.fromEntries(
     Object.entries(rawViews).map(([id, record]) => [
       id,
-      { ...record, kind: record.kind ?? "window" } as ViewRecord,
+      { ...record, kind: record.kind ?? "window" } as ItemRecord,
     ]),
   );
-  const withKind = { ...state, views };
+  const withKind = { ...state, items };
   const healedTree = normalizeGrids(withKind.tree);
-  return normalizeViews(
+  return normalizeItems(
     healedTree === withKind.tree ? withKind : { ...withKind, tree: healedTree },
   );
 }
@@ -90,12 +98,12 @@ function healSpace(state: SpaceState): SpaceState {
     viewportWidth: 0,
     viewportHeight: 0,
     tree: state.tree,
-    views: state.views,
+    items: state.items,
     catalogueVersion: 0,
     activePanelId: null,
   };
   const healed = healState(withKind);
-  return { tree: healed.tree, views: healed.views };
+  return { tree: healed.tree, items: healed.items };
 }
 
 /** Create the frame shell's store. */
@@ -105,7 +113,7 @@ export function createFrameStore(
 ): LayoutStore {
   return {
     ...createCell(createFrameState(), key, healState),
-    requestCloseView: onRequestCloseView,
+    requestCloseItem: onRequestCloseView,
   };
 }
 

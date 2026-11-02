@@ -102,7 +102,7 @@ describe("resolveSizes", () => {
   it("keeps every child inside its bounds when the frame is tight", () => {
     const state: LayoutState = {
       tree: split([box("a", 0, { min: 40 }), box("b", 0, { min: 40 })]),
-      views: {},
+      items: {},
     } as unknown as LayoutState;
     // Sashes overlay the boundary; the regions share all 900.
     expect(widths(state, ["a", "b"])).toEqual([450, 450]);
@@ -113,7 +113,7 @@ describe("resizeBoundary", () => {
   const three = (): LayoutState =>
     ({
       tree: split([box("a", 300), box("b", 300), box("c", 300)]),
-      views: {},
+      items: {},
     }) as unknown as LayoutState;
 
   it("distributes a drag over the whole side, in proportion", () => {
@@ -126,7 +126,7 @@ describe("resizeBoundary", () => {
   it("clamps the drag to what the two sides can do", () => {
     const state = {
       tree: split([box("a", 300, { max: 350 }), box("b", 300), box("c", 300)]),
-      views: {},
+      items: {},
     } as unknown as LayoutState;
     const next = resizeBoundary(state, "root", 1, 90);
     // `a` cannot take more than 50, and nothing may end up under its floor either.
@@ -136,7 +136,7 @@ describe("resizeBoundary", () => {
   it("does not move when the side that should shrink is already at its floor", () => {
     const state = {
       tree: split([box("a", 300), box("b", 40), box("c", 40)]),
-      views: {},
+      items: {},
     } as unknown as LayoutState;
     // Growing a needs b/c to shrink, and they cannot: the drag is a no-op, not a partial move.
     expect(resizeBoundary(state, "root", 1, 90)).toBe(state);
@@ -145,7 +145,7 @@ describe("resizeBoundary", () => {
   it("does not move when the side that should grow is already at its ceiling", () => {
     const state = {
       tree: split([box("a", 300, { max: 300 }), box("b", 300), box("c", 300)]),
-      views: {},
+      items: {},
     } as unknown as LayoutState;
     expect(resizeBoundary(state, "root", 1, 90)).toBe(state);
   });
@@ -153,7 +153,7 @@ describe("resizeBoundary", () => {
   it("does not move up when the up side is already at its floor", () => {
     const state = {
       tree: split([box("a", 40), box("b", 300), box("c", 300)]),
-      views: {},
+      items: {},
     } as unknown as LayoutState;
     expect(resizeBoundary(state, "root", 1, -90)).toBe(state);
   });
@@ -165,7 +165,7 @@ describe("resizeBoundary", () => {
         box("b", 300, { priority: "normal" }),
         box("c", 300, { priority: "high" }),
       ]),
-      views: {},
+      items: {},
     } as unknown as LayoutState;
     // The high-priority neighbour is considered first, so it is the one that gives way.
     expect(widths(resizeBoundary(state, "root", 1, 90, "expand"), ["a", "b", "c"])).toEqual([
@@ -185,7 +185,7 @@ describe("snapTargets and distributeSplitEvenly", () => {
   const state = (extra: Partial<RegionNode> = {}): LayoutState =>
     ({
       tree: split([box("a", 300, { snap: true, ...extra }), box("b", 300, { snap: true })]),
-      views: {},
+      items: {},
     }) as unknown as LayoutState;
   // What the two are actually drawn at: the split is 900 wide, less its sash.
   const drawn = new Map([

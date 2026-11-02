@@ -22,6 +22,15 @@ export interface ContentConstraints {
   readonly flex?: boolean;
 }
 
+/** One content offering and where it currently sits. */
+export interface ContentInfo {
+  readonly id: string;
+  readonly region: string | null;
+  readonly hidden: boolean;
+  readonly order: number | null;
+  readonly kind: string;
+}
+
 /** One content item: identity + the thing it renders. */
 export interface ContentItem<TContent = unknown> {
   readonly id: string;

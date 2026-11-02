@@ -16,7 +16,7 @@ import {
   findRegion,
   findSplit,
   freshNodeId,
-  frontView,
+  frontItem,
   isPresent,
   nodeBasis,
   place,
@@ -24,7 +24,7 @@ import {
   regionInfos,
   regionNode,
   removeRegion,
-  removeView,
+  removeItem,
   resolveSizes,
   sashSizes,
   selectChild,
@@ -37,7 +37,7 @@ import {
   splitRegionWith,
   stackEntries,
   subtreeMin,
-  visibleViews,
+  visibleItems,
 } from "./model.js";
 
 /**
@@ -51,12 +51,12 @@ import {
  */
 const state = (
   tree: LayoutNode = defaultTree(),
-  views: LayoutState["views"] = {},
+  items: LayoutState["items"] = {},
 ): LayoutState => ({
   viewportWidth: 1000,
   viewportHeight: 800,
   tree,
-  views,
+  items,
   catalogueVersion: 0,
   activePanelId: null,
 });
@@ -106,7 +106,7 @@ describe("defaultTree", () => {
 describe("placement", () => {
   it("places a view visibly as its region's front", () => {
     const next = place(state(), "vscode:sidebar", "left");
-    expect(next.views["vscode:sidebar"]).toMatchObject({
+    expect(next.items["vscode:sidebar"]).toMatchObject({
       region: "left",
       order: 0,
       hidden: false,
@@ -119,15 +119,15 @@ describe("placement", () => {
     current = place(current, "vscode:view:a", "left");
     current = {
       ...current,
-      views: {
-        ...current.views,
-        "vscode:view:a": { ...current.views["vscode:view:a"]!, hidden: true },
+      items: {
+        ...current.items,
+        "vscode:view:a": { ...current.items["vscode:view:a"]!, hidden: true },
       },
     };
-    expect(visibleViews(current, "left")).toEqual(["vscode:sidebar"]);
-    expect(frontView(current, "left")).toBe("vscode:sidebar");
-    expect(visibleViews(current, "right")).toEqual([]);
-    expect(frontView(current, "right")).toBeUndefined();
+    expect(visibleItems(current, "left")).toEqual(["vscode:sidebar"]);
+    expect(frontItem(current, "left")).toBe("vscode:sidebar");
+    expect(visibleItems(current, "right")).toEqual([]);
+    expect(frontItem(current, "right")).toBeUndefined();
   });
 
   it("appends a new placement and makes it the front", () => {
@@ -135,17 +135,17 @@ describe("placement", () => {
     current = place(current, "b", "left");
     // The strip is **open order** (VS Code appends tabs); "who is shown" is the front
     // marker, so placing `b` does not move `a`.
-    expect(visibleViews(current, "left")).toEqual(["a", "b"]);
-    expect(frontView(current, "left")).toBe("b");
+    expect(visibleItems(current, "left")).toEqual(["a", "b"]);
+    expect(frontItem(current, "left")).toBe("b");
   });
 
   it("changes the front without reordering the strip", () => {
     let current = place(state(), "a", "left");
     current = place(current, "b", "left");
     const clicked = setFront(current, "a");
-    expect(visibleViews(clicked, "left")).toEqual(["a", "b"]);
-    expect(frontView(clicked, "left")).toBe("a");
-    expect(clicked.views.a?.order).toBe(current.views.a?.order);
+    expect(visibleItems(clicked, "left")).toEqual(["a", "b"]);
+    expect(frontItem(clicked, "left")).toBe("a");
+    expect(clicked.items.a?.order).toBe(current.items.a?.order);
   });
 
   it("is a no-op when the view already holds the region's front", () => {
@@ -154,17 +154,17 @@ describe("placement", () => {
     // produce a change of its own by asking for what already holds.
     // Asking for what already holds leaves the view where it was — stated as an **effect**, since
     // S2 may hand back a new state (the shape normaliser runs on the way out of a placement).
-    expect(place(current, "a", "left").views.a?.front).toBe(true);
+    expect(place(current, "a", "left").items.a?.front).toBe(true);
     // …while placing the *other* view, or the same view elsewhere, still moves.
     const other = place(current, "b", "left");
-    expect(other.views.b?.front).toBe(true);
-    expect(place(other, "a", "right").views.a?.region).toBe("right");
+    expect(other.items.b?.front).toBe(true);
+    expect(place(other, "a", "right").items.a?.region).toBe("right");
     // A hidden view is not "already there": placing it shows it again.
     const hidden = {
       ...current,
-      views: { ...current.views, a: { ...current.views.a!, hidden: true } },
+      items: { ...current.items, a: { ...current.items.a!, hidden: true } },
     };
-    expect(place(hidden, "a", "left").views.a).toMatchObject({ hidden: false });
+    expect(place(hidden, "a", "left").items.a).toMatchObject({ hidden: false });
   });
 
   it("a region shows no header for one view, and becomes rows for two (S2)", () => {
@@ -185,12 +185,12 @@ describe("placement", () => {
     // record is what the frame persists, and a fresh placement of that file is named
     // again — so a remembered one would block it.
     const one = place(state(), "vscode:file:p1:x", "left");
-    expect(one.views["vscode:file:p1:x"]).toBeDefined();
-    const forgotten = removeView(one, "vscode:file:p1:x");
-    expect(forgotten.views["vscode:file:p1:x"]).toBeUndefined();
+    expect(one.items["vscode:file:p1:x"]).toBeDefined();
+    const forgotten = removeItem(one, "vscode:file:p1:x");
+    expect(forgotten.items["vscode:file:p1:x"]).toBeUndefined();
     // A view that is not there is not a change: a caller re-running its sync must not
     // wake the store.
-    expect(removeView(forgotten, "vscode:file:p1:x")).toBe(forgotten);
+    expect(removeItem(forgotten, "vscode:file:p1:x")).toBe(forgotten);
     // A selector region's child exists for one view, so it goes with it.
     const selector = setRegionChildren(one.tree, "left", [
       regionNode("left/keep", 0, { stack: true }),
@@ -199,14 +199,14 @@ describe("placement", () => {
     const placed = place(held, "vscode:file:p2:y", "left");
     expect(findRegion(placed.tree, "left/vscode:file:p2:y")).not.toBeNull();
     expect(
-      findRegion(removeView(placed, "vscode:file:p2:y").tree, "left/vscode:file:p2:y"),
+      findRegion(removeItem(placed, "vscode:file:p2:y").tree, "left/vscode:file:p2:y"),
     ).toBeNull();
   });
 
   it("mints node ids the restored tree has not taken", () => {
     // The counter restarts every page load while the tree persists, so a split after a
     // reload used to be able to reuse a restored region's id — and two regions with one id
-    // are rendered twice, with the views in them mounted twice.
+    // are rendered twice, with the items in them mounted twice.
     const restored = splitRegionWith(state(), CENTER_REGION, "right", "split-1", "region-1");
     let seq = 0;
     // A fresh counter's very first candidate is the id the restored tree already carries.
@@ -234,11 +234,11 @@ describe("showsTabStrip", () => {
     expect(showsTabStrip(two, region({ tabs: "none" }))).toBe(false);
   });
 
-  it("never shows for a region without a tab mode, however many views it holds", () => {
+  it("never shows for a region without a tab mode, however many items it holds", () => {
     const plain = region();
     const two = place(place({ ...state(), tree: plain }, "a", "r"), "b", "r");
     expect(showsTabStrip(two, plain)).toBe(false);
-    // …and a split node is never a strip: it has no views of its own.
+    // …and a split node is never a strip: it has no items of its own.
     expect(showsTabStrip(two, defaultTree())).toBe(false);
   });
 });
@@ -504,7 +504,7 @@ describe("nested regions (containers)", () => {
     ]);
 
   /** One visible view in each container, so both are present. */
-  const bothFilled: LayoutState["views"] = {
+  const bothFilled: LayoutState["items"] = {
     a: { region: "left.explorer", order: 0, hidden: false, kind: "window" },
     b: { region: "left.search", order: 0, hidden: false, kind: "window" },
   };
@@ -552,7 +552,7 @@ describe("nested regions (containers)", () => {
     expect(activeChild(only, findRegion(tree, "left")!)?.id).toBe("left.search");
   });
 
-  it("has no active child when it holds views instead", () => {
+  it("has no active child when it holds items instead", () => {
     const plain = state();
     expect(activeChild(plain, findRegion(plain.tree, "left")!)).toBeNull();
   });
@@ -581,8 +581,8 @@ describe("nested regions (containers)", () => {
 
   it("keeps a view placed in a nested container reachable by its own region", () => {
     const next = place(state(withContainers()), "v", "left.search");
-    expect(visibleViews(next, "left.search")).toEqual(["v"]);
-    expect(visibleViews(next, "left")).toEqual([]);
+    expect(visibleItems(next, "left.search")).toEqual(["v"]);
+    expect(visibleItems(next, "left")).toEqual([]);
   });
 });
 
@@ -606,12 +606,12 @@ describe("pruneEmbedderRegions", () => {
     const current = splitRegionWith(state(), CENTER_REGION, "right", "split-1", "region-1", {
       embedder: true,
     });
-    const withView: typeof current = {
+    const withItem: typeof current = {
       ...current,
-      views: {
+      items: {
         "vscode:file:p0": { region: "region-1", order: 0, hidden: false, front: true },
-      } as unknown as typeof current.views,
+      } as unknown as typeof current.items,
     };
-    expect(pruneEmbedderRegions(withView)).toBe(withView);
+    expect(pruneEmbedderRegions(withItem)).toBe(withItem);
   });
 });

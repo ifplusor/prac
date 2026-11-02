@@ -36,7 +36,7 @@ import { StackHeader, StackRowOverlay } from "prac-ui-kit-frame";
 import { LayoutSashDrag } from "prac-ui-kit-frame";
 import { GridCellHandles, GridTrackHandle } from "prac-ui-kit-frame";
 import { beginStackReorder } from "prac-ui-kit-frame";
-import { ViewActions } from "prac-ui-kit-frame";
+import { ItemActions } from "prac-ui-kit-frame";
 import { ContainerBar } from "prac-ui-kit-frame";
 import { LayoutIsolation } from "prac-ui-kit-frame";
 import { LayoutItem, type ItemRenderSlot } from "./layoutItem.js";
@@ -49,6 +49,7 @@ import type {
   ChromeRegistry,
   ChromeSlotFace,
   LayoutIntents,
+  RenderItemAction,
 } from "prac-ui-kit-frame";
 import { createFrameChrome } from "./frameChrome.js";
 import { createLayoutIntents } from "prac-ui-kit-frame";
@@ -69,7 +70,7 @@ import {
   edgeRegion,
   findRegion,
   isPresent,
-  frontView,
+  frontItem,
   mergeGridCells,
   place,
   moveGridCell,
@@ -77,7 +78,7 @@ import {
   setFront,
   selectChild,
   reorderTab,
-  visibleViews,
+  visibleItems,
   resetStackBoundary,
   setEntryFolded,
   setEntryHeight,
@@ -85,7 +86,7 @@ import {
   drawsRegionBar,
 } from "prac-ui-kit-frame";
 import { type LayoutStore, useLayout } from "prac-ui-kit-frame";
-import type { ViewRecord } from "prac-ui-kit-frame";
+import type { ItemRecord } from "prac-ui-kit-frame";
 
 /** A minimal pointer event, as the sash drag machine reads it. */
 interface PointerDragEvent {
@@ -248,15 +249,15 @@ function startEntryBoundaryDrag(
   // drag at all — no resize, no fallback. Only `Enabled`/`AtMinimum`/`AtMaximum`
   // reach the starter.
   const rows = readStackRows(container as unknown as StackContainer);
-  const at = rows.findIndex((row) => row.viewId === node.id);
+  const at = rows.findIndex((row) => row.itemId === node.id);
   if (at < 0 || at >= rows.length - 1) return;
   const state = entrySashState(
     store.get(),
     node.id,
-    new Map(rows.map((row) => [row.viewId, row.height])),
+    new Map(rows.map((row) => [row.itemId, row.height])),
   );
   if (state === "disabled") return;
-  startEntryDrag<ViewRecord>(
+  startEntryDrag<ItemRecord>(
     store,
     container as unknown as StackContainer,
     node.id,
@@ -288,7 +289,7 @@ function resetEntryBoundary(
   const reset = resetStackBoundary(readStackRows(container as unknown as StackContainer), node.id);
   store.update((next) => {
     let out = next;
-    for (const { viewId, height } of reset) out = setEntryHeight(out, viewId, height);
+    for (const { itemId, height } of reset) out = setEntryHeight(out, itemId, height);
     return out;
   });
 }
@@ -301,7 +302,7 @@ function gridCellDragOver(canDrag: boolean, event: ReactDragEvent<HTMLDivElement
 /**
  * Drop something onto one grid cell.
  *
- * Tabs and views land in the cell's region (or its leading edge when the cell is
+ * Tabs and items land in the cell's region (or its leading edge when the cell is
  * a split); a grid cell dragged from another cell swaps placements, and
  * Shift-drag merges the two.
  *
@@ -587,7 +588,7 @@ export function createFrame(
     readonly viewGroups?: WindowGroupHost;
     readonly contentHosts?: import("prac-ui-kit-frame").ContentHostRegistry;
     readonly boardLayouts?: import("prac-ui-kit-frame").BoardLayoutRegistry;
-    readonly chrome?: ChromeRegistry<ViewRecord>;
+    readonly chrome?: ChromeRegistry<ItemRecord>;
     readonly windowActions: PracWindowActionsFace;
   },
 ): (props: FrameProps) => ReactElement {
@@ -660,7 +661,7 @@ export function createFrame(
     const rowHeights = new Map<string, number>([...sizes].map(([id, box]) => [id, box.height]));
 
     /**
-     * A region renders the front-most visible view from the views table.
+     * A region renders the front-most visible view from the items table.
      *
      * @param node - the region to render.
      * @param dir - the parent split's axis.
@@ -678,34 +679,34 @@ export function createFrame(
      * + direction (`Grid.moveView`, `grid.ts:480-495`), so the drop target is "the row under the
      * pointer, above or below its midline"; a pointer that leaves the rows drops nothing and the
      * entry stays where it was. The dragged entry keeps its height and fold state — only `order`
-     * changes — and this path never folds anything (`setViewCollapsed` is not involved).
+     * changes — and this path never folds anything (`setItemCollapsed` is not involved).
      */
     const beginReorder = (
       down: PointerDragEvent,
       viewId: string,
       containerIn?: HTMLElement | null,
-    ): void => beginStackReorder<ViewRecord>(store, down, viewId, containerIn);
+    ): void => beginStackReorder<ItemRecord>(store, down, viewId, containerIn);
 
     /**
-     * One region's tab strip: the visible views in order, the front one active.
+     * One region's tab strip: the visible items in order, the front one active.
      *
      * Borrowed from VS Code's editor group, including its `showTabs` default:
      * with `"multiple"` the strip is there for a single view too. Clicking a tab
      * brings that view to the front — the same ordering a `place` writes — so the
      * strip is a view of the region's order, not a second source of truth.
      *
-     * @param views - the region's visible views, in order.
+     * @param items - the region's visible items, in order.
      */
-    const tabStrip = (views: readonly string[], regionId: string): ReactElement => {
-      const active = frontView(state, regionId) ?? views[0];
+    const tabStrip = (items: readonly string[], regionId: string): ReactElement => {
+      const active = frontItem(state, regionId) ?? items[0];
       return createElement(TabStrip, {
         state,
         regionId,
-        views,
+        items,
         active,
         label: viewLabel,
         onActivate: (viewId: string) => store.update((current) => setFront(current, viewId)),
-        onClose: (viewId: string) => store.requestCloseView(viewId),
+        onClose: (viewId: string) => store.requestCloseItem(viewId),
         onReorder: (id: string, dragged: string, target: string) =>
           store.update((current) => reorderTab(current, id, dragged, target)),
         renderActions: (viewId: string | undefined) =>
@@ -713,10 +714,14 @@ export function createFrame(
             Fragment,
             null,
             createElement(TabActions, { face: sources.windowActions, viewId: viewId ?? "" }),
-            createElement(ViewActions, {
-              viewId: viewId ?? "",
-              kind: viewId === undefined ? "window" : (state.views[viewId]?.kind ?? "window"),
-              renderSlot,
+            createElement(ItemActions, {
+              itemId: viewId ?? "",
+              slots:
+                (viewId === undefined ? "window" : (state.items[viewId]?.kind ?? "window")) ===
+                "widget"
+                  ? ["prac.widgetActions", "prac.viewActions"]
+                  : ["prac.windowActions", "prac.viewActions"],
+              renderSlot: renderSlot as unknown as RenderItemAction,
             }),
           ),
       });
@@ -731,27 +736,27 @@ export function createFrame(
     const viewBody = (viewId: string, box: Box, chrome?: "frame"): ReactElement =>
       createElement(
         LayoutIsolation,
-        { key: viewId, viewId, ...(chrome === undefined ? {} : { chrome }) },
+        { key: viewId, itemId: viewId, ...(chrome === undefined ? {} : { chrome }) },
         createElement(LayoutItem, {
           viewId,
-          viewKind: state.views[viewId]?.kind ?? "window",
+          viewKind: state.items[viewId]?.kind ?? "window",
           contentHost:
-            state.views[viewId]?.contentId === undefined
+            state.items[viewId]?.contentId === undefined
               ? undefined
-              : sources.contentHosts?.get(state.views[viewId]!.contentId!),
-          ...(state.views[viewId]?.contentRegion === undefined
+              : sources.contentHosts?.get(state.items[viewId]!.contentId!),
+          ...(state.items[viewId]?.contentRegion === undefined
             ? {}
             : {
-                contentRegion: state.views[viewId]!.contentRegion!,
+                contentRegion: state.items[viewId]!.contentRegion!,
                 renderContentRegion: (regionId: string) => {
                   const node = findNode(state.tree, regionId);
                   return node?.type === "region" ? renderRegion(node, "row") : null;
                 },
               }),
-          ...(state.views[viewId]?.boardId === undefined
+          ...(state.items[viewId]?.boardId === undefined
             ? {}
             : {
-                board: sources.boardLayouts?.get(state.views[viewId]!.boardId!),
+                board: sources.boardLayouts?.get(state.items[viewId]!.boardId!),
               }),
           itemFacts,
           renderSlot: renderSlot as unknown as ItemRenderSlot,
@@ -846,7 +851,7 @@ export function createFrame(
     };
 
     /**
-     * A region renders the child it selects, or — when it holds views — its
+     * A region renders the child it selects, or — when it holds items — its
      * front-most visible view: a **stack** shows every visible view with a header
      * of its own, and a stack of one renders bare, so a single-view region looks
      * and measures exactly as it did before stacking existed.
@@ -864,7 +869,7 @@ export function createFrame(
     const entryHeader = (node: RegionNode, viewId: string): ReactElement =>
       createElement(StackHeader, {
         nodeId: node.id,
-        viewId,
+        itemId: viewId,
         folded: node.collapsed === true,
         label: viewLabel(viewId),
         icon: viewIconNode(viewId),
@@ -880,10 +885,13 @@ export function createFrame(
           const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
           beginReorder(event as unknown as PointerDragEvent, node.id, row?.parentElement ?? null);
         },
-        renderActions: createElement(ViewActions, {
-          viewId,
-          kind: state.views[viewId]?.kind ?? "window",
-          renderSlot,
+        renderActions: createElement(ItemActions, {
+          itemId: viewId,
+          slots:
+            (state.items[viewId]?.kind ?? "window") === "widget"
+              ? ["prac.widgetActions", "prac.viewActions"]
+              : ["prac.windowActions", "prac.viewActions"],
+          renderSlot: renderSlot as unknown as RenderItemAction,
         }),
       });
 
@@ -902,7 +910,7 @@ export function createFrame(
     const entryOverlay = (node: RegionNode, viewId: string): ReactElement =>
       createElement(StackRowOverlay, {
         nodeId: node.id,
-        viewId,
+        itemId: viewId,
         folded: node.collapsed === true,
         label: viewLabel(viewId),
         onToggle: (event) => {
@@ -927,37 +935,37 @@ export function createFrame(
      * container's contributions) is copied in first, so the frame adds to it
      * rather than replacing it.
      */
-    const renderTabs = (ctx: ChromeContext<ViewRecord>): ReactNode => {
+    const renderTabs = (ctx: ChromeContext<ItemRecord>): ReactNode => {
       const node = ctx.node;
       if (node.type !== "region") return null;
-      const views = visibleViews(state, node.id);
-      if (views.length === 0) return null;
-      return tabStrip(views, node.id);
+      const items = visibleItems(state, node.id);
+      if (items.length === 0) return null;
+      return tabStrip(items, node.id);
     };
 
-    const renderContainerBar = (ctx: ChromeContext<ViewRecord>): ReactNode => {
+    const renderContainerBar = (ctx: ChromeContext<ItemRecord>): ReactNode => {
       const node = ctx.node;
       if (node.type !== "region" || !drawsRegionBar(node)) return null;
       return containerBar(node, ctx.itemId ?? node.active ?? "");
     };
 
-    const renderRowHeader = (ctx: ChromeContext<ViewRecord>): ReactNode => {
+    const renderRowHeader = (ctx: ChromeContext<ItemRecord>): ReactNode => {
       const node = ctx.node;
       if (node.type !== "region" || node.entry !== true) return null;
-      const viewId = ctx.itemId ?? visibleViews(state, node.id)[0];
+      const viewId = ctx.itemId ?? visibleItems(state, node.id)[0];
       return viewId === undefined ? null : entryHeader(node, viewId);
     };
 
-    const renderRowOverlay = (ctx: ChromeContext<ViewRecord>): ReactNode => {
+    const renderRowOverlay = (ctx: ChromeContext<ItemRecord>): ReactNode => {
       const node = ctx.node;
       if (node.type !== "region" || node.entry !== true || node.collapsed === true) return null;
-      const views = visibleViews(state, node.id);
-      if (views.length !== 1) return null;
-      const viewId = views[0]!;
+      const items = visibleItems(state, node.id);
+      if (items.length !== 1) return null;
+      const viewId = items[0]!;
       return declaredViewPaneHeader(viewId) ? entryOverlay(node, viewId) : null;
     };
 
-    const renderSash = (ctx: ChromeContext<ViewRecord>): ReactNode => {
+    const renderSash = (ctx: ChromeContext<ItemRecord>): ReactNode => {
       const node = ctx.node;
       if (node.type !== "split" || ctx.beforeId === undefined || ctx.afterId === undefined)
         return null;
@@ -978,7 +986,7 @@ export function createFrame(
       });
     };
 
-    const renderGridCell = (ctx: ChromeContext<ViewRecord>): ReactNode => {
+    const renderGridCell = (ctx: ChromeContext<ItemRecord>): ReactNode => {
       const grid = ctx.node;
       const child = ctx.child;
       const placement = ctx.placement;
@@ -1000,7 +1008,7 @@ export function createFrame(
       });
     };
 
-    const renderGridTrack = (ctx: ChromeContext<ViewRecord>): ReactNode => {
+    const renderGridTrack = (ctx: ChromeContext<ItemRecord>): ReactNode => {
       const grid = ctx.node;
       if (
         grid.type !== "grid" ||
@@ -1030,7 +1038,7 @@ export function createFrame(
       },
       sources.chrome,
     );
-    const intents: LayoutIntents = createLayoutIntents<ViewRecord>(store);
+    const intents: LayoutIntents = createLayoutIntents<ItemRecord>(store);
 
     /**
      * The frame's node decoration: surfaces, stack-row gestures, grid drops.
@@ -1040,7 +1048,7 @@ export function createFrame(
      * on a cell means).
      */
     const decorateNode = (
-      ctx: LayoutDecorationContext<ViewRecord>,
+      ctx: LayoutDecorationContext<ItemRecord>,
     ): LayoutDecoration | undefined => {
       const node = ctx.node;
       const surface = sources.viewGroups?.surfaceFor(node.id);
@@ -1151,7 +1159,7 @@ export function createFrame(
         // The float layer is the frame's overlay: its entries are surfaces
         // themselves (the workbench float host, prac overlays) and must be direct
         // children here. Wrapping them in an isolation root clipped the workbench's
-        // context views/quick input inside that shadow instead of the overlay.
+        // context items/quick input inside that shadow instead of the overlay.
         renderSlot("shell.overlay", {}),
       ),
     );

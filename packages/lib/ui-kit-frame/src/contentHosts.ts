@@ -1,7 +1,7 @@
 /**
  * Runtime registry for window content hosts.
  *
- * A `ViewRecord` may name a `contentId`; the actual renderer is a `ContentHost`
+ * A `ItemRecord` may name a `contentId`; the actual renderer is a `ContentHost`
  * registered here. Windows can own editor / chat / board content without going
  * through the generic slot path.
  *

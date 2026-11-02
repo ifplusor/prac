@@ -209,7 +209,7 @@ async function sample(page) {
         // conversation a view like any other it moves, so a gate that cares
         // about "the track stayed alive" has to read the placement, not infer it.
         conversationRegion:
-          globalThis.__pracFrame?.getState?.().views?.["dsh:main:conversation"]?.region ?? null,
+          globalThis.__pracFrame?.getState?.().items?.["dsh:main:conversation"]?.region ?? null,
         overlay: box(globalThis.__deep.one("[data-prac-recall]")),
         strip: !!globalThis.__deep.one("[data-prac-focus-strip]"),
         rows: [...globalThis.__deep.all(rowSelector)].map((element) => ({
@@ -236,7 +236,7 @@ async function sample(page) {
         regionInfos: globalThis.__pracFrame.listRegions(),
         catalogueVersion: state.catalogueVersion,
         modelSizes: sizes,
-        modelViews: state.views,
+        modelViews: state.items,
       };
     },
     {

@@ -207,8 +207,8 @@ await second.page.close();
 const third = await open();
 await third.page.evaluate(() => {
   const raw = JSON.parse(localStorage.getItem("prac-layout/v1"));
-  raw.views["vscode:view:workbench.explorer.fileView"] = {
-    ...raw.views["vscode:view:workbench.explorer.fileView"],
+  raw.items["vscode:view:workbench.explorer.fileView"] = {
+    ...raw.items["vscode:view:workbench.explorer.fileView"],
     size: 210,
   };
   localStorage.setItem("prac-layout/v1", JSON.stringify(raw));
@@ -227,8 +227,8 @@ await fourth.show();
 // room, so this stack is the five rows these drag checks mean to measure.
 await fourth.page.evaluate(() => {
   for (const view of ["vscode:view:outline", "vscode:view:timeline"]) {
-    globalThis.__pracFrame.setViewCollapsed(view, false);
-    globalThis.__pracFrame.setViewSize(view, 160);
+    globalThis.__pracFrame.setItemCollapsed(view, false);
+    globalThis.__pracFrame.setItemSize(view, 160);
   }
 });
 await fourth.page.waitForTimeout(800);
@@ -243,8 +243,8 @@ await fourth.page.close();
 const sixth = await open();
 await sixth.page.evaluate(() => {
   const raw = JSON.parse(localStorage.getItem("prac-layout/v1"));
-  raw.views["vscode:view:outline"] = {
-    ...raw.views["vscode:view:outline"],
+  raw.items["vscode:view:outline"] = {
+    ...raw.items["vscode:view:outline"],
     size: 18,
     collapsed: true,
   };
@@ -279,8 +279,8 @@ await sixth.page.close();
 const seventh = await open();
 await seventh.page.evaluate(() => {
   const raw = JSON.parse(localStorage.getItem("prac-layout/v1"));
-  raw.views["vscode:view:workbench.explorer.fileView"] = {
-    ...raw.views["vscode:view:workbench.explorer.fileView"],
+  raw.items["vscode:view:workbench.explorer.fileView"] = {
+    ...raw.items["vscode:view:workbench.explorer.fileView"],
     size: 300,
   };
   localStorage.setItem("prac-layout/v1", JSON.stringify(raw));
@@ -301,8 +301,8 @@ const bottomView = await seventh.page.evaluate(() => {
 });
 await seventh.page.evaluate((last) => {
   const raw = JSON.parse(localStorage.getItem("prac-layout/v1"));
-  const key = Object.keys(raw.views).find((id) => id === last);
-  if (key !== undefined) raw.views[key] = { ...raw.views[key], collapsed: true };
+  const key = Object.keys(raw.items).find((id) => id === last);
+  if (key !== undefined) raw.items[key] = { ...raw.items[key], collapsed: true };
   localStorage.setItem("prac-layout/v1", JSON.stringify(raw));
 }, bottomView);
 await seventh.page.reload({ waitUntil: "load" });

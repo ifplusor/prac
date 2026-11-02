@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import type { ReactNode } from "react";
-import type { Box, LayoutNode, LayoutState, ViewRecord } from "./contract.js";
+import type { Box, LayoutNode, LayoutState, ItemRecord } from "./contract.js";
 import { LayoutRenderer } from "./layoutRenderer.js";
 import type { LayoutDecoration } from "./layoutRenderer.js";
 import { ChromeRegistry, type ChromeContext } from "./chrome.js";
@@ -16,26 +16,26 @@ import { regionNode } from "./model.js";
  * a split's sashes, and which chrome context each anchor receives. The frame's
  * gates still cover the pixels; this covers the shape the pixels are made of.
  */
-const view = (region: string, order: number): ViewRecord => ({
+const view = (region: string, order: number): ItemRecord => ({
   kind: "window",
   region,
   order,
   hidden: false,
 });
 
-const state = (tree: LayoutNode, views: Record<string, ViewRecord> = {}): LayoutState => ({
+const state = (tree: LayoutNode, items: Record<string, ItemRecord> = {}): LayoutState => ({
   viewportWidth: 1000,
   viewportHeight: 800,
   tree,
-  views,
+  items,
   catalogueVersion: 0,
   activePanelId: null,
 });
 
-const renderItem = (_record: ViewRecord, viewId: string): ReactNode =>
-  createElement("span", { "data-item": viewId }, viewId);
+const renderItem = (_record: ItemRecord, itemId: string): ReactNode =>
+  createElement("span", { "data-item": itemId }, itemId);
 
-const registry = (): ChromeRegistry<ViewRecord> => new ChromeRegistry<ViewRecord>();
+const registry = (): ChromeRegistry<ItemRecord> => new ChromeRegistry<ItemRecord>();
 
 const sizes = (entries: Record<string, Box>): ReadonlyMap<string, Box> =>
   new Map(Object.entries(entries));
@@ -84,7 +84,7 @@ describe("LayoutRenderer", () => {
       children: [regionNode("a", 0, { flex: true }), regionNode("b", 0, { flex: true })],
     });
     const chrome = registry();
-    const bars: ChromeContext<ViewRecord>[] = [];
+    const bars: ChromeContext<ItemRecord>[] = [];
     chrome.add({
       id: "bar",
       anchor: "region.header",
@@ -204,7 +204,7 @@ describe("LayoutRenderer", () => {
       children: [regionNode("a", 100, { flex: false }), regionNode("b", 200, { flex: false })],
     };
     const chrome = registry();
-    const seen: ChromeContext<ViewRecord>[] = [];
+    const seen: ChromeContext<ItemRecord>[] = [];
     chrome.add({
       id: "sash",
       anchor: "split.sash",
@@ -248,8 +248,8 @@ describe("LayoutRenderer", () => {
       children: [regionNode("a", 0, { flex: true }), regionNode("b", 0, { flex: true })],
     };
     const chrome = registry();
-    const cells: ChromeContext<ViewRecord>[] = [];
-    const tracks: ChromeContext<ViewRecord>[] = [];
+    const cells: ChromeContext<ItemRecord>[] = [];
+    const tracks: ChromeContext<ItemRecord>[] = [];
     chrome.add({
       id: "cell",
       anchor: "grid.cell",

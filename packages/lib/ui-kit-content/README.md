@@ -17,7 +17,7 @@ store          LayoutStore / useLayout
 switching      active-store switcher
 snapshot       versioned serializable shape
 workspace      workspace persistence scope
-isolation      per-view shadow-root isolation
+isolation      per-item shadow-root isolation
 chrome         ChromeRegistry / contributions / intents
 renderModel    the renderer's read-only placement helpers
 renderer       LayoutRenderer over LayoutState<TRecord>

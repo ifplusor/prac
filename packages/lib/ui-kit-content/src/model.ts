@@ -1,5 +1,5 @@
 /**
- * The layout model: pure functions over the region tree and the views table.
+ * The layout model: pure functions over the region tree and the items table.
  *
  * Nothing here touches React or the DOM — placement is data, so `place`,
  * `setCollapsed` and `splitRegionWith` are ordinary tree rewrites that the store
@@ -42,10 +42,10 @@ import {
   activeChild,
   entrySashState,
   findParentSplit,
-  frontView,
+  frontItem,
   isPresent,
   stackEntries,
-  visibleViews,
+  visibleItems,
 } from "./renderModel.js";
 
 /** Generic region minimum, in px. */
@@ -123,7 +123,7 @@ export function gridNode(
  * A node's children, whichever kind it is.
  *
  * A split lays out its children; a region's children are the sub-regions it
- * **selects** among (empty when it holds views directly).
+ * **selects** among (empty when it holds items directly).
  *
  * @param node - the node.
  */
@@ -135,7 +135,7 @@ function childNodes(node: LayoutNode): readonly LayoutNode[] {
  * The child region a selector region shows.
  *
  * The recorded choice wins while it is still present; otherwise the first
- * present child. `null` means the region has no children — it holds views.
+ * present child. `null` means the region has no children — it holds items.
  *
  * @param state - current state.
  * @param node - the region to look into.
@@ -346,7 +346,7 @@ export function resizeBoundary<TRecord extends PlacementRecord>(
  * Give a region its sub-regions, and optionally a name.
  *
  * This is how the arrangement builds a **container**: a child region, named from
- * the source catalogue, with the container's views placed into it. Idempotent —
+ * the source catalogue, with the container's items placed into it. Idempotent —
  * rebuilding after a catalogue change replaces the children wholesale, which is
  * what "the catalogue is the truth" means here.
  *
@@ -459,28 +459,28 @@ export function revealRegion(tree: LayoutNode, id: string): LayoutNode {
  * something places or shows it — a generic fallback, never a per-view default.
  *
  * @param state - current state.
- * @param viewId - the view identity.
+ * @param itemId - the view identity.
  */
-export function ensureView(state: LayoutState, viewId: string, kind?: string): PlacementRecord;
-export function ensureView<TRecord extends PlacementRecord>(
+export function ensureItem(state: LayoutState, itemId: string, kind?: string): PlacementRecord;
+export function ensureItem<TRecord extends PlacementRecord>(
   state: LayoutState<TRecord>,
-  viewId: string,
-  create: (viewId: string) => TRecord,
+  itemId: string,
+  create: (itemId: string) => TRecord,
 ): TRecord;
-export function ensureView<TRecord extends PlacementRecord>(
+export function ensureItem<TRecord extends PlacementRecord>(
   state: LayoutState<TRecord>,
-  viewId: string,
-  kindOrCreate?: string | ((viewId: string) => TRecord),
+  itemId: string,
+  kindOrCreate?: string | ((itemId: string) => TRecord),
 ): TRecord | PlacementRecord {
-  const existing = state.views[viewId];
+  const existing = state.items[itemId];
   if (existing !== undefined) return existing;
-  if (typeof kindOrCreate === "function") return kindOrCreate(viewId);
+  if (typeof kindOrCreate === "function") return kindOrCreate(itemId);
   const base: PlacementRecord = { region: firstRegionId(state.tree), order: 0, hidden: true };
   return kindOrCreate === undefined ? base : { ...base, kind: kindOrCreate };
 }
 
 /** Build one item record for a generic layout state. */
-export type LayoutItemFactory<TRecord extends PlacementRecord> = (viewId: string) => TRecord;
+export type LayoutItemFactory<TRecord extends PlacementRecord> = (itemId: string) => TRecord;
 
 /**
  * Place a view in a region (creating the view record if needed).
@@ -499,34 +499,34 @@ export type LayoutItemFactory<TRecord extends PlacementRecord> = (viewId: string
  * thread stopped answering.
  *
  * @param state - current state.
- * @param viewId - the view identity.
+ * @param itemId - the view identity.
  * @param regionId - the destination region.
  */
 export function place<TRecord extends PlacementRecord = PlacementRecord>(
   state: LayoutState<TRecord>,
-  viewId: string,
+  itemId: string,
   regionId: string,
   create?: LayoutItemFactory<TRecord>,
 ): LayoutState<TRecord> {
-  const current = state.views[viewId];
+  const current = state.items[itemId];
   if (current !== undefined && !current.hidden) {
     // The landing region is where routing would put it — a container shows a child
     // of its own, not the view directly.
-    const landing = landingRegion(state.tree, regionId, viewId).region;
-    const front = frontView(state, landing);
+    const landing = landingRegion(state.tree, regionId, itemId).region;
+    const front = frontItem(state, landing);
     if (
       current.region === landing &&
-      front === viewId &&
+      front === itemId &&
       revealRegion(state.tree, landing) === state.tree
     ) {
       return state;
     }
   }
-  const next = placeQuietly(state, viewId, regionId, create);
+  const next = placeQuietly(state, itemId, regionId, create);
   // Placing into a container shows that container: the selector ancestors are
   // what decide which child is on screen. The *landing* region is the one to
   // reveal — routing may have put the view in a child of the region named.
-  const landing = next.views[viewId]?.region ?? regionId;
+  const landing = next.items[itemId]?.region ?? regionId;
   const tree = revealRegion(next.tree, landing);
   return ensureStackShape(tree === next.tree ? next : { ...next, tree });
 }
@@ -545,34 +545,34 @@ export function place<TRecord extends PlacementRecord = PlacementRecord>(
  * A selector region that exists only to hold this view is dropped with it.
  *
  * @param state - current state.
- * @param viewId - the view to forget.
+ * @param itemId - the view to forget.
  * @returns the next state, or the same one when there was nothing to forget.
  */
-export function removeView<TRecord extends PlacementRecord>(
+export function removeItem<TRecord extends PlacementRecord>(
   state: LayoutState<TRecord>,
-  viewId: string,
+  itemId: string,
 ): LayoutState<TRecord> {
-  if (state.views[viewId] === undefined) return state;
-  const views = { ...state.views };
-  delete views[viewId];
-  return { ...state, views, tree: dropOwnChild(state.tree, viewId) };
+  if (state.items[itemId] === undefined) return state;
+  const items = { ...state.items };
+  delete items[itemId];
+  return { ...state, items, tree: dropOwnChild(state.tree, itemId) };
 }
 
 /**
  * Drop the child region a selector region created for one view (`landingRegion`).
  *
  * @param tree - the tree to update.
- * @param viewId - the view whose child is going.
+ * @param itemId - the view whose child is going.
  */
-function dropOwnChild(tree: LayoutNode, viewId: string): LayoutNode {
+function dropOwnChild(tree: LayoutNode, itemId: string): LayoutNode {
   if (tree.type === "split") {
-    const children = tree.children.map((child) => dropOwnChild(child, viewId));
+    const children = tree.children.map((child) => dropOwnChild(child, itemId));
     return children.some((child, index) => child !== tree.children[index])
       ? { ...tree, children }
       : tree;
   }
   if (tree.children === undefined) return tree;
-  const kept = tree.children.filter((child) => child.id !== `${tree.id}/${viewId}`);
+  const kept = tree.children.filter((child) => child.id !== `${tree.id}/${itemId}`);
   return kept.length === tree.children.length ? tree : { ...tree, children: kept };
 }
 
@@ -584,20 +584,20 @@ function dropOwnChild(tree: LayoutNode, viewId: string): LayoutNode {
  * somewhere must not yank the selection.
  *
  * @param state - current state.
- * @param viewId - the view identity.
+ * @param itemId - the view identity.
  * @param regionId - the destination region.
  */
 export function placeQuietly<TRecord extends PlacementRecord = PlacementRecord>(
   state: LayoutState<TRecord>,
-  viewId: string,
+  itemId: string,
   regionId: string,
   create?: LayoutItemFactory<TRecord>,
 ): LayoutState<TRecord> {
-  const view = create === undefined ? ensureView(state, viewId) : ensureView(state, viewId, create);
-  // A region that selects among children shows none of its own views, so a
+  const view = create === undefined ? ensureItem(state, itemId) : ensureItem(state, itemId, create);
+  // A region that selects among children shows none of its own items, so a
   // direct placement into it lands in a child of its own — "a container with
   // one view", the shape the design gives a view that stands alone.
-  const landing = landingRegion(state.tree, regionId, viewId);
+  const landing = landingRegion(state.tree, regionId, itemId);
   // No live window group to land in: placing anyway would record a home that
   // no renderer can find.
   if (landing.region === "") return state;
@@ -607,21 +607,21 @@ export function placeQuietly<TRecord extends PlacementRecord = PlacementRecord>(
   // **landing** region: a view already in one of a stack's rows is not arriving just
   // because the caller named the split.
   const arriving =
-    state.views[viewId] === undefined || state.views[viewId]?.region !== landing.region;
+    state.items[itemId] === undefined || state.items[itemId]?.region !== landing.region;
   // A view arriving in the region goes after the ones already there; one that is
   // already there keeps its order (so activating never moves a tab).
   const order = arriving ? maxOrder(state, landing.region) + 1 : view.order;
-  const views = { ...state.views };
+  const items = { ...state.items };
   // At most one front per region: bringing this view forward takes the marker from
   // whichever view held it.
-  for (const [id, record] of Object.entries(views)) {
-    if (id !== viewId && record.region === landing.region && record.front === true) {
-      views[id] = { ...record, front: false };
+  for (const [id, record] of Object.entries(items)) {
+    if (id !== itemId && record.region === landing.region && record.front === true) {
+      items[id] = { ...record, front: false };
     }
   }
-  views[viewId] = { ...view, region: landing.region, hidden: false, order, front: true } as TRecord;
+  items[itemId] = { ...view, region: landing.region, hidden: false, order, front: true } as TRecord;
   // A placement is where a stack appears or changes shape: normalise on the way out.
-  return ensureStackShape({ ...state, tree: landing.tree, views });
+  return ensureStackShape({ ...state, tree: landing.tree, items });
 }
 
 /**
@@ -635,37 +635,37 @@ function maxOrder<TRecord extends PlacementRecord>(
   state: LayoutState<TRecord>,
   regionId: string,
 ): number {
-  // A stack's views live in its rows, not directly in the region: ask the split for them too, or a
+  // A stack's items live in its rows, not directly in the region: ask the split for them too, or a
   // placement into a stack would always get order 0.
   const split = findSplit(state.tree, regionId);
   const rowIds = new Set(split === null ? [] : stackEntries(split).map((row) => row.id));
-  const orders = Object.entries(state.views)
+  const orders = Object.entries(state.items)
     .filter(([, view]) => view.region === regionId || rowIds.has(view.region))
     .map(([, view]) => view.order);
   return orders.length === 0 ? -1 : Math.max(...orders);
 }
 
 /** A view id's tail, as a child region's name when nothing better is known. */
-function viewLabelOf(viewId: string): string {
-  return (viewId.split(":").pop() ?? viewId).replace(/[-_]/g, " ");
+function itemLabelOf(itemId: string): string {
+  return (itemId.split(":").pop() ?? itemId).replace(/[-_]/g, " ");
 }
 
 /**
  * Where a view placed "into" a region actually lands.
  *
- * A plain region shows its own views, so it takes the view as-is. A region that
+ * A plain region shows its own items, so it takes the view as-is. A region that
  * selects among children shows only one child, so the view gets a child of its
  * own (created on demand) and that child is selected — otherwise the view would
  * be placed but shown by nobody.
  *
  * @param tree - the tree to update.
  * @param regionId - the region the caller named.
- * @param viewId - the view being placed.
+ * @param itemId - the view being placed.
  */
 function landingRegion(
   tree: LayoutNode,
   regionId: string,
-  viewId: string,
+  itemId: string,
 ): { tree: LayoutNode; region: string } {
   const region = findRegion(tree, regionId);
   const stack = findSplit(tree, regionId);
@@ -676,7 +676,7 @@ function landingRegion(
     // split, not a region, so this is also how a placement addressed to the split id lands in
     // its existing row.
     if (rows.length > 0) {
-      const home = rows.find((row) => row.id.endsWith(`/stack/${viewId}`));
+      const home = rows.find((row) => row.id.endsWith(`/stack/${itemId}`));
       return { tree, region: home?.id ?? regionId };
     }
     if (region !== null) return { tree, region: regionId };
@@ -687,12 +687,12 @@ function landingRegion(
     const fallback = firstWindowGroupRegion(tree);
     return fallback === undefined ? { tree, region: "" } : { tree, region: fallback };
   }
-  const id = `${regionId}/${viewId}`;
+  const id = `${regionId}/${itemId}`;
   if (region.children.some((child) => child.id === id)) return { tree, region: id };
   const children = [
     ...region.children,
     // A container's children stack: a view landing beside others shares the strip.
-    regionNode(id, 0, { label: viewLabelOf(viewId), stack: true }),
+    regionNode(id, 0, { label: itemLabelOf(itemId), stack: true }),
   ];
   return { tree: setRegionChildren(tree, regionId, children), region: id };
 }
@@ -713,54 +713,54 @@ function landingRegion(
  *
  * Upstream states a move as **reference + direction** (`Grid.moveView(view, sizing, referenceView,
  * direction)`, `grid.ts:480-495`; `Direction.Up` / `Direction.Down`, `editorPart.ts:807-810`), and
- * within one parent that is a pure reorder. A region's order is its views' `order` field
- * (`visibleViews` sorts by it), so the move renumbers that field: the dragged view lands immediately
- * before or after the reference, and everything else keeps its relative position — including views
+ * within one parent that is a pure reorder. A region's order is its items' `order` field
+ * (`visibleItems` sorts by it), so the move renumbers that field: the dragged view lands immediately
+ * before or after the reference, and everything else keeps its relative position — including items
  * that are currently hidden. The view keeps its own height and fold state; only `order` changes
  * (`moveView` passes no `Sizing`, `grid.ts:480-495`).
  *
  * @param state - current state.
- * @param viewId - the view being moved.
- * @param referenceViewId - the view it is dropped against.
+ * @param itemId - the view being moved.
+ * @param referenceItemId - the view it is dropped against.
  * @param direction - `"up"` lands it before the reference, `"down"` after it.
  * @returns the new state, or the same state when the move changes nothing.
  */
-export function moveViewInRegion<TRecord extends PlacementRecord>(
+export function moveItemInRegion<TRecord extends PlacementRecord>(
   state: LayoutState<TRecord>,
-  viewId: string,
-  referenceViewId: string,
+  itemId: string,
+  referenceItemId: string,
   direction: "up" | "down",
 ): LayoutState<TRecord> {
-  const view = state.views[viewId];
-  const reference = state.views[referenceViewId];
+  const view = state.items[itemId];
+  const reference = state.items[referenceItemId];
   if (view === undefined || reference === undefined) return state;
   // Moving across regions is `place`, a different mechanism; this one only reorders.
   if (view.region !== reference.region) return state;
-  if (viewId === referenceViewId) return state;
-  const strip = Object.entries(state.views)
+  if (itemId === referenceItemId) return state;
+  const strip = Object.entries(state.items)
     .filter(([, entry]) => entry.region === view.region)
     .sort((a, b) => a[1].order - b[1].order)
     .map(([id]) => id);
-  const others = strip.filter((id) => id !== viewId);
-  const at = others.indexOf(referenceViewId);
+  const others = strip.filter((id) => id !== itemId);
+  const at = others.indexOf(referenceItemId);
   if (at < 0) return state;
   const target = direction === "up" ? at : at + 1;
-  const next = [...others.slice(0, target), viewId, ...others.slice(target)];
+  const next = [...others.slice(0, target), itemId, ...others.slice(target)];
   if (next.every((id, index) => id === strip[index])) return state;
-  const views = { ...state.views };
+  const items = { ...state.items };
   next.forEach((id, index) => {
-    const entry = views[id];
-    if (entry !== undefined && entry.order !== index) views[id] = { ...entry, order: index };
+    const entry = items[id];
+    if (entry !== undefined && entry.order !== index) items[id] = { ...entry, order: index };
   });
-  return { ...state, views };
+  return { ...state, items };
 }
 
 /**
  * Shape every stack in the tree the way the design states it: **a `column` split whose children are
  * one-view regions**.
  *
- * A region in `stack` mode that holds two or more visible views stops being a region that holds
- * views: it becomes a split of leaves, one per view, and the views' `region` moves to their leaf.
+ * A region in `stack` mode that holds two or more visible items stops being a region that holds
+ * items: it becomes a split of leaves, one per view, and the items' `region` moves to their leaf.
  * Heights and folds move with them — a leaf's `size` **is** the row's height (`splitview.ts:60-84`
  * is upstream's version of the same idea) — so the drawn height and the stored height are the same
  * number by construction, which is what `PlacementRecord.size` used to break.
@@ -769,7 +769,7 @@ export function moveViewInRegion<TRecord extends PlacementRecord>(
  *
  * - the split takes the **region's own id**, so a named region (`left`, `center`, …) keeps the name
  *   its role binding is looked up by;
- * - a leaf's id is derived from the region and the view (`<region>/stack/<viewId>`), so reordering
+ * - a leaf's id is derived from the region and the view (`<region>/stack/<itemId>`), so reordering
  *   does not rename anything and a normalised state normalises to itself.
  *
  * Regions that hold one visible view, and regions in `tabs` mode (which has no height semantics),
@@ -782,18 +782,18 @@ export function ensureStackShape<TRecord extends PlacementRecord = PlacementReco
   state: LayoutState<TRecord>,
 ): LayoutState<TRecord> {
   let changed = false;
-  const views = { ...state.views };
+  const items = { ...state.items };
 
   /** One view's leaf: the id is derived, the height/fold moves from the record. */
-  const leafFor = (regionId: string, viewId: string): RegionNode => {
-    const view = state.views[viewId];
+  const leafFor = (regionId: string, itemId: string): RegionNode => {
+    const view = state.items[itemId];
     // A row nobody sized stays **flexible** so the rows keep sharing the height equally, the way a
     // stack does before anyone touches it; a row that was sized keeps that height. A folded row has
     // no height of its own (`size = 0`, E1) — its header is drawn from `collapsed` + `HEADER_HEIGHT`
     // — and its memory is `cachedSize`.
     const sized = view?.size;
     const folded = view?.collapsed === true;
-    const leaf = regionNode(`${regionId}/stack/${viewId}`, folded ? 0 : (sized ?? 0), {
+    const leaf = regionNode(`${regionId}/stack/${itemId}`, folded ? 0 : (sized ?? 0), {
       min: MIN_ENTRY,
       entry: true,
       flex: folded ? false : sized === undefined,
@@ -803,20 +803,20 @@ export function ensureStackShape<TRecord extends PlacementRecord = PlacementReco
       // The ceiling is the view's to declare; the layout only reads it.
       ...(view?.max === undefined ? {} : { max: view.max }),
     });
-    const record = views[viewId];
+    const record = items[itemId];
     if (record !== undefined && record.region !== leaf.id) {
       // The height lives in the tree now; the record no longer carries one (G1: `tabs` has none).
       const { size: _size, cachedSize: _cached, ...rest } = record;
-      views[viewId] = { ...rest, region: leaf.id, collapsed: undefined } as TRecord;
+      items[itemId] = { ...rest, region: leaf.id, collapsed: undefined } as TRecord;
       changed = true;
     }
     return leaf;
   };
 
-  // Read the **working** map, not `state.views`: `leafFor` re-points a view at the leaf it just
+  // Read the **working** map, not `state.items`: `leafFor` re-points a view at the leaf it just
   // made, and a reader on the old map would see every fresh row as empty and melt it away.
   const visibleIn = (regionId: string): string[] =>
-    Object.entries(views)
+    Object.entries(items)
       .filter(([, view]) => view.region === regionId && !view.hidden)
       .sort((a, b) => a[1].order - b[1].order)
       .map(([id]) => id);
@@ -827,21 +827,21 @@ export function ensureStackShape<TRecord extends PlacementRecord = PlacementReco
    * This is the one-view interlude (A4/melt): a lone view has no header, so its fold has nowhere to
    * be drawn; the record is where it waits until a second view makes the region a stack again.
    */
-  const writeBack = (viewId: string, row: RegionNode, regionId: string): void => {
-    const record = views[viewId];
+  const writeBack = (itemId: string, row: RegionNode, regionId: string): void => {
+    const record = items[itemId];
     if (record === undefined) return;
     const base = { ...record, region: regionId };
     if (row.collapsed === true) {
-      views[viewId] = {
+      items[itemId] = {
         ...base,
         collapsed: true,
         size: 0,
         cachedSize: row.cachedSize ?? row.size,
       };
     } else if (row.flex === true && row.size === 0) {
-      views[viewId] = { ...base, collapsed: undefined, size: undefined, cachedSize: undefined };
+      items[itemId] = { ...base, collapsed: undefined, size: undefined, cachedSize: undefined };
     } else {
-      views[viewId] = { ...base, collapsed: undefined, size: row.size, cachedSize: row.size };
+      items[itemId] = { ...base, collapsed: undefined, size: row.size, cachedSize: row.size };
     }
     changed = true;
   };
@@ -864,8 +864,8 @@ export function ensureStackShape<TRecord extends PlacementRecord = PlacementReco
         ...(node.label === undefined ? {} : { label: node.label }),
       });
     }
-    const viewId = visibleIn(kept.id)[0];
-    if (viewId !== undefined) writeBack(viewId, kept, node.id);
+    const itemId = visibleIn(kept.id)[0];
+    if (itemId !== undefined) writeBack(itemId, kept, node.id);
     // The region's `collapsed` is a **track** collapse, not the row's fold: the view's fold moved
     // back to its record above, and a second view turns the region into a stack again.
     return regionNode(node.id, size, {
@@ -879,8 +879,8 @@ export function ensureStackShape<TRecord extends PlacementRecord = PlacementReco
   /** The order a child row's view holds (F7: one order for the region). */
   const orderOf = (child: LayoutNode): number => {
     if (child.type !== "region" || child.entry !== true) return Number.POSITIVE_INFINITY;
-    const viewId = visibleIn(child.id)[0];
-    return viewId === undefined ? Number.POSITIVE_INFINITY : (views[viewId]?.order ?? 0);
+    const itemId = visibleIn(child.id)[0];
+    return itemId === undefined ? Number.POSITIVE_INFINITY : (items[itemId]?.order ?? 0);
   };
 
   const walk = (node: LayoutNode): LayoutNode => {
@@ -893,7 +893,7 @@ export function ensureStackShape<TRecord extends PlacementRecord = PlacementReco
         return { ...node, children };
       }
       let dirty = !children.every((child, index) => child === node.children[index]);
-      // Reconcile the rows with the views. A row with no visible view is not a row (A4); a row with
+      // Reconcile the rows with the items. A row with no visible view is not a row (A4); a row with
       // more than one visible view is split, one leaf each; a visible view pointing at the split is a
       // stray and becomes a row (this is how a hidden view comes back).
       const next: LayoutNode[] = [];
@@ -902,22 +902,22 @@ export function ensureStackShape<TRecord extends PlacementRecord = PlacementReco
           next.push(child);
           continue;
         }
-        const rowViews = visibleIn(child.id);
-        if (rowViews.length === 0) {
-          for (const [viewId, record] of Object.entries(views)) {
-            if (record.region === child.id) writeBack(viewId, child, node.id);
+        const rowItems = visibleIn(child.id);
+        if (rowItems.length === 0) {
+          for (const [itemId, record] of Object.entries(items)) {
+            if (record.region === child.id) writeBack(itemId, child, node.id);
           }
           dirty = true;
           continue;
         }
         next.push(child);
-        for (const viewId of rowViews.slice(1)) {
-          next.push(leafFor(node.id, viewId));
+        for (const itemId of rowItems.slice(1)) {
+          next.push(leafFor(node.id, itemId));
           dirty = true;
         }
       }
-      for (const viewId of visibleIn(node.id)) {
-        next.push(leafFor(node.id, viewId));
+      for (const itemId of visibleIn(node.id)) {
+        next.push(leafFor(node.id, itemId));
         dirty = true;
       }
       next.sort((a, b) => orderOf(a) - orderOf(b));
@@ -947,7 +947,7 @@ export function ensureStackShape<TRecord extends PlacementRecord = PlacementReco
         region = { ...region, children };
         changed = true;
       }
-      // A region with children **selects** among them; its own views are not a stack of rows. Leave
+      // A region with children **selects** among them; its own items are not a stack of rows. Leave
       // the shape alone: converting it here would drop the children (measured on the container layer).
       return region;
     }
@@ -970,7 +970,7 @@ export function ensureStackShape<TRecord extends PlacementRecord = PlacementReco
       // The split stands in for the region, name included: a bar that lists this region's children
       // reads the label, and a container that became a stack must not turn into its raw id.
       ...(region.label === undefined ? {} : { label: region.label }),
-      children: visible.map((viewId) => leafFor(region.id, viewId)),
+      children: visible.map((itemId) => leafFor(region.id, itemId)),
     };
   };
 
@@ -979,7 +979,7 @@ export function ensureStackShape<TRecord extends PlacementRecord = PlacementReco
   // A record may still carry the height the layout used to keep there (the same persisted key was in
   // use before rows held it): move it into the row, so an old state keeps the size and the fold it
   // was saved with instead of quietly forgetting them.
-  for (const [viewId, record] of Object.entries(views)) {
+  for (const [itemId, record] of Object.entries(items)) {
     if (
       record.size === undefined &&
       record.cachedSize === undefined &&
@@ -1005,40 +1005,40 @@ export function ensureStackShape<TRecord extends PlacementRecord = PlacementReco
           : { ...entry, collapsed: false, flex: false, size: from, cachedSize: from },
     );
     const { size: _size, cachedSize: _cached, ...rest } = record;
-    views[viewId] = { ...rest, collapsed: undefined } as TRecord;
+    items[itemId] = { ...rest, collapsed: undefined } as TRecord;
     changed = true;
   }
   if (!changed) return state;
-  return { ...state, tree, views };
+  return { ...state, tree, items };
 }
 
 /**
  * Make one view the front of its region, without moving it in the strip.
  *
  * @param state - current state.
- * @param viewId - the view to bring to the front.
+ * @param itemId - the view to bring to the front.
  * @returns the next state, or the same one when it is already front.
  */
 export function setFront<TRecord extends PlacementRecord>(
   state: LayoutState<TRecord>,
-  viewId: string,
+  itemId: string,
 ): LayoutState<TRecord> {
-  const view = state.views[viewId];
+  const view = state.items[itemId];
   if (view === undefined || view.front === true) return state;
-  const views = { ...state.views };
-  for (const [id, record] of Object.entries(views)) {
+  const items = { ...state.items };
+  for (const [id, record] of Object.entries(items)) {
     if (record.region === view.region && record.front === true) {
-      views[id] = { ...record, front: false };
+      items[id] = { ...record, front: false };
     }
   }
-  views[viewId] = { ...view, front: true };
-  return { ...state, views };
+  items[itemId] = { ...view, front: true };
+  return { ...state, items };
 }
 
 /**
  * Move one view's tab to another tab's place in the same region.
  *
- * Orders are only compared **within** a region (`visibleViews` sorts by them), so the
+ * Orders are only compared **within** a region (`visibleItems` sorts by them), so the
  * region's visible list is renumbered after the move — and the drag is a reorder, not a
  * placement: nothing else about the view changes.
  *
@@ -1055,23 +1055,23 @@ export function reorderTab<TRecord extends PlacementRecord>(
   target: string,
 ): LayoutState<TRecord> {
   if (dragged === target) return state;
-  const list = visibleViews(state, regionId);
+  const list = visibleItems(state, regionId);
   const from = list.indexOf(dragged);
   const to = list.indexOf(target);
   if (from === -1 || to === -1) return state;
   const next = [...list];
   next.splice(from, 1);
   next.splice(to, 0, dragged);
-  const views = { ...state.views };
+  const items = { ...state.items };
   next.forEach((id, index) => {
-    const record = views[id];
-    if (record !== undefined) views[id] = { ...record, order: index };
+    const record = items[id];
+    if (record !== undefined) items[id] = { ...record, order: index };
   });
-  return { ...state, views };
+  return { ...state, items };
 }
 
 /**
- * The region's visible views, in order. The first one renders.
+ * The region's visible items, in order. The first one renders.
  *
  * @param state - current state.
  * @param regionId - the region to inspect.
@@ -1089,10 +1089,10 @@ export function reorderTab<TRecord extends PlacementRecord>(
  * @param node - the subtree to test.
  */
 /**
- * Whether a region renders a **tab strip** rather than bare or stacked views.
+ * Whether a region renders a **tab strip** rather than bare or stacked items.
  *
  * The mode is VS Code's `showTabs` vocabulary (`contract.ts`), and the count it
- * is compared against is the region's visible views — the same list the stack
+ * is compared against is the region's visible items — the same list the stack
  * and the bare rendering use.
  *
  * @param state - current state.
@@ -1172,35 +1172,35 @@ export function sashSizes(
  * @param height - frame height in px.
  */
 /**
- * Re-home visible views whose recorded window group no longer exists.
+ * Re-home visible items whose recorded window group no longer exists.
  *
  * The tree is not the only place a removed region leaves a reference: the view
  * table names its region directly. A visible view pointing at a missing region
  * renders nowhere while still counting as placed, so callers keep re-placing it
  * and get the same dead record back — the reason a window (the conversation is
  * the common one) can disappear for good after its group is removed. Hidden
- * views are left alone: they are not on screen, and `place` overwrites the
+ * items are left alone: they are not on screen, and `place` overwrites the
  * region the next time one is shown.
  *
  * @param state - the state to reconcile.
  * @returns the same state when every visible view has a live region, a new state otherwise.
  */
-export function normalizeViews<TRecord extends PlacementRecord>(
+export function normalizeItems<TRecord extends PlacementRecord>(
   state: LayoutState<TRecord>,
 ): LayoutState<TRecord> {
   const fallback = firstWindowGroupRegion(state.tree);
   if (fallback === undefined) return state;
   let changed = false;
-  const views: Record<string, TRecord> = {};
-  for (const [id, record] of Object.entries(state.views) as Array<[string, TRecord]>) {
+  const items: Record<string, TRecord> = {};
+  for (const [id, record] of Object.entries(state.items) as Array<[string, TRecord]>) {
     if (record.hidden !== true && findRegion(state.tree, record.region) === null) {
-      views[id] = { ...record, region: fallback };
+      items[id] = { ...record, region: fallback };
       changed = true;
     } else {
-      views[id] = record;
+      items[id] = record;
     }
   }
-  return changed ? { ...state, views } : state;
+  return changed ? { ...state, items } : state;
 }
 
 /** Chrome insets reserved from a region's content box. */
@@ -1577,7 +1577,7 @@ export function splitRegionWith<TRecord extends PlacementRecord>(
     min: DEFAULT_MIN,
     // A split is a second area of the **same kind**: it shows the chrome the region it
     // came from shows. The centre carries `tabs: "multiple"`, so a region split off it
-    // has a tab strip for the views it holds — which is what a person expects of an
+    // has a tab strip for the items it holds — which is what a person expects of an
     // editor group they just created.
     ...(tabs === undefined ? {} : { tabs }),
     // Only the embedder's own splits carry the mark: a region the app made for a **view** is
@@ -1719,7 +1719,7 @@ export function removeRegion<TRecord extends PlacementRecord>(
  * is removed when its last editor closes — so a marked region with nothing in it is the
  * leftover of a session whose files are gone, with no group to close and no chrome on screen to
  * close it with. Unmarked regions are the app's own shape and are never pruned, however empty
- * they look while their views are still being placed.
+ * they look while their items are still being placed.
  *
  * @param state - the layout state.
  * @returns the state with the left-over regions removed.
@@ -1745,8 +1745,8 @@ export const MIN_ENTRY = 48;
 /**
  * What every entry of a stack becomes when one entry is dragged to `target`.
  *
- * The delta goes to the sash's own view first, then to the views **above** it (nearest first), and
- * the views **below** give up the same delta (nearest first, each clamped at its floor) — upstream's
+ * The delta goes to the sash's own view first, then to the items **above** it (nearest first), and
+ * the items **below** give up the same delta (nearest first, each clamped at its floor) — upstream's
  * loops from `SplitView.resize` (`splitview.ts:1308-1325`). How far the boundary may travel is
  * upstream's `maxDelta` (`:1281`), and it counts the room the entries **below** have: nothing above
  * the dragged entry is ever taken from (measured: doing that made a drag eat the entries above, and
@@ -1755,18 +1755,18 @@ export const MIN_ENTRY = 48;
  * with.
  *
  * @param entries - every entry of the stack, top-down, with its height and fold state.
- * @param viewId - the entry whose bottom edge is being dragged.
+ * @param itemId - the entry whose bottom edge is being dragged.
  * @param target - the height it is being dragged to.
  * @returns the new height of every entry the drag touches (folded entries are absent).
  */
 export function redistributeOnDrag(
-  entries: readonly { viewId: string; height: number; folded: boolean }[],
-  viewId: string,
+  entries: readonly { itemId: string; height: number; folded: boolean }[],
+  itemId: string,
   target: number,
 ): Map<string, number> {
   const open = entries.filter((entry) => !entry.folded);
-  const sizes = new Map(open.map((entry) => [entry.viewId, entry.height]));
-  const at = open.findIndex((entry) => entry.viewId === viewId);
+  const sizes = new Map(open.map((entry) => [entry.itemId, entry.height]));
+  const at = open.findIndex((entry) => entry.itemId === itemId);
   const dragged = open[at];
   if (dragged === undefined) return sizes;
   const room = (entry: { height: number }): number => Math.max(0, entry.height - MIN_ENTRY);
@@ -1783,13 +1783,13 @@ export function redistributeOnDrag(
     for (const entry of [dragged, ...up.slice().reverse()]) {
       const size = Math.max(MIN_ENTRY, entry.height + deltaUp);
       deltaUp -= size - entry.height;
-      sizes.set(entry.viewId, size);
+      sizes.set(entry.itemId, size);
     }
     let deltaDown = delta;
     for (const entry of down) {
       const size = Math.max(MIN_ENTRY, entry.height - deltaDown);
       deltaDown += size - entry.height;
-      sizes.set(entry.viewId, size);
+      sizes.set(entry.itemId, size);
     }
   }
   // Hand back **only the entries that really move**. Everything else was in `sizes` at the height
@@ -1797,7 +1797,7 @@ export function redistributeOnDrag(
   // so a drawn 199 can sit next to a stored 200) — writing those back rewrote entries the drag
   // never touched, and the entries above a drag drifted every time it ran (measured).
   for (const entry of entries) {
-    if (sizes.get(entry.viewId) === entry.height) sizes.delete(entry.viewId);
+    if (sizes.get(entry.itemId) === entry.height) sizes.delete(entry.itemId);
   }
   return sizes;
 }
@@ -1813,16 +1813,16 @@ export function redistributeOnDrag(
  * `redistributeOnDrag`.
  *
  * @param entries - the stack's rows, top-down, with the heights they are drawn at.
- * @param viewId - the row whose bottom edge is being dragged.
+ * @param itemId - the row whose bottom edge is being dragged.
  * @param target - the unconstrained height the pointer asks for.
  * @returns the Alt-constrained height for that row.
  */
 export function altDragTarget(
-  entries: readonly { viewId: string; height: number; folded: boolean }[],
-  viewId: string,
+  entries: readonly { itemId: string; height: number; folded: boolean }[],
+  itemId: string,
   target: number,
 ): number {
-  const at = entries.findIndex((entry) => entry.viewId === viewId);
+  const at = entries.findIndex((entry) => entry.itemId === itemId);
   const dragged = entries[at];
   if (dragged === undefined || dragged.folded || at >= entries.length - 1) return target;
   const last = at === entries.length - 2;
@@ -1847,14 +1847,14 @@ export function altDragTarget(
  * the pair the same height (their average, never under the floor). Anything else resets nothing.
  *
  * @param entries - the stack's rows, in visual order, with the heights they are drawn at.
- * @param viewId - the row whose bottom edge was double-clicked.
+ * @param itemId - the row whose bottom edge was double-clicked.
  * @returns the new heights for the pair, or an empty list when there is nothing to even out.
  */
 export function resetStackBoundary(
-  entries: readonly { viewId: string; height: number; folded: boolean }[],
-  viewId: string,
-): { viewId: string; height: number }[] {
-  const at = entries.findIndex((entry) => entry.viewId === viewId);
+  entries: readonly { itemId: string; height: number; folded: boolean }[],
+  itemId: string,
+): { itemId: string; height: number }[] {
+  const at = entries.findIndex((entry) => entry.itemId === itemId);
   if (at < 0) return [];
   // Upstream searches outward **from the boundary's own row** (`range(index, -1)` / `range(index+1,…)`,
   // `:1187-1188`) and only refuses when a whole side is folded (`:1193-1199`).
@@ -1863,8 +1863,8 @@ export function resetStackBoundary(
   if (above === undefined || below === undefined) return [];
   const even = Math.max(MIN_ENTRY, Math.round((above.height + below.height) / 2));
   return [
-    { viewId: above.viewId, height: even },
-    { viewId: below.viewId, height: even },
+    { itemId: above.itemId, height: even },
+    { itemId: below.itemId, height: even },
   ];
 }
 
@@ -1924,14 +1924,14 @@ export function entryBoundary<TRecord extends PlacementRecord>(
  * was the folded row).
  *
  * @param rows - the stack's rows, top-down.
- * @param viewId - the row whose bottom edge was pressed.
+ * @param itemId - the row whose bottom edge was pressed.
  * @returns the nearest open row at or above the pressed row; undefined when there is none.
  */
-export function stackDragAnchor<T extends { readonly viewId: string; readonly folded: boolean }>(
+export function stackDragAnchor<T extends { readonly itemId: string; readonly folded: boolean }>(
   rows: readonly T[],
-  viewId: string,
+  itemId: string,
 ): T | undefined {
-  const at = rows.findIndex((row) => row.viewId === viewId);
+  const at = rows.findIndex((row) => row.itemId === itemId);
   if (at < 0) return undefined;
   for (let index = at; index >= 0; index -= 1) {
     if (rows[index]!.folded !== true) return rows[index];
@@ -2062,7 +2062,7 @@ export function setEntryFolded<TRecord extends PlacementRecord>(
 }
 
 /**
- * Move one stack row next to another — the same reference-and-direction move as `moveViewInRegion`,
+ * Move one stack row next to another — the same reference-and-direction move as `moveItemInRegion`,
  * but the order lives in the split's children now.
  *
  * @param state - current state.
@@ -2094,21 +2094,21 @@ export function moveEntry<TRecord extends PlacementRecord>(
   if (children.every((child, position) => child === parent.children[position])) return state;
   const tree = replaceNode(state.tree, parent.id, () => ({ ...parent, children }));
   // F7: the region has **one** order. A stack stores it in the split's children; the tab strip
-  // stores it in `PlacementRecord.order`. Renumber the rows' views so the two forms cannot drift when a
+  // stores it in `PlacementRecord.order`. Renumber the rows' items so the two forms cannot drift when a
   // region changes mode.
-  const views = { ...state.views };
+  const items = { ...state.items };
   children.forEach((child, position) => {
     if (child.type !== "region" || child.entry !== true) return;
-    const inRow = Object.entries(views)
+    const inRow = Object.entries(items)
       .filter(([, view]) => view.region === child.id)
       .sort((a, b) => a[1].order - b[1].order);
-    inRow.forEach(([viewId], offset) => {
-      const view = views[viewId];
+    inRow.forEach(([itemId], offset) => {
+      const view = items[itemId];
       if (view !== undefined && view.order !== position + offset)
-        views[viewId] = { ...view, order: position + offset };
+        items[itemId] = { ...view, order: position + offset };
     });
   });
-  return { ...state, tree, views };
+  return { ...state, tree, items };
 }
 
 /**
@@ -2119,16 +2119,16 @@ export function moveEntry<TRecord extends PlacementRecord>(
  * on its record, where shaping picks it up when the row appears.
  *
  * @param state - the layout state.
- * @param viewId - the view whose height is being declared.
+ * @param itemId - the view whose height is being declared.
  * @param size - the height in px.
  * @returns the state, or the same state when there is nothing to change.
  */
-export function setViewSize<TRecord extends PlacementRecord>(
+export function setItemSize<TRecord extends PlacementRecord>(
   state: LayoutState<TRecord>,
-  viewId: string,
+  itemId: string,
   size: number,
 ): LayoutState<TRecord> {
-  const view = state.views[viewId];
+  const view = state.items[itemId];
   if (view === undefined) return state;
   const rounded = Math.max(0, Math.round(size));
   // 0 is "no claim" (C1); any real height is a row's, so the floor and the view's own `max` apply
@@ -2164,16 +2164,16 @@ export function setViewSize<TRecord extends PlacementRecord>(
     };
   }
   if (view.size === wanted) return state;
-  return { ...state, views: { ...state.views, [viewId]: { ...view, size: wanted } } };
+  return { ...state, items: { ...state.items, [itemId]: { ...view, size: wanted } } };
 }
 
-export function setViewCollapsed<TRecord extends PlacementRecord>(
+export function setItemCollapsed<TRecord extends PlacementRecord>(
   state: LayoutState<TRecord>,
-  viewId: string,
+  itemId: string,
   collapsed: boolean,
   measuredHeight?: number,
 ): LayoutState<TRecord> {
-  const view = state.views[viewId];
+  const view = state.items[itemId];
   if (view === undefined || view.collapsed === collapsed) return state;
   // A view that lives in a stack **row** folds through its region: that is where a row's height and
   // fold live, so writing the record flag would draw nothing.
@@ -2187,7 +2187,7 @@ export function setViewCollapsed<TRecord extends PlacementRecord>(
     const cachedSize = remembered === undefined ? undefined : Math.round(remembered);
     return {
       ...state,
-      views: { ...state.views, [viewId]: { ...view, collapsed, size: undefined, cachedSize } },
+      items: { ...state.items, [itemId]: { ...view, collapsed, size: undefined, cachedSize } },
     };
   }
   // Unfolding goes back to the remembered height, **lifted to the floor** rather than dropped
@@ -2205,6 +2205,6 @@ export function setViewCollapsed<TRecord extends PlacementRecord>(
         );
   return {
     ...state,
-    views: { ...state.views, [viewId]: { ...view, collapsed, size, cachedSize: undefined } },
+    items: { ...state.items, [itemId]: { ...view, collapsed, size, cachedSize: undefined } },
   };
 }

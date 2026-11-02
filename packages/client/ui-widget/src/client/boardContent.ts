@@ -18,10 +18,10 @@ import {
   freshNodeId,
   place,
   regionNode,
-  removeView,
+  removeItem,
   setFront,
-  setViewCollapsed,
-  setViewSize,
+  setItemCollapsed,
+  setItemSize,
   splitRegionWith,
   structuralRegion,
   workspaceScope,
@@ -54,7 +54,7 @@ export interface BoardContentShape {
 /**
  * What a widget declares about its place in the board.
  *
- * The frame's `setViewSize` / `setViewCollapsed` are declarations that the
+ * The frame's `setItemSize` / `setItemCollapsed` are declarations that the
  * layout only reads: a widget keeps them across a reorder and loses them to
  * nobody. A second widget turns the board root into a stack of rows, and the
  * declarations move into the rows (see `ensureStackShape`).
@@ -86,13 +86,13 @@ export function boardStorageKey(id: string): string {
 /** Whether a hydrated tree looks like a board layout at all. */
 function looksLikeBoard(value: unknown): value is LayoutState<WidgetRecord> {
   if (typeof value !== "object" || value === null) return false;
-  const candidate = value as { tree?: unknown; views?: unknown };
+  const candidate = value as { tree?: unknown; items?: unknown };
   return (
     typeof candidate.tree === "object" &&
     candidate.tree !== null &&
     typeof (candidate.tree as { type?: unknown }).type === "string" &&
-    typeof candidate.views === "object" &&
-    candidate.views !== null
+    typeof candidate.items === "object" &&
+    candidate.items !== null
   );
 }
 
@@ -122,7 +122,7 @@ export class BoardContent implements BoardContentShape {
       // The board root is a **stack**: two or more widgets become rows with headers, the
       // way a sidebar board reads. A lone widget stays a bare region (no header).
       tree: regionNode(id, 0, { stack: true }),
-      views: {},
+      items: {},
       catalogueVersion: 0,
       activePanelId: null,
     };
@@ -181,7 +181,7 @@ export class BoardContent implements BoardContentShape {
   removeWidget(id: string): void {
     this.#hosts.delete(id);
     this.#board.remove(id);
-    this.#set(removeView(this.#state, id) as LayoutState<WidgetRecord>);
+    this.#set(removeItem(this.#state, id) as LayoutState<WidgetRecord>);
   }
 
   /** The board root's layout state; widgets are its items. */
@@ -206,7 +206,7 @@ export class BoardContent implements BoardContentShape {
   }
 
   /** The board chrome asks to close a widget; the source owns what closing means. */
-  requestCloseView(widgetId: string): void {
+  requestCloseItem(widgetId: string): void {
     this.removeWidget(widgetId);
   }
 
@@ -224,10 +224,10 @@ export class BoardContent implements BoardContentShape {
       contentId: id,
     })) as LayoutState<WidgetRecord>;
     if (options.size !== undefined) {
-      next = setViewSize(next, widgetId, options.size) as LayoutState<WidgetRecord>;
+      next = setItemSize(next, widgetId, options.size) as LayoutState<WidgetRecord>;
     }
     if (options.folded === true) {
-      next = setViewCollapsed(next, widgetId, true) as LayoutState<WidgetRecord>;
+      next = setItemCollapsed(next, widgetId, true) as LayoutState<WidgetRecord>;
     }
     this.#set(next);
   }
@@ -244,31 +244,31 @@ export class BoardContent implements BoardContentShape {
     regionId: string,
     side?: "left" | "right" | "top" | "bottom",
   ): void {
-    const source = this.#state.views[widgetId]?.region;
+    const source = this.#state.items[widgetId]?.region;
     if (source === undefined) return;
     const target = structuralRegion(this.#state.tree, regionId);
     const sourceHome = structuralRegion(this.#state.tree, source);
     if (sourceHome === target) {
       // Same stack: a drop on a row is a reorder, not a second row.
-      const targetId = Object.entries(this.#state.views).find(
+      const targetId = Object.entries(this.#state.items).find(
         ([, record]) => record.region === regionId,
       )?.[0];
-      const order = Object.entries(this.#state.views)
+      const order = Object.entries(this.#state.items)
         .sort((a, b) => a[1].order - b[1].order)
         .map(([id]) => id)
         .filter((id) => id !== widgetId);
       const at = targetId === undefined ? order.length : Math.max(0, order.indexOf(targetId));
       order.splice(at, 0, widgetId);
-      const views = Object.fromEntries(
-        Object.entries(this.#state.views).map(([id, record]) => [
+      const items = Object.fromEntries(
+        Object.entries(this.#state.items).map(([id, record]) => [
           id,
           { ...record, order: order.indexOf(id) },
         ]),
       );
-      this.#set(ensureStackShape({ ...this.#state, views }) as LayoutState<WidgetRecord>);
+      this.#set(ensureStackShape({ ...this.#state, items }) as LayoutState<WidgetRecord>);
     } else {
       // Different container: leave the old row, then land in the target stack.
-      const cleared = removeView(this.#state, widgetId) as LayoutState<WidgetRecord>;
+      const cleared = removeItem(this.#state, widgetId) as LayoutState<WidgetRecord>;
       const next = place(cleared, widgetId, target, (id) => ({
         region: target,
         order: 0,
@@ -290,21 +290,21 @@ export class BoardContent implements BoardContentShape {
   /** Reorder the board's widgets; the set must match the placed widgets. */
   reorderWidgets(order: readonly string[]): void {
     const position = new Map(order.map((id, index) => [id, index]));
-    const views = Object.fromEntries(
-      Object.entries(this.#state.views).map(([id, record]) => [
+    const items = Object.fromEntries(
+      Object.entries(this.#state.items).map(([id, record]) => [
         id,
         position.has(id) ? { ...record, order: position.get(id)! } : record,
       ]),
     );
     // The rows are tree children: their order has to follow the new `order` values,
     // or the board would report one order and draw another.
-    this.#set(ensureStackShape({ ...this.#state, views }) as LayoutState<WidgetRecord>);
+    this.#set(ensureStackShape({ ...this.#state, items }) as LayoutState<WidgetRecord>);
   }
 
   /** Fold / unfold one widget's row, measuring the drawn height when the caller has it. */
   setWidgetCollapsed(widgetId: string, collapsed: boolean, measuredHeight?: number): void {
     this.#set(
-      setViewCollapsed(
+      setItemCollapsed(
         this.#state,
         widgetId,
         collapsed,
@@ -315,7 +315,7 @@ export class BoardContent implements BoardContentShape {
 
   /** Declare one widget row's height. */
   setWidgetSize(widgetId: string, size: number): void {
-    this.#set(setViewSize(this.#state, widgetId, size) as LayoutState<WidgetRecord>);
+    this.#set(setItemSize(this.#state, widgetId, size) as LayoutState<WidgetRecord>);
   }
 
   /**
@@ -325,7 +325,7 @@ export class BoardContent implements BoardContentShape {
    * split is completed here, in the target board's own layout root.
    */
   splitWidget(widgetId: string, side: Side): void {
-    const record = this.#state.views[widgetId];
+    const record = this.#state.items[widgetId];
     if (record?.region === undefined) return;
     this.#nodeSeq += 1;
     const splitId = freshNodeId(this.#state.tree, "split", () => this.#nodeSeq);
@@ -346,7 +346,7 @@ export class BoardContent implements BoardContentShape {
 
   /** Keep the placement model (order / active) on the layout's records. */
   #syncPlacements(): void {
-    const ids = Object.entries(this.#state.views)
+    const ids = Object.entries(this.#state.items)
       .sort((a, b) => a[1].order - b[1].order)
       .map(([widgetId]) => widgetId);
     const known = new Set(this.#board.state.order);
@@ -354,7 +354,7 @@ export class BoardContent implements BoardContentShape {
       if (!ids.includes(widgetId)) this.#board.remove(widgetId);
     }
     for (const widgetId of ids) if (!known.has(widgetId)) this.#board.place(widgetId);
-    const front = ids.find((widgetId) => this.#state.views[widgetId]?.front === true) ?? ids[0];
+    const front = ids.find((widgetId) => this.#state.items[widgetId]?.front === true) ?? ids[0];
     if (front !== undefined) this.#board.activate(front);
   }
 

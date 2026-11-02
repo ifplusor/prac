@@ -468,7 +468,7 @@ prac-ui-kit-content/react    renderer / React mount / chrome
 - adapters 只做来源翻译，不拥有 frame / window / widget 机制；
 - **bundle 是叶子**：其它包不能 import bundle；bundle 内不出现默认布局、默认 placement、业务 action、DSH / VS Code 映射；只做包选择、启动顺序、provider / 根组件装配；
 - `ui-workbench` 承接 arrangement / recall / 默认落位 / open policy，不是 bundle 的业务逻辑；
-- 当前 `prac-ui-kit-content` 已抽出 content protocols / placement / store / switching / snapshot / isolation / chrome / renderModel / `LayoutRenderer` / tabs / stack / sash / containerBar / grid / resize / drag / containerChrome / chromeIntents / generic `model`；`Window` 实现 `ContentItem`、`WindowGroup` 实现 `ContentGroup`（`itemId` 已进入 placement）；frame 的 `model` 只保留 defaultTree / window-widget record factory / prune，`layoutDrop` / `layoutActions` / `layoutContentHost` 是 prac/window 专属；`Surface` 是 `ContentRoot` + `ContentMount` 的 frame 特化。
+- 当前 `prac-ui-kit-content` 已抽出 content protocols / placement / store / switching / snapshot / isolation / chrome / renderModel / `LayoutRenderer` / tabs / stack / sash / containerBar / grid / resize / drag / containerChrome / chromeIntents / generic `model`；`Window` 实现 `ContentItem`、`WindowGroup` 实现 `ContentGroup`（`itemId` 已进入 placement）；frame 的 `model` 只保留 defaultTree / window-widget record factory / prune，`layoutDrop` / `layoutActions` / `layoutContentHost` 是 prac/window 专属；`Surface` 是 `ContentRoot` + `ContentMount` 的 frame 特化。`catalogue` / `ItemInfo` / slot keys 已移到 `ui-frame` plugin；`WindowContentKind` 已是 string；frame 不再出现 `prac.view` / `prac.window` / `prac.widget` 字面量。
 - 当前 `ui-window` / `ui-widget` 仍含具体模型实现；这是待办。`FrameState` / `SpaceState` 已拆（`prac-frame/v1` + `prac-space/v1`），renderer 通过 composed state 消费。
 
 `ui-frame` 是真正的 DSH 插件行：`dsh.client` + `./client` loader artifact，`./client` 的 `types` 条件做 DSH 契约的 type-only 入口；`./lib` 已删除，共享的 model / renderer / chrome 在 DSH-free 的 `prac-ui-kit-frame`。服务面：
@@ -528,6 +528,8 @@ ctx.layout           // DSH compat shim（放 ui-frame）
 - UI 框架按 L0 layout / L1 content / L2 frame / L3 prac 分层；每层都能独立使用，L1 可独立用于 window 内容。
 - window / board / widget / space 是通用 UI 原语，属于 kit；prac 只提供内容种类、来源、catalogue、默认 arrangement、faces。
 - 拆包按层，不按 window / board 领域；`prac-ui-kit-content`（L1）已立包，先抽出 content protocols / placement / store / snapshot / isolation；renderer / model 随后迁入。
+- 包名保持 `prac-ui-kit-*`：暂不引入独立的 `@prac-ui` scope；等框架真的要对外发布时再讨论。
+- kit 的 “view” 词汇已清：`ItemRecord` / `ItemFlags` / `ItemKind` / `itemId` / `items`；`prac.view` 等 source slot 留在 plugin。持久化不升 v2，旧 `views` 字段由 store heal 时读成 `items`。
 - 包入口按层：`prac-ui-kit-*` 是库，只出 `.`，且不 import DSH；`prac-client-*` 是 DSH 插件行，出 `./client`。`ui-frame` 的 `./client` 出 loader artifact，其 `types` 条件承载 DSH 契约类型；root 是 host 半。
 - 包划分与 bundle 规则见「包与依赖」。
 
@@ -559,10 +561,8 @@ ctx.layout           // DSH compat shim（放 ui-frame）
 
 1. L1 的 `LayoutRoot` 是否加 `"content"` kind，还是直接用 `LayoutState` 的 tree。
 2. `ContentMount` 的 API / 归属：谁创建、谁持有、renderer 如何组合；`Surface` 如何迁移到 `ContentRoot` + `ContentMount`。
-3. `PlacementRecord` / `ViewRecord` 的泛型化边界；`ViewInfo` / `ViewSlotKey` / `prac.view` 的改名。
-4. L2 的默认模型 vs 适配器：Window / Board / Widget 的默认实现放 kit 还是 `ui-window` / `ui-widget`。
-5. 包名 scope：`prac-ui-kit-*` 还是 `@prac-ui/kit-*`。
-6. 顺序：先立 `prac-ui-kit-content` 包，还是先迁移 window / board 的具体模型。
+3. L2 的默认模型 vs 适配器：Window / Board / Widget 的默认实现放 kit 还是 `ui-window` / `ui-widget`。
+4. 顺序：先立 `prac-ui-kit-content` 包，还是先迁移 window / board 的具体模型。
 
 ## Validation
 

@@ -5,10 +5,10 @@
  *
  * 1. **Regions are a tree.** A region is a leaf of the region tree with a size
  *    and a minimum; regions nest inside row/column splits. Nothing in a region
- *    says what may go in it. Which view sits where is *data* (`views`), so any
+ *    says what may go in it. Which view sits where is *data* (`items`), so any
  *    view can be placed in any region — constraints (if we ever want them)
  *    belong in a policy layer, never in the region model.
- * 2. **The view catalogue, not a list of views.** A view id is
+ * 2. **The view catalogue, not a list of items.** A view id is
  *    `<source>:<name>`. `dsh:` names a slot DSH's own plugins register into
  *    (`dsh:sidebar`, `dsh:main:<key>`, `dsh:rightbar`) — their slot names are
  *    view *identities*, not positions, and because this frame is the renderer,
@@ -21,7 +21,7 @@
  *    *queryable* — {@link PracLayoutFace.listViews} enumerates the slot
  *    registry live (so a later `main` key or `prac.view` entry appears) and
  *    joins it with each view's placement, which is what lets a UI offer the
- *    views that are hidden or unplaced, not just the visible ones.
+ *    items that are hidden or unplaced, not just the visible ones.
  * 3. **Sashes and collapse are frame-owned.** Dragging a sash adjusts the two
  *    regions beside it; collapsing a region remembers its width so expanding
  *    restores it. This is the (b) option from the integration note: the frame
@@ -70,7 +70,7 @@ import { workspaceScope } from "prac-ui-kit-frame";
 declare global {
   /**
    * Page-level probe the verification drivers reach the layout face through
-   * (`vendor/vscode/scripts/verify-{layout,views}.mjs` read it).
+   * (`vendor/vscode/scripts/verify-{layout,items}.mjs` read it).
    *
    * Published by this module's `apply`; removal is scoped to the instance that
    * published it.
@@ -81,8 +81,7 @@ declare global {
   /** The Space registry, for the live gates / a page-level probe. */
   var __pracSpaces: PracSpacesFace | undefined;
 }
-import { VIEW_SLOT, WIDGET_SLOT, WINDOW_SLOT } from "prac-ui-kit-frame";
-import { readDeclaredViewIds } from "./catalogue.js";
+import { VIEW_SLOT, WIDGET_SLOT, WINDOW_SLOT, readDeclaredViewIds } from "./catalogue.js";
 
 /**
  * Install the mechanism: declare the frame's slots, publish the faces, keep the
@@ -263,7 +262,7 @@ export function apply(ctx: Context): void {
           main: { kind: "keyed", scope: "root" },
           rightbar: { kind: "single", scope: "root" },
           "shell.overlay": { kind: "list", scope: "root" },
-          // The slot prac's own views (`prac:*`) and VS part hosts (`vscode:*`)
+          // The slot prac's own items (`prac:*`) and VS part hosts (`vscode:*`)
           // register into; the entry's declared id is its view id.
           "prac.view": { kind: "list", scope: "root" },
           "prac.window": { kind: "list", scope: "root" },
@@ -307,7 +306,7 @@ export function apply(ctx: Context): void {
     // The catalogue's live sources. `listViews()` reads the registry on every
     // call, so a later registration is already visible; these subscriptions
     // only bump `catalogueVersion`, which is how a subscribed UI (and this
-    // frame) learns to re-read it — and refresh which views the slot declares,
+    // frame) learns to re-read it — and refresh which items the slot declares,
     // which is what the frame dispatches on.
     const bumpCatalogue = (): void => {
       readDeclaredViewIds(ctx.slots);

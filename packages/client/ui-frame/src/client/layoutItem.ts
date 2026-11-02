@@ -18,15 +18,14 @@ import {
   type BoardLayout,
   type Box,
   type ChromeItemFacts,
-  ContentHostView,
+  ContentHostMount,
   type ContentHost,
   type LayoutDecoration,
   LayoutRenderer,
   readBoardDrop,
-  WIDGET_SLOT,
-  WINDOW_SLOT,
   type WidgetRecord,
 } from "prac-ui-kit-frame";
+import { WIDGET_SLOT, WINDOW_SLOT } from "./catalogue.js";
 import { DSH_MAIN_PREFIX, DSH_RIGHTBAR_VIEW, DSH_SIDEBAR_VIEW, viewKind } from "./catalogue.js";
 
 /** The slot face an item needs; frame and board can both satisfy it. */
@@ -177,7 +176,7 @@ export function LayoutItem({
   viewportWidth,
 }: LayoutItemProps): ReactNode {
   if (contentHost !== undefined) {
-    return createElement(ContentHostView, { host: contentHost, contentId: viewId });
+    return createElement(ContentHostMount, { host: contentHost, contentId: viewId });
   }
   if (board !== undefined) {
     return createElement(BoardItem, {

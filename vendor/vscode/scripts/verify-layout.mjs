@@ -199,8 +199,8 @@ async function sample(page, fileView) {
             }
           : null,
         fileHostCount: globalThis.__deep.all("[data-vscode-embed-file]").length,
-        modelFileRegion: state?.views?.[fileView]?.region ?? null,
-        modelConversationRegion: state?.views?.["dsh:main:conversation"]?.region ?? null,
+        modelFileRegion: state?.items?.[fileView]?.region ?? null,
+        modelConversationRegion: state?.items?.["dsh:main:conversation"]?.region ?? null,
         modelRightSize: regionOf(state?.tree, trackRegion)?.size ?? null,
         modelRightCollapsed: regionOf(state?.tree, trackRegion)?.collapsed ?? null,
       };

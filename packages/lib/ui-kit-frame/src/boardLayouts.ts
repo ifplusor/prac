@@ -2,7 +2,7 @@
  * Runtime registry for board layout roots.
  *
  * A board window's content is a `LayoutState<WidgetRecord>` owned by the board.
- * The frame resolves `ViewRecord.boardId` through this registry and renders that
+ * The frame resolves `ItemRecord.boardId` through this registry and renders that
  * root with the generic `LayoutRenderer`; it is the board-side analogue of
  * `ContentHostRegistry`.
  *

@@ -9,9 +9,8 @@
  * @module prac-ui-kit-frame
  */
 
-export type { RegionInfo, ViewInfo } from "./catalogue.js";
+export type { ContentInfo, RegionInfo } from "prac-ui-kit-content";
 export * from "./contract.js";
-export * from "./catalogue.js";
 export * from "./model.js";
 export * from "./store.js";
 export * from "./switching.js";

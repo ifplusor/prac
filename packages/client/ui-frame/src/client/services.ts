@@ -37,20 +37,21 @@ import {
   type RegionChild,
   type RegionSelector,
   type Side,
-  type ViewFlags,
-  type ViewRecord,
+  type ItemFlags,
+  type ItemRecord,
 } from "prac-ui-kit-frame";
 import type { LayoutFace, PracLayoutFace, RoleBindings } from "./contract.js";
-import type { RegionInfo, ViewInfo } from "prac-ui-kit-frame";
+import type { RegionInfo } from "prac-ui-kit-frame";
+import type { ItemInfo } from "./contract.js";
 import {
   activeChild,
-  ensureView,
+  ensureItem,
   findRegion,
   findNode,
   freshNodeId,
   regionInDirection as findRegionInDirection,
   firstRegionId,
-  frontView,
+  frontItem,
   mergeGridCells,
   moveGridCell,
   unmergeGridCell,
@@ -63,11 +64,11 @@ import {
   pruneEmbedderRegions,
   ensureStackShape,
   removeRegion as removeRegionFromTree,
-  removeView,
+  removeItem,
   regionNode,
   setCollapsed,
-  setViewCollapsed,
-  setViewSize,
+  setItemCollapsed,
+  setItemSize,
   setFront,
   setRegionChildren,
   setRegionSelector as setSelectorInTree,
@@ -119,13 +120,14 @@ export function createServices(
   // The frame's own housekeeping at load: the regions the embedder created and left empty are
   // leftovers of a session whose files are gone, and nothing on screen can close them (see
   // `pruneEmbedderRegions`). Idempotent, and it runs before the app places anything.
-  // Every write keeps the stack invariant: a region with two visible views **is** a column split of
+  // Every write keeps the stack invariant: a region with two visible items **is** a column split of
   // one-view rows. Hiding the last visible view, placing one, folding one — they all change the shape
   // (a stack that falls back to one row melts, an empty leftover holds no space), so the normaliser
   // runs on the way out of each change rather than only on placements.
   const viewGroups = new WindowGroupHost(store);
   const surfaces = new SurfaceRegistry<FrameWindowGroup>();
-  const write = store.update.bind(store);
+  const originalUpdate = store.update;
+  const write = (change: Parameters<typeof store.update>[0]): void => originalUpdate(change);
   store.update = (change: Parameters<typeof store.update>[0]) =>
     write((state: LayoutState) => ensureStackShape(change(state)));
   store.update(pruneEmbedderRegions);
@@ -136,7 +138,7 @@ export function createServices(
   /** Where a view parks when it gives up the centre (unbound until the arrangement says). */
   let trackRegion: string | undefined;
 
-  /** The region new centre views go to: the frame's centre, or the first region without one. */
+  /** The region new centre items go to: the frame's centre, or the first region without one. */
   const centreRegion = (state: LayoutState): string =>
     findRegion(state.tree, CENTER_REGION) ? CENTER_REGION : firstRegionId(state.tree);
 
@@ -195,10 +197,10 @@ export function createServices(
         // centre when it has no home of its own — never to "wherever the panel
         // on show happened to sit". A view parked in the track counts as having
         // no home: selecting it brings it back to the centre.
-        const current = state.views[viewId]?.region;
+        const current = state.items[viewId]?.region;
         const regionId =
           current !== undefined && current !== trackRegion ? current : centreRegion(state);
-        const outgoing = frontView(state, regionId);
+        const outgoing = frontItem(state, regionId);
         const next = place({ ...state, activePanelId: panelId }, viewId, regionId);
         // One view holds a region. The one that gave it up parks in the track
         // the arrangement bound, which is what lets a panel and the
@@ -223,7 +225,7 @@ export function createServices(
       const viewId = roles.primarySidebar;
       if (viewId === undefined) return;
       store.update((state) => {
-        const regionId = state.views[viewId]?.region;
+        const regionId = state.items[viewId]?.region;
         if (regionId === undefined) return state;
         const node = findRegion(state.tree, regionId);
         if (!node) return state;
@@ -236,11 +238,11 @@ export function createServices(
       // The role's region hosts it; DSH's own right panel asks to be shown, so
       // it is unhidden and brought to the front of wherever it already sits.
       store.update((state) => {
-        const view = ensureView(state, viewId);
-        const lowest = Math.min(0, ...Object.values(state.views).map((entry) => entry.order));
+        const view = ensureItem(state, viewId);
+        const lowest = Math.min(0, ...Object.values(state.items).map((entry) => entry.order));
         return {
           ...state,
-          views: { ...state.views, [viewId]: { ...view, hidden: false, order: lowest - 1 } },
+          items: { ...state.items, [viewId]: { ...view, hidden: false, order: lowest - 1 } },
         };
       });
     },
@@ -248,8 +250,8 @@ export function createServices(
       const viewId = roles.secondarySidebar;
       if (viewId === undefined) return;
       store.update((state) => {
-        const view = ensureView(state, viewId);
-        return { ...state, views: { ...state.views, [viewId]: { ...view, hidden: true } } };
+        const view = ensureItem(state, viewId);
+        return { ...state, items: { ...state.items, [viewId]: { ...view, hidden: true } } };
       });
     },
   };
@@ -259,11 +261,11 @@ export function createServices(
   const pracFrame: PracLayoutFace = {
     getState: () => store.get(),
     subscribe: (listener) => store.subscribe(listener),
-    /** The union of the slot registry's views and each one's placement. */
-    listViews(): ViewInfo[] {
+    /** The union of the slot registry's items and each one's placement. */
+    listViews(): ItemInfo[] {
       const state = store.get();
       return catalogueViewIds(ctx.slots).map((id) => {
-        const record: ViewRecord | undefined = state.views[id];
+        const record: ItemRecord | undefined = state.items[id];
         return record === undefined
           ? {
               id,
@@ -296,14 +298,14 @@ export function createServices(
       store.update((state) => placeQuietly(state, viewId, regionId));
     },
     /** Forget a view's placement record (see the face's own note). */
-    removeView(viewId: string): void {
-      store.update((state) => removeView(state, viewId));
+    removeItem(viewId: string): void {
+      store.update((state) => removeItem(state, viewId));
     },
     /** Give a region its child regions — the container shape. */
     setRegionChildren(regionId: string, children: readonly RegionChild[], label?: string): void {
       store.update((state) => {
-        // A container's children **stack** their views: that is what a container
-        // is for — grouping views that share one strip of screen.
+        // A container's children **stack** their items: that is what a container
+        // is for — grouping items that share one strip of screen.
         const nodes = children.map((child) => {
           // **Keep** a subtree that already exists under this id: it may be a `column` split (a stack
           // that took the region's place), and rebuilding it as a fresh region would throw its rows
@@ -375,12 +377,12 @@ export function createServices(
     },
     setViewBoard(viewId: string, boardId: string | undefined): void {
       store.update((state) => {
-        const view = ensureView(state, viewId);
+        const view = ensureItem(state, viewId);
         const { boardId: _old, ...rest } = view;
         return {
           ...state,
-          views: {
-            ...state.views,
+          items: {
+            ...state.items,
             [viewId]: boardId === undefined ? rest : { ...rest, boardId },
           },
         };
@@ -388,24 +390,24 @@ export function createServices(
     },
     setViewKind(viewId: string, kind: "window" | "widget"): void {
       store.update((state) => {
-        const view = ensureView(state, viewId);
-        return { ...state, views: { ...state.views, [viewId]: { ...view, kind } } };
+        const view = ensureItem(state, viewId);
+        return { ...state, items: { ...state.items, [viewId]: { ...view, kind } } };
       });
     },
-    setViewSize(viewId: string, size: number): void {
-      store.update((state) => setViewSize(state, viewId, size));
+    setItemSize(viewId: string, size: number): void {
+      store.update((state) => setItemSize(state, viewId, size));
     },
     /** Show/hide a view without moving it. */
     show(viewId: string): void {
       store.update((state) => {
-        const view = ensureView(state, viewId);
-        return { ...state, views: { ...state.views, [viewId]: { ...view, hidden: false } } };
+        const view = ensureItem(state, viewId);
+        return { ...state, items: { ...state.items, [viewId]: { ...view, hidden: false } } };
       });
     },
     hide(viewId: string): void {
       store.update((state) => {
-        const view = ensureView(state, viewId);
-        return { ...state, views: { ...state.views, [viewId]: { ...view, hidden: true } } };
+        const view = ensureItem(state, viewId);
+        return { ...state, items: { ...state.items, [viewId]: { ...view, hidden: true } } };
       });
     },
     registerWindowGroup(group: FrameWindowGroup, regionId: string): FrameGroup {
@@ -417,7 +419,7 @@ export function createServices(
     unregisterWindowGroup(groupId: string): void {
       viewGroups.unregister(groupId);
     },
-    setViewCollapsed(viewId: string, collapsed: boolean): void {
+    setItemCollapsed(viewId: string, collapsed: boolean): void {
       // Through the model: a view that lives in a stack **row** folds through its region, so writing
       // the record here would leave the picture unchanged. E1 wants the height it is drawn at, and
       // this face has the DOM the model deliberately does not: read the row before folding, so an
@@ -428,7 +430,7 @@ export function createServices(
           : document
               .querySelector(`[data-prac-stack-entry="${CSS.escape(viewId)}"]`)
               ?.getBoundingClientRect().height;
-      store.update((state) => setViewCollapsed(state, viewId, collapsed, height));
+      store.update((state) => setItemCollapsed(state, viewId, collapsed, height));
     },
     /** Collapse a region to nothing (remembering its size) or restore it. */
     setCollapsed(regionId: string, collapsed: boolean): void {
@@ -452,7 +454,7 @@ export function createServices(
      */
     splitView(viewId: string, side: Side): void {
       store.update((state) => {
-        const record: ViewRecord | undefined = state.views[viewId];
+        const record: ItemRecord | undefined = state.items[viewId];
         if (record === undefined) return state;
         const splitId = nextNodeId("split", state);
         const newRegionId = nextNodeId("region", state);
@@ -537,7 +539,7 @@ export function createServices(
      * Remove a region — the inverse of {@link createRegionBeside}.
      *
      * The embedder asks for this when a group it created is gone (its last editor closed and
-     * the group is not the only one left). The region's **views go with it**: a record that
+     * the group is not the only one left). The region's **items go with it**: a record that
      * pointed at a region which no longer exists would render nowhere and stay "known" for
      * good.
      *
@@ -547,10 +549,10 @@ export function createServices(
       store.update((state) => {
         const next = removeRegionFromTree(state, regionId);
         if (next === state) return state;
-        const views = Object.fromEntries(
-          Object.entries(state.views).filter(([, view]) => !inRegionSubtree(view.region, regionId)),
+        const items = Object.fromEntries(
+          Object.entries(state.items).filter(([, view]) => !inRegionSubtree(view.region, regionId)),
         );
-        return { ...next, views };
+        return { ...next, items };
       });
     },
     createRegionBeside(regionId: string, side: Side): string | undefined {
@@ -578,9 +580,9 @@ export function createServices(
       closeListeners.add(listener);
       return () => closeListeners.delete(listener);
     },
-    setViewFlags(viewId: string, flags: ViewFlags): void {
+    setItemFlags(viewId: string, flags: ItemFlags): void {
       store.update((state) => {
-        const view = state.views[viewId];
+        const view = state.items[viewId];
         if (!view) return state;
         const next = { ...view.flags, ...flags };
         const same =
@@ -589,13 +591,13 @@ export function createServices(
           (next.closable ?? false) === (view.flags?.closable ?? false);
         return same
           ? state
-          : { ...state, views: { ...state.views, [viewId]: { ...view, flags: next } } };
+          : { ...state, items: { ...state.items, [viewId]: { ...view, flags: next } } };
       });
     },
     /** The centre region's front view: what prac is showing as active. */
     activeView(): string | null {
       const state = store.get();
-      return frontView(state, centreRegion(state)) ?? null;
+      return frontItem(state, centreRegion(state)) ?? null;
     },
     /** Bind the roles DSH's borrowed vocabulary resolves through. */
     bindRoles(next: RoleBindings): void {

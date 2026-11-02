@@ -24,22 +24,22 @@ import {
   StackHeader,
   StackRowOverlay,
   TabStrip,
-  ViewActions,
+  ItemActions,
   beginStackReorder,
   createContainerChrome,
   createLayoutIntents,
   entrySashState,
   findRegion,
-  frontView,
+  frontItem,
   reorderTab,
   setEntryFolded,
-  visibleViews,
+  visibleItems,
   type ChromeContext,
   type ChromeRegistry,
   type LayoutIntents,
   type LayoutStore,
-  type ViewActionsProps,
-  type ViewRecord,
+  type ItemActionsProps,
+  type ItemRecord,
   type WidgetRecord,
 } from "prac-ui-kit-frame";
 import type { BoardContent } from "./boardContent.js";
@@ -69,7 +69,7 @@ export function createBoardChrome(
   options: BoardChromeOptions = {},
 ): ChromeRegistry<WidgetRecord> {
   const store = options.store ?? createBoardStore(content);
-  const intents = options.intents ?? createLayoutIntents<ViewRecord>(store);
+  const intents = options.intents ?? createLayoutIntents<ItemRecord>(store);
 
   /** The title the container declared for a widget, else the id tail. */
   const labelFor = (ctx: ChromeContext<WidgetRecord>, viewId: string): string =>
@@ -82,22 +82,22 @@ export function createBoardChrome(
   /** The widget's own actions, dispatched through the container's slot face. */
   const renderActions = (ctx: ChromeContext<WidgetRecord>, viewId: string): ReactNode => {
     if (ctx.slotFace === undefined) return null;
-    return createElement(ViewActions, {
-      viewId,
-      kind: "widget",
-      renderSlot: ctx.slotFace as unknown as ViewActionsProps["renderSlot"],
+    return createElement(ItemActions, {
+      itemId: viewId,
+      slots: ["prac.widgetActions", "prac.viewActions"],
+      renderSlot: ctx.slotFace as unknown as ItemActionsProps["renderSlot"],
     });
   };
 
   const renderTabs = (ctx: ChromeContext<WidgetRecord>): ReactNode => {
     if (ctx.node.type !== "region") return null;
-    const views = visibleViews(ctx.state, ctx.node.id);
-    if (views.length === 0) return null;
-    const active = frontView(ctx.state, ctx.node.id) ?? views[0];
+    const items = visibleItems(ctx.state, ctx.node.id);
+    if (items.length === 0) return null;
+    const active = frontItem(ctx.state, ctx.node.id) ?? items[0];
     return createElement(TabStrip, {
       state: ctx.state,
       regionId: ctx.node.id,
-      views,
+      items,
       active,
       label: (id) => labelFor(ctx, id),
       onActivate: (id) => intents.activate(id),
@@ -113,7 +113,7 @@ export function createBoardChrome(
   const renderRowHeader = (ctx: ChromeContext<WidgetRecord>): ReactNode => {
     const node = ctx.node;
     if (node.type !== "region" || node.entry !== true) return null;
-    const viewId = ctx.itemId ?? visibleViews(ctx.state, node.id)[0];
+    const viewId = ctx.itemId ?? visibleItems(ctx.state, node.id)[0];
     if (viewId === undefined) return null;
     const icon = ctx.itemFacts?.(viewId).icon;
     const folded = node.collapsed === true;
@@ -128,7 +128,7 @@ export function createBoardChrome(
     };
     return createElement(StackHeader, {
       nodeId: node.id,
-      viewId,
+      itemId: viewId,
       folded,
       label: labelFor(ctx, viewId),
       ...(icon === undefined
@@ -138,7 +138,7 @@ export function createBoardChrome(
       onReorder: (event) => {
         if (event.button !== 0) return;
         const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
-        beginStackReorder<ViewRecord>(store, event, node.id, row?.parentElement ?? null);
+        beginStackReorder<ItemRecord>(store, event, node.id, row?.parentElement ?? null);
       },
       renderActions: renderActions(ctx, viewId),
       onDragStart: (event) => startWidgetDrag(event, { boardId: content.id, widgetId: viewId }),
@@ -148,13 +148,13 @@ export function createBoardChrome(
   const renderRowOverlay = (ctx: ChromeContext<WidgetRecord>): ReactNode => {
     const node = ctx.node;
     if (node.type !== "region" || node.entry !== true || node.collapsed === true) return null;
-    const views = visibleViews(ctx.state, node.id);
-    if (views.length !== 1) return null;
-    const viewId = views[0]!;
+    const items = visibleItems(ctx.state, node.id);
+    if (items.length !== 1) return null;
+    const viewId = items[0]!;
     if (!hasPaneHeader(ctx, viewId)) return null;
     return createElement(StackRowOverlay, {
       nodeId: node.id,
-      viewId,
+      itemId: viewId,
       folded: false,
       label: labelFor(ctx, viewId),
       onToggle: (event: ReactMouseEvent<HTMLElement>) => {
@@ -169,7 +169,7 @@ export function createBoardChrome(
       onReorder: (event: ReactPointerEvent<HTMLElement>) => {
         if (event.button !== 0) return;
         const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
-        beginStackReorder<ViewRecord>(store, event, node.id, row?.parentElement ?? null);
+        beginStackReorder<ItemRecord>(store, event, node.id, row?.parentElement ?? null);
       },
     });
   };

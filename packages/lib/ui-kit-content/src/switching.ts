@@ -34,7 +34,7 @@ export function createSwitchingStore<TRecord extends PlacementRecord>(
       return () => listeners.delete(listener);
     },
     update: (updater) => active.update(updater),
-    requestCloseView: (itemId) => active.requestCloseView(itemId),
+    requestCloseItem: (itemId) => active.requestCloseItem(itemId),
     switchTo: (next) => {
       if (next === active) return;
       offActive();

@@ -39,10 +39,10 @@ import {
   chosenChild,
   edgeRegion,
   entrySashState,
-  frontView,
+  frontItem,
   isPresent,
   showsTabStrip,
-  visibleViews,
+  visibleItems,
 } from "./renderModel.js";
 import type {
   ChromeAnchor,
@@ -103,7 +103,7 @@ export interface LayoutRendererProps<TRecord extends PlacementRecord> {
   /** Render one item's content by its record. */
   readonly renderItem: (
     record: TRecord,
-    viewId: string,
+    itemId: string,
     box: Box,
     options?: ItemRenderOptions,
   ) => ReactNode;
@@ -116,7 +116,7 @@ export interface LayoutRendererProps<TRecord extends PlacementRecord> {
   /** The container's declared item facts, forwarded to chrome contributions. */
   readonly itemFacts?: (itemId: string) => ChromeItemFacts;
   /** Whether one item brings its own pane header (draw chrome as an overlay). */
-  readonly ownHeader?: (record: TRecord, viewId: string) => boolean;
+  readonly ownHeader?: (record: TRecord, itemId: string) => boolean;
   /** The pane for a chosen selector child with nothing visible in it. */
   readonly renderEmpty?: (ctx: ChromeContext<TRecord>) => ReactNode;
   /** Container markers, surface attachment and gestures for a node. */
@@ -271,19 +271,19 @@ export function LayoutRenderer<TRecord extends PlacementRecord>(
   };
 
   const itemContent = (
-    viewId: string | undefined,
+    itemId: string | undefined,
     box: Box,
     options?: ItemRenderOptions,
   ): ReactNode => {
-    if (viewId === undefined) return null;
-    const record = state.views[viewId];
+    if (itemId === undefined) return null;
+    const record = state.items[itemId];
     if (record === undefined) return null;
-    return renderItem(record, viewId, box, options);
+    return renderItem(record, itemId, box, options);
   };
 
   const renderRegionNode = (node: RegionNode, dir: Dir, fill: boolean): ReactElement => {
     const box = sizes?.get(node.id) ?? ZERO_BOX;
-    const views = visibleViews(state, node.id);
+    const items = visibleItems(state, node.id);
     const chosen = chosenChild(state, node);
     const child = activeChild(state, node);
     // The pane follows what was **picked**: a container with nothing in it says so, instead of the
@@ -332,12 +332,12 @@ export function LayoutRenderer<TRecord extends PlacementRecord>(
     }
 
     const paneHeader =
-      views.length === 1 && state.views[views[0] ?? ""] !== undefined
-        ? ownHeader?.(state.views[views[0]!]!, views[0]!) === true
+      items.length === 1 && state.items[items[0] ?? ""] !== undefined
+        ? ownHeader?.(state.items[items[0]!]!, items[0]!) === true
         : false;
     const sashState: string =
       node.entry === true ? entrySashState(state, node.id, rowHeights) : "disabled";
-    const activeItem = frontView(state, node.id) ?? views[0];
+    const activeItem = frontItem(state, node.id) ?? items[0];
     const decoration = decorate?.({
       state,
       node,
@@ -354,9 +354,9 @@ export function LayoutRenderer<TRecord extends PlacementRecord>(
     if (showsTabStrip(state, node)) {
       children.push(anchor("tabs", "region.tabs", chromeContext(node, activeItem)));
       children.push(keyed("item", itemContent(activeItem, box)));
-    } else if (node.entry === true && views.length === 1) {
-      const viewId = views[0]!;
-      const record = state.views[viewId];
+    } else if (node.entry === true && items.length === 1) {
+      const itemId = items[0]!;
+      const record = state.items[itemId];
       const body =
         node.collapsed === true || record === undefined
           ? null
@@ -367,7 +367,7 @@ export function LayoutRenderer<TRecord extends PlacementRecord>(
                 { "data-prac-stack-body": node.id, style: STACK_BODY_STYLE },
                 keyed(
                   "item",
-                  renderItem(record, viewId, box, paneHeader ? { chrome: "frame" } : undefined),
+                  renderItem(record, itemId, box, paneHeader ? { chrome: "frame" } : undefined),
                 ),
               ),
             );
@@ -376,10 +376,10 @@ export function LayoutRenderer<TRecord extends PlacementRecord>(
       // frame's own header (with the declared title) is what remains.
       if (paneHeader) {
         if (node.collapsed === true)
-          children.push(anchor("header", "row.header", chromeContext(node, viewId)));
+          children.push(anchor("header", "row.header", chromeContext(node, itemId)));
         else children.push(body);
       } else {
-        children.push(anchor("header", "row.header", chromeContext(node, viewId)));
+        children.push(anchor("header", "row.header", chromeContext(node, itemId)));
         children.push(body);
       }
     } else {
@@ -390,7 +390,7 @@ export function LayoutRenderer<TRecord extends PlacementRecord>(
       children.push(keyed("item", itemContent(activeItem, box)));
     }
     children.push(anchor("footer", "region.footer", chromeContext(node, activeItem)));
-    children.push(anchor("overlay", "region.overlay", chromeContext(node, views[0] ?? activeItem)));
+    children.push(anchor("overlay", "region.overlay", chromeContext(node, items[0] ?? activeItem)));
 
     return createElement(
       "div",
@@ -403,7 +403,7 @@ export function LayoutRenderer<TRecord extends PlacementRecord>(
               // A stack row is a region too: carry the entry markers so the frame's DOM-based
               // helpers (`readStackRows`, the reorder gesture, the gates) see a row where they
               // expect one.
-              "data-prac-stack-entry": views[0] ?? "",
+              "data-prac-stack-entry": items[0] ?? "",
               "data-prac-stack-row": node.id,
               // The boundary under this row follows `SashState` (B2/B4): `Disabled` has no handle
               // or resize cursor; `AtMinimum`/`AtMaximum` keep the handle and a **directional**
@@ -434,7 +434,7 @@ export function LayoutRenderer<TRecord extends PlacementRecord>(
             node.entry === true ? sizes?.get(node.id)?.height : undefined,
           ),
           // The overlay is absolute inside its row; the row is the containing block.
-          ...(node.entry === true && views.length === 1 && node.collapsed !== true && paneHeader
+          ...(node.entry === true && items.length === 1 && node.collapsed !== true && paneHeader
             ? { position: "relative" as const }
             : {}),
           ...decoration?.style,
@@ -637,12 +637,12 @@ export function LayoutRenderer<TRecord extends PlacementRecord>(
   );
 }
 
-/** Visible views in a region, for callers that need the item ids as well. */
+/** Visible items in a region, for callers that need the item ids as well. */
 export function regionItems<TRecord extends PlacementRecord>(
   state: LayoutState<TRecord>,
   regionId: string,
 ): string[] {
-  return visibleViews(state, regionId);
+  return visibleItems(state, regionId);
 }
 
 /** The effective placement of one grid cell (flow position when none is recorded). */

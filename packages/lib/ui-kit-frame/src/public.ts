@@ -15,17 +15,9 @@ export type {
   RegionNode,
   Side,
   SplitNode,
-  ViewRecord,
+  ItemRecord,
 } from "./contract.js";
-export type { RegionInfo, ViewInfo } from "./catalogue.js";
-
-/**
- * The slot key a prac surface registers its view into (`prac.view`).
- */
-export type ViewSlotKey =
-  | typeof import("./catalogue.js").VIEW_SLOT
-  | typeof import("./catalogue.js").WINDOW_SLOT
-  | typeof import("./catalogue.js").WIDGET_SLOT;
+export type { ContentInfo, RegionInfo } from "prac-ui-kit-content";
 
 export type { WindowGroupLayoutBridge } from "./frameBridge.js";
 

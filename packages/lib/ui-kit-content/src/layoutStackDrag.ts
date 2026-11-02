@@ -3,7 +3,7 @@
  *
  * A stack row's title answers to both a click and a drag: a click folds the entry
  * (`setViewFolded`), a drag moves it among its siblings
- * (`moveViewInRegion` / `moveEntry`). This module owns that machine — the slop,
+ * (`moveItemInRegion` / `moveEntry`). This module owns that machine — the slop,
  * the drop line, the "row under the pointer" hit test — so the frame and a board
  * root share one implementation over their own store.
  *
@@ -13,13 +13,13 @@ import { findRegion } from "prac-ui-kit-layout";
 import type { PlacementRecord } from "./placement.js";
 import type { LayoutStore } from "./store.js";
 import { readStackRows, type StackContainer } from "./resizeController.js";
-import { moveEntry, moveViewInRegion, setEntryFolded, setViewCollapsed } from "./model.js";
+import { moveEntry, moveItemInRegion, setEntryFolded, setItemCollapsed } from "./model.js";
 
 /**
  * How far a press may drift before it counts as a drag instead of a click.
  *
- * A title bar answers to both: a click folds the entry (`setViewCollapsed`), a drag reorders it
- * (`moveViewInRegion`). This slop is what drag-and-drop layers use to tell the two apart.
+ * A title bar answers to both: a click folds the entry (`setItemCollapsed`), a drag reorders it
+ * (`moveItemInRegion`). This slop is what drag-and-drop layers use to tell the two apart.
  */
 export const REORDER_SLOP = 4;
 
@@ -34,7 +34,7 @@ export interface StackReorderPointer {
 
 /** One in-flight reorder drag. */
 let reorderDrag: {
-  viewId: string;
+  itemId: string;
   pointerId: number;
   container: HTMLElement;
   line: HTMLElement;
@@ -49,23 +49,23 @@ let reorderDrag: {
  * + direction (`Grid.moveView`, `grid.ts:480-495`), so the drop target is "the row under the
  * pointer, above or below its midline"; a pointer that leaves the rows drops nothing and the
  * entry stays where it was. The dragged entry keeps its height and fold state — only `order`
- * changes — and this path never folds anything (`setViewCollapsed` is not involved).
+ * changes — and this path never folds anything (`setItemCollapsed` is not involved).
  *
  * @param store - the container's layout store.
  * @param down - the pointer-down event on the entry's title.
- * @param viewId - the entry being dragged.
+ * @param itemId - the entry being dragged.
  * @param containerIn - the stack container; defaults to the title's parent element.
  */
 export function beginStackReorder<TRecord extends PlacementRecord>(
   store: LayoutStore<TRecord>,
   down: StackReorderPointer,
-  viewId: string,
+  itemId: string,
   containerIn?: HTMLElement | null,
 ): void {
   const container = containerIn ?? (down.currentTarget.parentElement as HTMLElement | null);
   if (container === null || container === undefined) return;
   const line = document.createElement("div");
-  line.setAttribute("data-prac-stack-drop", viewId);
+  line.setAttribute("data-prac-stack-drop", itemId);
   Object.assign(line.style, {
     position: "absolute",
     left: "0",
@@ -76,7 +76,7 @@ export function beginStackReorder<TRecord extends PlacementRecord>(
     zIndex: "6",
   });
   const drag = {
-    viewId,
+    itemId,
     pointerId: down.pointerId,
     container,
     line,
@@ -142,25 +142,25 @@ export function beginStackReorder<TRecord extends PlacementRecord>(
     if (!moved) {
       // They clicked the title rather than dragging it: that is the fold switch.
       const height = readStackRows(container as unknown as StackContainer).find(
-        (row) => row.viewId === viewId,
+        (row) => row.itemId === itemId,
       )?.height;
       store.update((state) =>
-        findRegion(state.tree, viewId)?.entry === true
+        findRegion(state.tree, itemId)?.entry === true
           ? setEntryFolded(
               state,
-              viewId,
-              findRegion(state.tree, viewId)?.collapsed !== true,
+              itemId,
+              findRegion(state.tree, itemId)?.collapsed !== true,
               height,
             )
-          : setViewCollapsed(state, viewId, state.views[viewId]?.collapsed !== true, height),
+          : setItemCollapsed(state, itemId, state.items[itemId]?.collapsed !== true, height),
       );
       return;
     }
-    if (target === null || target.reference === viewId) return;
+    if (target === null || target.reference === itemId) return;
     store.update((state) =>
-      findRegion(state.tree, viewId)?.entry === true
-        ? moveEntry(state, viewId, target.reference, target.direction)
-        : moveViewInRegion(state, viewId, target.reference, target.direction),
+      findRegion(state.tree, itemId)?.entry === true
+        ? moveEntry(state, itemId, target.reference, target.direction)
+        : moveItemInRegion(state, itemId, target.reference, target.direction),
     );
   };
   window.addEventListener("pointermove", move);

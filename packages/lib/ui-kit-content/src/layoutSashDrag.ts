@@ -115,12 +115,12 @@ export function LayoutSashDrag<TRecord extends PlacementRecord = PlacementRecord
       // Between two stack rows the boundary is the stack's own: floors and the four `SashState`
       // values are the stack's semantics (B/C/D), not the generic two-region resize.
       const rows = readStackRows(container as unknown as StackContainer);
-      const at = rows.findIndex((row) => row.viewId === a.id);
+      const at = rows.findIndex((row) => row.itemId === a.id);
       if (at < 0) return;
       const state = entrySashState(
         store.get(),
         a.id,
-        new Map(rows.map((row) => [row.viewId, row.height])),
+        new Map(rows.map((row) => [row.itemId, row.height])),
       );
       if (state === "disabled") return;
       startEntryDrag(
@@ -168,7 +168,7 @@ export function LayoutSashDrag<TRecord extends PlacementRecord = PlacementRecord
     const reset = resetStackBoundary(readStackRows(host as unknown as StackContainer), leftId);
     store.update((next) => {
       let out = next;
-      for (const { viewId, height } of reset) out = setEntryHeight(out, viewId, height);
+      for (const { itemId, height } of reset) out = setEntryHeight(out, itemId, height);
       return out;
     });
   };
