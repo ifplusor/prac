@@ -6,9 +6,9 @@
 
 export * from "./widget.js";
 export * from "./board.js";
-export * from "./boardContent.js";
-export * from "./boardWindow.js";
-export * from "./boardChrome.js";
-export * from "./widgetDrag.js";
-export * from "./boardStore.js";
+export * from "./board-content.js";
+export * from "./board-window.js";
+export * from "./board-chrome.js";
+export * from "./widget-drag.js";
+export * from "./board-store.js";
 export * from "./service.js";

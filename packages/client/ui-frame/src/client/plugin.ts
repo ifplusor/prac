@@ -66,7 +66,7 @@ import { createFrame, ensureStyles } from "./frame.js";
 import { createServices } from "./services.js";
 
 import { createFrameStore, createSpaceStore } from "./store.js";
-import { WindowGroupAdapter } from "./windowGroupAdapter.js";
+import { WindowGroupAdapter } from "./window-group-adapter.js";
 import { ThemePresenter } from "./theme.js";
 
 declare global {

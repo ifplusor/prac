@@ -19,7 +19,7 @@ import {
 } from "./model.js";
 import { findRegion } from "prac-ui-kit-layout";
 import type { LayoutState } from "./placement.js";
-import { isPresent } from "./renderModel.js";
+import { isPresent } from "./render-model.js";
 
 function state(): LayoutState {
   return {

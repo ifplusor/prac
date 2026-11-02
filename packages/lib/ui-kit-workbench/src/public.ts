@@ -18,7 +18,7 @@ export type {
   ItemRecord,
 } from "./contract.js";
 
-export type { WindowGroupLayoutBridge } from "./groupBridge.js";
+export type { WindowGroupLayoutBridge } from "./group-bridge.js";
 
-export type { RegionBinding, GroupBarItem, WindowGroupBindings } from "./regionBindings.js";
-export type { WindowGroup } from "./workbenchModel.js";
+export type { RegionBinding, GroupBarItem, WindowGroupBindings } from "./region-bindings.js";
+export type { WindowGroup } from "./workbench-model.js";

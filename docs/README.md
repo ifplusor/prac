@@ -10,3 +10,4 @@
 | [vscode.md](vscode.md)                 | **被依赖的系统**：VS Code 的内部结构（两半与主线程、平台服务、extHost 协议与载体、诊断怎么走、agent / MCP / 工具 / skill / prompt 做在哪一层） |
 | [ui-surface-map.md](ui-surface-map.md) | **UI 参考**：两个生态的 UI 贡献面 → prac 的格子，以及 UI 术语表                                                                                |
 | [theory/](theory/)                     | 继承的 LLM 限制理论：固有特征、记忆模型、双 Agent、设计模式                                                                                    |
+| [file-naming.md](file-naming.md)       | **代码规范**：文件 / 目录 / 公共 subpath 的 kebab-case 与符号命名                                                                              |

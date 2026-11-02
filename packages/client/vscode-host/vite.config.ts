@@ -9,7 +9,7 @@ import { PLATFORM_MODULES, clientPack } from "../../../scripts/pack-client.ts";
  * - the **host half** (`src/index.ts` → `dist/index.mjs`) is intentionally
  *   empty — the mechanism is browser-only — but every bundle row is imported on
  *   both planes, so the entry has to exist.
- * - the **client half** (`src/client.ts` → `dist/client.js`) is the mechanism:
+ "* - the **client half** (`src/client.ts` → `dist/client.js`) is the mechanism":
  *   it reads the embed bridge the vendor lib publishes and hands its two part
  *   hosts to prac's frame as the `vscode:*` faces. Its wrapping is DSH's loader
  *   contract, so it comes from `scripts/pack-client.ts` rather than being

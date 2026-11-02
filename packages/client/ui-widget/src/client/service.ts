@@ -9,8 +9,8 @@ import type { Context } from "@deepseek-ai/cordis";
 // Type-only, for the frame plugin's `Context` / `SlotMap` merges.
 import type {} from "prac-client-ui-frame/client";
 
-import type { BoardWindowFrameFace } from "./boardWindow.js";
-import { BoardWindowAdapter } from "./boardWindow.js";
+import type { BoardWindowFrameFace } from "./board-window.js";
+import { BoardWindowAdapter } from "./board-window.js";
 import { WidgetRegistry } from "./widget.js";
 
 /** The widget-board factory / registry other plugins inject. */

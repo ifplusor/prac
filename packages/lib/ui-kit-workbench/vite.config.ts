@@ -1,7 +1,7 @@
 import { defineConfig } from "vite-plus";
 
 /**
- * The frame kit is a DSH-free library: no plugin artifact, no DSH loader, no
+ "* The frame kit is a DSH-free library": no plugin artifact, no DSH loader, no
  * DSH runtime import. React / react-dom stay external because the consuming
  * client bundles answer them from the loader's platform table.
  */

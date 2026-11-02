@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { LayoutState } from "./placement.js";
 import { ensureItem, place, regionNode } from "./model.js";
-import { visibleItems } from "./renderModel.js";
+import { visibleItems } from "./render-model.js";
 
 const empty = (): LayoutState => ({
   viewportWidth: 0,

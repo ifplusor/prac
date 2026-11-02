@@ -8,7 +8,16 @@ export default defineConfig({
   fmt: { ignorePatterns: [".agents/notes/**", ".agents/worklog/**"] },
   lint: {
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
-    rules: { "vite-plus/prefer-vite-plus-imports": "error" },
+    rules: {
+      "vite-plus/prefer-vite-plus-imports": "error",
+      "unicorn/filename-case": ["error", { case: "kebabCase" }],
+    },
+    overrides: [
+      {
+        files: ["vendor/**"],
+        rules: { "unicorn/filename-case": "off" },
+      },
+    ],
     options: { typeAware: true, typeCheck: true },
   },
   run: {

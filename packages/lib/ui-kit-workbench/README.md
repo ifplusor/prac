@@ -30,15 +30,15 @@ The kit exports no `apply` / `inject` / `name` and cannot be composed as a row.
 ## Scope
 
 ```text
-contract / workbenchModel    LayoutState / ItemRecord / WidgetRecord, WindowGroup
+contract / workbench-model    LayoutState / ItemRecord / WidgetRecord, WindowGroup
 regionContent                RegionContent / RegionBinding / RegionContentRegistry
 frameState                   FrameState / SpaceState / composed LayoutStore
 model                        defaultTree, placement wrappers over ItemRecord
 store                        LayoutStore / SpaceStore interface
-regionBindings / groupBridge  group ↔ region binding and placement projection
-layoutRoot / contentHostRegistry  frame / space / board roots and content-host registry
+region-bindings / group-bridge  group ↔ region binding and placement projection
+layout-root / content-host-registry  frame / space / board roots and content-host registry
 boardLayouts                 live board roots the frame renders
-workbenchModel / windowGroupModel  Window / Board / Widget and the generic window group
+workbench-model / window-group-model  Window / Board / Widget and the generic window group
 layoutActions / layoutDrop    L2-specific action and drop primitives
 ```
 

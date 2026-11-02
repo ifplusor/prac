@@ -90,9 +90,9 @@ import type {
 import { createPortal } from "react-dom";
 import type { UsePanelInfo } from "@deepseek-ai/dsh-client-ui-layout/client";
 
-import { LayoutItem, type ItemRenderSlot } from "./layoutItem.js";
+import { LayoutItem, type ItemRenderSlot } from "./layout-item.js";
 
-import { createFrameChrome } from "./frameChrome.js";
+import { createFrameChrome } from "./frame-chrome.js";
 
 import type { UseSessions } from "@deepseek-ai/dsh-client-ui-session/client";
 import { declaredViewIcon, declaredViewLabel, declaredViewPaneHeader } from "./catalogue.js";

@@ -48,9 +48,9 @@
       "types": "./dist/chrome.d.mts",
       "default": "./dist/chrome.mjs"
     },
-    "./renderModel": {
-      "types": "./dist/renderModel.d.mts",
-      "default": "./dist/renderModel.mjs"
+    "./render-model": {
+      "types": "./dist/render-model.d.mts",
+      "default": "./dist/render-model.mjs"
     },
     "./renderer": {
       "types": "./dist/renderer.d.mts",
@@ -72,7 +72,7 @@
       "types": "./dist/sash.d.mts",
       "default": "./dist/sash.mjs"
     },
-    "./containerBar": {
+    "./container-bar": {
       "types": "./dist/containerBar.d.mts",
       "default": "./dist/containerBar.mjs"
     },
@@ -80,37 +80,37 @@
       "types": "./dist/grid.d.mts",
       "default": "./dist/grid.mjs"
     },
-    "./chromeIntents": {
-      "types": "./dist/chromeIntents.d.mts",
-      "default": "./dist/chromeIntents.mjs"
+    "./chrome-intents": {
+      "types": "./dist/chrome-intents.d.mts",
+      "default": "./dist/chrome-intents.mjs"
     },
-    "./containerChrome": {
-      "types": "./dist/containerChrome.d.mts",
-      "default": "./dist/containerChrome.mjs"
+    "./container-chrome": {
+      "types": "./dist/container-chrome.d.mts",
+      "default": "./dist/container-chrome.mjs"
     },
     "./resize": {
       "types": "./dist/resize.d.mts",
       "default": "./dist/resize.mjs"
     },
-    "./sashDrag": {
+    "./sash-drag": {
       "types": "./dist/sashDrag.d.mts",
       "default": "./dist/sashDrag.mjs"
     },
-    "./stackDrag": {
+    "./stack-drag": {
       "types": "./dist/stackDrag.d.mts",
       "default": "./dist/stackDrag.mjs"
     },
-    "./layoutIsolation": {
-      "types": "./dist/layoutIsolation.d.mts",
-      "default": "./dist/layoutIsolation.mjs"
+    "./layout-isolation": {
+      "types": "./dist/layout-isolation.d.mts",
+      "default": "./dist/layout-isolation.mjs"
     },
     "./react": {
       "types": "./dist/react.d.mts",
       "default": "./dist/react.mjs"
     },
-    "./contentHostMount": {
-      "types": "./dist/contentHostMount.d.mts",
-      "default": "./dist/contentHostMount.mjs"
+    "./content-host-mount": {
+      "types": "./dist/content-host-mount.d.mts",
+      "default": "./dist/content-host-mount.mjs"
     }
   },
   "scripts": {

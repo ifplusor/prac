@@ -20,14 +20,14 @@ snapshot       versioned serializable shape
 workspace      workspace persistence scope
 isolation      per-item shadow-root isolation
 chrome         ChromeRegistry / contributions / intents
-renderModel    the renderer's read-only placement helpers
+render-model   the renderer's read-only placement helpers
 renderer       LayoutRenderer over LayoutState<TRecord>
-tabs/stack/sash/containerBar  generic chrome components
+tabs/stack/sash/container-bar  generic chrome components
 grid/resize/drag  grid handles, resize controller, sash / stack drag
 ```
 
 Subpaths: `./content`, `./placement`, `./store`, `./switching`, `./snapshot`,
-`./workspace-scope`, `./contentHostMount`, `./react`, `./isolation`, `./chrome`, `./renderModel`, `./renderer`, `./tabs`, `./stack`, `./sash`, `./containerBar`, `./grid`, `./resize`, `./sashDrag`, `./stackDrag`, `./chromeIntents`, `./containerChrome`, `./layoutIsolation`.
+`./workspace-scope`, `./content-host-mount`, `./react`, `./isolation`, `./chrome`, `./render-model`, `./renderer`, `./tabs`, `./stack`, `./sash`, `./container-bar`, `./grid`, `./resize`, `./sash-drag`, `./stack-drag`, `./chrome-intents`, `./container-chrome`, `./layout-isolation`.
 
 Not in scope: window / board / widget / Space / frame shell, DSH slots, source
 adapters.

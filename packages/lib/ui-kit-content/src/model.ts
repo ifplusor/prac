@@ -46,7 +46,7 @@ import {
   isPresent,
   stackEntries,
   visibleItems,
-} from "./renderModel.js";
+} from "./render-model.js";
 
 /** Generic region minimum, in px. */
 const DEFAULT_MIN = 120;

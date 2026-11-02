@@ -1,7 +1,7 @@
 import { defineConfig } from "vite-plus";
 
 /**
- * Host-only package: one Node entry the DSH loader imports.
+ "* Host-only package": one Node entry the DSH loader imports.
  *
  * There is no client half. The parts that render in the page are declared by the
  * view-declaring packages (`prac-client-ui-vscode-editor` / `-explorer`) and booted by
