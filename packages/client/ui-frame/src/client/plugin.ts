@@ -18,7 +18,7 @@
  *    from the registry, never assumed from the tag. The mechanism ships **no concrete
  *    view name and no default placement**: the bundle's arrangement says what
  *    goes where through {@link PracLayoutFace}. The catalogue itself is
- *    *queryable* — {@link PracLayoutFace.listViews} enumerates the slot
+ *    *queryable* — {@link PracLayoutFace.listItems} enumerates the slot
  *    registry live (so a later `main` key or `prac.view` entry appears) and
  *    joins it with each view's placement, which is what lets a UI offer the
  *    items that are hidden or unplaced, not just the visible ones.
@@ -95,7 +95,7 @@ import { VIEW_SLOT, WIDGET_SLOT, WINDOW_SLOT, readDeclaredViewIds } from "./cata
 export function apply(ctx: Context): void {
   ensureStyles();
   // The frame reports a close request through the store; this set is what carries it to
-  // whoever declared the view (the face's `onDidRequestCloseView`).
+  // whoever declared the view (the face's `onDidRequestCloseItem`).
   const closeListeners = new Set<(viewId: string) => void>();
   const close = (viewId: string): void => {
     for (const listener of Array.from(closeListeners)) listener(viewId);
@@ -303,7 +303,7 @@ export function apply(ctx: Context): void {
     const disposePracSurfaces = ctx.provide("pracSurfaces", surfaces);
     const disposePracSpaces = ctx.provide("pracSpaces", pracSpaces);
     const disposeWindowActions = ctx.provide("pracWindowActions", windowActions);
-    // The catalogue's live sources. `listViews()` reads the registry on every
+    // The catalogue's live sources. `listItems()` reads the registry on every
     // call, so a later registration is already visible; these subscriptions
     // only bump `catalogueVersion`, which is how a subscribed UI (and this
     // frame) learns to re-read it — and refresh which items the slot declares,

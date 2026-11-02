@@ -117,7 +117,7 @@ export function apply(ctx: Context): void {
         if (view === null || view === undefined) return null;
         return host.filePlacement(view)?.placement ?? null;
       };
-      const active = layout.activeView();
+      const active = layout.activeItem();
       for (const { view } of files) {
         const entry = entries.get(placementOfView(view) ?? "");
         layout.setItemFlags(view, {
@@ -184,7 +184,7 @@ export function apply(ctx: Context): void {
     const stopEditors = editors.subscribe(sync);
     // The tab's close button asks; this package closes the app's editor, which is what
     // takes the view away (the mechanism never removes a view on its own).
-    const stopClose = layout.onDidRequestCloseView((view) => {
+    const stopClose = layout.onDidRequestCloseItem((view) => {
       // The tab names one **placement**: the same file may be open in another region, and
       // that region's editor is not what this × asks about.
       const placement = host.filePlacement(view);

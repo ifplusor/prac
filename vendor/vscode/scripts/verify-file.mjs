@@ -330,7 +330,7 @@ const activeAfterClick = await page.evaluate(
 // one surface each — VS Code's model, with prac's regions as its grid.
 step("split region");
 await page.evaluate(
-  (resource) => globalThis.__pracFrame.splitView(globalThis.__pracFileView(resource), "right"),
+  (resource) => globalThis.__pracFrame.splitItem(globalThis.__pracFileView(resource), "right"),
   uriOf(FILE_A),
 );
 await waitForSurface(uriOf(FILE_A));
@@ -576,7 +576,7 @@ await page.waitForTimeout(2000);
 // prac owns the region tree, so a group the workbench makes on its own would have no
 // region until the frame renders a view for it.)
 await page.evaluate(
-  (resource) => globalThis.__pracFrame.splitView(globalThis.__pracFileView(resource), "right"),
+  (resource) => globalThis.__pracFrame.splitItem(globalThis.__pracFileView(resource), "right"),
   uriOf(FILE_B),
 );
 await page.waitForTimeout(3000);
@@ -682,7 +682,7 @@ step("project the frame's active window");
 const activeProjection = await page.evaluate(
   async ({ conversation, file }) => {
     const wait = () => new Promise((resolve) => setTimeout(resolve, 1600));
-    const front = globalThis.__pracFrame.activeView();
+    const front = globalThis.__pracFrame.activeItem();
     if (front !== null && front !== conversation) globalThis.__pracFrame.hide(front);
     globalThis.__pracFrame.setFront(conversation);
     await wait();
@@ -701,7 +701,7 @@ const activeProjection = await page.evaluate(
     await wait();
     return {
       chat,
-      frame: globalThis.__pracFrame.activeView(),
+      frame: globalThis.__pracFrame.activeItem(),
       fileView: globalThis.__pracFileView(file),
       fileActive: globalThis.__vscodeEmbed.face.activeWindow(),
       chatOrder,
@@ -717,7 +717,7 @@ const activeProjection = await page.evaluate(
 step("audit the window projection writes");
 const projectionAudit = await page.evaluate(async () => {
   const before = globalThis.__vscodeEmbed.face.projectionWriteAudit();
-  globalThis.__pracFrame.setFront(globalThis.__pracFrame.activeView());
+  globalThis.__pracFrame.setFront(globalThis.__pracFrame.activeItem());
   await new Promise((resolve) => setTimeout(resolve, 1400));
   return { before, after: globalThis.__vscodeEmbed.face.projectionWriteAudit() };
 });

@@ -530,6 +530,7 @@ ctx.layout           // DSH compat shim（放 ui-frame）
 - 拆包按层，不按 window / board 领域；`prac-ui-kit-content`（L1）已立包，先抽出 content protocols / placement / store / snapshot / isolation；renderer / model 随后迁入。
 - 包名保持 `prac-ui-kit-*`：暂不引入独立的 `@prac-ui` scope；等框架真的要对外发布时再讨论。
 - kit 的 “view” 词汇已清：`ItemRecord` / `ItemFlags` / `ItemKind` / `itemId` / `items`；`prac.view` 等 source slot 留在 plugin。持久化不升 v2，旧 `views` 字段由 store heal 时读成 `items`。
+- plugin face 也改用 `Item*`：`listItems` / `activeItem` / `splitItem` / `setItemKind` / `setItemBoard` / `onDidRequestCloseItem`；source adapter 的 `viewId` 仍保留。
 - 包入口按层：`prac-ui-kit-*` 是库，只出 `.`，且不 import DSH；`prac-client-*` 是 DSH 插件行，出 `./client`。`ui-frame` 的 `./client` 出 loader artifact，其 `types` 条件承载 DSH 契约类型；root 是 host 半。
 - 包划分与 bundle 规则见「包与依赖」。
 

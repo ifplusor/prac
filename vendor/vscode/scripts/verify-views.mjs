@@ -14,7 +14,7 @@
  *
  *  1. `Cmd/Ctrl+Alt+V` opens and closes the overlay (present + painted), and
  *     `Escape` dismisses it;
- *  2. the catalogue the overlay lists is the mechanism's `listViews()` — the
+ *  2. the catalogue the overlay lists is the mechanism's `listItems()` — the
  *     union of DSH slots (`dsh:sidebar`, every registered `main` key,
  *     `dsh:rightbar`) and the `prac.view` seat (one `vscode:file:<resource>` per
  *     open file), including views that are hidden;
@@ -232,7 +232,7 @@ async function sample(page) {
           document
             .querySelector("[data-prac-recall-selected]")
             ?.getAttribute("data-prac-recall-row") ?? null,
-        catalogue: globalThis.__pracFrame.listViews(),
+        catalogue: globalThis.__pracFrame.listItems(),
         regionInfos: globalThis.__pracFrame.listRegions(),
         catalogueVersion: state.catalogueVersion,
         modelSizes: sizes,
@@ -297,19 +297,19 @@ await page.waitForTimeout(3000);
 
 const probeReady = await page.evaluate(
   () =>
-    typeof globalThis.__pracFrame?.listViews === "function" &&
+    typeof globalThis.__pracFrame?.listItems === "function" &&
     typeof globalThis.__pracFrame?.listRegions === "function" &&
     typeof globalThis.__pracFrame?.place === "function" &&
     typeof globalThis.__pracFrame?.hide === "function" &&
     typeof globalThis.__pracFrame?.show === "function" &&
-    typeof globalThis.__pracFrame?.splitView === "function",
+    typeof globalThis.__pracFrame?.splitItem === "function",
 );
 if (!probeReady) throw new Error("globalThis.__pracFrame is missing the catalogue/placement face");
 
 const FILE_VIEW = await page.evaluate(
   (prefix) =>
     globalThis.__pracFrame
-      .listViews()
+      .listItems()
       .map((view) => view.id)
       .find((id) => id.startsWith(prefix)) ?? null,
   FILE_VIEW_PREFIX,

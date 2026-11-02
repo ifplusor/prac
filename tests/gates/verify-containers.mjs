@@ -51,7 +51,7 @@ const read = () =>
     return {
       left: rail("left"),
       right: rail("right"),
-      views: globalThis.__pracFrame?.listViews().map((view) => ({
+      views: globalThis.__pracFrame?.listItems().map((view) => ({
         id: view.id,
         region: view.region ?? null,
         hidden: view.hidden === true,

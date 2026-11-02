@@ -79,7 +79,7 @@ function recordingFace(items: LayoutState["items"] = {}): {
   const face = {
     getState: () => stateWith(live),
     subscribe: () => () => {},
-    listViews: (): ItemInfo[] =>
+    listItems: (): ItemInfo[] =>
       Object.entries(live).map(([id, record]) => ({
         id,
         region: record.region ?? null,
@@ -117,18 +117,18 @@ function recordingFace(items: LayoutState["items"] = {}): {
     },
     setItemCollapsed: record("setItemCollapsed"),
     setItemSize: record("setItemSize"),
-    setViewKind: record("setViewKind"),
+    setItemKind: record("setItemKind"),
     registerContentHost: () => () => {},
     registerBoardLayout: () => () => {},
-    setViewBoard: () => {},
+    setItemBoard: () => {},
     setCollapsed: record("setCollapsed"),
     setWidth: record("setWidth"),
-    splitView: record("splitView"),
+    splitItem: record("splitItem"),
     bindRoles: record("bindRoles"),
     bindTrack: record("bindTrack"),
     setItemFlags: record("setItemFlags"),
-    activeView: () => null,
-    onDidRequestCloseView: () => () => {},
+    activeItem: () => null,
+    onDidRequestCloseItem: () => () => {},
     // The frame owns the region tree: `addGroup` asks it for a region and binds the group to
     // the id it returns. A test double that never splits answers `undefined`.
     createRegionBeside: () => undefined,
@@ -417,7 +417,7 @@ describe("placeCatalogue", () => {
     ]);
     expect(shapes(calls)).toEqual([
       ["placeQuietly", "vscode:file:p2:x", CENTER],
-      ["splitView", "vscode:file:p2:x", "right"],
+      ["splitItem", "vscode:file:p2:x", "right"],
     ]);
   });
 

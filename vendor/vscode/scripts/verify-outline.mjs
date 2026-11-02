@@ -194,7 +194,7 @@ async function focusFirstFixture() {
     page.evaluate((resource) => globalThis.__pracFileView(resource), uriOf(fixture));
   const fileViews = () =>
     globalThis.__pracFrame
-      .listViews()
+      .listItems()
       .filter((entry) => entry.id.startsWith("vscode:file:"))
       .map(
         (entry) => `${globalThis.__pracFileResource(entry.id).split("/").pop()} @${entry.region}`,
@@ -210,7 +210,7 @@ async function focusFirstFixture() {
   await page.waitForTimeout(3000);
   const spot = await page.evaluate(
     (view) => {
-      const region = globalThis.__pracFrame.listViews().find((entry) => entry.id === view)?.region;
+      const region = globalThis.__pracFrame.listItems().find((entry) => entry.id === view)?.region;
       const host = region
         ? document.querySelector(`[data-prac-region="${region}"] [data-prac-view-host]`)
         : null;

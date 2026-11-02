@@ -77,7 +77,7 @@ await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 // nothing selects (the catalogue sync rescues it, but does not choose for the
 // person).
 await page.waitForFunction(
-  () => globalThis.__pracFrame.listViews().some((view) => (view.region ?? "").startsWith("left/")),
+  () => globalThis.__pracFrame.listItems().some((view) => (view.region ?? "").startsWith("left/")),
   null,
   { timeout: 90_000 },
 );

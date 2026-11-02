@@ -235,7 +235,7 @@ export interface PracLayoutFace {
    *
    * @returns one entry per known view (placed or not).
    */
-  listViews(): ItemInfo[];
+  listItems(): ItemInfo[];
   /**
    * The region ids a view can be moved to, in tree order.
    *
@@ -347,7 +347,7 @@ export interface PracLayoutFace {
    */
   hide(viewId: string): void;
   /** Classify an existing view as a window or a widget (model discriminator). */
-  setViewKind(viewId: string, kind: ItemKind): void;
+  setItemKind(viewId: string, kind: ItemKind): void;
   /** Register a content host for a window; returns the unregister function. */
   registerContentHost(contentId: string, host: ContentHost): () => void;
   /** Register a board layout root for a board window; returns the unregister function. */
@@ -357,7 +357,7 @@ export interface PracLayoutFace {
     chrome?: ChromeRegistry<WidgetRecord>,
   ): () => void;
   /** Point a window record at a board layout root (or clear it). */
-  setViewBoard(viewId: string, boardId: string | undefined): void;
+  setItemBoard(viewId: string, boardId: string | undefined): void;
   registerWindowGroup(group: FrameWindowGroup, regionId: string): FrameGroup;
   registerSurface(surface: FrameSurface, regionId: string): FrameGroup;
   /**
@@ -407,7 +407,7 @@ export interface PracLayoutFace {
    * @param viewId - the view to move into the new region.
    * @param side - which side of its current region the new region goes on.
    */
-  splitView(viewId: string, side: Side): void;
+  splitItem(viewId: string, side: Side): void;
   /**
    * Swap two cells of a grid.
    *
@@ -520,7 +520,7 @@ export interface PracLayoutFace {
    * @param listener - called with the view id.
    * @returns a function that unsubscribes.
    */
-  onDidRequestCloseView(listener: (viewId: string) => void): () => void;
+  onDidRequestCloseItem(listener: (viewId: string) => void): () => void;
   /**
    * The view the mechanism considers active: the front view of the centre region.
    *
@@ -529,7 +529,7 @@ export interface PracLayoutFace {
    *
    * @returns the view id, or null when the centre shows nothing.
    */
-  activeView(): string | null;
+  activeItem(): string | null;
   /**
    * Bind the roles DSH's borrowed vocabulary resolves through. Supplied by the
    * arrangement; the mechanism itself names no view. Later bindings win, and a

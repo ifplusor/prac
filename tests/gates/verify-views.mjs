@@ -28,7 +28,7 @@ const catalogue = await page.evaluate(() => ({
     row.getAttribute("data-prac-recall-row"),
   ),
   views: globalThis.__pracFrame
-    .listViews()
+    .listItems()
     .filter((view) => view.kind !== "widget")
     .map((view) => view.id),
   selected:
@@ -42,19 +42,19 @@ const catalogue = await page.evaluate(() => ({
 // view table, so the recall surface must not offer them (a second home would double-render).
 const target = "dsh:main:conversation";
 const before = await page.evaluate(
-  (id) => globalThis.__pracFrame.listViews().find((view) => view.id === id),
+  (id) => globalThis.__pracFrame.listItems().find((view) => view.id === id),
   target,
 );
 await page.click(`[data-prac-recall-toggle="${target}"]`);
 await page.waitForTimeout(500);
 const hidden = await page.evaluate(
-  (id) => globalThis.__pracFrame.listViews().find((view) => view.id === id),
+  (id) => globalThis.__pracFrame.listItems().find((view) => view.id === id),
   target,
 );
 await page.click(`[data-prac-recall-toggle="${target}"]`);
 await page.waitForTimeout(500);
 const restored = await page.evaluate(
-  (id) => globalThis.__pracFrame.listViews().find((view) => view.id === id),
+  (id) => globalThis.__pracFrame.listItems().find((view) => view.id === id),
   target,
 );
 

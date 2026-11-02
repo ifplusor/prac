@@ -52,7 +52,7 @@ export function apply(ctx: Context): void {
         { getState: () => content.get(), subscribe: (listener) => content.subscribe(listener) },
         chrome,
       ),
-    setViewBoard: (viewId, boardId) => frame.setViewBoard(viewId, boardId),
+    setItemBoard: (viewId, boardId) => frame.setItemBoard(viewId, boardId),
   };
   const face: PracWidgetsFace = {
     registry: new WidgetRegistry(),

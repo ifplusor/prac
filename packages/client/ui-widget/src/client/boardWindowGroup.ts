@@ -28,7 +28,7 @@ export interface BoardWindowFrameFace {
     source: BoardContent,
     chrome: ReturnType<typeof createBoardChrome>,
   ): () => void;
-  setViewBoard(viewId: string, boardId: string | undefined): void;
+  setItemBoard(viewId: string, boardId: string | undefined): void;
 }
 
 /** What the group's one window renders. */

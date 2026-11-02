@@ -89,7 +89,7 @@ const facts = () =>
       tabs: [...globalThis.__deep.all("[data-prac-tab]")]
         .map((tab) => (tab.getAttribute("data-prac-tab") ?? "").split("/").pop())
         .filter((name) => ["a.txt", "b.txt", "c.txt"].includes(name ?? "")),
-      front: (globalThis.__pracFrame.activeView() ?? "").split("/").pop(),
+      front: (globalThis.__pracFrame.activeItem() ?? "").split("/").pop(),
       surface: (surface?.getAttribute("data-vscode-embed-file") ?? "").split("/").pop() ?? null,
       app: (
         globalThis.__vscodeEmbed.face.capabilities.editors.snapshot().find((entry) => entry.active)
@@ -110,7 +110,7 @@ const tabIdOf = (file) =>
   page.evaluate(
     (name) =>
       globalThis.__pracFrame
-        .listViews()
+        .listItems()
         .map((view) => view.id)
         .find((id) => id.startsWith("vscode:file:") && id.endsWith(name)) ?? null,
     file.name,

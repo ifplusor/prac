@@ -381,7 +381,7 @@ export function apply(ctx: Context): void {
         | { order: number; kind: "window"; id: string }
       )[]
     >();
-    for (const view of ctx.pracFrame.listViews()) {
+    for (const view of ctx.pracFrame.listItems()) {
       if (view.region === null || view.hidden) continue;
       const file = view.id.startsWith("vscode:file:") ? face.filePlacement(view.id) : undefined;
       if (file !== undefined) {

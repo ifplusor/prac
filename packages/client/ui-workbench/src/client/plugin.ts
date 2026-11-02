@@ -163,7 +163,7 @@ interface RecallSurfaceProps {
  * do I get it back?* It lists every view the mechanism knows (including ones
  * nothing has placed), where each sits, and offers the mechanism's own moves:
  * 聚焦 (`place` into the console), 隐藏/显示 (`hide`/`show`), 移到 (`place` into
- * any region from `listRegions()`), 分到上/下/左/右 (`splitView`, per view — the
+ * any region from `listRegions()`), 分到上/下/左/右 (`splitItem`, per view — the
  * mechanism creates the pane *for* that view, so no direction can leave an empty
  * pane behind), and 收起/展开 (`setCollapsed`) per region.
  *
@@ -202,7 +202,7 @@ function RecallSurface({ layout, onFocus }: RecallSurfaceProps): ReactElement | 
   // Widgets live on their board now, not in the frame's view table. The recall surface is
   // the mechanism's window catalogue; widget recall (cross-board move / hide) moves with the
   // board model instead of minting a second frame record for a widget.
-  const items = layout.listViews().filter((view) => view.kind !== "widget");
+  const items = layout.listItems().filter((view) => view.kind !== "widget");
   const regions = layout.listRegions();
   const active = items.length === 0 ? 0 : Math.min(cursor, items.length - 1);
 
@@ -399,7 +399,7 @@ function RecallSurface({ layout, onFocus }: RecallSurfaceProps): ReactElement | 
             title,
             "aria-label": `${view.id} ${title}`,
             disabled: view.region === null,
-            onClick: () => layout.splitView(view.id, side),
+            onClick: () => layout.splitItem(view.id, side),
             style: RECALL_BUTTON_STYLE,
           },
           glyph,
@@ -643,7 +643,7 @@ export function apply(ctx: Context): void {
     if (entry.registered) return entry.board;
     try {
       layout.registerSurface(entry.board, region);
-      layout.setViewBoard(entry.board.windowId, entry.board.boardId);
+      layout.setItemBoard(entry.board.windowId, entry.board.boardId);
       entry.registered = true;
       return entry.board;
     } catch {
@@ -817,12 +817,12 @@ export function apply(ctx: Context): void {
         vscode.mapWindow(conversation, "Chat", region);
       }
       layout.setItemFlags(conversation, { closable: true });
-      if (layout.activeView() === conversation) vscode.activateWindow(conversation);
+      if (layout.activeItem() === conversation) vscode.activateWindow(conversation);
     };
     scope.effect(() => {
       syncChat();
       const offLayout = layout.subscribe(syncChat);
-      const offClose = layout.onDidRequestCloseView((view) => {
+      const offClose = layout.onDidRequestCloseItem((view) => {
         if (view === conversation) layout.hide(view);
       });
       return () => {
@@ -848,8 +848,8 @@ export function apply(ctx: Context): void {
       // Model discriminator: a file view is a window; a contributed view is a
       // widget. Board windows are not classified yet; dsh:* stays the default window.
       for (const id of Object.keys(layout.getState().items)) {
-        if (id.startsWith("vscode:file:")) layout.setViewKind(id, "window");
-        else if (id.startsWith("vscode:view:")) layout.setViewKind(id, "widget");
+        if (id.startsWith("vscode:file:")) layout.setItemKind(id, "window");
+        else if (id.startsWith("vscode:view:")) layout.setItemKind(id, "widget");
       }
       if (layout.activeContainer("bottom") === null) {
         const terminal = layout
@@ -930,7 +930,7 @@ export function apply(ctx: Context): void {
         // items anywhere, so moving it is not a state the left rail can lose it in.)
         const placedRight = new Set(
           layout
-            .listViews()
+            .listItems()
             .filter(
               (view) =>
                 view.region !== null &&
@@ -1045,7 +1045,7 @@ export function apply(ctx: Context): void {
         containerBoards.delete(sourceChild);
         try {
           layout.registerSurface(entry.board, targetChild);
-          layout.setViewBoard(entry.board.windowId, entry.board.boardId);
+          layout.setItemBoard(entry.board.windowId, entry.board.boardId);
           entry.registered = true;
           containerBoards.set(targetChild, entry);
         } catch {

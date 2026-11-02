@@ -207,7 +207,7 @@ export function placeCatalogue(
     }
     // Views still sitting directly in the region (placed before it became a
     // selector) move into a child of their own, ahead of the containers.
-    for (const record of layout.listViews()) {
+    for (const record of layout.listItems()) {
       if (record.region !== region) continue;
       children.set(childRegionId(region, record.id), {
         id: childRegionId(region, record.id),
@@ -223,7 +223,7 @@ export function placeCatalogue(
     layout.setRegionChildren(region, [...children.values()]);
     // Views still sitting directly in the region (placed before it became a
     // selector) move into a child of their own.
-    for (const record of layout.listViews()) {
+    for (const record of layout.listItems()) {
       if (record.region !== region) continue;
       layout.placeQuietly(record.id, childRegionId(region, record.id));
     }
@@ -295,7 +295,7 @@ function placeFileEntries(layout: PracLayout, entries: readonly VscodeCatalogueE
       // The same file already holds a region: this placement is the app showing it a
       // second time, so it goes beside that one rather than on top of it.
       layout.placeQuietly(entry.view, shown.region);
-      layout.splitView(entry.view, "right");
+      layout.splitItem(entry.view, "right");
     } else {
       layout.placeQuietly(entry.view, CENTER);
     }

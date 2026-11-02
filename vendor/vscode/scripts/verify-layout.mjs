@@ -58,7 +58,7 @@ const FILE_VIEW_PREFIX = "vscode:file:";
 
 /**
  * The arrangement's own centre occupant, used as the *view* the row split
- * carries: `splitView` moves a view into the pane it creates, so a split needs a
+ * carries: `splitItem` moves a view into the pane it creates, so a split needs a
  * view to name (decision 15/20 — a split never creates an empty pane).
  */
 const CONVERSATION_VIEW = "dsh:main:conversation";
@@ -262,7 +262,7 @@ await page.waitForTimeout(3000);
 
 const probeReady = await page.evaluate(
   () =>
-    typeof globalThis.__pracFrame?.splitView === "function" &&
+    typeof globalThis.__pracFrame?.splitItem === "function" &&
     typeof globalThis.__pracFrame?.setCollapsed === "function" &&
     typeof globalThis.__pracFrame?.place === "function",
 );
@@ -272,7 +272,7 @@ if (!probeReady)
 const fileView = await page.evaluate(
   (prefix) =>
     globalThis.__pracFrame
-      .listViews()
+      .listItems()
       .map((view) => view.id)
       .find((id) => id.startsWith(prefix)) ?? null,
   FILE_VIEW_PREFIX,
@@ -291,13 +291,13 @@ const states = {};
 states.default = await read();
 
 // ── split: the conversation leaves the track for a pane the sidebar keeps alive ─
-// `splitView` is view-centric: it creates the pane *for* the named view. The
+// `splitItem` is view-centric: it creates the pane *for* the named view. The
 // conversation is the track's only visible occupant, so the sidebar is placed
 // there first — otherwise the emptied track would not render and there would be
 // no pane to sit beside. The file, in the centre, is untouched.
 await act("place", VSCODE_SIDEBAR_VIEW, TRACK_REGION);
 await page.waitForTimeout(700);
-await act("splitView", CONVERSATION_VIEW, TRACK_REGION);
+await act("splitItem", CONVERSATION_VIEW, TRACK_REGION);
 await page.waitForTimeout(900);
 states.split = await read();
 
@@ -326,7 +326,7 @@ states.expanded = await read();
 // centre would make a flex|flex pair, whose sash is inert by design.
 await act("place", fileView, TRACK_REGION);
 await page.waitForTimeout(900);
-await act("splitView", fileView, "down");
+await act("splitItem", fileView, "down");
 await page.waitForTimeout(900);
 states.columnSplit = await read();
 await dragSash(page, '[data-prac-sash-dir="column"]', 0, 150);

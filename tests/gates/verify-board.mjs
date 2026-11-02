@@ -84,7 +84,7 @@ const dragBoard = await page.evaluate(async () => {
   board.addWidget("gate:drag-a");
   board.addWidget("gate:drag-b");
   globalThis.__pracFrame.place(board.windowId, "center");
-  globalThis.__pracFrame.setViewBoard(board.windowId, board.boardId);
+  globalThis.__pracFrame.setItemBoard(board.windowId, board.boardId);
   await new Promise((resolve) => setTimeout(resolve, 800));
   const host = document.querySelector(`[data-prac-view-id="${board.windowId}"]`);
   const root = host?.shadowRoot;
@@ -142,7 +142,7 @@ const crossDrag = await page.evaluate(async (targetBoardId) => {
   const source = globalThis.__pracWidgets.createBoardWindow("gate:drag-cross", "Cross");
   source.addWidget("gate:cross-a");
   globalThis.__pracFrame.place(source.windowId, "center");
-  globalThis.__pracFrame.setViewBoard(source.windowId, source.boardId);
+  globalThis.__pracFrame.setItemBoard(source.windowId, source.boardId);
   await new Promise((resolve) => setTimeout(resolve, 800));
   const target = globalThis.__pracWidgets.boards().find((board) => board.id === targetBoardId);
   const host = target === undefined
@@ -225,7 +225,7 @@ const stage = await page.evaluate(async ({ uri }) => {
   }
   const board = globalThis.__pracWidgets.createBoardWindow("gate:stage-board", "Gate Stage");
   globalThis.__pracFrame.place(board.windowId, "center");
-  globalThis.__pracFrame.setViewBoard(board.windowId, board.boardId);
+  globalThis.__pracFrame.setItemBoard(board.windowId, board.boardId);
   await new Promise((resolve) => setTimeout(resolve, 600));
   globalThis.__pracVscodeFace.mapWindow(board.windowId, "Gate Stage", "center");
   await new Promise((resolve) => setTimeout(resolve, 1200));

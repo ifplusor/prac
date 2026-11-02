@@ -50,7 +50,7 @@ await clearLayoutState(page);
 await page.reload({ waitUntil: "load" });
 await settle();
 
-await page.evaluate((view) => globalThis.__pracFrame.splitView(view, "right"), CONVERSATION);
+await page.evaluate((view) => globalThis.__pracFrame.splitItem(view, "right"), CONVERSATION);
 await page.waitForTimeout(1200);
 await page.evaluate(() => globalThis.__pracFrame.setWidth("left", 340));
 await page.waitForTimeout(1200);

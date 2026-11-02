@@ -262,7 +262,7 @@ export function createServices(
     getState: () => store.get(),
     subscribe: (listener) => store.subscribe(listener),
     /** The union of the slot registry's items and each one's placement. */
-    listViews(): ItemInfo[] {
+    listItems(): ItemInfo[] {
       const state = store.get();
       return catalogueViewIds(ctx.slots).map((id) => {
         const record: ItemRecord | undefined = state.items[id];
@@ -280,7 +280,7 @@ export function createServices(
               hidden: record.hidden,
               order: record.order,
               // A widget the board owns has no frame record; its declared slot still says what
-              // it is, and `listViews` must not report it as a window.
+              // it is, and `listItems` must not report it as a window.
               kind: record?.kind ?? (declaredViewSlot(id) === "widget" ? "widget" : "window"),
             };
       });
@@ -375,7 +375,7 @@ export function createServices(
     ): () => void {
       return boardLayouts.register(boardId, source, chrome);
     },
-    setViewBoard(viewId: string, boardId: string | undefined): void {
+    setItemBoard(viewId: string, boardId: string | undefined): void {
       store.update((state) => {
         const view = ensureItem(state, viewId);
         const { boardId: _old, ...rest } = view;
@@ -388,7 +388,7 @@ export function createServices(
         };
       });
     },
-    setViewKind(viewId: string, kind: "window" | "widget"): void {
+    setItemKind(viewId: string, kind: "window" | "widget"): void {
       store.update((state) => {
         const view = ensureItem(state, viewId);
         return { ...state, items: { ...state.items, [viewId]: { ...view, kind } } };
@@ -452,7 +452,7 @@ export function createServices(
      * two spellings. A view that is placed nowhere has no region to split, and a
      * region that no longer exists is not a split target: both are no-ops.
      */
-    splitView(viewId: string, side: Side): void {
+    splitItem(viewId: string, side: Side): void {
       store.update((state) => {
         const record: ItemRecord | undefined = state.items[viewId];
         if (record === undefined) return state;
@@ -528,7 +528,7 @@ export function createServices(
     /**
      * Split a region in two without moving a view into it (see the face's doc).
      *
-     * The tree edit is the same one `splitView` makes; what differs is that no view is
+     * The tree edit is the same one `splitItem` makes; what differs is that no view is
      * placed, so the new region starts empty and becomes visible when the app puts a view
      * there (which is exactly what the workbench's move/open into the new group produces).
      */
@@ -576,7 +576,7 @@ export function createServices(
      * A no-op when nothing changes, by identity: a UI that re-syncs flags on every
      * layout change (the editor package does) must not wake the store in a loop.
      */
-    onDidRequestCloseView(listener: (viewId: string) => void): () => void {
+    onDidRequestCloseItem(listener: (viewId: string) => void): () => void {
       closeListeners.add(listener);
       return () => closeListeners.delete(listener);
     },
@@ -595,7 +595,7 @@ export function createServices(
       });
     },
     /** The centre region's front view: what prac is showing as active. */
-    activeView(): string | null {
+    activeItem(): string | null {
       const state = store.get();
       return frontItem(state, centreRegion(state)) ?? null;
     },

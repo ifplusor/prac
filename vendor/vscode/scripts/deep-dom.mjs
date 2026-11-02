@@ -57,7 +57,7 @@ const WALKER = `(() => {
   // Every prac view standing for one file, in layout order: one per **placement**
   // (the same file open in two editor groups is two views).
   globalThis.__pracFileViews = (resource) =>
-    (globalThis.__pracFrame?.listViews() ?? [])
+    (globalThis.__pracFrame?.listItems() ?? [])
       .map((view) => view.id)
       .filter((id) => id.startsWith("vscode:file:") && id.endsWith(resource));
   globalThis.__pracFileView = (resource) => globalThis.__pracFileViews(resource)[0] ?? null;

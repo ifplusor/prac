@@ -52,7 +52,7 @@ const state = () =>
         catalogue: globalThis.__pracVscodeFace
           ?.catalogue()
           .filter((entry) => entry.view === view || entry.appId === appView),
-        frames: globalThis.__pracFrame?.listViews().filter((entry) => entry.id === view) ?? [],
+        frames: globalThis.__pracFrame?.listItems().filter((entry) => entry.id === view) ?? [],
         boards,
         owners: boards.filter((board) => board.widgets.includes(view)).map((board) => board.id),
         hosts: deepHosts(),
