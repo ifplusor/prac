@@ -2,7 +2,6 @@ import {
   ItemActions,
   type RenderItemAction,
   type GroupBarItem,
-  type WindowGroupBindings,
   SASH_SIZE,
   type StyleObject,
   setEntryFolded,
@@ -12,6 +11,7 @@ import {
   type LayoutStore,
   type ItemRecord,
 } from "prac-ui-kit-workbench";
+import type { WindowManager } from "./window-manager.js";
 import {
   TabStrip,
   StackHeader,
@@ -595,7 +595,7 @@ export function createFrame(
   store: LayoutStore,
   sources: {
     readonly currentSession: CurrentSessionSource;
-    readonly viewGroups?: WindowGroupBindings;
+    readonly windows?: WindowManager;
     readonly contentHosts?: import("prac-ui-kit-workbench").ContentHostRegistry;
     readonly boardLayouts?: import("prac-ui-kit-workbench").BoardLayoutRegistry;
     readonly chrome?: ChromeRegistry<ItemRecord>;
@@ -825,7 +825,7 @@ export function createFrame(
         ? selectedId.slice("container:".length)
         : selectedId;
       const groups = new Map(
-        (sources.viewGroups?.barItems(node.id) ?? []).map((item): [string, GroupBarItem] => [
+        (sources.windows?.barItems(node.id) ?? []).map((item): [string, GroupBarItem] => [
           item.regionId,
           item,
         ]),
@@ -1061,7 +1061,7 @@ export function createFrame(
       ctx: LayoutDecorationContext<ItemRecord>,
     ): LayoutDecoration | undefined => {
       const node = ctx.node;
-      const surface = sources.viewGroups?.contentFor(node.id);
+      const surface = sources.windows?.contentFor(node.id);
       const surfacePart: LayoutDecoration =
         surface === undefined
           ? {}

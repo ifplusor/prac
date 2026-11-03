@@ -89,6 +89,7 @@ import {
 import type { LayoutFace, PracLayoutFace, RoleBindings } from "./contract.js";
 
 import type { ItemInfo } from "./contract.js";
+import { WindowManager, type WindowGroupRuntime } from "./window-manager.js";
 
 /** Whether a view's region sits inside the subtree a region id names. */
 function inRegionSubtree(region: string, target: string): boolean {
@@ -104,7 +105,7 @@ export interface LayoutServices {
   /** The `panelInfo` root hook's observable. */
   readonly panelInfo: HostObservable<PanelInfo>;
   /** The frame's view-group owner. */
-  readonly viewGroups: WindowGroupBindings;
+  readonly windows: WindowManager;
   /** Region-content factories registered by window / widget plugins. */
   readonly surfaces: RegionContentRegistry<WindowGroup>;
   /** Runtime content hosts for windows; keyed by `contentId`. */
@@ -132,7 +133,7 @@ export function createServices(
   // one-view rows. Hiding the last visible view, placing one, folding one — they all change the shape
   // (a stack that falls back to one row melts, an empty leftover holds no space), so the normaliser
   // runs on the way out of each change rather than only on placements.
-  const viewGroups = new WindowGroupBindings(store);
+  const windows = new WindowManager(new WindowGroupBindings(store));
   const surfaces = new RegionContentRegistry<WindowGroup>();
   const originalUpdate = store.update;
   const write = (change: Parameters<typeof store.update>[0]): void => originalUpdate(change);
@@ -419,13 +420,13 @@ export function createServices(
       });
     },
     registerWindowGroup(group: WindowGroup, regionId: string): RegionBinding {
-      return viewGroups.register(group, regionId);
+      return windows.register(group as unknown as WindowGroupRuntime, regionId);
     },
     registerContent(content: GroupRegionContent<WindowGroup>, regionId: string): RegionBinding {
-      return viewGroups.registerContent(content, regionId);
+      return windows.registerContent(content, regionId);
     },
     unregisterWindowGroup(groupId: string): void {
-      viewGroups.unregister(groupId);
+      windows.unregister(groupId);
     },
     setItemCollapsed(viewId: string, collapsed: boolean): void {
       // Through the model: a view that lives in a stack **row** folds through its region, so writing
@@ -617,5 +618,5 @@ export function createServices(
     },
   };
 
-  return { layout, pracFrame, panelInfo, viewGroups, surfaces, contentHosts, boardLayouts };
+  return { layout, pracFrame, panelInfo, windows, surfaces, contentHosts, boardLayouts };
 }

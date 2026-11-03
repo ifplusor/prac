@@ -234,7 +234,7 @@ export function apply(ctx: Context): void {
       return () => spaceListeners.delete(listener);
     },
   };
-  const { layout, pracFrame, panelInfo, viewGroups, surfaces, contentHosts, boardLayouts } =
+  const { layout, pracFrame, panelInfo, windows, surfaces, contentHosts, boardLayouts } =
     createServices(ctx, store, closeListeners);
   const disposeWindowGroupRegionContent = surfaces.register("window-group", {
     create: ({ nodeId }) => new WindowGroupAdapter(nodeId),
@@ -291,7 +291,7 @@ export function apply(ctx: Context): void {
       // from the session adapter, which is where this shell keeps navigation now.
       createFrame(store, {
         currentSession: ctx.uiSession.adapter.current,
-        viewGroups,
+        windows,
         contentHosts,
         boardLayouts,
         windowActions,
@@ -358,7 +358,7 @@ export function apply(ctx: Context): void {
       disposePracFrame();
       disposeLayout();
       disposePanelInfo();
-      viewGroups.dispose();
+      windows.dispose();
       disposeRoot();
     };
   }, "prac-client-ui-frame: frame + services");
