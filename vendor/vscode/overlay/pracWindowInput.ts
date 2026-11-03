@@ -16,7 +16,7 @@ import { EditorInput } from "../common/editor/editorInput.js";
 export class PracWindowInput extends EditorInput {
   static readonly typeId = "workbench.editors.pracWindowInput";
 
-  /** The frame window id (a `prac.view` id). */
+  /** The frame window id (a content-slot view id). */
   readonly windowId: string;
   private title: string;
 

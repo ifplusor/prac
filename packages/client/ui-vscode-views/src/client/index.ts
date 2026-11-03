@@ -1,7 +1,7 @@
 /**
  * prac-client-ui-vscode-views — the VS Code views package.
  *
- * Declares **one `prac.view` entry per view the app's view registry reports**:
+ * Declares **one `prac.widget` entry per view the app's view registry reports**:
  * the core contributions (Folders, Search, SCM, Run, Problems, Output, Debug
  * Console, Terminal, …) and the views extensions contribute (a tree view, a
  * webview view) alike — both register into the same upstream registry, so this

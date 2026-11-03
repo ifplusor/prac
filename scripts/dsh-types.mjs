@@ -14,7 +14,7 @@
  * Why it does not type-check *against* the checkout directly: a `tsconfig`
  * `paths` override was implemented and rejected. Mapping DSH specifiers to
  * checkout files splits module identity for declaration-merged modules —
- * measured: under the override the seats' `slots.register({ name: 'prac.view' })`
+ * measured: under the override the seats' `slots.register({ name: 'prac.widget' })`
  * fails overload resolution while `keyof SlotMap` from the same import still
  * shows the key, i.e. `register`'s constraint sits on a second copy of the
  * module. It reports false errors. A mechanism-correct override has to redirect

@@ -51,3 +51,13 @@ Did you mean to access the static member 'Context.effect' instead?
 - `vp check packages/client`：0 type/lint error。
 - `pnpm verify:ui`：在 `3184` 的一次性 rig 上跑完全部 live gate（containers / board / stack / split / grid / resize / persistence / space / bottom / views / file / editor / tabs / dynamic / lifecycle），全部 OK，最后一行 `UI ACCEPTANCE: all gates passed`——说明 arrangement 改从 `ctx.pracDsh` 取词、`./lib` 拆除与 contract 类型都没有改变页面行为。
 - 遗留：`pnpm check` 仍因 **18 个与本次无关的文件**（`docs/ui-*.md`、`tests/gates/*`、`vendor/vscode/*`、`packages/bundle/web-app/package.json`）报格式化问题；`git status` 显示这些文件未被本次改动触碰，是既有状态。
+
+## 6. 删除 `prac.view` 空座位（2026-11-03）
+
+**现象**：`prac.view` 留着声明、`SlotMap` 条目和 catalogue 的 `"legacy"` 分支，但全仓没有生产者——`ui-vscode-views` 的 `SLOT = "prac.widget"`（`src/client/index.ts:37`），`ui-vscode-editor` 的 `SLOT: PracSlotKey = "prac.window"`（`src/client/index.ts:47`）。它是 kind 拆分（window / widget）之前的通用座位，代码先走了一步，座位没跟着删。
+
+**改法**：删掉 `root` 的该 child 声明、`SlotMap` 条目与 `VIEW_SLOT` 常量；catalogue 只读 `prac.window` / `prac.widget`，`"legacy"` 从 `declaredViewSlots` 与 `declaredViewSlot()` 的类型里消失；`PracSlotKey` 收窄成 `"prac.window" | "prac.widget"`；`frame.ts` 的 `RenderSlot` 联合去掉该键。同轮清掉文档与注释里的旧词（`concepts.md`、`ui-surface-map.md`、bundle patch、两个适配器、vscode-host contract、workbench、`dsh-types.mjs`、vendor README / verify-views）。
+
+**判断依据**：`slots.register({ name: "prac.view" })` 在全仓不存在；持久化里不会有这类 id；`declaredViewSlot()` 的消费点只把它折成 window（`services.ts:283`）。
+
+**验证**：`pnpm build` ✅、`pnpm test` ✅、`pnpm verify:entries` ✅、`vp check packages/client` 0 error、`pnpm verify:ui` 全绿（`UI ACCEPTANCE: all gates passed`）。

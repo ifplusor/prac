@@ -49,7 +49,7 @@ Space
 | 内部 slot（conversation.* / sidebar.* / settings.* / plugins.*）   | slot entry / React     | **widget / section**，属于对应 app window / board |
 | `shell.overlay` / toast / quota notice                             | 应用级浮层             | **frame overlay**                                 |
 | `shell.leading` / `shell.bottom`                                   | 窗口 chrome 座位       | frame chrome / part seat                          |
-| `prac.view` / `prac.viewActions`                                   | 自定义 widget / action | **widget / action slot**                          |
+| `prac.window` / `prac.widget` / `prac.viewActions`                 | 自定义 window / widget 内容与 action | **window / widget / action slot**     |
 | `ctx.layout`                                                       | DSH layout compat      | `ctx.layout` compat，放 `ui-frame`                |
 | client graph / loader / HMR                                        | 代码到达与替换         | lifecycle；frame 只订阅注册                       |
 | store / locale / theme / 组件库                                    | 来源运行时             | source runtime；不进入 frame 模型                 |
@@ -97,7 +97,7 @@ Space
 | 包                 | 职责                                              |
 | ------------------ | ------------------------------------------------- |
 | `ui-frame`         | Space / split / grid / region / dock rail / sidebar / panel |
-| `ui-widget`        | widget / board / `prac.view` / `prac.viewActions` |
+| `ui-widget`        | widget / board / `prac.widget` / `prac.viewActions` |
 | `ui-workbench`     | 默认放置 / arrangement / recall                   |
 | `ui-dsh`           | DSH slot → application / window / widget / action |
 | `ui-vscode-host`   | VS Code bridge / face / catalogue                 |

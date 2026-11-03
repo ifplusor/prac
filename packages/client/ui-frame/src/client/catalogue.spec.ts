@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import "./contract.js";
-import { VIEW_SLOT, viewSource } from "./catalogue.js";
+import { WIDGET_SLOT, viewSource } from "./catalogue.js";
 import {
   DSH_CONVERSATION_KEY,
   catalogueViewIds,
@@ -56,7 +56,7 @@ describe("catalogueViewIds", () => {
         // A main entry with no key is not a view: it has no id to offer.
         { options: {} },
       ],
-      [VIEW_SLOT]: [{ options: { id: "vscode:view:b" } }, { options: { id: "vscode:view:a" } }],
+      [WIDGET_SLOT]: [{ options: { id: "vscode:view:b" } }, { options: { id: "vscode:view:a" } }],
     });
     expect(catalogueViewIds(slots)).toEqual([
       "dsh:sidebar",
@@ -72,7 +72,7 @@ describe("catalogueViewIds", () => {
   it("is stable regardless of registration order", () => {
     const slots = registry({
       main: [{ options: { key: "beta" } }, { options: { key: "alpha" } }],
-      [VIEW_SLOT]: [{ options: { id: "z" } }, { options: { id: "a" } }],
+      [WIDGET_SLOT]: [{ options: { id: "z" } }, { options: { id: "a" } }],
     });
     expect(catalogueViewIds(slots)).toEqual(catalogueViewIds(slots));
     expect(catalogueViewIds(slots)).toEqual([
@@ -92,7 +92,7 @@ describe("catalogueViewIds", () => {
 
 describe("readDeclaredViewIds / isDeclaredView", () => {
   it("takes membership from the slot registry, not from a name prefix", () => {
-    readDeclaredViewIds(registry({ [VIEW_SLOT]: [{ options: { id: "vscode:view:b" } }] }));
+    readDeclaredViewIds(registry({ [WIDGET_SLOT]: [{ options: { id: "vscode:view:b" } }] }));
     expect(isDeclaredView("vscode:view:b")).toBe(true);
     // Same source, not registered: the prefix decides nothing.
     expect(isDeclaredView("vscode:view:a")).toBe(false);
@@ -100,7 +100,7 @@ describe("readDeclaredViewIds / isDeclaredView", () => {
   });
 
   it("re-reads, so a view appearing or leaving is picked up", () => {
-    readDeclaredViewIds(registry({ [VIEW_SLOT]: [{ options: { id: "prac:notes" } }] }));
+    readDeclaredViewIds(registry({ [WIDGET_SLOT]: [{ options: { id: "prac:notes" } }] }));
     expect(isDeclaredView("prac:notes")).toBe(true);
     readDeclaredViewIds(registry({}));
     expect(isDeclaredView("prac:notes")).toBe(false);
@@ -108,7 +108,7 @@ describe("readDeclaredViewIds / isDeclaredView", () => {
 
   it("ignores an entry that declares no id", () => {
     const ids = readDeclaredViewIds(
-      registry({ [VIEW_SLOT]: [{ options: { id: "" } }, { options: { id: "prac:notes" } }] }),
+      registry({ [WIDGET_SLOT]: [{ options: { id: "" } }, { options: { id: "prac:notes" } }] }),
     );
     expect([...ids]).toEqual(["prac:notes"]);
   });
@@ -116,7 +116,7 @@ describe("readDeclaredViewIds / isDeclaredView", () => {
   it("reads the declared title, and forgets it when the view leaves", () => {
     readDeclaredViewIds(
       registry({
-        [VIEW_SLOT]: [{ options: { id: "vscode:view:outline", label: "Outline" } }],
+        [WIDGET_SLOT]: [{ options: { id: "vscode:view:outline", label: "Outline" } }],
       }),
     );
     expect(declaredViewLabel("vscode:view:outline")).toBe("Outline");
@@ -127,7 +127,7 @@ describe("readDeclaredViewIds / isDeclaredView", () => {
   it("reads whether a view brings its own pane header, and forgets it when it leaves", () => {
     readDeclaredViewIds(
       registry({
-        [VIEW_SLOT]: [
+        [WIDGET_SLOT]: [
           { options: { id: "vscode:view:outline", paneHeader: true } },
           { options: { id: "prac:notes" } },
         ],
@@ -143,7 +143,7 @@ describe("readDeclaredViewIds / isDeclaredView", () => {
 
 describe("viewKind", () => {
   it("lets a declaration win over the id's source segment", () => {
-    readDeclaredViewIds(registry({ [VIEW_SLOT]: [{ options: { id: "dsh:declared" } }] }));
+    readDeclaredViewIds(registry({ [WIDGET_SLOT]: [{ options: { id: "dsh:declared" } }] }));
     // The producer owns its ids; a `dsh:` prefix is not a dispatch rule.
     expect(viewKind("dsh:declared")).toBe("declared");
     expect(viewKind("dsh:sidebar")).toBe("dsh");

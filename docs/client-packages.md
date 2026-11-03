@@ -4,12 +4,12 @@ Every package under `packages/client/` is a **DSH plugin row**, not a library. A
 
 ## Shape
 
-| Path | Role | Builds to |
-| --- | --- | --- |
-| `src/index.ts` | Host half: `export function apply(): void {}` | `dist/index.mjs` |
-| `src/client/index.ts` | Client half: the loader entry and the package's public module (`name`, `inject`, `apply`) | `dist/client.js` (loader artifact) |
-| `src/client/contract.ts` | Optional type-only contract: `Context` / `SlotMap` merges and face types | `dist/client-types.d.mts` |
-| `src/client/<domain>.ts` | Implementation: stores, services, chrome, adapters | — |
+| Path                     | Role                                                                                      | Builds to                          |
+| ------------------------ | ----------------------------------------------------------------------------------------- | ---------------------------------- |
+| `src/index.ts`           | Host half: `export function apply(): void {}`                                             | `dist/index.mjs`                   |
+| `src/client/index.ts`    | Client half: the loader entry and the package's public module (`name`, `inject`, `apply`) | `dist/client.js` (loader artifact) |
+| `src/client/contract.ts` | Optional type-only contract: `Context` / `SlotMap` merges and face types                  | `dist/client-types.d.mts`          |
+| `src/client/<domain>.ts` | Implementation: stores, services, chrome, adapters                                        | —                                  |
 
 No `plugin.ts`, no `lib.ts`, no `./lib` export, no second build. The plugin body **is** the entry: assembly lives in `index.ts`, and code that grows too large moves into a domain module rather than into a differently named body file.
 
@@ -17,11 +17,11 @@ The host half is empty because these mechanisms are browser-only, but every bund
 
 ## Cross-package sharing
 
-| What | Channel |
-| --- | --- |
-| Values / behavior | A Cordis service (`ctx.pracFrame`, `ctx.pracDsh`, `ctx.pracWidgets`, …); consumers list it in `inject`. |
-| Types | `import type { … } from "prac-client-<name>/client"` — served by the `types` condition of the `./client` export. |
-| Same-package tests | Relative imports of internal modules (`../src/client/frame.ts`). |
+| What               | Channel                                                                                                          |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| Values / behavior  | A Cordis service (`ctx.pracFrame`, `ctx.pracDsh`, `ctx.pracWidgets`, …); consumers list it in `inject`.          |
+| Types              | `import type { … } from "prac-client-<name>/client"` — served by the `types` condition of the `./client` export. |
+| Same-package tests | Relative imports of internal modules (`../src/client/frame.ts`).                                                 |
 
 **A client package must not import another client package's values**, directly or by re-export. Two module records for one value is a real divergence as soon as the value carries state, and the sanctioned channel for state is a service anyway.
 

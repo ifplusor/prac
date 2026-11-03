@@ -1,7 +1,7 @@
 /**
  * prac-client-ui-vscode-editor — the editor package.
  *
- * Declares **one `prac.view` entry per placement** (decision 17, made precise by split
+ * Declares **one `prac.window` entry per placement** (decision 17, made precise by split
  * editors): a placement is a file in one of the app's editor groups, the app contributes
  * that file's editing surface there, and this package turns the app's placements into
  * views. Which files are open comes from the app's own editor service (an explorer

@@ -11,7 +11,7 @@
  * 2. **the app's catalogue, as prac views** — the two upstream sources (the editor
  *    service's open files, the view registry's active views) published as one
  *    shape, together with the view-id convention and the mount entry point; which
- *    entries a package turns into `prac.view` registrations is that package's
+ *    entries a package turns into `prac.widget` registrations is that package's
  *    policy;
  * 3. **the face** — published on the DSH service registry, which is what makes
  *    `inject: ["pracVscode"]` keep a consumer pending until the mechanism is there.

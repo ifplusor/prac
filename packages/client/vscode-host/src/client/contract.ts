@@ -49,7 +49,7 @@ export interface PracVscodeFace {
    *
    * The app has two sources — its open files (`IEditorService`) and the views its
    * view registry reports (`IViewDescriptorService`) — and this is the one shape
-   * they are turned into, so a consumer registers `prac.view` entries and mounts
+   * they are turned into, so a consumer registers `prac.widget` entries and mounts
    * them without knowing which upstream service an entry came from. The frame
    * sees the same thing either way; only {@link VscodeCatalogueEntry.source}
    * records where it came from.
@@ -155,7 +155,7 @@ export interface PracVscodeFace {
    * Focus the workbench view behind a view id, so its title actions run in the
    * view's own context.
    *
-   * @param view - a `prac.view` view id.
+   * @param view - a content-slot view id.
    */
   focusView(view: string): void;
   /**
@@ -353,7 +353,7 @@ export interface VscodeEditorEntry {
  * One thing the app offers as a prac view, as {@link PracVscodeFace.catalogue}
  * reports it.
  *
- * Plain data: a consumer registers `prac.view` entries from these and mounts
+ * Plain data: a consumer registers `prac.widget` entries from these and mounts
  * them through {@link PracVscodeFace.hostFor}, and the arrangement uses
  * {@link VscodeCatalogueEntry.location} for its own default placement. Nothing
  * here says how the frame renders it — that is the frame's business.

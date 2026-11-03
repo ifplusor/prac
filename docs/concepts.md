@@ -114,7 +114,7 @@ Frame shell（frame 级）
 
 - frame 不认识 `vscode:` / `dsh:`；
 - adaptor 只翻译，不拥有 frame / window / widget 的 layout / active / placement；
-- `prac.view` 是 widget 注册面（历史名字；对外应是 `prac.widget`；当前代码仍是 view，属于待收的命名债）；window / board 有各自注册面。
+- 注册面按 kind 分：widget 走 `prac.widget`，window 走 `prac.window`（`prac.view` 这个通用座位已删除）；board 有各自的注册面。
 - **view 是 adapter / source 术语，不是 prac 的原生对象**；VS Code `ViewDescriptor`、DSH slot 都在 adapter 侧落到 widget。
 
 ## 五、术语

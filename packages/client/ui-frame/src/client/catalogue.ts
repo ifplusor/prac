@@ -1,16 +1,15 @@
 /**
  * The DSH side of the view catalogue.
  *
- * Which view ids DSH's own slots declare, which entries the `prac.view` slot
- * holds, and the DSH id vocabulary (`dsh:sidebar`, `dsh:main:<key>`,
- * `dsh:rightbar`). This lives in the plugin: `prac-ui-kit-workbench` only owns the
- * view/region shapes and prac's own slot keys.
+ * Which view ids DSH's own slots declare, which entries the content slots
+ * (`prac.window` / `prac.widget`) hold, and the DSH id vocabulary
+ * (`dsh:sidebar`, `dsh:main:<key>`, `dsh:rightbar`). This lives in the plugin:
+ * `prac-ui-kit-workbench` only owns the view/region shapes and prac's own slot
+ * keys.
  *
  * @module prac-client-ui-frame/client/catalogue
  */
 
-/** The slot prac's own items register into. */
-export const VIEW_SLOT = "prac.view";
 /** Window content slot. */
 export const WINDOW_SLOT = "prac.window";
 /** Widget content slot. */
@@ -30,7 +29,7 @@ export function viewSource(viewId: string): string {
  * satisfies it because its `entries` accepts a superset of these keys.
  */
 export interface CatalogueSlots {
-  entries(slot: "main" | "prac.view" | "prac.window" | "prac.widget"): Iterable<{
+  entries(slot: "main" | "prac.window" | "prac.widget"): Iterable<{
     readonly options: {
       readonly id?: string;
       readonly key?: string;
@@ -56,7 +55,7 @@ export const DSH_MAIN_PREFIX = "dsh:main:";
 export const DSH_CONVERSATION_KEY = "conversation";
 
 /**
- * The view ids the `prac.view` slot currently declares.
+ * The view ids the content slots currently declare.
  *
  * Membership in the slot's registry **is** what makes a view one this frame
  * renders: a name prefix would not do — the mechanism owns neither the slot's
@@ -65,10 +64,10 @@ export const DSH_CONVERSATION_KEY = "conversation";
  */
 let declaredViewIds: ReadonlySet<string> = new Set<string>();
 /** The content slot each declared view registered into. */
-let declaredViewSlots: ReadonlyMap<string, "window" | "widget" | "legacy"> = new Map();
-/** The display title each `prac.view` entry declares, keyed by view id. */
+let declaredViewSlots: ReadonlyMap<string, "window" | "widget"> = new Map();
+/** The display title each content-slot entry declares, keyed by view id. */
 let declaredViewLabels: ReadonlyMap<string, string> = new Map<string, string>();
-/** The icon class each `prac.view` entry declares, keyed by view id. */
+/** The icon class each content-slot entry declares, keyed by view id. */
 let declaredViewIcons: ReadonlyMap<string, string> = new Map<string, string>();
 /** Which declared items bring a native pane header. */
 let declaredViewPaneHeaders: ReadonlySet<string> = new Set<string>();
@@ -84,11 +83,10 @@ export function readDeclaredViewIds(slots: CatalogueSlots): ReadonlySet<string> 
   const labels = new Map<string, string>();
   const icons = new Map<string, string>();
   const paneHeaders = new Set<string>();
-  const slotsById = new Map<string, "window" | "widget" | "legacy">();
+  const slotsById = new Map<string, "window" | "widget">();
   for (const [slot, kind] of [
     [WINDOW_SLOT, "window"],
     [WIDGET_SLOT, "widget"],
-    [VIEW_SLOT, "legacy"],
   ] as const) {
     for (const entry of slots.entries(slot)) {
       const id = entry.options.id;
@@ -111,16 +109,16 @@ export function readDeclaredViewIds(slots: CatalogueSlots): ReadonlySet<string> 
 }
 
 /** The content slot a declared view registered into. */
-export function declaredViewSlot(viewId: string): "window" | "widget" | "legacy" | undefined {
+export function declaredViewSlot(viewId: string): "window" | "widget" | undefined {
   return declaredViewSlots.get(viewId);
 }
 
-/** The display title a `prac.view` entry declared, if any. */
+/** The display title a content-slot entry declared, if any. */
 export function declaredViewLabel(viewId: string): string | undefined {
   return declaredViewLabels.get(viewId);
 }
 
-/** The icon class a `prac.view` entry declared, if any. */
+/** The icon class a content-slot entry declared, if any. */
 export function declaredViewIcon(viewId: string): string | undefined {
   return declaredViewIcons.get(viewId);
 }
@@ -133,10 +131,10 @@ export function declaredViewPaneHeader(viewId: string): boolean {
 /**
  * How the frame should render a view id.
  *
- * **Membership wins over the id's source segment**: a `prac.view` declaration is
- * authoritative even when its id starts with `dsh:` (a producer owns its ids, so
- * a prefix is not a dispatch rule). `dsh:` is only the fallback for DSH's own
- * slots, which are not declared into `prac.view`.
+ * **Membership wins over the id's source segment**: a declaration in a content
+ * slot is authoritative even when its id starts with `dsh:` (a producer owns its
+ * ids, so a prefix is not a dispatch rule). `dsh:` is only the fallback for
+ * DSH's own slots, which are not declared into `prac.window` / `prac.widget`.
  */
 export type ViewKind = "declared" | "dsh" | "unknown";
 
@@ -144,7 +142,7 @@ export type ViewKind = "declared" | "dsh" | "unknown";
  * Classify a view id for rendering.
  *
  * @param viewId - the view identity.
- * @returns `"declared"` for a `prac.view` entry, `"dsh"` for one of DSH's own
+ * @returns `"declared"` for a content-slot entry, `"dsh"` for one of DSH's own
  *   slots, `"unknown"` otherwise.
  */
 export function viewKind(viewId: string): ViewKind {
@@ -153,7 +151,7 @@ export function viewKind(viewId: string): ViewKind {
 }
 
 /**
- * Whether a view id is declared by the `prac.view` slot (rather than being one of
+ * Whether a view id is declared by a content slot (rather than being one of
  * DSH's own slots).
  *
  * @param viewId - the view identity.
@@ -167,7 +165,7 @@ export function isDeclaredView(viewId: string): boolean {
  *
  * The catalogue is the union of two live sources, never a hard-coded list:
  * DSH's own slots (`sidebar`, `rightbar`, and one id per currently registered
- * `main` key) and every entry of the `prac.view` slot. Sorting each group keeps
+ * `main` key) and every entry of the content slots. Sorting each group keeps
  * the offered order stable across re-reads.
  *
  * @param slots - the slot registry face the frame holds.

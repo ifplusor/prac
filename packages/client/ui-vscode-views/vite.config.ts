@@ -10,7 +10,7 @@ import { PLATFORM_MODULES, clientPack } from "../../../scripts/pack-client.ts";
  *   empty — the client half is browser-only — but every bundle row is imported on both
  *   planes, so the entry has to exist.
  * - the **client half** (`src/client/index.ts` → `dist/client.js`) declares one
- *   `prac.view` per entry of the app's view catalogue. Its wrapping is DSH's
+ *   `prac.widget` per entry of the app's view catalogue. Its wrapping is DSH's
  *   loader contract, so it comes from `scripts/pack-client.ts` rather than being
  *   restated here.
  *

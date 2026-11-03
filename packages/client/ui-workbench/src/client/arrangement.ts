@@ -95,7 +95,7 @@ const LOCATION_REGION: Readonly<Record<VscodeCatalogueEntry["location"], string>
  * - the debug **welcome** pane — a placeholder with no data provider, which reads
  *   as an empty box.
  *
- * They stay registered as `prac.view`s either way: the recall surface can bring
+ * They stay registered in a content slot either way: the recall surface can bring
  * them up, which is what "off screen" means here.
  */
 const EXCLUDED_VIEWS: ReadonlySet<string> = new Set([

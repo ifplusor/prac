@@ -137,7 +137,6 @@ type RenderSlot = import("@deepseek-ai/dsh-client-ui-slots").PropsRenderSlots<
   | "main"
   | "rightbar"
   | "shell.overlay"
-  | "prac.view"
   | "prac.window"
   | "prac.widget"
   | "prac.viewActions"

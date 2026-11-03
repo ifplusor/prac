@@ -13,14 +13,15 @@
  *    (`dsh:sidebar`, `dsh:main:<key>`, `dsh:rightbar`) — their slot names are
  *    view *identities*, not positions, and because this frame is the renderer,
  *    *where* each one lands is the arrangement's decision. Anything else is a
- *    view some surface declares into the `prac.view` slot and names with its own
- *    source tag (`vscode:view:<app view id>` is a VS Code part host); which ids those are is read
- *    from the registry, never assumed from the tag. The mechanism ships **no concrete
+ *    view some surface declares into `prac.window` / `prac.widget` and names
+ *    with its own source tag (`vscode:view:<app view id>` is a VS Code part
+ *    host); which ids those are is read from the registry, never assumed from
+ *    the tag. The mechanism ships **no concrete
  *    view name and no default placement**: the workbench's arrangement
  *    (`prac-client-ui-workbench`) says what goes where through
  *    {@link PracLayoutFace}. The catalogue itself is
  *    *queryable* — {@link PracLayoutFace.listItems} enumerates the slot
- *    registry live (so a later `main` key or `prac.view` entry appears) and
+ *    registry live (so a later `main` key or content-slot entry appears) and
  *    joins it with each view's placement, which is what lets a UI offer the
  *    items that are hidden or unplaced, not just the visible ones.
  * 3. **Sashes and collapse are frame-owned.** Dragging a sash adjusts the two
@@ -42,8 +43,8 @@
  *    mechanism never hard-codes which view plays a role.
  *
  * It keeps the contracts the rest of DSH registers against: the four frame slots
- * (`sidebar` / `main` / `rightbar` / `shell.overlay`), the `prac.view` /
- * `prac.window` / `prac.widget` surfaces and their action slots, `ctx.layout`,
+ * (`sidebar` / `main` / `rightbar` / `shell.overlay`), the `prac.window` /
+ * `prac.widget` content slots and their action slots, `ctx.layout`,
  * `ctx.pracFrame`, `ctx.pracSurfaces`, `ctx.pracSpaces`,
  * `ctx.pracWindowActions`, the `panelInfo` root hook, theme presentation and the
  * document title.
@@ -91,7 +92,7 @@ declare global {
   /** The Space registry, for the live gates / a page-level probe. */
   var __pracSpaces: PracSpacesFace | undefined;
 }
-import { VIEW_SLOT, WIDGET_SLOT, WINDOW_SLOT, readDeclaredViewIds } from "./catalogue.js";
+import { WIDGET_SLOT, WINDOW_SLOT, readDeclaredViewIds } from "./catalogue.js";
 
 /**
  * Install the mechanism: declare the frame's slots, publish the faces, keep the
@@ -275,12 +276,11 @@ export function apply(ctx: Context): void {
           main: { kind: "keyed", scope: "root" },
           rightbar: { kind: "single", scope: "root" },
           "shell.overlay": { kind: "list", scope: "root" },
-          // The slot prac's own items (`prac:*`) and VS part hosts (`vscode:*`)
-          // register into; the entry's declared id is its view id.
-          "prac.view": { kind: "list", scope: "root" },
+          // The content seats prac's own items (`prac:*`) and VS part hosts
+          // (`vscode:*`) register into; an entry's declared id is its view id.
           "prac.window": { kind: "list", scope: "root" },
           "prac.widget": { kind: "list", scope: "root" },
-          // The action surface a view may fill; keyed by its `prac.view` id.
+          // The action surface a view may fill; keyed by its view id.
           "prac.viewActions": { kind: "keyed", scope: "root" },
           "prac.windowActions": { kind: "keyed", scope: "root" },
           "prac.widgetActions": { kind: "keyed", scope: "root" },
@@ -329,10 +329,10 @@ export function apply(ctx: Context): void {
       }));
     };
     const offMain = ctx.slots.subscribe("main", bumpCatalogue);
-    // The adapters register into the split content slots (`prac.window` / `prac.widget`) since
-    // the kind split; a title / icon / pane-header declared there has to reach the catalogue
-    // just like a legacy `prac.view` entry, or every header falls back to the raw id.
-    const stopSlots = ([VIEW_SLOT, WINDOW_SLOT, WIDGET_SLOT] as const).map((slot) =>
+    // The adapters register into the split content slots (`prac.window` / `prac.widget`);
+    // a title / icon / pane-header declared there has to reach the catalogue just like
+    // any other registration, or every header falls back to the raw id.
+    const stopSlots = ([WINDOW_SLOT, WIDGET_SLOT] as const).map((slot) =>
       ctx.slots.subscribe(slot, bumpCatalogue),
     );
     // A page-level probe for verification: the bundle's `require` resolves

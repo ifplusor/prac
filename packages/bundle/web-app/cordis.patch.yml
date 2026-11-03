@@ -11,7 +11,7 @@
 
 - insert:
     # The frame mechanism: region tree, sashes, collapse, surfaces and the
-    # `prac.view` seat; provides `ctx.pracFrame`, `ctx.layout` and the
+    # content seats (`prac.window` / `prac.widget`); provides `ctx.pracFrame`, `ctx.layout` and the
     # window-group surface factory.
     - id: prac-client-ui-frame
       name: "prac-client-ui-frame"

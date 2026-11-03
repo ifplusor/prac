@@ -19,7 +19,7 @@ import type { Side } from "prac-ui-kit-layout";
  * and the drag/collapse behaviour are `ui-frame`'s. Every placement goes
  * through `ctx.pracFrame`; every view is rendered by the mechanism, including the
  * file items the editor package (`prac-client-ui-vscode-editor`) registers through
- * the `prac.view` slot.
+ * the content slots.
  *
  * This file is the plugin body as an ordinary ESM module (`name`, `inject`,
  * `apply`). DSH's closure-factory artifact (`window.__ModuleLoader__.load`) is
@@ -175,7 +175,7 @@ interface RecallSurfaceProps {
  * writing — and the plain keys are handled on the panel, never document-wide.
  *
  * The catalogue is re-read on every layout store change, so a `main` panel or a
- * `prac.view` entry registered later is offered without a reload.
+ * `prac.window` / `prac.widget` entry registered later is offered without a reload.
  *
  * @param props - the mechanism's placement face.
  */

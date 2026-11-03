@@ -16,7 +16,7 @@
  *     `Escape` dismisses it;
  *  2. the catalogue the overlay lists is the mechanism's `listItems()` — the
  *     union of DSH slots (`dsh:sidebar`, every registered `main` key,
- *     `dsh:rightbar`) and the `prac.view` seat (one `vscode:file:<resource>` per
+ *     `dsh:rightbar`) and the content seats (one `vscode:file:<resource>` per
  *     open file), including views that are hidden;
  *  3. **移到** frees the track: the conversation leaves `right` for `left`, and
  *     the current file view then moves into `right` as its only occupant;

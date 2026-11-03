@@ -28,7 +28,7 @@ import type { RegionChild, RegionSelector, Side } from "prac-ui-kit-layout";
  * @module prac-client-ui-frame/client/contract
  */
 
-import { VIEW_SLOT, WIDGET_SLOT, WINDOW_SLOT } from "./catalogue.js";
+import { WIDGET_SLOT, WINDOW_SLOT } from "./catalogue.js";
 // Type-only, for the modules whose declaration merges this file augments.
 import type {} from "@deepseek-ai/cordis";
 import type {} from "@deepseek-ai/dsh-client-ui-slots";
@@ -44,8 +44,8 @@ export interface ItemInfo extends ContentInfo {
   readonly kind: "window" | "widget";
 }
 
-/** A slot key a prac surface registers its content into. */
-export type PracSlotKey = typeof VIEW_SLOT | typeof WINDOW_SLOT | typeof WIDGET_SLOT;
+/** A slot key a prac content surface registers its item into. */
+export type PracSlotKey = typeof WINDOW_SLOT | typeof WIDGET_SLOT;
 
 // The merges reach this program through the **type-only** imports above. Do not
 // "make it explicit" with side-effect imports here: a bare `import "@deepseek-ai/…"`
@@ -55,13 +55,11 @@ export type PracSlotKey = typeof VIEW_SLOT | typeof WINDOW_SLOT | typeof WIDGET_
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface SlotMap {
-    /** prac's slot: a `root`-scoped list slot every prac surface declares one view into. */
-    "prac.view": { kind: "list"; scope: "root" };
     /** Window content: file / chat / board window content. */
     "prac.window": { kind: "list"; scope: "root" };
     /** Widget content: VS Code view / DSH widget content. */
     "prac.widget": { kind: "list"; scope: "root" };
-    /** The per-view action surface a `prac.view` owner may fill; keyed by view id. */
+    /** The action surface a view's owner may fill; keyed by view id. */
     "prac.viewActions": { kind: "keyed"; scope: "root" };
     /** Window content actions (chat / board), keyed by window id. */
     "prac.windowActions": { kind: "keyed"; scope: "root" };
@@ -230,8 +228,9 @@ export interface PracLayoutFace {
    * The view catalogue: every view the frame knows about and where each one
    * currently sits.
    *
-   * Read live from the slot registry, so a `main` key or `prac.view` entry
-   * registered later appears here; the returned order is deterministic.
+   * Read live from the slot registry, so a `main` key or a `prac.window` /
+   * `prac.widget` entry registered later appears here; the returned order is
+   * deterministic.
    *
    * @returns one entry per known view (placed or not).
    */
