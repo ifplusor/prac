@@ -42,8 +42,8 @@ const run = (script, args = []) =>
 
 /** The static gates, in the order they should fail fast. */
 const STATIC = [
-  [join(here, "static/entries.mjs"), []],
-  [join(here, "static/packages.mjs"), []],
+  [join(here, "static/entries.ts"), []],
+  [join(here, "static/packages.ts"), []],
   [join(repo, "scripts/dsh-types.mjs"), ["--compare"]],
 ];
 

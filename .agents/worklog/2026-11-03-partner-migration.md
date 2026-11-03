@@ -65,3 +65,11 @@ previewSurvivesCloseReopen, twoPlacementsAreTwoViews
 - 补了一条 L1 回归：「group-less window 关闭后不得留在目录里」（stale `p0`）。
 
 已知缺口：L2（模型级集成，不启浏览器）还没有，所以跨对象路径仍只能靠 4 分钟的 live gate 发现——下一步补。
+
+## 6. 工具链收敛（round 9）
+
+把静态 gate 从 `.mjs`+JSDoc 改成 **TypeScript**（`tests/static/*.ts`），由 `node` 直接跑、`vp check` 类型检查；`tests/run.mjs` 的路径随之上移。
+
+**尝试过把编排搬到 `vite.config.ts` 的 `run.tasks`**（`verify` / `verify:ui` / `verify:static` / `verify:gate`），静态任务可用，但 live 任务在 `vp run` 的环境下起不来：一次性 rig 的 `pnpm dsh` 解析到临时 XDG 树里自安装的 pnpm **SEA**，`SeaDeserializer` 的 magic 校验断言失败，rig 永远不发布 URL。直接 `node tests/ui.mjs` 同一套代码是绿的。
+
+因此编排暂留在 `tests/run.mjs`（标签保持 `verify` / `static` / `ui` / `gate` / `list`，迁移只是机械替换），把阻塞证据写进 `docs/testing.md`；gate 本体继续 `.mjs`（真实 rig + Playwright + vendor 自己的 Playwright 副本）。

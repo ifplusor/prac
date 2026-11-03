@@ -34,8 +34,7 @@ const FORBIDDEN_FILES = ["plugin.ts", "lib.ts"];
 /** The one loader entry every client package names. */
 const ENTRY = "src/client/index.ts";
 
-/** @type {string[]} */
-const failures = [];
+const failures: string[] = [];
 let checked = 0;
 
 /**
@@ -44,7 +43,7 @@ let checked = 0;
  * @param {string} packageName - the manifest name.
  * @param {string} message - what is wrong.
  */
-function fail(packageName, message) {
+function fail(packageName: string, message: string): void {
   failures.push(`${packageName}: ${message}`);
 }
 
@@ -54,9 +53,8 @@ function fail(packageName, message) {
  * @param {string} dir - the directory to walk.
  * @returns {string[]} absolute file paths.
  */
-function sourceFiles(dir) {
-  /** @type {string[]} */
-  const files = [];
+function sourceFiles(dir: string): string[] {
+  const files: string[] = [];
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) files.push(...sourceFiles(path));

@@ -15,10 +15,13 @@ const clientDir = join(root, "packages/client");
 const bundleDir = join(root, "packages/bundle");
 const libDir = join(root, "packages/lib");
 
-/** @typedef {{ forbidden?: readonly string[], why?: string }} Rule */
+/** One package's forbidden edges, with the reason shown on failure. */
+interface Rule {
+  readonly forbidden?: readonly string[];
+  readonly why?: string;
+}
 
-/** @type {Record<string, Rule>} */
-const RULES = {
+const RULES: Record<string, Rule> = {
   "prac-ui-kit-layout": {
     forbidden: [
       "prac-ui-kit-content",
@@ -114,13 +117,13 @@ const RULES = {
   },
 };
 
-function readPackage(dir) {
+function readPackage(dir: string): { dir: string; file: string; json: any } | undefined {
   const file = join(dir, "package.json");
   if (!existsSync(file)) return undefined;
   return { dir, file, json: JSON.parse(readFileSync(file, "utf8")) };
 }
 
-function depsOf(pkg) {
+function depsOf(pkg: { json: any }): Set<string> {
   const json = pkg.json;
   return new Set([
     ...Object.keys(json.dependencies ?? {}),
@@ -129,7 +132,7 @@ function depsOf(pkg) {
   ]);
 }
 
-const packages = [];
+const packages: { dir: string; file: string; json: any }[] = [];
 for (const parent of [libDir, clientDir, bundleDir]) {
   if (!existsSync(parent)) continue;
   for (const name of readdirSync(parent)) {

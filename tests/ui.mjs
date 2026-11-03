@@ -35,6 +35,14 @@ const fixture = join(repo, "tests/fixtures/dynamic-extension");
  * without paying for the whole acceptance run. The lifecycle phases are part of
  * the full run only.
  */
+// `vp run verify:ui -- file,stack` forwards the `--` as an argument too.
+const positional = process.argv
+  .slice(2)
+  .filter((arg) => arg !== "--")
+  .join(",")
+  .trim();
+if (positional !== "") process.env.PRAC_GATES = positional;
+
 const selected = (process.env.PRAC_GATES ?? "")
   .split(",")
   .map((name) => name.trim())
@@ -104,7 +112,12 @@ async function startRig() {
   for (let attempt = 0; attempt < 120 && url === undefined; attempt += 1) {
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 500));
   }
-  if (url === undefined) throw new Error("the throwaway rig did not publish a URL");
+  if (url === undefined) {
+    process.stderr.write(
+      `rig did not publish a URL in time\n${stdout.slice(-4000)}\n${stderr.slice(-4000)}\n`,
+    );
+    throw new Error("the throwaway rig did not publish a URL");
+  }
 }
 
 async function stopRig() {

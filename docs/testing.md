@@ -96,6 +96,22 @@ These need a fake slot registry and a real `LayoutStore`; they belong in
 `ui-frame` next to `window-manager.spec.ts`. A model change should then fail a
 two-second test instead of a four-minute gate.
 
+## Toolchain
+
+- The static gates are **TypeScript** (`tests/static/*.ts`) and run under `node`
+  (type stripping), so `vp check` type-checks them. They used to be `.mjs` with
+  JSDoc, which quietly escaped the type checker.
+- The **orchestration** is `tests/run.mjs` (a small CLI) rather than `vp run`
+  tasks: in `vp run`'s environment the throwaway rig's `pnpm dsh` resolves to a
+  self-installed pnpm SEA that asserts (`SeaDeserializer` magic mismatch) inside
+  the temp XDG tree, so the rig never starts. `vp run` is the right home once
+  that environment difference is understood; the CLI keeps the labels
+  `verify` / `static` / `ui` / `gate` / `list` so the migration is mechanical.
+- The **gate bodies** stay `.mjs`: each spawns a real rig and Chromium, and the
+  vendor gates import their own Playwright copy (importing the harness there
+  loads a second one and throws). They are not vitest cases for the same reason
+  — a shared rig does not fit vitest's per-file isolation.
+
 ## What a new model object owes
 
 - a unit test for every invariant it owns (uniqueness, lifecycle, single-instance
