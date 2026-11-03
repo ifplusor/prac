@@ -27,3 +27,19 @@ export const GATES = [
   ["tabs", "vendor/vscode/scripts/verify-tabs.mjs"],
   ["dynamic", "tests/gates/verify-dynamic.mjs"],
 ];
+
+/**
+ * Named subsets for the inner loop.
+ *
+ * `vp run verify:ui -- smoke` runs only these; a name may be a gate or a group.
+ * Keep them small: this is the loop a change is iterated on, the full roster is
+ * the baseline before a commit.
+ */
+export const GROUPS = {
+  /** Frame basics: a surface, the catalogue, a split, the tab strip. */
+  smoke: ["stack", "views", "split", "tabs"],
+  /** The editor path: the slow gate plus the two group checks. */
+  editor: ["file", "editor:group", "editor:close"],
+  /** Grid placement and resize. */
+  grid: ["grid", "grid:resize", "grid:merge", "grid:view", "grid:tab", "grid:free"],
+};

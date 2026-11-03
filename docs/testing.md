@@ -57,6 +57,8 @@ abandon the change.
 ## Changing a gate
 
 1. Reproduce with one gate: `vp run verify:ui -- file`.
+   For everyday iteration use a group: `vp run verify:ui -- smoke`（stack,
+   views, split, tabs；~46s）or `-- grid` / `-- editor`.
    The failure prints the gate's full output, the classified checks, and the page
    console errors.
 2. Classify: behaviour or probe (the report says which).
@@ -95,6 +97,25 @@ single test that runs the whole seam against a real `LayoutStore`:
 These need a fake slot registry and a real `LayoutStore`; they belong in
 `ui-frame` next to `window-manager.spec.ts`. A model change should then fail a
 two-second test instead of a four-minute gate.
+
+## Cost profile
+
+The run prints per-gate wall time at the end. Measured on 2026-11-03:
+
+| gate                  | wall       |
+| --------------------- | ---------- |
+| stack / split / views | ~5.5s each |
+| tabs                  | 29s        |
+| file                  | 92s        |
+| full roster           | ~5 min     |
+
+The dominant cost is **fixed sleeps**: the roster contains ~177
+`page.waitForTimeout(…)` calls (~236s of pure waiting); `file` alone has 18
+(41.5s) and `tabs` 8 (21.4s). The first optimisation is replacing them with
+condition waits (`waitForSelector` / `waitForFunction` on the state the step is
+about), starting with those two gates. Second is running gates on parallel rigs
+(separate `PRAC_TEST_PORT` + temp XDG). `smoke` is the loop for an ordinary
+edit; the full roster is the baseline before a commit.
 
 ## Toolchain
 

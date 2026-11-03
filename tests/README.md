@@ -21,7 +21,9 @@ the layers are described in [docs/testing.md](../docs/testing.md).
 vp run verify                # static gates, then the full live acceptance
 vp run verify:static         # entries + packages + pinned DSH types
 vp run verify:ui             # live acceptance only
-vp run verify:ui -- file,stack  # a subset of the roster
+vp run verify:ui -- smoke        # the inner loop: stack, views, split, tabs
+vp run verify:ui -- grid,editor  # named groups
+vp run verify:ui -- file,stack   # explicit gates
 vp run verify:gate -- file   # one gate against URL=<a running page>
 ```
 

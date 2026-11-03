@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { GATES } from "./gates.mjs";
+import { GATES, GROUPS } from "./gates.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, "..");
@@ -50,14 +50,16 @@ const selected = (process.env.PRAC_GATES ?? "")
 
 const gates = GATES;
 const knownGates = new Set(gates.map(([name]) => name));
-const unknownGates = selected.filter((name) => !knownGates.has(name));
+/** Expand a group name into its gates; gate names pass through. */
+const expanded = selected.flatMap((name) => GROUPS[name] ?? [name]);
+const wantedNames = new Set(expanded);
+const unknownGates = expanded.filter((name) => !knownGates.has(name));
 if (unknownGates.length > 0) {
   console.error(`verify-ui: unknown gate(s): ${unknownGates.join(", ")}`);
   console.error(`verify-ui: known gates: ${[...knownGates].join(", ")}`);
   process.exit(1);
 }
-const chosenGates =
-  selected.length === 0 ? gates : gates.filter(([name]) => selected.includes(name));
+const chosenGates = selected.length === 0 ? gates : gates.filter(([name]) => wantedNames.has(name));
 
 const run = (command, args, options = {}) =>
   new Promise((resolvePromise) => {
@@ -151,12 +153,17 @@ async function stopRig() {
   url = undefined;
 }
 
+/** Wall time per gate, printed at the end: the acceptance run's cost profile. */
+const timings = [];
+
 async function runGate(name, script, extra = {}) {
   process.stdout.write(`\n=== ${name} ===\n`);
+  const started = Date.now();
   const result = await run(process.execPath, [join(repo, script)], {
     cwd: repo,
     env: { ...process.env, URL: url, EXTENSIONS_DIR: extensions, ...extra },
   });
+  timings.push([name, Date.now() - started]);
   const line = result.stdout
     .split("\n")
     .find((entry) => entry.startsWith("OK:") || entry.startsWith("SKIPPED:"));
@@ -235,6 +242,14 @@ try {
         PHASE: "restored",
       }));
     await stopRig();
+  }
+
+  if (timings.length > 0) {
+    process.stdout.write("\nper-gate wall time (s):\n");
+    for (const [name, ms] of timings)
+      process.stdout.write(`  ${name.padEnd(14)} ${(ms / 1000).toFixed(1)}\n`);
+    const total = timings.reduce((sum, [, ms]) => sum + ms, 0);
+    process.stdout.write(`  ${"total".padEnd(14)} ${(total / 1000).toFixed(1)}\n`);
   }
 
   if (failed) process.exitCode = 1;
