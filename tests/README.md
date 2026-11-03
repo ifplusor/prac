@@ -1,13 +1,13 @@
 # tests
 
-The verification assets. `pnpm verify` is the only entry point; the roster and
+The verification assets. `vp run verify` is the only entry point; the roster and
 the layers are described in [docs/testing.md](../docs/testing.md).
 
 ## Layout
 
 | path                                    | role                                                                                                            |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `run.mjs`                               | the CLI: `ui` / `static` / `gate <name>` / `list`                                                               |
+| `gate.mjs`                              | one gate against a running URL                                                                                  |
 | `gates.mjs`                             | the live gate roster (name → script); the one source of truth                                                   |
 | `ui.mjs`                                | live acceptance: starts a throwaway rig, links the profile, runs the gates, then proves the extension lifecycle |
 | `gates/`                                | live gates driven by `harness.mjs` (prac's own surfaces)                                                        |
@@ -18,12 +18,11 @@ the layers are described in [docs/testing.md](../docs/testing.md).
 ## Commands
 
 ```bash
-pnpm verify                # static gates, then the full live acceptance
-pnpm verify static         # entries + packages + pinned DSH types
-pnpm verify ui             # live acceptance only
-pnpm verify ui file,stack  # a subset of the roster
-pnpm verify gate file      # one gate against URL=<a running page>
-pnpm verify list           # the roster
+vp run verify                # static gates, then the full live acceptance
+vp run verify:static         # entries + packages + pinned DSH types
+vp run verify:ui             # live acceptance only
+vp run verify:ui -- file,stack  # a subset of the roster
+vp run verify:gate -- file   # one gate against URL=<a running page>
 ```
 
 A gate's failure prints the gate's full output and, through the harness, the page

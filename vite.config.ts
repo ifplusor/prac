@@ -22,5 +22,20 @@ export default defineConfig({
   },
   run: {
     cache: true,
+    tasks: {
+      // `vp run verify` is the whole baseline: static gates, then live acceptance.
+      verify: {
+        command: "node tests/ui.mjs",
+        dependsOn: ["verify:static"],
+      },
+      "verify:static": {
+        command:
+          "node tests/static/entries.ts && node tests/static/packages.ts && node scripts/dsh-types.mjs --compare",
+      },
+      // `vp run verify:ui -- file,stack` narrows the live roster.
+      "verify:ui": { command: "node tests/ui.mjs" },
+      // `vp run verify:gate -- file` needs URL=<a running page>.
+      "verify:gate": { command: "node tests/gate.mjs" },
+    },
   },
 });

@@ -8,7 +8,6 @@
     "test": "vp run -r test",
     "check": "vp check . && node scripts/dsh-types.mjs --compare",
     "dsh-types": "node scripts/dsh-types.mjs",
-    "verify": "node tests/run.mjs",
     "profile:link": "node scripts/link-profile.mjs"
   },
   "devDependencies": {

@@ -6,12 +6,12 @@ was watching behaviour or an implementation detail.
 
 ## Layers
 
-| layer                    | command                                                      | proves                                                                                                             | changes when                                                     |
-| ------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| **L0 static**            | `pnpm check`（types + lint）、`pnpm verify static`           | package shape, client entry contract, dependency boundaries, pinned DSH types                                      | the convention changes (edit the convention doc + gate together) |
-| **L1 unit**              | `pnpm test`                                                  | invariants of one object: the kit's registries, the frame's window manager, a board model                          | the object's contract changes                                    |
-| **L2 model integration** | _(none yet — see below)_                                     | a cross-object path without a browser: `admit → seat → catalogue`                                                  | —                                                                |
-| **L3 live acceptance**   | `pnpm verify ui`（`pnpm verify ui file,stack` for a subset） | what a person sees on a real rig: surfaces paint, tabs switch, state survives reload, no prac-owned console errors | the product behaviour changes                                    |
+| layer                    | command                                                             | proves                                                                                                             | changes when                                                     |
+| ------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| **L0 static**            | `vp check`（types + lint）、`vp run verify:static`                  | package shape, client entry contract, dependency boundaries, pinned DSH types                                      | the convention changes (edit the convention doc + gate together) |
+| **L1 unit**              | `pnpm test`                                                         | invariants of one object: the kit's registries, the frame's window manager, a board model                          | the object's contract changes                                    |
+| **L2 model integration** | _(none yet — see below)_                                            | a cross-object path without a browser: `admit → seat → catalogue`                                                  | —                                                                |
+| **L3 live acceptance**   | `vp run verify:ui`（`vp run verify:ui -- file,stack` for a subset） | what a person sees on a real rig: surfaces paint, tabs switch, state survives reload, no prac-owned console errors | the product behaviour changes                                    |
 
 L0/L1 run in seconds and should run on every edit. L3 is the baseline for
 "did the architecture change break the product"; it is expensive, so it runs at
@@ -56,13 +56,13 @@ abandon the change.
 
 ## Changing a gate
 
-1. Reproduce with one gate: `pnpm verify ui file`.
+1. Reproduce with one gate: `vp run verify:ui -- file`.
    The failure prints the gate's full output, the classified checks, and the page
    console errors.
 2. Classify: behaviour or probe (the report says which).
 3. For a probe under an intended model change: change the probe's reading, not the
    gate's intent; add the check name to `probes` if it is new.
-4. Run the full `pnpm verify ui`.
+4. Run the full `vp run verify:ui`.
 5. Record the model + gate change in `.agents/worklog/`.
 
 ## Current probes
@@ -101,12 +101,13 @@ two-second test instead of a four-minute gate.
 - The static gates are **TypeScript** (`tests/static/*.ts`) and run under `node`
   (type stripping), so `vp check` type-checks them. They used to be `.mjs` with
   JSDoc, which quietly escaped the type checker.
-- The **orchestration** is `tests/run.mjs` (a small CLI) rather than `vp run`
-  tasks: in `vp run`'s environment the throwaway rig's `pnpm dsh` resolves to a
-  self-installed pnpm SEA that asserts (`SeaDeserializer` magic mismatch) inside
-  the temp XDG tree, so the rig never starts. `vp run` is the right home once
-  that environment difference is understood; the CLI keeps the labels
-  `verify` / `static` / `ui` / `gate` / `list` so the migration is mechanical.
+- The **orchestration** is `vite.config.ts` `run.tasks`: `verify`（static →
+  live）、`verify:static`、`verify:ui`、`verify:gate`. `.mjs` only remains for
+  the gate bodies (next bullet).
+- The rig is started with the **anchor's pnpm shim by absolute path**, not the
+  `pnpm` on PATH: under `vp run` the PATH's pnpm is the self-installed SEA that
+  asserts (`SeaDeserializer` magic mismatch) inside the throwaway XDG tree, and
+  the rig never publishes a URL.
 - The **gate bodies** stay `.mjs`: each spawns a real rig and Chromium, and the
   vendor gates import their own Playwright copy (importing the harness there
   loads a second one and throws). They are not vitest cases for the same reason

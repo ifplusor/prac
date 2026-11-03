@@ -77,18 +77,25 @@ let fixtureInstalled = false;
 
 async function startRig() {
   url = undefined;
-  rig = spawn("pnpm", ["dsh", "--profile", "prac-dev", "--port", String(port), "--no-open"], {
-    cwd: anchor,
-    detached: true,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: {
-      ...process.env,
-      HOME: home,
-      DSH_HOME: dshHome,
-      XDG_DATA_HOME: dataHome,
-      pnpm_config_store_dir: process.env.pnpm_config_store_dir ?? "/Volumes/Dev/.pnpm-store",
+  // The rig is the anchor's own CLI, launched with the anchor's pnpm shim by
+  // absolute path: under `vp run` the PATH's pnpm resolves to a self-installed
+  // SEA that bootstraps into the throwaway XDG tree and asserts.
+  rig = spawn(
+    join(anchor, "node_modules/.bin/pnpm"),
+    ["dsh", "--profile", "prac-dev", "--port", String(port), "--no-open"],
+    {
+      cwd: anchor,
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        HOME: home,
+        DSH_HOME: dshHome,
+        XDG_DATA_HOME: dataHome,
+        pnpm_config_store_dir: process.env.pnpm_config_store_dir ?? "/Volumes/Dev/.pnpm-store",
+      },
     },
-  });
+  );
   let stdout = "";
   let stderr = "";
   const capture = (text) => {
@@ -109,6 +116,13 @@ async function startRig() {
       process.stderr.write(`${stdout.slice(-4000)}\n${stderr.slice(-4000)}\n`);
     }
   });
+  if (process.env.PRAC_RIG_LOG === "1") {
+    const { writeFileSync } = await import("node:fs");
+    setInterval(
+      () => writeFileSync("/tmp/prac-rig.log", `${stdout}\n--- stderr ---\n${stderr}`),
+      1000,
+    ).unref?.();
+  }
   for (let attempt = 0; attempt < 120 && url === undefined; attempt += 1) {
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 500));
   }

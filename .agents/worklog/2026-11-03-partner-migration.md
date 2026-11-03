@@ -70,6 +70,8 @@ previewSurvivesCloseReopen, twoPlacementsAreTwoViews
 
 把静态 gate 从 `.mjs`+JSDoc 改成 **TypeScript**（`tests/static/*.ts`），由 `node` 直接跑、`vp check` 类型检查；`tests/run.mjs` 的路径随之上移。
 
-**尝试过把编排搬到 `vite.config.ts` 的 `run.tasks`**（`verify` / `verify:ui` / `verify:static` / `verify:gate`），静态任务可用，但 live 任务在 `vp run` 的环境下起不来：一次性 rig 的 `pnpm dsh` 解析到临时 XDG 树里自安装的 pnpm **SEA**，`SeaDeserializer` 的 magic 校验断言失败，rig 永远不发布 URL。直接 `node tests/ui.mjs` 同一套代码是绿的。
+**编排已迁到 `vite.config.ts` 的 `run.tasks`**（`verify` / `verify:ui` / `verify:static` / `verify:gate`），`vp run verify*` 是唯一入口。
 
-因此编排暂留在 `tests/run.mjs`（标签保持 `verify` / `static` / `ui` / `gate` / `list`，迁移只是机械替换），把阻塞证据写进 `docs/testing.md`；gate 本体继续 `.mjs`（真实 rig + Playwright + vendor 自己的 Playwright 副本）。
+中间的阻塞：`vp run` 下一次性 rig 起不来（`pnpm dsh` 解析到临时 XDG 树里自安装的 pnpm **SEA**，`SeaDeserializer` 断言失败）。根因是 PATH 解析，不是 vp 的 task 能力：rig 现在用**锚点自己的 pnpm shim 绝对路径**启动（`<anchor>/node_modules/.bin/pnpm`），不再依赖 PATH；`vp run verify:ui -- stack` 恢复全绿。
+
+gate 本体继续 `.mjs`（真实 rig + Playwright + vendor 自己的 Playwright 副本），理由写进 `docs/testing.md`。

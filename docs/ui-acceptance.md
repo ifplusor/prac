@@ -8,22 +8,22 @@ throwaway rig with its own XDG/HOME tree and removes it afterwards.
 
 ```bash
 cd /Volumes/Dev/prac/prac-dev
-pnpm verify ui
+vp run verify:ui
 ```
 
 It starts a rig on `PRAC_TEST_PORT` (default `3184`), installs the dynamic
 fixture, runs the gates below, then proves the extension lifecycle by stopping
 the rig, removing the fixture, starting again, and restoring it.
 
-`pnpm verify ui` needs permission to write the DSH profile outside the
+`vp run verify:ui` needs permission to write the DSH profile outside the
 workspace: the CLI resolves that profile from the user home even when
 `XDG_DATA_HOME`/`HOME` point at the temporary tree.
 
 ### One gate at a time
 
 ```bash
-pnpm verify ui file          # one gate on the throwaway rig
-pnpm verify ui file,tabs     # a few
+vp run verify:ui -- file          # one gate on the throwaway rig
+vp run verify:ui -- file,tabs     # a few
 ```
 
 The argument is a comma-separated subset of the gate names below (it sets `PRAC_GATES`); the rig, the
@@ -64,7 +64,7 @@ whenever a gate fails, not only for the "no prac-owned console errors" check.
 ## Static gates
 
 ```bash
-pnpm verify static
+vp run verify:static
 ```
 
 The static gates check the DSH plugin package graph (`ui-frame` /
@@ -74,7 +74,7 @@ remain until the split lands.
 
 ## Planned live gates
 
-These are not in `pnpm verify ui` yet:
+These are not in `vp run verify:ui` yet:
 
 | gate              | proves                                            |
 | ----------------- | ------------------------------------------------- |
@@ -93,7 +93,7 @@ URL='http://127.0.0.1:3084/?token=…' node tests/gates/verify-grid.mjs
 ```
 
 `verify:grid-view` and `verify:dynamic` need the dynamic fixture installed.
-`tests/gates/verify-extension-lifecycle.mjs` is phase-based and is driven by `pnpm verify ui`; it is
+`tests/gates/verify-extension-lifecycle.mjs` is phase-based and is driven by `vp run verify:ui`; it is
 not a standalone install/uninstall command.
 
 ## Noise
@@ -109,4 +109,4 @@ known lines; a gate's `own(prefix)` is expected to be empty.
    `tests/gates/harness.mjs`.
 2. Use a real action and assert pixels or model state, not only DOM presence.
 3. Add it to the roster in `tests/gates.mjs`.
-4. Run `pnpm verify ui` before committing.
+4. Run `vp run verify:ui` before committing.
