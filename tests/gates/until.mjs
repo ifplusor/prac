@@ -35,3 +35,38 @@ export async function until(page, predicate, arg, options = {}) {
   }
   return false;
 }
+
+/**
+ * Wait until a view's window-action model is published.
+ *
+ * The model is the state (the strip renders from it); waiting on the rendered
+ * buttons instead would measure React's commit timing, and in a slow order that
+ * is the flake. Resolves `false` when the bound passes or the probe is absent.
+ *
+ * @param {import("playwright").Page} page - the gate's page.
+ * @param {string} view - the view id whose actions to wait for.
+ * @param {{ timeout?: number }} [options] - bound in ms.
+ * @returns {Promise<boolean>} whether the model was published before the bound.
+ */
+export function windowActionsReady(page, view, { timeout = 5000 } = {}) {
+  return page.evaluate(
+    ({ view: id, timeout: bound }) =>
+      new Promise((resolve) => {
+        const face = globalThis.__pracWindowActions;
+        if (face === undefined) return resolve(false);
+        const ready = () => face.get(id) !== undefined;
+        if (ready()) return resolve(true);
+        const timer = setTimeout(() => {
+          stop();
+          resolve(false);
+        }, bound);
+        const stop = face.subscribe(() => {
+          if (!ready()) return;
+          clearTimeout(timer);
+          stop();
+          resolve(true);
+        });
+      }),
+    { view, timeout },
+  );
+}

@@ -91,6 +91,14 @@ declare global {
   var __pracBoardLayouts: import("prac-ui-kit-workbench").BoardLayoutRegistry | undefined;
   /** The Space registry, for the live gates / a page-level probe. */
   var __pracSpaces: PracSpacesFace | undefined;
+  /**
+   * The window-actions face, for the live gates / a page-level probe.
+   *
+   * Gates wait on the **model event** (`subscribe` + `get`) rather than on the
+   * rendered buttons: a tab strip can be present a frame before its actions are
+   * published, and waiting on the DOM then measures the renderer's timing.
+   */
+  var __pracWindowActions: PracWindowActionsFace | undefined;
 }
 import { WIDGET_SLOT, WINDOW_SLOT, readDeclaredViewIds } from "./catalogue.js";
 
@@ -354,10 +362,12 @@ export function apply(ctx: Context): void {
     // reachable through the frame's view table).
     globalThis.__pracBoardLayouts = boardLayouts;
     globalThis.__pracSpaces = pracSpaces;
+    globalThis.__pracWindowActions = windowActions;
     return () => {
       if (globalThis.__pracFrame === pracFrame) delete globalThis.__pracFrame;
       if (globalThis.__pracBoardLayouts === boardLayouts) delete globalThis.__pracBoardLayouts;
       if (globalThis.__pracSpaces === pracSpaces) delete globalThis.__pracSpaces;
+      if (globalThis.__pracWindowActions === windowActions) delete globalThis.__pracWindowActions;
       for (const stop of stopSlots) stop();
       offMain();
       disposeWindowActions();
