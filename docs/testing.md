@@ -6,12 +6,12 @@ was watching behaviour or an implementation detail.
 
 ## Layers
 
-| layer                    | command                                                                                                             | proves                                                                                                             | changes when                                                     |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| **L0 static**            | `pnpm check`（types + lint）、`pnpm verify:entries`、`pnpm verify:packages`、`node scripts/dsh-types.mjs --compare` | package shape, client entry contract, dependency boundaries, pinned DSH types                                      | the convention changes (edit the convention doc + gate together) |
-| **L1 unit**              | `pnpm test`                                                                                                         | invariants of one object: the kit's registries, the frame's window manager, a board model                          | the object's contract changes                                    |
-| **L2 model integration** | _(none yet — see below)_                                                                                            | a cross-object path without a browser: `admit → seat → catalogue`                                                  | —                                                                |
-| **L3 live acceptance**   | `pnpm verify:ui`（`PRAC_GATES=…` for one gate）                                                                     | what a person sees on a real rig: surfaces paint, tabs switch, state survives reload, no prac-owned console errors | the product behaviour changes                                    |
+| layer                    | command                                                      | proves                                                                                                             | changes when                                                     |
+| ------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| **L0 static**            | `pnpm check`（types + lint）、`pnpm verify static`           | package shape, client entry contract, dependency boundaries, pinned DSH types                                      | the convention changes (edit the convention doc + gate together) |
+| **L1 unit**              | `pnpm test`                                                  | invariants of one object: the kit's registries, the frame's window manager, a board model                          | the object's contract changes                                    |
+| **L2 model integration** | _(none yet — see below)_                                     | a cross-object path without a browser: `admit → seat → catalogue`                                                  | —                                                                |
+| **L3 live acceptance**   | `pnpm verify ui`（`pnpm verify ui file,stack` for a subset） | what a person sees on a real rig: surfaces paint, tabs switch, state survives reload, no prac-owned console errors | the product behaviour changes                                    |
 
 L0/L1 run in seconds and should run on every edit. L3 is the baseline for
 "did the architecture change break the product"; it is expensive, so it runs at
@@ -56,13 +56,13 @@ abandon the change.
 
 ## Changing a gate
 
-1. Reproduce with one gate: `PRAC_GATES=file pnpm verify:ui`.
+1. Reproduce with one gate: `pnpm verify ui file`.
    The failure prints the gate's full output, the classified checks, and the page
    console errors.
 2. Classify: behaviour or probe (the report says which).
 3. For a probe under an intended model change: change the probe's reading, not the
    gate's intent; add the check name to `probes` if it is new.
-4. Run the full `pnpm verify:ui`.
+4. Run the full `pnpm verify ui`.
 5. Record the model + gate change in `.agents/worklog/`.
 
 ## Current probes

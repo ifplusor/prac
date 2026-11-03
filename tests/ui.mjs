@@ -13,6 +13,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { GATES } from "./gates.mjs";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, "..");
 const anchor = resolve(repo, "../../deepseek-harness/dsh-prac-dev");
@@ -38,29 +40,7 @@ const selected = (process.env.PRAC_GATES ?? "")
   .map((name) => name.trim())
   .filter((name) => name !== "");
 
-const gates = [
-  ["containers", "tests/gates/verify-containers.mjs"],
-  ["board", "tests/gates/verify-board.mjs"],
-  ["stack", "tests/gates/verify-stack.mjs"],
-  ["split", "tests/gates/verify-split.mjs"],
-  ["grid", "tests/gates/verify-grid.mjs"],
-  ["grid:resize", "tests/gates/verify-grid-resize.mjs"],
-  ["grid:merge", "tests/gates/verify-grid-merge.mjs"],
-  ["grid:view", "tests/gates/verify-grid-view.mjs"],
-  ["grid:tab", "tests/gates/verify-grid-tab.mjs"],
-  ["grid:free", "tests/gates/verify-grid-free-resize.mjs"],
-  ["resize", "tests/gates/verify-resize.mjs"],
-  ["persistence", "tests/gates/verify-persistence.mjs"],
-  ["space", "tests/gates/verify-space.mjs"],
-  ["bottom", "tests/gates/verify-bottom.mjs"],
-  ["views", "tests/gates/verify-views.mjs"],
-  ["file", "vendor/vscode/scripts/verify-file.mjs"],
-  ["editor:group", "vendor/vscode/scripts/verify-group.mjs"],
-  ["editor:close", "vendor/vscode/scripts/verify-close.mjs"],
-  ["tabs", "vendor/vscode/scripts/verify-tabs.mjs"],
-  ["dynamic", "tests/gates/verify-dynamic.mjs"],
-];
-
+const gates = GATES;
 const knownGates = new Set(gates.map(([name]) => name));
 const unknownGates = selected.filter((name) => !knownGates.has(name));
 if (unknownGates.length > 0) {

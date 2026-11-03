@@ -95,7 +95,8 @@ for (const dirName of existsSync(clientDir) ? readdirSync(clientDir) : []) {
   for (const [, id, body] of packCalls) {
     if (id !== name) fail(name, `clientPack() id is "${id}"`);
     const entry = /entry:\s*["']([^"']+)["']/.exec(body)?.[1];
-    if (entry !== ENTRY) fail(name, `clientPack() entry is ${entry ?? "missing"}, expected ${ENTRY}`);
+    if (entry !== ENTRY)
+      fail(name, `clientPack() entry is ${entry ?? "missing"}, expected ${ENTRY}`);
   }
 
   // 2. No second role as a file, and no library artifact.
@@ -109,7 +110,10 @@ for (const dirName of existsSync(clientDir) ? readdirSync(clientDir) : []) {
   const clientExport = manifest.exports?.["./client"];
   if (clientExport === undefined) fail(name, "exports has no ./client");
   else if (clientExport.default !== "./dist/client.js") {
-    fail(name, `./client default is ${clientExport.default ?? "missing"}, expected ./dist/client.js`);
+    fail(
+      name,
+      `./client default is ${clientExport.default ?? "missing"}, expected ./dist/client.js`,
+    );
   }
 
   // 4. The type-only contract, when declared.
@@ -118,11 +122,13 @@ for (const dirName of existsSync(clientDir) ? readdirSync(clientDir) : []) {
     if (types !== "./dist/client-types.d.mts") {
       fail(name, `./client types is ${types}, expected ./dist/client-types.d.mts`);
     }
-    if (!existsSync(join(dir, "src/client/contract.ts"))) fail(name, "missing src/client/contract.ts");
+    if (!existsSync(join(dir, "src/client/contract.ts")))
+      fail(name, "missing src/client/contract.ts");
   }
 
   // 5. The artifact-shape assertion.
-  if (!viteCode.includes("check:client")) fail(name, "vite.config.ts declares no check:client task");
+  if (!viteCode.includes("check:client"))
+    fail(name, "vite.config.ts declares no check:client task");
 
   // 6. No value import / re-export of another client plugin.
   const src = join(dir, "src");

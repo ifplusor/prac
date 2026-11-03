@@ -76,7 +76,7 @@ status: resolved:implemented
 
 ## Gate
 
-新增 `scripts/verify-client-entries.mjs`（或在 `verify-ui-packages.mjs` 里加一节），断言：
+新增 `tests/static/entries.mjs`（或在 package graph gate 里加一节），断言：
 
 1. 每个 `packages/client/*` 有 `src/client/index.ts`，且没有 `src/client/plugin.ts` / `lib.ts`；
 2. `vite.config.ts` 中每个 `clientPack()` 的 `entry` 是 `src/client/index.ts`、id 等于包名；
@@ -123,5 +123,5 @@ status: resolved:implemented
 - [2026-10-20-ui-framework.md](../in-progress/2026-10-20-ui-framework.md)：「包入口按层」那条决定（`prac-ui-kit-*` 只出 `.`，`prac-client-*` 出 `./client`），本文是它在 client 包内部的下沉。
 - [2026-10-23-ui-scheme.md](../in-progress/2026-10-23-ui-scheme.md)：插件化收口的经过（谁被拆成 row，`./lib` 从哪里来）。
 - [docs/client-packages.md](../../../docs/client-packages.md)：本规范落成后的稳定参考（现时态、给消费者看）。
-- [scripts/verify-client-entries.mjs](../../../scripts/verify-client-entries.mjs)：机械守卫。
+- [tests/static/entries.mjs](../../../tests/static/entries.mjs)：机械守卫。
 - DSH checkout：`packages/client/tsdown.client.ts:124`（入口路径硬编码）、`packages/client/AGENTS.md:36-44`（`/client` 是公开 API；feature plugin 不得 runtime-import 别的插件值）。

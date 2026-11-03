@@ -43,11 +43,11 @@ The contract file is type-only for a mechanical reason: the loader artifact is a
 4. `src/client/contract.ts` **only** if other packages need this package's types.
 5. `vite.config.ts`: host entry, `clientPack("<name>", { entry: "src/client/index.ts" })`, `check:client`, and a `client-types` entry when `contract.ts` exists.
 6. Register the row in the bundle patch.
-7. Run `pnpm verify:entries` and `pnpm build`.
+7. Run `pnpm verify static` and `pnpm build`.
 
 ## Enforcement
 
-`scripts/verify-client-entries.mjs` (`pnpm verify:entries`) asserts, per package:
+`tests/static/entries.mjs` (`pnpm verify static`) asserts, per package:
 
 1. `src/client/index.ts` exists, and every `clientPack()` call names it with the package's own id;
 2. no `plugin.ts` / `lib.ts`, no `./lib` export;

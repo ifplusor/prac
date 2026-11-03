@@ -8,25 +8,25 @@ throwaway rig with its own XDG/HOME tree and removes it afterwards.
 
 ```bash
 cd /Volumes/Dev/prac/prac-dev
-pnpm verify:ui
+pnpm verify ui
 ```
 
 It starts a rig on `PRAC_TEST_PORT` (default `3184`), installs the dynamic
 fixture, runs the gates below, then proves the extension lifecycle by stopping
 the rig, removing the fixture, starting again, and restoring it.
 
-`pnpm verify:ui` needs permission to write the DSH profile outside the
+`pnpm verify ui` needs permission to write the DSH profile outside the
 workspace: the CLI resolves that profile from the user home even when
 `XDG_DATA_HOME`/`HOME` point at the temporary tree.
 
 ### One gate at a time
 
 ```bash
-PRAC_GATES=file pnpm verify:ui          # one gate on the throwaway rig
-PRAC_GATES=file,tabs pnpm verify:ui     # a few
+pnpm verify ui file          # one gate on the throwaway rig
+pnpm verify ui file,tabs     # a few
 ```
 
-`PRAC_GATES` is a comma-separated subset of the gate names below; the rig, the
+The argument is a comma-separated subset of the gate names below (it sets `PRAC_GATES`); the rig, the
 profile link and the fixture are the same, only the gate loop is narrowed. The
 lifecycle phases are part of the full run only.
 
@@ -64,17 +64,17 @@ whenever a gate fails, not only for the "no prac-owned console errors" check.
 ## Static gates
 
 ```bash
-pnpm verify:packages
+pnpm verify static
 ```
 
-`verify:packages` checks the DSH plugin package graph (`ui-frame` /
+The static gates check the DSH plugin package graph (`ui-frame` /
 `ui-widget` / `ui-workbench` / `ui-dsh` / adapters) and the bundle-is-a-leaf rule. Target packages that have not been split out yet are reported as skipped,
 not failed. Current implementation-era gate names (`containers`, `editor:group`)
 remain until the split lands.
 
 ## Planned live gates
 
-These are not in `pnpm verify:ui` yet:
+These are not in `pnpm verify ui` yet:
 
 | gate              | proves                                            |
 | ----------------- | ------------------------------------------------- |
@@ -93,7 +93,7 @@ URL='http://127.0.0.1:3084/?token=…' node tests/gates/verify-grid.mjs
 ```
 
 `verify:grid-view` and `verify:dynamic` need the dynamic fixture installed.
-`verify:extension-lifecycle` is phase-based and is driven by `verify:ui`; it is
+`tests/gates/verify-extension-lifecycle.mjs` is phase-based and is driven by `pnpm verify ui`; it is
 not a standalone install/uninstall command.
 
 ## Noise
@@ -108,5 +108,5 @@ known lines; a gate's `own(prefix)` is expected to be empty.
 1. Put it under `tests/gates/` and import `openPrac`/`report`/`requireUrl` from
    `tests/gates/harness.mjs`.
 2. Use a real action and assert pixels or model state, not only DOM presence.
-3. Add it to the ordered list in `scripts/verify-ui.mjs`.
-4. Run `pnpm verify:ui` before committing.
+3. Add it to the roster in `tests/gates.mjs`.
+4. Run `pnpm verify ui` before committing.

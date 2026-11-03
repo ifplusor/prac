@@ -181,8 +181,10 @@ if (existsSync(workbenchSrc)) {
   for (const file of readdirSync(workbenchSrc)) {
     if (!file.endsWith(".ts")) continue;
     const source = readFileSync(join(workbenchSrc, file), "utf8");
-    if (/export\s+(?:type\s+)?\*?\s*\{[^}]*\}\s+from\s+"prac-ui-kit-content"/.test(source) ||
-        /export\s+\*\s+from\s+"prac-ui-kit-content"/.test(source)) {
+    if (
+      /export\s+(?:type\s+)?\*?\s*\{[^}]*\}\s+from\s+"prac-ui-kit-content"/.test(source) ||
+      /export\s+\*\s+from\s+"prac-ui-kit-content"/.test(source)
+    ) {
       failed = true;
       console.error(`✗ prac-ui-kit-workbench must not re-export content (${file})`);
     }
