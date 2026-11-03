@@ -98,7 +98,7 @@ export function apply(ctx: Context): void {
       const timer = setTimeout(() => {
         retryTimers.delete(timer);
         sync();
-      }, 100);
+      }, 250);
       retryTimers.add(timer);
     };
 
@@ -152,7 +152,7 @@ export function apply(ctx: Context): void {
         if (placement === undefined) {
           // The catalogue admits the view before the app has created its placement;
           // retry so the actions publish once the placement is known.
-          if ((emptyActionRetries.get(view) ?? 0) < 10) {
+          if ((emptyActionRetries.get(view) ?? 0) < 40) {
             emptyActionRetries.set(view, (emptyActionRetries.get(view) ?? 0) + 1);
             scheduleActionRetry();
           }
@@ -167,7 +167,7 @@ export function apply(ctx: Context): void {
           // Not cached: an empty model here is usually "the group is not ready yet",
           // so a later sync must be able to publish the real one.
           lastActionShapes.delete(view);
-          if ((emptyActionRetries.get(view) ?? 0) < 10) {
+          if ((emptyActionRetries.get(view) ?? 0) < 40) {
             emptyActionRetries.set(view, (emptyActionRetries.get(view) ?? 0) + 1);
             scheduleActionRetry();
           }

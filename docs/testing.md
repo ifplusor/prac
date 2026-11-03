@@ -131,9 +131,9 @@ The run prints per-gate wall time at the end. Measured on 2026-11-03:
 | gate                  | wall       |
 | --------------------- | ---------- |
 | stack / split / views | ~5.5s each |
-| tabs                  | 29s        |
+| tabs                  | 4.9s       |
 | file                  | 92s        |
-| full roster           | ~5 min     |
+| full roster           | ~4.3 min   |
 
 The dominant cost was **fixed sleeps**: the roster had ~177
 `page.waitForTimeout(…)` calls (~236s of pure waiting). Condition waits cut

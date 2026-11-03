@@ -22,6 +22,7 @@ import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { installDeepDom } from "./deep-dom.mjs";
+import { until, windowActionsReady } from "../../../tests/gates/until.mjs";
 import { writeFixtures } from "./gate-fixtures.mjs";
 
 const packageDir = resolve(import.meta.dirname, "..");
@@ -72,7 +73,8 @@ await installDeepDom(page);
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face && !!globalThis.__deep, null, {
   timeout: 60_000,
 });
-await page.waitForTimeout(5000);
+await until(page, () => globalThis.__pracFrame.listRegions().length > 0, null, { timeout: 10_000 });
+await page.waitForTimeout(200);
 
 /**
  * The facts this gate is about.
@@ -116,17 +118,68 @@ const tabIdOf = (file) =>
     file.name,
   );
 
+step("reset the app's open editors");
+// The extension host is server-side and outlives a browser, so an earlier gate's
+// files can still be open here. The strip would then carry them, and the app's
+// placements would not be the three this gate opens.
+await page.evaluate(() => {
+  const face = globalThis.__vscodeEmbed.face;
+  for (const placement of face.listPlacements()) {
+    face.capabilities.editors.actions.close(placement.placement, placement.resource);
+  }
+});
+await until(page, () => globalThis.__vscodeEmbed.face.listPlacements().length === 0, null, {
+  timeout: 10_000,
+});
+
 step("open three files");
 for (const file of [A, B, C]) {
   await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), file.uri);
-  await page.waitForTimeout(2500);
+  await until(
+    page,
+    (name) =>
+      globalThis.__deep
+        .all("[data-prac-tab]")
+        .some((tab) => (tab.getAttribute("data-prac-tab") ?? "").endsWith(name)),
+    file.name,
+    { timeout: 10_000 },
+  );
 }
+await until(
+  page,
+  () =>
+    (globalThis.__pracFrame.activeItem() ?? "").endsWith("c.txt") &&
+    globalThis.__deep
+      .all("[data-vscode-embed-file]")
+      .some(
+        (element) =>
+          (element.getAttribute("data-vscode-embed-file") ?? "").endsWith("c.txt") &&
+          element.querySelector(".monaco-editor") !== null,
+      ),
+  null,
+  { timeout: 10_000 },
+);
+// The model is what the strip renders from: wait for the action event, not for
+// the buttons, then let the check say whether they rendered.
+await windowActionsReady(page, await tabIdOf(C));
 const opened = await facts();
 
 step("click the middle tab");
 const bView = await tabIdOf(B);
 await page.click(`[data-prac-tab="${bView}"]`);
-await page.waitForTimeout(2500);
+await until(
+  page,
+  (name) =>
+    (globalThis.__pracFrame.activeItem() ?? "").endsWith(name) &&
+    globalThis.__deep
+      .all("[data-vscode-embed-file]")
+      .some(
+        (element) =>
+          (element.getAttribute("data-vscode-embed-file") ?? "").endsWith(name) &&
+          element.querySelector(".monaco-editor") !== null,
+      ),
+  "b.txt",
+);
 const clicked = await facts();
 
 step("activate the first file from the app");
@@ -137,14 +190,26 @@ await page.evaluate(
   (uri) => globalThis.__vscodeEmbed.face.capabilities.editors.actions.activate(uri),
   A.uri,
 );
-await page.waitForTimeout(2500);
+await until(
+  page,
+  (name) =>
+    (globalThis.__pracFrame.activeItem() ?? "").endsWith(name) &&
+    globalThis.__deep
+      .all("[data-vscode-embed-file]")
+      .some(
+        (element) =>
+          (element.getAttribute("data-vscode-embed-file") ?? "").endsWith(name) &&
+          element.querySelector(".monaco-editor") !== null,
+      ),
+  "a.txt",
+);
 const activated = await facts();
 const activateAuditAfter = await page.evaluate(() =>
   globalThis.__vscodeEmbed.face.editorModelWriteAudit(),
 );
 // Sampled twice: a pair that keeps flipping between the app and prac's front (the storm
 // this reconciliation used to fall into) would differ here.
-await page.waitForTimeout(2500);
+await page.waitForTimeout(500);
 const activatedLater = await facts();
 
 step("drag the first tab onto the third");
@@ -154,7 +219,17 @@ const dragAuditBefore = await page.evaluate(() =>
   globalThis.__vscodeEmbed.face.editorModelWriteAudit(),
 );
 await page.dragAndDrop(`[data-prac-tab="${aView}"]`, `[data-prac-tab="${cView}"]`);
-await page.waitForTimeout(2500);
+await until(
+  page,
+  (want) =>
+    JSON.stringify(
+      globalThis.__deep
+        .all("[data-prac-tab]")
+        .map((tab) => (tab.getAttribute("data-prac-tab") ?? "").split("/").pop())
+        .filter((name) => ["a.txt", "b.txt", "c.txt"].includes(name ?? "")),
+    ) === JSON.stringify(want),
+  ["b.txt", "c.txt", "a.txt"],
+);
 const dragged = await facts();
 const dragAuditAfter = await page.evaluate(() =>
   globalThis.__vscodeEmbed.face.editorModelWriteAudit(),
@@ -166,7 +241,9 @@ await page
   .locator('[data-prac-window-action="workbench.action.splitEditor"]')
   .first()
   .click();
-await page.waitForTimeout(3500);
+await until(page, (before) => globalThis.__pracFrame.listRegions().length > before, regionsBefore, {
+  timeout: 10_000,
+});
 const regionsAfter = await page.evaluate(() => globalThis.__pracFrame.listRegions().length);
 const splitActionHosts = await page.evaluate(
   () => globalThis.__deep.all("[data-prac-window-actions]").length,
@@ -174,7 +251,9 @@ const splitActionHosts = await page.evaluate(
 
 step("open the overflow menu");
 await page.locator("[data-prac-window-actions-more]").first().click();
-await page.waitForTimeout(400);
+await until(page, () => document.querySelector("[data-prac-window-actions-menu]") !== null, null, {
+  timeout: 3000,
+});
 const menu = await page.evaluate(() => {
   const element = document.querySelector("[data-prac-window-actions-menu]");
   if (element === null) return null;
