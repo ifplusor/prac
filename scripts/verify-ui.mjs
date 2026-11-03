@@ -25,6 +25,19 @@ const profileDir = join(dshHome, "profiles", "prac-dev");
 const extensions = join(dataHome, "prac/code-server/extensions");
 const target = join(extensions, "prac.gate-dynamic-1.0.0");
 const fixture = join(repo, "tests/fixtures/dynamic-extension");
+/**
+ * Gate selection.
+ *
+ * The full set runs by default; `PRAC_GATES=file,split,stack` runs only the
+ * named gates on the same rig, which is how a single assertion is iterated
+ * without paying for the whole acceptance run. The lifecycle phases are part of
+ * the full run only.
+ */
+const selected = (process.env.PRAC_GATES ?? "")
+  .split(",")
+  .map((name) => name.trim())
+  .filter((name) => name !== "");
+
 const gates = [
   ["containers", "tests/gates/verify-containers.mjs"],
   ["board", "tests/gates/verify-board.mjs"],
@@ -47,6 +60,16 @@ const gates = [
   ["tabs", "vendor/vscode/scripts/verify-tabs.mjs"],
   ["dynamic", "tests/gates/verify-dynamic.mjs"],
 ];
+
+const knownGates = new Set(gates.map(([name]) => name));
+const unknownGates = selected.filter((name) => !knownGates.has(name));
+if (unknownGates.length > 0) {
+  console.error(`verify-ui: unknown gate(s): ${unknownGates.join(", ")}`);
+  console.error(`verify-ui: known gates: ${[...knownGates].join(", ")}`);
+  process.exit(1);
+}
+const chosenGates =
+  selected.length === 0 ? gates : gates.filter(([name]) => selected.includes(name));
 
 const run = (command, args, options = {}) =>
   new Promise((resolvePromise) => {
@@ -132,8 +155,11 @@ async function runGate(name, script, extra = {}) {
     .find((entry) => entry.startsWith("OK:") || entry.startsWith("SKIPPED:"));
   process.stdout.write(`${line ?? "no OK line"}\n`);
   if (result.code === 0) return true;
-  process.stderr.write(result.stdout.slice(-4000));
-  process.stderr.write(result.stderr.slice(-4000));
+  // Full output, not a tail: a gate's diagnostics (a probe, a console error, the
+  // report JSON) are usually at the front, and a truncated tail is what made a
+  // failing assertion undiagnosable in the editor migration.
+  process.stderr.write(result.stdout);
+  process.stderr.write(result.stderr);
   return false;
 }
 
@@ -174,14 +200,16 @@ fixtureInstalled = true;
 try {
   let failed = false;
   await startRig();
-  for (const [name, script] of gates) {
+  for (const [name, script] of chosenGates) {
     if (!(await runGate(name, script))) {
       failed = true;
       break;
     }
   }
 
-  if (!failed) {
+  // The lifecycle phases need the full set (they restart the rig around the
+  // dynamic fixture); a selected subset stops after its own gates.
+  if (!failed && selected.length === 0) {
     await stopRig();
     await rm(target, { recursive: true, force: true });
     fixtureInstalled = false;
@@ -203,7 +231,10 @@ try {
   }
 
   if (failed) process.exitCode = 1;
-  else process.stdout.write("\nUI ACCEPTANCE: all gates passed\n");
+  else {
+    const scope = selected.length === 0 ? "all gates" : `${chosenGates.length} selected gate(s)`;
+    process.stdout.write(`\nUI ACCEPTANCE: ${scope} passed\n`);
+  }
 } finally {
   await stopRig();
   if (!fixtureInstalled)

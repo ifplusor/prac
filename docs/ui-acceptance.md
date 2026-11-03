@@ -19,31 +19,47 @@ the rig, removing the fixture, starting again, and restoring it.
 workspace: the CLI resolves that profile from the user home even when
 `XDG_DATA_HOME`/`HOME` point at the temporary tree.
 
+### One gate at a time
+
+```bash
+PRAC_GATES=file pnpm verify:ui          # one gate on the throwaway rig
+PRAC_GATES=file,tabs pnpm verify:ui     # a few
+```
+
+`PRAC_GATES` is a comma-separated subset of the gate names below; the rig, the
+profile link and the fixture are the same, only the gate loop is narrowed. The
+lifecycle phases are part of the full run only.
+
+A failing gate prints its **complete** stdout/stderr (the probe values, the
+report JSON, and — through the harness — the page console errors), not a tail,
+so the assertion that failed can be read in place. `console errors` are printed
+whenever a gate fails, not only for the "no prac-owned console errors" check.
+
 ## Gates
 
-| gate                 | proves                                                                    |
-| -------------------- | ------------------------------------------------------------------------- |
+| gate                 | proves                                                                                                                                                                      |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `containers`         | dock rail lists the borrowed tools, switches their board windows, and proves an editor window can live in a sidebar WindowGroup plus the board window's identity projection |
-| `board`              | the Explorer board window owns widget order / active / add / remove and renders its rows |
-| `stack`              | Explorer stack rows, header fold / unfold, bodies                         |
-| `split`              | left / center row split; dragging its sash resizes both sides             |
-| `grid`               | dragging a cell swaps placements and the swap persists                    |
-| `grid:resize`        | dragging a cell's resize handle changes its span and persists             |
-| `grid:merge`         | grid merge / unmerge controls and persistence                             |
-| `grid:view`          | a recall-catalogue row drags into a grid cell; placement persists         |
-| `grid:tab`           | a mounted tab drags into another grid cell; placement persists            |
-| `grid:free`          | dragging a track boundary changes column weights in pixels                |
-| `resize`             | track resize, distribution, floors, centre priority                       |
-| `persistence`        | frame + board layout state reload; a resized track and a folded board row persist |
-| `bottom`             | bottom bar appears when filled, takes room, and returns it on collapse    |
-| `views`              | recall surface: open, window catalogue (widgets are board-owned), hide/show, Escape |
-| `file`               | editor surface, tab activation, second group, close/reopen                |
-| `editor:group`       | split editor group, focus sides, empty group removal                      |
-| `editor:close`       | dirty-close dialog, Cancel and Don't Save                                 |
-| `tabs`               | tab order, activation, frame→`EditorGroupModel` reorder; window actions in the tab strip |
-| `dynamic`            | a contributed view enters/leaves the catalogue without reload             |
-| `lifecycle:absent`   | removing the extension removes catalogue/frame/host                       |
-| `lifecycle:restored` | restoring the extension rebuilds catalogue/frame/host                     |
+| `board`              | the Explorer board window owns widget order / active / add / remove and renders its rows                                                                                    |
+| `stack`              | Explorer stack rows, header fold / unfold, bodies                                                                                                                           |
+| `split`              | left / center row split; dragging its sash resizes both sides                                                                                                               |
+| `grid`               | dragging a cell swaps placements and the swap persists                                                                                                                      |
+| `grid:resize`        | dragging a cell's resize handle changes its span and persists                                                                                                               |
+| `grid:merge`         | grid merge / unmerge controls and persistence                                                                                                                               |
+| `grid:view`          | a recall-catalogue row drags into a grid cell; placement persists                                                                                                           |
+| `grid:tab`           | a mounted tab drags into another grid cell; placement persists                                                                                                              |
+| `grid:free`          | dragging a track boundary changes column weights in pixels                                                                                                                  |
+| `resize`             | track resize, distribution, floors, centre priority                                                                                                                         |
+| `persistence`        | frame + board layout state reload; a resized track and a folded board row persist                                                                                           |
+| `bottom`             | bottom bar appears when filled, takes room, and returns it on collapse                                                                                                      |
+| `views`              | recall surface: open, window catalogue (widgets are board-owned), hide/show, Escape                                                                                         |
+| `file`               | editor surface, tab activation, second group, close/reopen                                                                                                                  |
+| `editor:group`       | split editor group, focus sides, empty group removal                                                                                                                        |
+| `editor:close`       | dirty-close dialog, Cancel and Don't Save                                                                                                                                   |
+| `tabs`               | tab order, activation, frame→`EditorGroupModel` reorder; window actions in the tab strip                                                                                    |
+| `dynamic`            | a contributed view enters/leaves the catalogue without reload                                                                                                               |
+| `lifecycle:absent`   | removing the extension removes catalogue/frame/host                                                                                                                         |
+| `lifecycle:restored` | restoring the extension rebuilds catalogue/frame/host                                                                                                                       |
 
 ## Static gates
 

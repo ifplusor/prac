@@ -116,6 +116,9 @@ export async function hasLayoutState(page) {
   );
 }
 
+/** The page's console errors, for {@link report} to print when a check fails. */
+let lastConsoleErrors = [];
+
 /**
  * Open the prac page: chromium, console capture, and the frame waited for.
  *
@@ -159,6 +162,7 @@ export async function openPrac(url, options = {}) {
     await page.waitForTimeout(1000);
   }
   await page.waitForFunction(() => !!globalThis.__pracFrame, null, { timeout: 60_000 });
+  lastConsoleErrors = consoleErrors;
   return {
     browser,
     page,
@@ -242,6 +246,11 @@ export function report(result) {
     .map(([name]) => name);
   if (failed.length > 0) {
     console.error(`FAILED: ${failed.join(", ")}`);
+    // A check like "no prac-owned console errors" is only actionable with the
+    // lines themselves; the page already collected them for this gate.
+    if (lastConsoleErrors.length > 0) {
+      console.error(`console errors:\n${lastConsoleErrors.join("\n")}`);
+    }
     process.exit(1);
   }
   console.log(result.ok);
