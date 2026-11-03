@@ -85,3 +85,11 @@ gate 本体继续 `.mjs`（真实 rig + Playwright + vendor 自己的 Playwright
 保留的改动：per-gate 计时（`tests/ui.mjs` 末尾打印）、`smoke`/`editor`/`grid` 分组（`vp run verify:ui -- smoke` ≈46s）、`docs/testing.md` 的成本画像。
 
 下一步加速的正确顺序：先让 `file`/`tabs` 在**全量顺序**下可复现地绿（例如 gate 开始时显式重置 frame 布局、或用独立 rig per gate），再谈并行 rig。
+
+## 8. 等待问题的根因（round 11）
+
+把 `tabs` 的 sleep 换成条件等待后，`fileActionsRenderInTheTabStrip` 在全量顺序下失败（单跑却绿）。探针显示：`editorActions()` 的模型已就绪、placements 存在，但 DOM 里 `data-prac-window-action` 为 0 —— 说明 **actions 的发布依赖事件**：chrome sync 只在 `editors`/`layout` 变化时跑；catalogue 先 admit 视图、placement 后到，sync 早跑一次就把空模型缓存了，之后没有事件再触发。
+
+修在源头（`ui-vscode-editor`）：① catalogue 变化也触发 chrome sync；② 空模型不缓存、placement 缺失时按 100ms 最多重试 10 次；③ 清理时清掉重试定时器。全量（原始 gate）绿。
+
+但 `tabs` 的快等待在全量下仍失败（同样这条检查）——说明 actions 还有另一个发布条件没找到；不再靠猜时序，留给下一次用探针定位。gate 回退，基线保持绿。

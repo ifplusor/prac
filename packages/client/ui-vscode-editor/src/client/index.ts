@@ -83,6 +83,24 @@ export function apply(ctx: Context): void {
     let lastAppActive: string | null = null;
     /** The action model last published per view, as `placement + model` shape. */
     const lastActionShapes = new Map<string, string>();
+    /**
+     * How many times an empty action model has been retried per view.
+     *
+     * A view's group can be created after the sync that first sees it (the app
+     * opens the file, then the group's actions exist), and an empty model cached
+     * there would leave the tab strip with no actions until some unrelated event
+     * happened to re-run the sync. The retry is bounded so a genuinely empty
+     * group does not poll forever.
+     */
+    const emptyActionRetries = new Map<string, number>();
+    const retryTimers = new Set<ReturnType<typeof setTimeout>>();
+    const scheduleActionRetry = (): void => {
+      const timer = setTimeout(() => {
+        retryTimers.delete(timer);
+        sync();
+      }, 100);
+      retryTimers.add(timer);
+    };
 
     const toWindowAction = (action: PracVscodeAction): WindowAction => ({
       id: action.id,
@@ -131,14 +149,30 @@ export function apply(ctx: Context): void {
       const wantedActions = new Set<string>();
       for (const { view } of files) {
         const placement = host.filePlacement(view)?.placement;
-        if (placement === undefined) continue;
+        if (placement === undefined) {
+          // The catalogue admits the view before the app has created its placement;
+          // retry so the actions publish once the placement is known.
+          if ((emptyActionRetries.get(view) ?? 0) < 10) {
+            emptyActionRetries.set(view, (emptyActionRetries.get(view) ?? 0) + 1);
+            scheduleActionRetry();
+          }
+          continue;
+        }
         wantedActions.add(view);
         const model = host.editorActions(placement);
         const shape = JSON.stringify({ placement, model });
         if (lastActionShapes.get(view) === shape) continue;
         if (model.primary.length === 0 && model.secondary.length === 0) {
           windowActions.remove(view);
+          // Not cached: an empty model here is usually "the group is not ready yet",
+          // so a later sync must be able to publish the real one.
+          lastActionShapes.delete(view);
+          if ((emptyActionRetries.get(view) ?? 0) < 10) {
+            emptyActionRetries.set(view, (emptyActionRetries.get(view) ?? 0) + 1);
+            scheduleActionRetry();
+          }
         } else {
+          emptyActionRetries.delete(view);
           const actionModel: WindowActionModel = {
             primary: model.primary.map(toWindowAction),
             secondary: model.secondary.map(toWindowAction),
@@ -188,10 +222,16 @@ export function apply(ctx: Context): void {
     // prac's own front view changes without the app knowing (a tab click), so the
     // layout is a source too.
     const stopLayout = layout.subscribe(sync);
+    // The catalogue is how a view learns its placement: a sync that ran while the
+    // placement was still missing has to run again when it arrives.
+    const stopCatalogue = host.onDidChangeCatalogue(sync);
     return () => {
+      for (const timer of retryTimers) clearTimeout(timer);
+      retryTimers.clear();
       for (const view of lastActionShapes.keys()) windowActions.remove(view);
       lastActionShapes.clear();
       stopLayout();
+      stopCatalogue();
       stopEditors();
       stopClose();
     };
