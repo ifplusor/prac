@@ -29,6 +29,7 @@
  */
 import { createRequire } from "node:module";
 import { installDeepDom, resourceOfFileView } from "./deep-dom.mjs";
+import { until } from "../../../tests/gates/until.mjs";
 import { classifyFailures } from "../../../tests/gates/classify.mjs";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -177,8 +178,25 @@ async function waitForSurface(resource, timeout = 60_000) {
     { timeout },
   );
   // Present but not yet laid out paints nothing, and "present, blank" is this
-  // gate's failure mode — so let the frame lay the new body out before measuring.
-  await page.waitForTimeout(2500);
+  // gate's failure mode — so wait for a real box and real text, twice (a surface
+  // can move as the layout settles), then two frames.
+  await until(
+    page,
+    (uri) => {
+      const element = globalThis.__deep
+        .all(`[data-vscode-embed-file="${uri}"]`)
+        .find((candidate) => candidate.querySelector(".monaco-editor"));
+      if (element === undefined) return false;
+      const box = element.getBoundingClientRect();
+      const text = element.querySelector(".view-lines")?.textContent ?? "";
+      return box.width > 0 && box.height > 0 && text.trim().length > 0;
+    },
+    resource,
+    { timeout: 10_000 },
+  );
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
 }
 
 /** One file's surface: its box, rendered text, paint and editor identity. */
@@ -551,7 +569,18 @@ step("reload");
 await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
-await page.waitForTimeout(6000);
+await until(
+  page,
+  () =>
+    (globalThis.__deep.all("[data-prac-tab]") ?? []).every(
+      (tab) => !(tab.getAttribute("data-prac-tab") ?? "").startsWith("vscode:file:"),
+    ),
+  null,
+  { timeout: 10_000 },
+);
+await page.evaluate(
+  () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+);
 const reloaded = await page.evaluate(() => ({
   open: globalThis.__vscodeEmbed.face.listOpenFiles(),
   fileHosts: globalThis.__deep.all("[data-vscode-embed-file]").length,

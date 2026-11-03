@@ -131,8 +131,8 @@ The run prints per-gate wall time at the end. Measured on 2026-11-03:
 | gate                  | wall       |
 | --------------------- | ---------- |
 | stack / split / views | ~5.5s each |
-| tabs                  | 4.9s       |
-| file                  | 92s        |
+| tabs                  | 5s         |
+| file                  | 65s        |
 | full roster           | ~4.3 min   |
 
 The dominant cost was **fixed sleeps**: the roster had ~177
