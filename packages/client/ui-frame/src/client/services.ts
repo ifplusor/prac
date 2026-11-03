@@ -90,6 +90,7 @@ import {
 import type { LayoutFace, PracLayoutFace, RoleBindings } from "./contract.js";
 
 import type { ItemInfo } from "./contract.js";
+import { listCatalogueItems } from "./catalogue-items.js";
 import { WindowManager, type WindowGroupRuntime } from "./window-manager.js";
 
 /** Whether a view's region sits inside the subtree a region id names. */
@@ -288,28 +289,12 @@ export function createServices(
     subscribe: (listener) => store.subscribe(listener),
     /** The union of the slot registry's items and each one's placement. */
     listItems(): ItemInfo[] {
-      const state = store.get();
-      const ids = new Set([...catalogueViewIds(ctx.slots), ...windows.ids()]);
-      return [...ids].map((id) => {
-        const record: ItemRecord | undefined = state.items[id];
-        return record === undefined
-          ? {
-              id,
-              region: null,
-              hidden: true,
-              order: null,
-              kind: declaredViewSlot(id) === "widget" ? "widget" : "window",
-            }
-          : {
-              id,
-              region: record.region,
-              hidden: record.hidden,
-              order: record.order,
-              // A widget the board owns has no frame record; its declared slot still says what
-              // it is, and `listItems` must not report it as a window.
-              kind: record?.kind ?? (declaredViewSlot(id) === "widget" ? "widget" : "window"),
-            };
-      });
+      return listCatalogueItems(
+        store.get(),
+        catalogueViewIds(ctx.slots),
+        windows.ids(),
+        declaredViewSlot,
+      );
     },
     /** The regions a view can be moved to (id + collapse state). */
     listRegions(): RegionInfo[] {

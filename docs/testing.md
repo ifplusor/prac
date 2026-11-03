@@ -82,8 +82,10 @@ default; add a `probes` entry when a check starts reading an internal.
 ## The gap to close: L2
 
 The last two migrations were diagnosed twice on a four-minute live rig, because
-there is no test between a unit object and the browser. The missing layer is a
-model-level integration test for paths like:
+there was no test between a unit object and the browser. The first L2 tests now
+cover the catalogue union (`listCatalogueItems`: slots ∪ admitted windows, placed
+and unplaced, the stale-entry case) and the manager's records. Still missing is a
+single test that runs the whole seam against a real `LayoutStore`:
 
 - `admit(app)` → the manager writes the seat → `listItems()` lists the window;
 - `close(window)` → the seat is disposed **and** the catalogue no longer lists it
