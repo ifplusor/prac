@@ -137,7 +137,19 @@ export function createServices(
   // (a stack that falls back to one row melts, an empty leftover holds no space), so the normaliser
   // runs on the way out of each change rather than only on placements.
   const applications = new ApplicationRegistry();
-  const windows = new WindowManager(new WindowGroupBindings(store), applications);
+  const windows = new WindowManager(new WindowGroupBindings(store), applications, {
+    register: (windowId, facts, content) => {
+      // `paneHeader` is this frame's own option, not one the registry's base
+      // type knows; keep it out of the literal's excess-property check.
+      const options = {
+        name: "prac.window" as const,
+        id: windowId,
+        ...(facts.label === undefined ? {} : { label: facts.label }),
+        ...(facts.paneHeader === true ? { paneHeader: true } : {}),
+      };
+      return ctx.slots.register(options, content);
+    },
+  });
   const surfaces = new RegionContentRegistry<WindowGroup>();
   const originalUpdate = store.update;
   const write = (change: Parameters<typeof store.update>[0]): void => originalUpdate(change);

@@ -41,3 +41,16 @@ previewSurvivesCloseReopen, twoPlacementsAreTwoViews
 下一步（round 7 起）不再猜：起一个不被 `verify-ui` 回收的 rig，打开一个文件，直接读页面 console 与 `__pracFrame.listItems()` / `mappedWindows()`，把「投影 effect 是否跑、跑了几次、读了什么」变成观测值，再改。
 
 代码已回退；`WindowManager.onDidChange` 保留（无订阅者，行为不变）。
+
+## 4. 尝试 3：座位由管理器写 + close 修好（round 7，成功）
+
+做法改变：不再删座位，而是**由窗口管理器写座位**——`admit` 时用 app 的 `content(windowId)` 与 `paneHeader` / label 注册一条 `prac.window`，`close` 时回收；editor 只注册 app + admit/close。
+
+排查过程：
+
+1. 第一次重跑：8 项失败里只剩 `twoPlacementsAreTwoViews`，其余全绿（内部座位让目录/投影恢复）。
+2. 用探针读 `__pracFrame.listItems()`：split 后同一 resource 有 **三条** file view（`p0` / `p1` / `p4`），app 只有 `p1` / `p4` 两个 placement ⇒ `p0` 是陈旧项。
+3. 根因：`WindowManager.close()` 在 group-less 分支里 **先 return**，只 dispose 了座位，没有删 `#appOf` / `#titles` / `#handles`，于是 `windows.ids()` 仍列出 `p0`，`listItems()` 继续返回它。
+4. 修法：`close` 先清记录（座位、appOf、titles、handles），再按是否有 group 决定是否 `runtime.remove`，两种情况都 `notify`。
+
+验证：`build` / `test` / `verify:entries` 绿；**`verify:ui` 全绿**（`UI ACCEPTANCE: all gates passed`）。

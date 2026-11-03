@@ -119,9 +119,11 @@ interface PracWindowManager {
 
 这条边界把今天分散在 `WindowGroupAdapter`、`ui-vscode-editor` 的 `mapWindow`、arrangement 里的 window 逻辑收进一个服务；`mapWindow` 这类上游投影留在适配器侧，作为管理器事件的消费者。
 
-### 5 frame 只剩 `prac.widget` 一个内容座位
+### 5 内容座位由谁写
 
-**`prac.window` 删除**。window 的内容由 app 提供（`app.content(windowId)`），window 记录由窗口管理器持有——再有一个「窗口内容座位」就是对同一事实的第二权威。今天它唯一的生产者是 `ui-vscode-editor`（每个文件 placement 一条），editor 变成 app 后这个生产者消失。
+`prac.window` **保留，但只由 application 层写**：app 的 `content(windowId)` 与它声明的 chrome 事实由窗口管理器在 `admit` 时注册成一条 `prac.window` 座位，`close` 时回收。伙伴不再直接注册它——座位是 frame 的渲染登记表，不是伙伴的 API。
+
+（早先的设计是「删掉座位、frame 直接渲染 app 内容」；实测删掉后 `verify-file` 的八项投影断言全红，根因是 frame 的目录/投影仍以座位为准。座位因此降为内部实现，等 frame 的渲染路径完全由 app 层接管后再评估删除。）
 
 - `prac.widget` 保留：widget 是伙伴的贡献，内容由 board 渲染器按 id 派发（`renderSlot("prac.widget", {}, { only: id })`），board 与 frame 是两个渲染器，这条派发路径不归 app 层；
 - 来源渲染位置（暂名 `prac.source`）：适配器声明自己渲染哪些子槽的位置。DSH 在这里声明 `main` / `sidebar` / `rightbar`；
@@ -154,7 +156,7 @@ interface PracWindowManager {
 ## Migration
 
 1. **application 层 + 窗口管理器**（kit + `ui-frame`）：`PracApplication` / `ApplicationRegistry`（含单测）→ `ctx.pracApplications`；`PracWindowManager` 接管 window 记录、group 归属、放置、active（`WindowGroupAdapter` 的内核上移为服务）。此步不改变现有行为，只建立边界。
-2. **editor 成为 app**：`ui-vscode-editor` 从「按 placement 注册 `prac.window`」改为「贡献 editor app + 按 placement `open` / `close`」；`mapWindow` 退化为管理器事件的消费者；board window 由 board host app 打开。同一步删掉 `prac.window` 座位（`SlotMap`、声明、`catalogue` 的读与 `layout-item` 的派发、`PracSlotKey` 收窄到 `prac.widget`）。判据：live gate 的 `file` / `editor:*` / `tabs` / `board` 全绿。
+2. **editor 成为 app**：`ui-vscode-editor` 从「按 placement 注册 `prac.window`」改为「贡献 editor app + 按 placement `admit` / `close`」；管理器负责写座位与回收；`mapWindow` 退化为管理器事件的消费者。判据：live gate 的 `file` / `editor:*` / `tabs` / `board` 全绿。
 3. **合流**：抽出 `PracPartner` + `registerContributions`；`ui-vscode-views` 变薄壳；editor 的 app 贡献走同一契约。
 4. **DSH 成为 host**：声明 DSH 子槽、实现 `PracPartner`（chat 为 app，sidebar / rightbar / main keys 按 kind 贡献），删 frame 的 `dsh:` 路径。
 5. **动作收口**：三个动作座位与 `ItemActions` 删除。

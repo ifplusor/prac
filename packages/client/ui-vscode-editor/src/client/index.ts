@@ -29,7 +29,6 @@
 import type { Context } from "@deepseek-ai/cordis";
 // Type-only, for the frame plugin's `Context` / `SlotMap` merges.
 import type {} from "prac-client-ui-frame/client";
-import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {
   PracVscodeAction,
   PracVscodeFace,
@@ -41,18 +40,13 @@ import type {
   WindowAction,
   WindowActionModel,
 } from "prac-client-ui-frame/client";
-import type { PracSlotKey } from "prac-client-ui-frame/client";
-
-/** The slot these views are registered into (checked against the mechanism's key). */
-const SLOT: PracSlotKey = "prac.window";
 
 /**
- * Declare one view entry per open file, and keep that set in sync with the app.
+ * Contribute the editor application, and keep its windows in step with the app.
  *
- * The slot is declared by `ui-frame`'s frame, so injecting waits for
- * that declaration (either client plugin may activate first). Each entry is a
- * registration of its own — the mechanism's view catalogue reads the registry, so
- * a file appearing or closing is exactly a registration appearing or going away.
+ * The editor is one **app**; each open file is a window instance the app asks the
+ * window manager to admit. The manager records the instance, its title, and the
+ * seat the frame renders — this package never registers a view slot.
  *
  * @param ctx - the Cordis client context.
  */
@@ -60,7 +54,8 @@ export function apply(ctx: Context): void {
   // The mechanism comes from the service registry; naming its published face here
   // is what keeps this slot's use of it checked.
   const host: PracVscodeFace = ctx.pracVscode;
-  const slots: SlotRegistry = ctx.slots;
+  const applications = ctx.pracApplications;
+  const windows = ctx.pracWindows;
   const windowActions: PracWindowActionsFace = ctx.pracWindowActions;
   // The type-only import and the ambient merge can come through different
   // declaration copies (vscode-host bundles its own), so cast at the boundary.
@@ -203,46 +198,45 @@ export function apply(ctx: Context): void {
   }, "prac-client-ui-vscode-editor: chrome + active editor");
   ctx.effect(
     () =>
-      slots.inject(SLOT, () => {
-        /** The live registration per file view, so a closed file can retract. */
-        const registered = new Map<string, () => void>();
-        const sync = (): void => {
-          const entries = fileEntries();
-          const wanted = new Set(entries.map((entry) => entry.view));
-          for (const [view, dispose] of Array.from(registered)) {
-            if (wanted.has(view)) continue;
-            dispose();
-            registered.delete(view);
-          }
-          for (const { view, title } of entries) {
-            if (registered.has(view)) continue;
-            // The component renders an empty host until the app has mounted the
-            // file, then fills it — the bridge's direction, one level up. The
-            // app's editor brings its own pane header, so the frame overlays its
-            // fold/drag control instead of drawing a second row header. The label
-            // is the catalogue's file title; without it the frame falls back to
-            // the view id's last colon segment (the raw resource).
-            const options = { name: SLOT, id: view, label: title, paneHeader: true };
-            registered.set(
-              view,
-              slots.register(options, () => host.hostFor(view)() ?? null),
-            );
-          }
-        };
-        sync();
-        const stop = host.onDidChangeCatalogue(sync);
-        return () => {
-          stop();
-          for (const dispose of registered.values()) dispose();
-          registered.clear();
-        };
+      applications.register({
+        id: "editor",
+        label: "Editor",
+        instances: "multi",
+        defaultRegion: "center",
+        paneHeader: true,
+        content: (windowId) => host.hostFor(windowId) ?? (() => null),
       }),
-    "prac-client-ui-vscode-editor: one view per open file",
+    "prac-client-ui-vscode-editor: editor app",
   );
+  ctx.effect(() => {
+    const sync = (): void => {
+      const entries = fileEntries();
+      const wanted = new Set(entries.map((entry) => entry.view));
+      for (const info of windows.windows("editor")) {
+        if (wanted.has(info.id)) continue;
+        windows.close(info.id);
+      }
+      for (const { view, title } of entries) {
+        windows.admit("editor", { windowId: view, title });
+      }
+    };
+    sync();
+    const stop = host.onDidChangeCatalogue(sync);
+    return () => {
+      stop();
+      for (const info of windows.windows("editor")) windows.close(info.id);
+    };
+  }, "prac-client-ui-vscode-editor: one window per open file");
 }
 
 /** The cordis plugin name used by loader diagnostics. */
 export const name = "prac-client-ui-vscode-editor";
 
-/** The DSH services this plugin needs: the slot, the mechanism, and the app face. */
-export const inject = ["slots", "pracVscode", "pracFrame", "pracWindowActions"];
+/** The DSH services this plugin needs: the app + window faces, the mechanism and the layout. */
+export const inject = [
+  "pracApplications",
+  "pracWindows",
+  "pracVscode",
+  "pracFrame",
+  "pracWindowActions",
+];

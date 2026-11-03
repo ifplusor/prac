@@ -67,6 +67,25 @@ export interface WindowGroupRuntime {
   select(windowId: string | undefined): void;
 }
 
+/**
+ * Where the frame renders app windows.
+ *
+ * The frame's item catalogue and renderer are slot-driven, so an admitted window
+ * becomes one seat entry: the app's content, plus the chrome facts the app
+ * declared. The seat is written by the manager — no partner touches it.
+ */
+export interface WindowSeatPort {
+  register(
+    windowId: string,
+    options: {
+      readonly label?: string;
+      readonly icon?: string;
+      readonly paneHeader?: boolean;
+    },
+    content: () => ReactNode,
+  ): () => void;
+}
+
 /** The frame projection the manager delegates to (satisfied by `WindowGroupBindings`). */
 export interface WindowGroupBindingsPort {
   register(
@@ -92,10 +111,13 @@ export class WindowManager {
   /** The title each app gave its window. */
   readonly #titles = new Map<string, string>();
   readonly #listeners = new Set<() => void>();
+  /** The seat registration per admitted window. */
+  readonly #seats = new Map<string, () => void>();
 
   constructor(
     private readonly bindings: WindowGroupBindingsPort,
     private readonly apps: ApplicationRegistry,
+    private readonly seat?: WindowSeatPort,
   ) {}
 
   /**
@@ -171,8 +193,35 @@ export class WindowManager {
     // directly in a region (file windows), so the manager only records it.
     this.#appOf.set(windowId, appId);
     if (options.title !== undefined) this.#titles.set(windowId, options.title);
+    this.#bindSeat(windowId, app);
     this.#notify();
     return windowId;
+  }
+
+  /** Register the window's content seat, once per window. */
+  #bindSeat(
+    windowId: string,
+    app: {
+      readonly icon?: string;
+      readonly paneHeader?: boolean;
+      content(id: string): () => ReactNode;
+    },
+  ): void {
+    if (this.seat === undefined || this.#seats.has(windowId)) return;
+    this.#seats.set(
+      windowId,
+      this.seat.register(
+        windowId,
+        {
+          ...(this.#titles.get(windowId) === undefined
+            ? {}
+            : { label: this.#titles.get(windowId) }),
+          ...(app.icon === undefined ? {} : { icon: app.icon }),
+          ...(app.paneHeader === undefined ? {} : { paneHeader: app.paneHeader }),
+        },
+        app.content(windowId),
+      ),
+    );
   }
 
   /** The app that opened a window, if any. */
@@ -289,12 +338,20 @@ export class WindowManager {
    * @returns whether a group held it.
    */
   close(windowId: string): boolean {
-    const runtime = this.groupOf(windowId);
-    if (runtime === undefined) return false;
-    runtime.remove(windowId);
+    const hadSeat = this.#seats.get(windowId);
+    hadSeat?.();
+    this.#seats.delete(windowId);
     this.#handles.delete(windowId);
     this.#appOf.delete(windowId);
     this.#titles.delete(windowId);
+    const runtime = this.groupOf(windowId);
+    if (runtime === undefined) {
+      // A window the arrangement placed directly is only an app window: dropping
+      // the record is the close.
+      if (hadSeat !== undefined) this.#notify();
+      return false;
+    }
+    runtime.remove(windowId);
     this.#notify();
     return true;
   }
@@ -354,6 +411,8 @@ export class WindowManager {
       this.#handles.delete(windowId);
       this.#appOf.delete(windowId);
       this.#titles.delete(windowId);
+      this.#seats.get(windowId)?.();
+      this.#seats.delete(windowId);
     }
     this.#runtimes.delete(groupId);
     this.bindings.unregister(groupId);
@@ -361,6 +420,8 @@ export class WindowManager {
 
   /** Drop every registration and projection. */
   dispose(): void {
+    for (const dispose of this.#seats.values()) dispose();
+    this.#seats.clear();
     this.#runtimes.clear();
     this.#handles.clear();
     this.#appOf.clear();
