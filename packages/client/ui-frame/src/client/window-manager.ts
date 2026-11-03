@@ -91,6 +91,7 @@ export class WindowManager {
   readonly #appOf = new Map<string, string>();
   /** The title each app gave its window. */
   readonly #titles = new Map<string, string>();
+  readonly #listeners = new Set<() => void>();
 
   constructor(
     private readonly bindings: WindowGroupBindingsPort,
@@ -170,6 +171,7 @@ export class WindowManager {
     // directly in a region (file windows), so the manager only records it.
     this.#appOf.set(windowId, appId);
     if (options.title !== undefined) this.#titles.set(windowId, options.title);
+    this.#notify();
     return windowId;
   }
 
@@ -220,6 +222,20 @@ export class WindowManager {
       if (runtime.state.order.includes(windowId)) return runtime;
     }
     return undefined;
+  }
+
+  /**
+   * Subscribe to membership changes (admitted, closed, activated, moved).
+   *
+   * The frame re-reads its item catalogue on this signal: a window that an app
+   * admitted has no slot registration, so nothing else would notify it.
+   *
+   * @param listener - called after every change.
+   * @returns the unsubscribe function.
+   */
+  onDidChange(listener: () => void): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
   }
 
   /** Every window an app opened (admitted), in no particular order. */
@@ -279,6 +295,7 @@ export class WindowManager {
     this.#handles.delete(windowId);
     this.#appOf.delete(windowId);
     this.#titles.delete(windowId);
+    this.#notify();
     return true;
   }
 
@@ -349,6 +366,10 @@ export class WindowManager {
     this.#appOf.clear();
     this.#titles.clear();
     this.bindings.dispose();
+  }
+
+  #notify(): void {
+    for (const listener of Array.from(this.#listeners)) listener();
   }
 
   #require(groupId: string): WindowGroupRuntime {

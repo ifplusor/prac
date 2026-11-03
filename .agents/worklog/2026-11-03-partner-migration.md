@@ -29,3 +29,15 @@ previewSurvivesCloseReopen, twoPlacementsAreTwoViews
 结论：**先补齐「窗口 chrome 事实」的模型来源，再删座位**。file window 的 label / paneHeader / closable / active 投影要有一条不依赖 slot 注册的路径（app 元数据 + manager 标题已有，但 `closable` / 投影的输入还没接上）；同时 `verify-file` 的每个失败断言要能被单独读完再改。
 
 代码已回退到 `9e3773f` 的状态（manager 的 `handle` / group-less admit / app 元数据保留）。
+
+## 3. 尝试 2：先补「管理器变更通知」再删座位（round 6，仍失败）
+
+假设：`pracFrame.listItems()` 只在 layout store / slot 变更时被重读，app 窗口的 admit 不触发任何通知，于是 `vscode-host` 的 `syncFrameEditorOrder`（它遍历 `listItems()` 找 `vscode:file:`）读不到 file window。
+
+做法：`WindowManager.onDidChange` + 在 `ui-frame` 里把它接到 `bumpCatalogue`；然后重做 step ②。
+
+结果：**同一组 8 项失败，一项不差**。所以通知不是根因（或不是唯一根因）。连 `chatActiveProjects` / `chatOrderProjects` 这种与 file window 无关的投影断言也一起红，说明失败面比「listItems 缺 file」更宽——更像是 `ui-workbench` / `vscode-host` 的整条投影 effect 没跑或提前失败，而不是逐项数据缺失。
+
+下一步（round 7 起）不再猜：起一个不被 `verify-ui` 回收的 rig，打开一个文件，直接读页面 console 与 `__pracFrame.listItems()` / `mappedWindows()`，把「投影 effect 是否跑、跑了几次、读了什么」变成观测值，再改。
+
+代码已回退；`WindowManager.onDidChange` 保留（无订阅者，行为不变）。
