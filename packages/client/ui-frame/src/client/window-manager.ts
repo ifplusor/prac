@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type {
   ApplicationRegistry,
   GroupBarItem,
@@ -32,6 +33,8 @@ export interface PracWindowInfo {
 export interface AdmitWindowOptions {
   /** The window instance id (global: `vscode:file:…`, `dsh:main:…`). */
   readonly windowId: string;
+  /** The window title the chrome shows until the app provides one. */
+  readonly title?: string;
   /** Which group takes it; otherwise the manager picks the group bound in `region`. */
   readonly groupId?: string;
   /** The region the window is expected in, when no group is named. */
@@ -80,6 +83,8 @@ export class WindowManager {
   readonly #handles = new Map<string, WindowRuntimeHandle>();
   /** The app that opened each window, for single-instance reuse. */
   readonly #appOf = new Map<string, string>();
+  /** The title each app gave its window. */
+  readonly #titles = new Map<string, string>();
 
   constructor(
     private readonly bindings: WindowGroupBindingsPort,
@@ -157,7 +162,28 @@ export class WindowManager {
     }
     this.open(groupId, { id: windowId });
     this.#appOf.set(windowId, appId);
+    if (options.title !== undefined) this.#titles.set(windowId, options.title);
     return windowId;
+  }
+
+  /** The title an app gave a window, if any. */
+  titleOf(windowId: string): string | undefined {
+    return this.#titles.get(windowId);
+  }
+
+  /**
+   * The content of one app window.
+   *
+   * The frame renders it for a window item that is not a slot declaration and not
+   * a DSH slot: content follows the app that opened the window, not a registration.
+   *
+   * @param windowId - the window instance.
+   * @returns the app's component factory, or `undefined` for a non-app window.
+   */
+  windowContentFor(windowId: string): (() => ReactNode) | undefined {
+    const appId = this.#appOf.get(windowId);
+    if (appId === undefined) return undefined;
+    return this.apps.get(appId)?.content(windowId);
   }
 
   /** The first group bound in a region (or a sub-region of it). */
@@ -172,6 +198,11 @@ export class WindowManager {
       if (runtime.state.order.includes(windowId)) return runtime;
     }
     return undefined;
+  }
+
+  /** Every window an app opened (admitted), in no particular order. */
+  ids(): readonly string[] {
+    return [...this.#appOf.keys()];
   }
 
   /** The windows a group holds, in the group's order. */
@@ -228,6 +259,7 @@ export class WindowManager {
     runtime.remove(windowId);
     this.#handles.delete(windowId);
     this.#appOf.delete(windowId);
+    this.#titles.delete(windowId);
     return true;
   }
 
@@ -285,6 +317,7 @@ export class WindowManager {
     for (const windowId of this.#runtimes.get(groupId)?.state.order ?? []) {
       this.#handles.delete(windowId);
       this.#appOf.delete(windowId);
+      this.#titles.delete(windowId);
     }
     this.#runtimes.delete(groupId);
     this.bindings.unregister(groupId);
@@ -295,6 +328,7 @@ export class WindowManager {
     this.#runtimes.clear();
     this.#handles.clear();
     this.#appOf.clear();
+    this.#titles.clear();
     this.bindings.dispose();
   }
 

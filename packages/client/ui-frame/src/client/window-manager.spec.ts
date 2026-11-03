@@ -184,6 +184,23 @@ describe("WindowManager.admit", () => {
     expect(() => manager.admit("editor", { windowId: "f1" })).toThrow(/no group/);
   });
 
+  it("reports app windows, their titles and their content", () => {
+    const apps = new ApplicationRegistry();
+    apps.register(app("editor"));
+    const manager = new WindowManager(fakeBindings(), apps);
+    manager.register(new FakeRuntime("center"), "center");
+    manager.admit("editor", { windowId: "f1", groupId: "center", title: "main.ts" });
+    expect(manager.ids()).toEqual(["f1"]);
+    expect(manager.titleOf("f1")).toBe("main.ts");
+    const resolved = manager.windowContentFor("f1");
+    expect(typeof resolved).toBe("function");
+    expect(resolved?.()).toBeNull();
+    expect(manager.windows("editor")).toEqual([{ id: "f1", appId: "editor", groupId: "center" }]);
+    manager.close("f1");
+    expect(manager.ids()).toEqual([]);
+    expect(manager.windowContentFor("f1")).toBeUndefined();
+  });
+
   it("reuses the single window of a single-instance app", () => {
     const { apps, manager } = managerWith();
     apps.register(app("chat", { instances: "single" }));

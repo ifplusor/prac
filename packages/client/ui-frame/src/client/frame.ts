@@ -770,6 +770,9 @@ export function createFrame(
               }),
           itemFacts,
           renderSlot: renderSlot as unknown as ItemRenderSlot,
+          ...(sources.windows?.windowContentFor(viewId) === undefined
+            ? {}
+            : { windowContent: sources.windows.windowContentFor(viewId)! }),
           box,
           viewportWidth: state.viewportWidth,
         }),
@@ -1111,11 +1114,15 @@ export function createFrame(
      * @param dir - the parent split's axis.
      * @param fill - whether the root fills a selector's box.
      */
-    const itemFacts = (viewId: string): ChromeItemFacts => ({
-      ...(declaredViewLabel(viewId) === undefined ? {} : { label: declaredViewLabel(viewId)! }),
-      ...(declaredViewIcon(viewId) === undefined ? {} : { icon: declaredViewIcon(viewId)! }),
-      paneHeader: declaredViewPaneHeader(viewId),
-    });
+    const itemFacts = (viewId: string): ChromeItemFacts => {
+      const label = declaredViewLabel(viewId) ?? sources.windows?.titleOf(viewId);
+      const icon = declaredViewIcon(viewId);
+      return {
+        ...(label === undefined ? {} : { label }),
+        ...(icon === undefined ? {} : { icon }),
+        paneHeader: declaredViewPaneHeader(viewId),
+      };
+    };
 
     const renderRegion = (node: LayoutNode, dir: Dir, fill = false): ReactElement =>
       LayoutRenderer({

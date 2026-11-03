@@ -49,6 +49,8 @@ export interface LayoutItemProps {
   /** The container's declared facts about an item (title / icon / pane header). */
   readonly itemFacts?: (itemId: string) => ChromeItemFacts;
   readonly renderSlot: ItemRenderSlot;
+  /** An app window's content, when the window was opened by an app (not a slot). */
+  readonly windowContent?: () => ReactNode;
   readonly box: Box;
   readonly viewportWidth: number;
 }
@@ -176,6 +178,7 @@ export function LayoutItem({
   board,
   itemFacts,
   renderSlot,
+  windowContent,
   box,
   viewportWidth,
 }: LayoutItemProps): ReactNode {
@@ -194,5 +197,7 @@ export function LayoutItem({
     return renderSlot(contentKind === "widget" ? WIDGET_SLOT : WINDOW_SLOT, {}, { only: viewId });
   }
   if (kind === "dsh") return renderDshView(viewId, renderSlot, box, viewportWidth);
+  // An app window: content follows the app that opened it, not a slot declaration.
+  if (windowContent !== undefined) return createElement(windowContent);
   return null;
 }

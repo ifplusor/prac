@@ -277,7 +277,8 @@ export function createServices(
     /** The union of the slot registry's items and each one's placement. */
     listItems(): ItemInfo[] {
       const state = store.get();
-      return catalogueViewIds(ctx.slots).map((id) => {
+      const ids = new Set([...catalogueViewIds(ctx.slots), ...windows.ids()]);
+      return [...ids].map((id) => {
         const record: ItemRecord | undefined = state.items[id];
         return record === undefined
           ? {
