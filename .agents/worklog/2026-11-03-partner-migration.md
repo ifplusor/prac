@@ -75,3 +75,13 @@ previewSurvivesCloseReopen, twoPlacementsAreTwoViews
 中间的阻塞：`vp run` 下一次性 rig 起不来（`pnpm dsh` 解析到临时 XDG 树里自安装的 pnpm **SEA**，`SeaDeserializer` 断言失败）。根因是 PATH 解析，不是 vp 的 task 能力：rig 现在用**锚点自己的 pnpm shim 绝对路径**启动（`<anchor>/node_modules/.bin/pnpm`），不再依赖 PATH；`vp run verify:ui -- stack` 恢复全绿。
 
 gate 本体继续 `.mjs`（真实 rig + Playwright + vendor 自己的 Playwright 副本），理由写进 `docs/testing.md`。
+
+## 7. 加速尝试（round 10）
+
+测了成本：全量 ~5 分钟；177 处 `waitForTimeout`（理论 ~236s），`file` 92s（18 处）、`tabs` 29s（8 处）。
+
+**`tabs` 的条件等待改造在单跑时是绿的**（29s → 4.4s），`file` 的改造单跑也绿（92s → 60s）。但**全量跑不过**：`file` 的 `directionalFocusFollowsTheTree`（focusLeft/Right 都停在 center）与 `tabs` 的 `fileActionsRenderInTheTabStrip` 都依赖前序 gate 留下的状态/时序，单独跑无法复现。按 `docs/testing.md` 的规则，这类 probe 失败不能靠删检查解决；基线优先，两处改造已回退。
+
+保留的改动：per-gate 计时（`tests/ui.mjs` 末尾打印）、`smoke`/`editor`/`grid` 分组（`vp run verify:ui -- smoke` ≈46s）、`docs/testing.md` 的成本画像。
+
+下一步加速的正确顺序：先让 `file`/`tabs` 在**全量顺序**下可复现地绿（例如 gate 开始时显式重置 frame 布局、或用独立 rig per gate），再谈并行 rig。

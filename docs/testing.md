@@ -109,11 +109,13 @@ The run prints per-gate wall time at the end. Measured on 2026-11-03:
 | file                  | 92s        |
 | full roster           | ~5 min     |
 
-The dominant cost is **fixed sleeps**: the roster contains ~177
-`page.waitForTimeout(…)` calls (~236s of pure waiting); `file` alone has 18
-(41.5s) and `tabs` 8 (21.4s). The first optimisation is replacing them with
-condition waits (`waitForSelector` / `waitForFunction` on the state the step is
-about), starting with those two gates. Second is running gates on parallel rigs
+The dominant cost was **fixed sleeps**: the roster had ~177
+`page.waitForTimeout(…)` calls (~236s of pure waiting). Condition waits cut
+`file` 92s → 60s and `tabs` 29s → 4.4s **in isolation**, but both went flaky in
+the full order: the focus probe and the tab-action probe depend on state/timing
+left by earlier gates, so the change was reverted and the baseline kept. The
+next step is to make those phases order-independent (reset the frame layout at
+gate start, or one rig per gate), then retry; after that, parallel rigs
 (separate `PRAC_TEST_PORT` + temp XDG). `smoke` is the loop for an ordinary
 edit; the full roster is the baseline before a commit.
 
