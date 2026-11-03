@@ -20,6 +20,7 @@ export * from "./frame-state.js";
 export * from "./layout-root.js";
 export * from "./workbench-model.js";
 export * from "./window-group-model.js";
+export * from "./applications.js";
 export * from "./content-host-registry.js";
 export * from "./board-layouts.js";
 export * from "./layout-actions.js";
