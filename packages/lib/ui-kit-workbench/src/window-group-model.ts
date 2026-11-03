@@ -96,6 +96,37 @@ export class WindowGroupModel implements WindowGroup {
     this.#emit();
   }
 
+  /**
+   * Manager-facing alias for {@link openWindow}: admit one window handle.
+   *
+   * The primary window is already a member; admitting it again is a no-op.
+   *
+   * @param window - the handle to admit.
+   */
+  add(window: { readonly id: string }): void {
+    if (window.id === this.primary.id) return;
+    this.openWindow(window.id);
+  }
+
+  /**
+   * Manager-facing alias for {@link closeWindow}.
+   *
+   * @param windowId - the window to drop; the primary cannot be removed.
+   */
+  remove(windowId: string): void {
+    this.closeWindow(windowId);
+  }
+
+  /**
+   * Manager-facing alias for {@link activateWindow}.
+   *
+   * @param windowId - the window to activate; `undefined` is a no-op.
+   */
+  select(windowId: string | undefined): void {
+    if (windowId === undefined) return;
+    this.activateWindow(windowId);
+  }
+
   /** Replace the hosted windows from another owner's placement projection. */
   syncWindows(itemIds: readonly string[]): void {
     const next = itemIds.filter((itemId) => itemId !== this.primary.id);

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
+import { ApplicationRegistry, type ApplicationDefinition } from "prac-ui-kit-workbench";
+
 import type { WindowGroupBindingsPort } from "./window-manager.js";
 import {
   WindowManager,
@@ -37,22 +39,36 @@ class FakeRuntime implements WindowGroupRuntime {
 }
 
 /** The frame projection, stubbed: the manager's tests are about membership. */
-const fakeBindings = (): WindowGroupBindingsPort =>
+const fakeBindings = (regions: Readonly<Record<string, string>> = {}): WindowGroupBindingsPort =>
   ({
     register: () => ({}) as never,
     registerContent: () => ({}) as never,
-    barItems: () => [],
+    barItems: (regionId: string) => {
+      const groupId = regions[regionId];
+      return groupId === undefined ? [] : [{ groupId, regionId, label: groupId }];
+    },
     contentFor: () => undefined,
     get: () => undefined,
     unregister: () => {},
     dispose: () => {},
   }) satisfies WindowGroupBindingsPort;
 
+const app = (
+  id: string,
+  overrides: Partial<ApplicationDefinition> = {},
+): ApplicationDefinition => ({
+  id,
+  label: id,
+  instances: "multi",
+  content: () => () => null,
+  ...overrides,
+});
+
 const handle = (id: string): WindowRuntimeHandle => ({ id });
 
 describe("WindowManager", () => {
   it("registers groups and reports the group that holds a window", () => {
-    const manager = new WindowManager(fakeBindings());
+    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
     const left = new FakeRuntime("left");
     const right = new FakeRuntime("right");
     manager.register(left, "left");
@@ -62,11 +78,11 @@ describe("WindowManager", () => {
     expect(manager.groupOf("a")?.id).toBe("left");
     expect(manager.groupOf("b")?.id).toBe("right");
     expect(manager.groups()).toEqual(["left", "right"]);
-    expect(manager.windows("left")).toEqual(["a"]);
+    expect(manager.groupWindows("left")).toEqual(["a"]);
   });
 
   it("opens a window as the group's active member", () => {
-    const manager = new WindowManager(fakeBindings());
+    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
     const group = new FakeRuntime("left");
     manager.register(group, "left");
     manager.open("left", handle("a"));
@@ -76,7 +92,7 @@ describe("WindowManager", () => {
   });
 
   it("closes a window wherever it is", () => {
-    const manager = new WindowManager(fakeBindings());
+    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
     const group = new FakeRuntime("left");
     manager.register(group, "left");
     manager.open("left", handle("a"));
@@ -86,7 +102,7 @@ describe("WindowManager", () => {
   });
 
   it("moves a window between groups without losing its handle", () => {
-    const manager = new WindowManager(fakeBindings());
+    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
     const left = new FakeRuntime("left");
     const right = new FakeRuntime("right");
     manager.register(left, "left");
@@ -99,7 +115,7 @@ describe("WindowManager", () => {
   });
 
   it("refuses to move a window that is not held, or into itself", () => {
-    const manager = new WindowManager(fakeBindings());
+    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
     const left = new FakeRuntime("left");
     manager.register(left, "left");
     expect(manager.move("missing", "left")).toBe(false);
@@ -108,7 +124,7 @@ describe("WindowManager", () => {
   });
 
   it("activates a held window", () => {
-    const manager = new WindowManager(fakeBindings());
+    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
     const group = new FakeRuntime("left");
     manager.register(group, "left");
     manager.open("left", handle("a"));
@@ -119,18 +135,77 @@ describe("WindowManager", () => {
   });
 
   it("rejects a duplicate group and an unknown group", () => {
-    const manager = new WindowManager(fakeBindings());
+    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
     manager.register(new FakeRuntime("left"), "left");
     expect(() => manager.register(new FakeRuntime("left"), "left")).toThrow(/already registered/);
     expect(() => manager.open("missing", handle("a"))).toThrow(/unknown group/);
   });
 
   it("forgets the windows of an unregistered group", () => {
-    const manager = new WindowManager(fakeBindings());
+    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
     manager.register(new FakeRuntime("left"), "left");
     manager.open("left", handle("a"));
     manager.unregister("left");
     expect(manager.groupOf("a")).toBeUndefined();
     expect(manager.groups()).toEqual([]);
+  });
+});
+
+describe("WindowManager.admit", () => {
+  const managerWith = (regions: Readonly<Record<string, string>> = {}) => {
+    const apps = new ApplicationRegistry();
+    const bindings = fakeBindings(regions);
+    const manager = new WindowManager(bindings, apps);
+    return { apps, bindings, manager };
+  };
+
+  it("admits a window into the group named explicitly", () => {
+    const { apps, manager } = managerWith();
+    apps.register(app("editor"));
+    const left = new FakeRuntime("left");
+    manager.register(left, "left");
+    expect(manager.admit("editor", { windowId: "f1", groupId: "left" })).toBe("f1");
+    expect(left.state.order).toEqual(["f1"]);
+  });
+
+  it("picks the group bound in the requested region", () => {
+    const { apps, manager } = managerWith({ center: "center-group" });
+    apps.register(app("editor"));
+    const center = new FakeRuntime("center-group");
+    manager.register(center, "center");
+    expect(manager.admit("editor", { windowId: "f1", region: "center" })).toBe("f1");
+    expect(center.state.order).toEqual(["f1"]);
+  });
+
+  it("refuses when the app is unknown or no group can take the window", () => {
+    const { apps, manager } = managerWith();
+    apps.register(app("editor"));
+    expect(() => manager.admit("missing", { windowId: "f1" })).toThrow(/unknown app/);
+    expect(() => manager.admit("editor", { windowId: "f1" })).toThrow(/no group/);
+  });
+
+  it("reuses the single window of a single-instance app", () => {
+    const { apps, manager } = managerWith();
+    apps.register(app("chat", { instances: "single" }));
+    const center = new FakeRuntime("center");
+    manager.register(center, "center");
+    manager.admit("chat", { windowId: "dsh:main:conversation", groupId: "center" });
+    expect(manager.admit("chat", { windowId: "chat/second", groupId: "center" })).toBe(
+      "dsh:main:conversation",
+    );
+    expect(center.state.order).toEqual(["dsh:main:conversation"]);
+  });
+
+  it("activates a window that is already held instead of re-adding it", () => {
+    const { apps, manager } = managerWith();
+    apps.register(app("editor"));
+    const center = new FakeRuntime("center");
+    manager.register(center, "center");
+    manager.admit("editor", { windowId: "f1", groupId: "center" });
+    manager.admit("editor", { windowId: "f2", groupId: "center" });
+    expect(center.state.active).toBe("f2");
+    manager.admit("editor", { windowId: "f1", groupId: "center" });
+    expect(center.state.order).toEqual(["f1", "f2"]);
+    expect(center.state.active).toBe("f1");
   });
 });

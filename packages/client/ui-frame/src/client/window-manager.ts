@@ -1,4 +1,5 @@
 import type {
+  ApplicationRegistry,
   GroupBarItem,
   GroupRegionContent,
   RegionBinding,
@@ -19,6 +20,23 @@ import type {
  *
  * @module prac-client-ui-frame/client/window-manager
  */
+
+/** One open window, as the manager reports it. */
+export interface PracWindowInfo {
+  readonly id: string;
+  readonly appId: string;
+  readonly groupId: string;
+}
+
+/** One window an app asks the manager to admit. */
+export interface AdmitWindowOptions {
+  /** The window instance id (global: `vscode:file:…`, `dsh:main:…`). */
+  readonly windowId: string;
+  /** Which group takes it; otherwise the manager picks the group bound in `region`. */
+  readonly groupId?: string;
+  /** The region the window is expected in, when no group is named. */
+  readonly region?: string;
+}
 
 /** The handle a source hands its group for one window. */
 export interface WindowRuntimeHandle {
@@ -60,8 +78,13 @@ export class WindowManager {
   readonly #runtimes = new Map<string, WindowGroupRuntime>();
   /** The source's handle per window, kept for a move (the group owns order only). */
   readonly #handles = new Map<string, WindowRuntimeHandle>();
+  /** The app that opened each window, for single-instance reuse. */
+  readonly #appOf = new Map<string, string>();
 
-  constructor(private readonly bindings: WindowGroupBindingsPort) {}
+  constructor(
+    private readonly bindings: WindowGroupBindingsPort,
+    private readonly apps: ApplicationRegistry,
+  ) {}
 
   /**
    * Register a group runtime in a frame region.
@@ -96,6 +119,53 @@ export class WindowManager {
     return this.bindings.registerContent(content, regionId);
   }
 
+  /**
+   * Admit a window an app opened.
+   *
+   * The manager decides the group: an explicit `groupId`, else the group bound
+   * in `region`, else it refuses (a window without a group has nowhere to live).
+   * A single-instance app reuses its open window; a window already held is only
+   * activated.
+   *
+   * @param appId - the app that opened the window.
+   * @param options - the window id and, optionally, its group or region.
+   * @returns the window id.
+   */
+  admit(appId: string, options: AdmitWindowOptions): string {
+    const app = this.apps.get(appId);
+    if (app === undefined) throw new Error(`window manager: unknown app: ${appId}`);
+    const { windowId } = options;
+
+    const holding = this.groupOf(windowId);
+    if (holding !== undefined) {
+      holding.select(windowId);
+      this.#appOf.set(windowId, appId);
+      return windowId;
+    }
+
+    if (app.instances === "single") {
+      for (const [openId, openApp] of this.#appOf) {
+        if (openApp !== appId) continue;
+        this.activate(openId);
+        return openId;
+      }
+    }
+
+    const groupId = options.groupId ?? this.groupIn(options.region);
+    if (groupId === undefined) {
+      throw new Error(`window manager: no group for ${windowId} (app ${appId})`);
+    }
+    this.open(groupId, { id: windowId });
+    this.#appOf.set(windowId, appId);
+    return windowId;
+  }
+
+  /** The first group bound in a region (or a sub-region of it). */
+  groupIn(regionId: string | undefined): string | undefined {
+    if (regionId === undefined) return undefined;
+    return this.bindings.barItems(regionId)[0]?.groupId;
+  }
+
   /** The group runtime that holds a window, if any. */
   groupOf(windowId: string): WindowGroupRuntime | undefined {
     for (const runtime of this.#runtimes.values()) {
@@ -105,8 +175,27 @@ export class WindowManager {
   }
 
   /** The windows a group holds, in the group's order. */
-  windows(groupId: string): readonly string[] {
+  groupWindows(groupId: string): readonly string[] {
     return this.#runtimes.get(groupId)?.state.order ?? [];
+  }
+
+  /**
+   * Every open window, or only one app's.
+   *
+   * @param appId - restrict to one app; omit for all windows.
+   * @returns one entry per open window.
+   */
+  windows(appId?: string): readonly PracWindowInfo[] {
+    const infos: PracWindowInfo[] = [];
+    for (const runtime of this.#runtimes.values()) {
+      for (const id of runtime.state.order) {
+        const opener = this.#appOf.get(id);
+        if (opener === undefined) continue;
+        if (appId !== undefined && opener !== appId) continue;
+        infos.push({ id, appId: opener, groupId: runtime.id });
+      }
+    }
+    return infos;
   }
 
   /** Every registered group id, in registration order. */
@@ -138,6 +227,7 @@ export class WindowManager {
     if (runtime === undefined) return false;
     runtime.remove(windowId);
     this.#handles.delete(windowId);
+    this.#appOf.delete(windowId);
     return true;
   }
 
@@ -194,6 +284,7 @@ export class WindowManager {
   unregister(groupId: string): void {
     for (const windowId of this.#runtimes.get(groupId)?.state.order ?? []) {
       this.#handles.delete(windowId);
+      this.#appOf.delete(windowId);
     }
     this.#runtimes.delete(groupId);
     this.bindings.unregister(groupId);
@@ -203,6 +294,7 @@ export class WindowManager {
   dispose(): void {
     this.#runtimes.clear();
     this.#handles.clear();
+    this.#appOf.clear();
     this.bindings.dispose();
   }
 

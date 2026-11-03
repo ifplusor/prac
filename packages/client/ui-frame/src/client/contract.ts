@@ -38,6 +38,9 @@ import type {} from "@deepseek-ai/dsh-client-ui-slots";
 // merged members (no `ctx.effect` / `ctx.provide`).
 export type { Context } from "@deepseek-ai/cordis";
 export type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
+import type { ApplicationRegistry } from "prac-ui-kit-workbench";
+
+import type { WindowManager } from "./window-manager.js";
 
 /** One view and where it currently sits. */
 export interface ItemInfo extends ContentInfo {
@@ -82,6 +85,10 @@ declare module "@deepseek-ai/cordis" {
   interface Context {
     /** The frame's placement face. */
     pracFrame: PracLayoutFace;
+    /** App definitions partners contribute (launch identity + per-window content). */
+    pracApplications: ApplicationRegistry;
+    /** Window membership: which group holds a window, and the membership operations. */
+    pracWindows: WindowManager;
     /** The Space registry: named layouts over the same project folder. */
     pracSpaces: PracSpacesFace;
     /** The active window's resolved actions, rendered in the tab strip. */

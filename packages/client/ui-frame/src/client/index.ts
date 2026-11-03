@@ -234,8 +234,16 @@ export function apply(ctx: Context): void {
       return () => spaceListeners.delete(listener);
     },
   };
-  const { layout, pracFrame, panelInfo, windows, surfaces, contentHosts, boardLayouts } =
-    createServices(ctx, store, closeListeners);
+  const {
+    layout,
+    pracFrame,
+    panelInfo,
+    windows,
+    applications,
+    surfaces,
+    contentHosts,
+    boardLayouts,
+  } = createServices(ctx, store, closeListeners);
   const disposeWindowGroupRegionContent = surfaces.register("window-group", {
     create: ({ nodeId }) => new WindowGroupAdapter(nodeId),
   });
@@ -313,6 +321,8 @@ export function apply(ctx: Context): void {
     // guard possible — see the note in `2026-10-07-editor-host.md`.
     const disposeLayout = ctx.provide("layout", layout);
     const disposePracFrame = ctx.provide("pracFrame", pracFrame);
+    const disposeApplications = ctx.provide("pracApplications", applications);
+    const disposeWindows = ctx.provide("pracWindows", windows);
     const disposePracSurfaces = ctx.provide("pracSurfaces", surfaces);
     const disposePracSpaces = ctx.provide("pracSpaces", pracSpaces);
     const disposeWindowActions = ctx.provide("pracWindowActions", windowActions);
@@ -355,6 +365,8 @@ export function apply(ctx: Context): void {
       disposePracSpaces();
       disposeWindowGroupRegionContent.dispose();
       disposePracSurfaces();
+      disposeWindows();
+      disposeApplications();
       disposePracFrame();
       disposeLayout();
       disposePanelInfo();

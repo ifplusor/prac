@@ -18,6 +18,7 @@ import {
   type LayoutStore,
   ContentHostRegistry,
   BoardLayoutRegistry,
+  ApplicationRegistry,
   WindowGroupBindings,
   type RegionBinding,
   type WindowGroup,
@@ -106,6 +107,8 @@ export interface LayoutServices {
   readonly panelInfo: HostObservable<PanelInfo>;
   /** The frame's view-group owner. */
   readonly windows: WindowManager;
+  /** The app definitions partners contribute. */
+  readonly applications: ApplicationRegistry;
   /** Region-content factories registered by window / widget plugins. */
   readonly surfaces: RegionContentRegistry<WindowGroup>;
   /** Runtime content hosts for windows; keyed by `contentId`. */
@@ -133,7 +136,8 @@ export function createServices(
   // one-view rows. Hiding the last visible view, placing one, folding one — they all change the shape
   // (a stack that falls back to one row melts, an empty leftover holds no space), so the normaliser
   // runs on the way out of each change rather than only on placements.
-  const windows = new WindowManager(new WindowGroupBindings(store));
+  const applications = new ApplicationRegistry();
+  const windows = new WindowManager(new WindowGroupBindings(store), applications);
   const surfaces = new RegionContentRegistry<WindowGroup>();
   const originalUpdate = store.update;
   const write = (change: Parameters<typeof store.update>[0]): void => originalUpdate(change);
@@ -618,5 +622,14 @@ export function createServices(
     },
   };
 
-  return { layout, pracFrame, panelInfo, windows, surfaces, contentHosts, boardLayouts };
+  return {
+    layout,
+    pracFrame,
+    panelInfo,
+    windows,
+    applications,
+    surfaces,
+    contentHosts,
+    boardLayouts,
+  };
 }
