@@ -236,6 +236,8 @@ export async function boxOf(page, selector) {
   }, selector);
 }
 
+export { until } from "./until.mjs";
+
 /**
  * Report a gate's result the way every gate does: the facts as JSON, then one
  * `OK:` line or a `FAILED:` line and a non-zero exit.

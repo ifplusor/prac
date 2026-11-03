@@ -17,6 +17,32 @@ L0/L1 run in seconds and should run on every edit. L3 is the baseline for
 "did the architecture change break the product"; it is expensive, so it runs at
 step boundaries and before a commit that touches the frame.
 
+## Waiting
+
+A gate must not synchronise with `page.waitForTimeout`. The primitive is
+`until(page, predicate, arg, { timeout })` from `tests/gates/until.mjs` (also
+exported by the harness). It polls a page predicate and only continues when it
+holds **twice, ~100ms apart**: one sample is not enough, because a surface can be
+present for one frame and move as the layout settles, and a click would land on
+the stale box. A miss falls through to the checks, so a failure names the fact
+that was wrong instead of a 30-second timeout.
+
+What to wait on, in order of preference:
+
+1. **the model** the assertion reads — `__pracFrame.listItems()` / `activeItem()`
+   / `listRegions()`, or a capability snapshot (`editorActions()`,
+   `capabilities.editors.snapshot()`);
+2. **a stable DOM fact** — a tab exists, a surface has a non-zero box and text;
+3. never "some time has passed".
+
+The one legitimate fixed sleep is **observing a non-event** (does a state stop
+flapping?), it must be short and say why. If a gate cannot find a state to wait
+on, the state is missing from the model: expose it (a capability or a test hook)
+rather than sleep — the fast-tabs attempt is the cautionary tale: it waited on
+`[data-prac-window-action]`, and in the full order that DOM fact stayed absent
+because the action model was published only on events, which is a product bug,
+not a waiting problem.
+
 ## Behaviour versus probe
 
 Every live check is one of two kinds:
