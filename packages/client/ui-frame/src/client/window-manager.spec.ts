@@ -177,11 +177,17 @@ describe("WindowManager.admit", () => {
     expect(center.state.order).toEqual(["f1"]);
   });
 
-  it("refuses when the app is unknown or no group can take the window", () => {
+  it("refuses an unknown app", () => {
+    const { manager } = managerWith();
+    expect(() => manager.admit("missing", { windowId: "f1" })).toThrow(/unknown app/);
+  });
+
+  it("records a window the arrangement places directly (no group)", () => {
     const { apps, manager } = managerWith();
     apps.register(app("editor"));
-    expect(() => manager.admit("missing", { windowId: "f1" })).toThrow(/unknown app/);
-    expect(() => manager.admit("editor", { windowId: "f1" })).toThrow(/no group/);
+    manager.admit("editor", { windowId: "f1", title: "main.ts" });
+    expect(manager.windows("editor")).toEqual([{ id: "f1", appId: "editor" }]);
+    expect(manager.groupOf("f1")).toBeUndefined();
   });
 
   it("reports app windows, their titles and their content", () => {
@@ -199,6 +205,24 @@ describe("WindowManager.admit", () => {
     manager.close("f1");
     expect(manager.ids()).toEqual([]);
     expect(manager.windowContentFor("f1")).toBeUndefined();
+  });
+
+  it("hands the source's handle to the group when one is given", () => {
+    const { apps, manager } = managerWith();
+    apps.register(app("editor"));
+    const center = new FakeRuntime("center");
+    manager.register(center, "center");
+    const handle = {
+      id: "f1",
+      released: false,
+      release() {
+        this.released = true;
+      },
+    };
+    manager.admit("editor", { windowId: "f1", groupId: "center", handle });
+    expect(center.state.order).toEqual(["f1"]);
+    manager.close("f1");
+    expect(handle.released).toBe(false);
   });
 
   it("reuses the single window of a single-instance app", () => {

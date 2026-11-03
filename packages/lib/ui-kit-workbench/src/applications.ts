@@ -29,6 +29,15 @@ export interface ApplicationDefinition {
   readonly instances: "single" | "multi";
   /** Region a new window lands in when the arrangement has no rule for it. */
   readonly defaultRegion?: string;
+  /** The app's icon class, when its windows show one in the chrome. */
+  readonly icon?: string;
+  /**
+   * Whether an app window brings its own native pane header.
+   *
+   * When true the frame overlays only its fold / drag controls on the app's own
+   * header instead of drawing a second row.
+   */
+  readonly paneHeader?: boolean;
   /**
    * The content of one window instance.
    *

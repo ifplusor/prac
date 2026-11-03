@@ -26,7 +26,8 @@ import type {
 export interface PracWindowInfo {
   readonly id: string;
   readonly appId: string;
-  readonly groupId: string;
+  /** The group holding the window; absent when the arrangement placed it directly. */
+  readonly groupId?: string;
 }
 
 /** One window an app asks the manager to admit. */
@@ -37,6 +38,11 @@ export interface AdmitWindowOptions {
   readonly title?: string;
   /** Which group takes it; otherwise the manager picks the group bound in `region`. */
   readonly groupId?: string;
+  /**
+   * The source's handle for the window (a materialized runtime view).
+   * Omitted, the manager appends a bare `{ id }` handle.
+   */
+  readonly handle?: WindowRuntimeHandle;
   /** The region the window is expected in, when no group is named. */
   readonly region?: string;
 }
@@ -157,13 +163,29 @@ export class WindowManager {
     }
 
     const groupId = options.groupId ?? this.groupIn(options.region);
-    if (groupId === undefined) {
-      throw new Error(`window manager: no group for ${windowId} (app ${appId})`);
+    if (groupId !== undefined) {
+      this.open(groupId, options.handle ?? { id: windowId });
     }
-    this.open(groupId, { id: windowId });
+    // A window with no group is still an app window: the arrangement may place it
+    // directly in a region (file windows), so the manager only records it.
     this.#appOf.set(windowId, appId);
     if (options.title !== undefined) this.#titles.set(windowId, options.title);
     return windowId;
+  }
+
+  /** The app that opened a window, if any. */
+  appOf(windowId: string): string | undefined {
+    return this.#appOf.get(windowId);
+  }
+
+  /** The chrome metadata of a window's app. */
+  appMeta(windowId: string): { readonly icon?: string; readonly paneHeader?: boolean } {
+    const appId = this.#appOf.get(windowId);
+    const app = appId === undefined ? undefined : this.apps.get(appId);
+    return {
+      ...(app?.icon === undefined ? {} : { icon: app.icon }),
+      ...(app?.paneHeader === undefined ? {} : { paneHeader: app.paneHeader }),
+    };
   }
 
   /** The title an app gave a window, if any. */
@@ -218,13 +240,10 @@ export class WindowManager {
    */
   windows(appId?: string): readonly PracWindowInfo[] {
     const infos: PracWindowInfo[] = [];
-    for (const runtime of this.#runtimes.values()) {
-      for (const id of runtime.state.order) {
-        const opener = this.#appOf.get(id);
-        if (opener === undefined) continue;
-        if (appId !== undefined && opener !== appId) continue;
-        infos.push({ id, appId: opener, groupId: runtime.id });
-      }
+    for (const [id, opener] of this.#appOf) {
+      if (appId !== undefined && opener !== appId) continue;
+      const groupId = this.groupOf(id)?.id;
+      infos.push({ id, appId: opener, ...(groupId === undefined ? {} : { groupId }) });
     }
     return infos;
   }
