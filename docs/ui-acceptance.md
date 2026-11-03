@@ -1,6 +1,6 @@
 # UI Acceptance
 
-The UI's live gates run against a real DSH rig and Chromium. `/Users/james` is
+The UI's live gates run against a real DSH rig and Chromium. This page is the gate catalogue; [testing.md](testing.md) owns the system around it (layers, behaviour vs probe, how to change a gate). `/Users/james` is
 not a test fixture: the normal 3084 rig is the person's, so acceptance uses a
 throwaway rig with its own XDG/HOME tree and removes it afterwards.
 

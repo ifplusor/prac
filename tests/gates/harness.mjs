@@ -14,6 +14,7 @@
  */
 import { chromium } from "@playwright/test";
 import { installShellModalAccommodation } from "../../scripts/shell-modal.mjs";
+import { classifyFailures } from "./classify.mjs";
 
 /**
  * The live DSH page to drive, from `URL` (token included), as every gate takes it.
@@ -115,6 +116,8 @@ export async function hasLayoutState(page) {
     ),
   );
 }
+
+export { classifyFailures } from "./classify.mjs";
 
 /** The page's console errors, for {@link report} to print when a check fails. */
 let lastConsoleErrors = [];
@@ -240,12 +243,19 @@ export async function boxOf(page, selector) {
  * @param {{ url: string, facts: object, checks: Record<string, boolean>, ok: string }} result - the result.
  */
 export function report(result) {
-  console.log(JSON.stringify({ url: result.url, ...result.facts, checks: result.checks }, null, 2));
-  const failed = Object.entries(result.checks)
-    .filter(([, ok]) => !ok)
-    .map(([name]) => name);
-  if (failed.length > 0) {
-    console.error(`FAILED: ${failed.join(", ")}`);
+  const { probes = [], ...facts } = result;
+  console.log(
+    JSON.stringify({ url: result.url, ...facts, probes, checks: result.checks }, null, 2),
+  );
+  const split = classifyFailures(result.checks, probes);
+  if (split.failed.length > 0) {
+    console.error(`FAILED: ${split.failed.join(", ")}`);
+    if (split.behaviour.length > 0) console.error(`  behaviour: ${split.behaviour.join(", ")}`);
+    if (split.probes.length > 0) {
+      console.error(
+        `  probes (update the gate if the model change was intended): ${split.probes.join(", ")}`,
+      );
+    }
     // A check like "no prac-owned console errors" is only actionable with the
     // lines themselves; the page already collected them for this gate.
     if (lastConsoleErrors.length > 0) {

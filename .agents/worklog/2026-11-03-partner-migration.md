@@ -54,3 +54,14 @@ previewSurvivesCloseReopen, twoPlacementsAreTwoViews
 4. 修法：`close` 先清记录（座位、appOf、titles、handles），再按是否有 group 决定是否 `runtime.remove`，两种情况都 `notify`。
 
 验证：`build` / `test` / `verify:entries` 绿；**`verify:ui` 全绿**（`UI ACCEPTANCE: all gates passed`）。
+
+## 5. 测试体系（round 8）
+
+删除 `prac.window` 卡住两次之后，把「测试是基线，不是真理」这件事做成机制：
+
+- `docs/testing.md`：四层（L0 静态 / L1 单测 / L2 模型集成（缺）/ L3 live），以及**behaviour vs probe** 的判定与改 gate 的流程；
+- `tests/gates/classify.mjs` + harness：gate 用 `probes: [...]` 声明读内部的检查；失败时分开打印，probe 失败提示「若模型变化是有意的，改 gate 并记录」；
+- `vendor/vscode/scripts/verify-file.mjs` 声明了 15 个投影/内部检查为 probe（`twoPlacementsAreTwoViews` 就在其中——它正是上次卡住的那条）；
+- 补了一条 L1 回归：「group-less window 关闭后不得留在目录里」（stale `p0`）。
+
+已知缺口：L2（模型级集成，不启浏览器）还没有，所以跨对象路径仍只能靠 4 分钟的 live gate 发现——下一步补。

@@ -225,6 +225,18 @@ describe("WindowManager.admit", () => {
     expect(handle.released).toBe(false);
   });
 
+  it("drops a group-less window on close, leaving no stale catalogue entry", () => {
+    const { apps, manager } = managerWith();
+    apps.register(app("editor"));
+    manager.admit("editor", { windowId: "p0", title: "alpha" });
+    manager.admit("editor", { windowId: "p1", title: "alpha" });
+    expect(manager.ids()).toEqual(["p0", "p1"]);
+    manager.close("p0");
+    expect(manager.ids()).toEqual(["p1"]);
+    expect(manager.titleOf("p0")).toBeUndefined();
+    expect(manager.windowContentFor("p0")).toBeUndefined();
+  });
+
   it("reuses the single window of a single-instance app", () => {
     const { apps, manager } = managerWith();
     apps.register(app("chat", { instances: "single" }));

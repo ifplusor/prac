@@ -29,6 +29,7 @@
  */
 import { createRequire } from "node:module";
 import { installDeepDom, resourceOfFileView } from "./deep-dom.mjs";
+import { classifyFailures } from "../../../tests/gates/classify.mjs";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
@@ -739,28 +740,56 @@ const closedChat = await page.evaluate(async (conversation) => {
   };
 }, "dsh:main:conversation");
 step("preview survives close/reopen conversation");
-const previewAfterReopen = await page.evaluate(async ({ conversation, file }) => {
-  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  globalThis.__pracFrame.show(conversation);
-  globalThis.__pracFrame.setFront(conversation);
-  await wait(1200);
-  const close = globalThis.__deep.one(`[data-prac-tab-close="${conversation}"]`);
-  close?.click();
-  await wait(1200);
-  globalThis.__pracFrame.show(conversation);
-  globalThis.__pracFrame.setFront(conversation);
-  await wait(1200);
-  globalThis.__vscodeEmbed.face.openPreviewFile(file);
-  await wait(2200);
-  return globalThis.__vscodeEmbed.face.capabilities.editors
-    .snapshot()
-    .filter((entry) => entry.resource === file)
-    .map((entry) => entry.preview);
-}, { conversation: "dsh:main:conversation", file: uriOf(REST[1]) });
+const previewAfterReopen = await page.evaluate(
+  async ({ conversation, file }) => {
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    globalThis.__pracFrame.show(conversation);
+    globalThis.__pracFrame.setFront(conversation);
+    await wait(1200);
+    const close = globalThis.__deep.one(`[data-prac-tab-close="${conversation}"]`);
+    close?.click();
+    await wait(1200);
+    globalThis.__pracFrame.show(conversation);
+    globalThis.__pracFrame.setFront(conversation);
+    await wait(1200);
+    globalThis.__vscodeEmbed.face.openPreviewFile(file);
+    await wait(2200);
+    return globalThis.__vscodeEmbed.face.capabilities.editors
+      .snapshot()
+      .filter((entry) => entry.resource === file)
+      .map((entry) => entry.preview);
+  },
+  { conversation: "dsh:main:conversation", file: uriOf(REST[1]) },
+);
 
 await browser.close();
 
 const painted = (colours) => typeof colours === "number" && colours > 4;
+/**
+ * The checks that read an internal rather than what a person sees.
+ *
+ * They are the ones to update when the frame's model changes on purpose (the
+ * `prac.window` seat, the item list, the embed's projection); a behaviour check
+ * that fails is a defect instead.
+ */
+const PROBES = [
+  "directionalFocusFollowsTheTree",
+  "frameWindowIsProjected",
+  "chatActiveProjects",
+  "fileActiveProjects",
+  "chatOrderProjects",
+  "chatMovesRegion",
+  "fileOrderProjects",
+  "hiddenWindowUnmaps",
+  "shownWindowRemaps",
+  "previewSurvivesCloseReopen",
+  "projectionIsQuiet",
+  "closingChatUnmapsProjection",
+  "splitEditorCopiesThePlacement",
+  "twoPlacementsAreTwoViews",
+  "twoViewsAreTwoSurfaces",
+];
+
 const checks = {
   // 1. Real editing surfaces: the workbench's model, rendered as lines of text. The
   // app opened the file and the frame showed it; nothing here mounted anything.
@@ -920,8 +949,7 @@ const checks = {
   fileOrderProjects: activeProjection.fileOrder[0] === uriOf(REST[0]),
   hiddenWindowUnmaps: !activeProjection.hiddenMapped.includes("dsh:main:conversation"),
   shownWindowRemaps: activeProjection.shownMapped.includes("dsh:main:conversation"),
-  previewSurvivesCloseReopen:
-    previewAfterReopen.length === 1 && previewAfterReopen[0] === true,
+  previewSurvivesCloseReopen: previewAfterReopen.length === 1 && previewAfterReopen[0] === true,
   projectionIsQuiet:
     JSON.stringify(projectionAudit.before) === JSON.stringify(projectionAudit.after),
   closingChatUnmapsProjection:
@@ -988,6 +1016,7 @@ console.log(
         beforeLastOpen: beforeLastOpen.length,
         lastOpen: lastOpen.map((tab) => (tab.active ? `${tab.id} (active)` : tab.id)),
       },
+      probes: PROBES,
       checks,
     },
     null,
@@ -995,11 +1024,16 @@ console.log(
   ),
 );
 
-const failed = Object.entries(checks)
-  .filter(([, ok]) => !ok)
-  .map(([name]) => name);
-if (failed.length > 0) {
-  console.error(`FAILED: ${failed.join(", ")}`);
+const classified = classifyFailures(checks, PROBES);
+if (classified.failed.length > 0) {
+  console.error(`FAILED: ${classified.failed.join(", ")}`);
+  if (classified.behaviour.length > 0)
+    console.error(`  behaviour: ${classified.behaviour.join(", ")}`);
+  if (classified.probes.length > 0) {
+    console.error(
+      `  probes (update the gate if the model change was intended): ${classified.probes.join(", ")}`,
+    );
+  }
   process.exit(1);
 }
 console.log(
