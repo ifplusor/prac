@@ -13,14 +13,30 @@
  *
  * Usage: URL='http://127.0.0.1:3084/?token=...' vp run verify:containers
  */
-import { openPrac, report, requireUrl } from "./harness.mjs";
+import { openPrac, report, requireUrl, until } from "./harness.mjs";
 import { writeFixtures } from "../../vendor/vscode/scripts/gate-fixtures.mjs";
 
 const url = requireUrl();
 const { page, own, close } = await openPrac(url);
 
-// A fresh profile may show the first-run project picker; the rail is behind it.
-await page.waitForTimeout(2500);
+// A fresh profile may show the first-run project picker; wait for the rail it covers.
+await until(
+  page,
+  () => {
+    const items = [...document.querySelectorAll('[data-prac-activity="left"] [data-prac-rail-item]')].map(
+      (item) => item.getAttribute("data-prac-rail-item"),
+    );
+    return [
+      "workbench.view.explorer",
+      "workbench.view.search",
+      "workbench.view.scm",
+      "workbench.view.debug",
+      "workbench.view.extension.gitlens",
+    ].every((id) => items.includes(id));
+  },
+  null,
+  { timeout: 10_000 },
+);
 
 const read = () =>
   page.evaluate(() => {
@@ -79,11 +95,27 @@ const leftIds = initial.left.items.map((item) => item.id);
 const activeLeft = initial.left.items.filter((item) => item.active);
 
 await page.click('[data-prac-activity="left"] [data-prac-rail-item="workbench.view.search"]');
-await page.waitForTimeout(1200);
+await until(
+  page,
+  () =>
+    document
+      .querySelector('[data-prac-activity="left"] [data-prac-rail-item].active')
+      ?.getAttribute("data-prac-rail-item") === "workbench.view.search",
+  null,
+  { timeout: 5000 },
+);
 const search = await read();
 
 await page.click('[data-prac-activity="left"] [data-prac-rail-item="workbench.view.explorer"]');
-await page.waitForTimeout(1200);
+await until(
+  page,
+  () =>
+    document
+      .querySelector('[data-prac-activity="left"] [data-prac-rail-item].active')
+      ?.getAttribute("data-prac-rail-item") === "workbench.view.explorer",
+  null,
+  { timeout: 5000 },
+);
 const explorer = await read();
 
 // A single editor window can live in the sidebar's WindowGroup: a file the frame

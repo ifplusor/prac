@@ -54,6 +54,10 @@ const KNOWN_NOISE = [
   "Cannot find module",
   "Element already has context attribute",
   "extension-telemetry",
+  // The DSH client runner syncs its inspect providers over HTTP; a transient
+  // fetch failure is the rig's, not the plugin's, and the stack it logs contains
+  // the plugin-bundle URL (so a `prac` prefix match would otherwise see it).
+  "syncing inspect providers failed",
 ];
 
 /**

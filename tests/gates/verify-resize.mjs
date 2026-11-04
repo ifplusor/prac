@@ -14,7 +14,7 @@
  *
  * Usage: URL='http://127.0.0.1:3084/?token=...' vp run verify:resize
  */
-import { openPrac, report, requireUrl } from "./harness.mjs";
+import { openPrac, report, requireUrl, until } from "./harness.mjs";
 
 const LEFT = "left";
 const CENTER = "center";
@@ -25,7 +25,15 @@ const RIGHT_WIDTH = 420;
 
 const url = requireUrl();
 const { page, own, consoleErrors, close } = await openPrac(url);
-await page.waitForTimeout(2000);
+await until(
+  page,
+  () => {
+    const region = document.querySelector('[data-prac-region="left"]');
+    return region !== null && region.getBoundingClientRect().width > 0;
+  },
+  null,
+  { timeout: 10_000 },
+);
 
 /** The box a region (or the split that took its id) is drawn at. */
 const box = (region) =>
@@ -51,6 +59,11 @@ const sample = async () => ({
 
 /** Drag the sash matching `selector` by `dx` px, in steps, and let the frame settle. */
 async function dragSash(selector, dx) {
+  const beforeWidths = await page.evaluate(() =>
+    [...document.querySelectorAll("[data-prac-region]")].map((region) =>
+      Math.round(region.getBoundingClientRect().width),
+    ),
+  );
   const point = await page.evaluate((sel) => {
     const sash = document.querySelector(sel);
     if (!sash) return null;
@@ -64,7 +77,17 @@ async function dragSash(selector, dx) {
     await page.mouse.move(point.x + (dx * step) / 10, point.y, { steps: 1 });
   }
   await page.mouse.up();
-  await page.waitForTimeout(800);
+  await until(
+    page,
+    (previous) => {
+      const widths = [...document.querySelectorAll("[data-prac-region]")].map((region) =>
+        Math.round(region.getBoundingClientRect().width),
+      );
+      return JSON.stringify(widths) !== JSON.stringify(previous);
+    },
+    beforeWidths,
+    { timeout: 5000 },
+  );
 }
 
 const initial = await sample();
@@ -82,8 +105,23 @@ const dragged = await sample();
 
 // A tight window: the frame loses 600px of width. The centre is `high` priority, so it is the block
 // that gives way; the tracks are `low`, so they keep their size as long as they can.
+const beforeResize = await page.evaluate(() =>
+  [...document.querySelectorAll("[data-prac-region]")].map((region) =>
+    Math.round(region.getBoundingClientRect().width),
+  ),
+);
 await page.setViewportSize({ width: 1000, height: 1000 });
-await page.waitForTimeout(1200);
+await until(
+  page,
+  (previous) => {
+    const widths = [...document.querySelectorAll("[data-prac-region]")].map((region) =>
+      Math.round(region.getBoundingClientRect().width),
+    );
+    return JSON.stringify(widths) !== JSON.stringify(previous);
+  },
+  beforeResize,
+  { timeout: 5000 },
+);
 const tight = await sample();
 
 /** Width change between two samples; an absent region counts as nothing drawn. */
@@ -102,8 +140,23 @@ async function resetSash(selector) {
     return { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) };
   }, selector);
   if (!point) throw new Error(`no sash matching "${selector}"`);
+  const before = await page.evaluate(() =>
+    [...document.querySelectorAll("[data-prac-region]")].map((region) =>
+      Math.round(region.getBoundingClientRect().width),
+    ),
+  );
   await page.mouse.dblclick(point.x, point.y);
-  await page.waitForTimeout(800);
+  await until(
+    page,
+    (previous) => {
+      const widths = [...document.querySelectorAll("[data-prac-region]")].map((region) =>
+        Math.round(region.getBoundingClientRect().width),
+      );
+      return JSON.stringify(widths) !== JSON.stringify(previous);
+    },
+    before,
+    { timeout: 5000 },
+  );
 }
 
 const beforeSnap = await sample();
