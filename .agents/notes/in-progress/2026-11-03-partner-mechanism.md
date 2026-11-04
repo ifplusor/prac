@@ -4,7 +4,7 @@ status: in-progress
 
 # Agent Note: partner 机制（VS Code 与 DSH 作为基座伙伴）
 
-> VS Code 与 DSH 是 prac 的两个基座伙伴：它们各自贡献 app 与 widget，prac 只拥有组合。共用机制是一个 `PracPartner` 契约 + 一个把贡献投影成注册的 runner，加一层只由 app 打开 window 的 application 层。frame 只保留 `prac.widget` 一个内容座位（window 的内容由 app 提供），加一个由伙伴持有的渲染位置（范围见 Open questions 5），不认识任何来源。
+> VS Code 与 DSH 是 prac 的两个基座伙伴：它们各自贡献 app 与 widget，prac 只拥有组合。共用机制是一个 `PracPartner` 契约 + 一个把贡献投影成注册的 runner，加一层只由 app 打开 window 的 application 层。frame 只保留 `prac.widget` 一个内容座位（window 的内容由 app 提供），加一个由伙伴持有的渲染位置（范围见 Open questions 4），不认识任何来源。
 
 ## Problem
 
@@ -119,6 +119,17 @@ interface PracWindowManager {
 
 这条边界把今天分散在 `WindowGroupAdapter`、`ui-vscode-editor` 的 `mapWindow`、arrangement 里的 window 逻辑收进一个服务；`mapWindow` 这类上游投影留在适配器侧，作为管理器事件的消费者。
 
+### 4.1 board 是 window，不是 group
+
+board 仍然是 **widget 的容器**：`BoardContent` 持有 widget 的 order / active / split 与 board 自己的 chrome，这部分不变。变的是它与 window 的关系：
+
+- board 是一个 **window**（内容是 `BoardContent`），由 `ui-widget` 贡献的 `prac.board` app 打开；
+- 一个 region 只有一种 group：region 的 **window group**，成员是 window（board window、editor window、其他 app window）；
+- 不存在「board 自己的 group」，也不存在 `board.hostedWindows`；window 的 group 归属由窗口管理器的放置动作维护（放置/移动到某 region 后，按最近的祖先 group 加入），不靠投影反推；
+- 投影（`PracWindowInput` / `mapWindow`）只读窗口管理器的记录（window → region / group / active），不读 group order。
+
+这条模型同时解掉三处耦合：`board.hostedWindows`、`syncBoardWindowProjection` 的 `hostedRegion` 反推、workbench 里 conversation 的 `mapWindow`。
+
 ### 5 内容座位由谁写
 
 `prac.window` **保留，但只由 application 层写**：app 的 `content(windowId)` 与它声明的 chrome 事实由窗口管理器在 `admit` 时注册成一条 `prac.window` 座位，`close` 时回收。伙伴不再直接注册它——座位是 frame 的渲染登记表，不是伙伴的 API。
@@ -177,18 +188,17 @@ interface PracWindowManager {
    - V1：body 不由适配器给；frame 对没有内容的 item 渲染来源位置，适配器在**自己的位置**渲染 DSH 内容。一定安全，但 item 的「内容」归属变模糊。
    - 关闭条件：一个最小 spike（座位里声明 `main`，在一棵由 frame 渲染的子树里调用该绑定，观察渲染 / 切换 / 卸载与 console），通过则 V2，否则 V1。
 
-2. **board host app**：board window 的 content 由 `ui-widget` 提供，是否意味着 widget 包也贡献 app（`prac.board`），以及 `ctx.pracWidgets.createBoardWindow` 是否改走 `pracApplications.open("prac.board", …)`。
+2. **conversation 的「bring forward」动作去留**：它是产品动作而非伙伴动作。候选：(a) 删除（recall 面已能 show/hide）；(b) 由 frame chrome 提供通用 affordance；(c) 由 dsh-host 的 entry 声明（名不正）。当前倾向 (a)。
 
-3. **conversation 的「bring forward」动作去留**：它是产品动作而非伙伴动作。候选：(a) 删除（recall 面已能 show/hide）；(b) 由 frame chrome 提供通用 affordance；(c) 由 dsh-host 的 entry 声明（名不正）。当前倾向 (a)。
+3. **runner 的落点与命名**：需要同时被两个伙伴的插件使用，又必须 DSH-free（结构化 `SlotRegistry` face）。候选：`packages/lib/ui-kit-source`（新），或并入某个现有 lib。关闭条件：确定包与名字后写进 `docs/client-packages.md` 的包表。
 
-4. **runner 的落点与命名**：需要同时被两个伙伴的插件使用，又必须 DSH-free（结构化 `SlotRegistry` face）。候选：`packages/lib/ui-kit-source`（新），或并入某个现有 lib。关闭条件：确定包与名字后写进 `docs/client-packages.md` 的包表。
-
-5. **来源渲染位置是否也承载 vscode 的内容**：VS Code 的内容由 `hostFor` 提供，不需要位置；只有 DSH 需要「声明子槽 + 渲染」的宿主能力。若 V2 成立，位置可能只需要给 DSH。
+4. **来源渲染位置是否也承载 vscode 的内容**：VS Code 的内容由 `hostFor` 提供，不需要位置；只有 DSH 需要「声明子槽 + 渲染」的宿主能力。若 V2 成立，位置可能只需要给 DSH。
 
 ## Validation
 
 - 步骤 1：live gate 全绿；同一份临时探针在改前 / 改后读 `slots.entries("prac.widget")`，id / label / icon / paneHeader 集合逐条相等；`prac.window` 的条目数在改后为 0（座位已删）。
 - 步骤 2：frame 源码不再出现 `dsh:` 字面量与 `DSH_*`；live gate（含 `views` / `file` / `editor:*` / `tabs`）全绿；`pnpm verify:entries` 通过。
+- 步骤 4（board 模型）：`BoardWindowAdapter` 不再有 `group` / `hostedWindows`；`board window` 是 `prac.board` app 打开的 window；`containers` 的「editor window in the sidebar WindowGroup」断言改为读窗口管理器的 group 成员；`syncChat` 的 `mapWindow` 删除后 `file` / `containers` / `board` 全绿。
 - 步骤 3：三个动作座位在源码与 `SlotMap` 中消失；带 actions 的 item 在 tab strip / widget 行渲染出动作；不带的不渲染。
 - 步骤 4：bundle 行按新 id 加载；`pnpm profile:link` 后 rig 起得来；`dsh-types` 比较通过。
 - 全程：`pnpm build` / `test` / `check`（本次改动范围）/ `verify:ui`。
