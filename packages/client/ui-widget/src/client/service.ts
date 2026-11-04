@@ -54,22 +54,13 @@ export function apply(ctx: Context): void {
     },
   };
   ctx.provide("pracWidgets", face);
-  // The frame's board-drop decoration reads this global (a production seam; the
-  // frame cannot depend on this plugin's service without a cycle).
-  globalThis.__pracWidgets = face;
-  // The page-level probe: gates read the same face through one registry.
-  const disposeProbe = publishProbe("widgets", face);
-  ctx.effect(() => () => {
-    disposeProbe();
-    if (globalThis.__pracWidgets === face) delete globalThis.__pracWidgets;
-  });
+  // The page-level probe: gates read the same face through one registry. The
+  // frame reads it from the Cordis service (its board drop decoration), not from
+  // this global.
+  ctx.effect(() => publishProbe("widgets", face));
 }
 
 /** Cordis plugin name. */
 export const name = "prac-client-ui-widget";
 /** The widget plugin needs the frame's placement face. */
 export const inject = ["pracFrame", "pracSurfaces"];
-
-declare global {
-  var __pracWidgets: PracWidgetsFace | undefined;
-}

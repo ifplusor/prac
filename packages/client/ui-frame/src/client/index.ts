@@ -72,6 +72,7 @@ import { createServices } from "./services.js";
 import { createFrameStore, createSpaceStore } from "./store.js";
 import { WindowGroupAdapter } from "./window-group-adapter.js";
 import { publishPracProbes } from "./probes.js";
+import type { BoardDropFace } from "./layout-item.js";
 import { ThemePresenter } from "./theme.js";
 
 import { WIDGET_SLOT, WINDOW_SLOT, readDeclaredViewIds } from "./catalogue.js";
@@ -86,6 +87,8 @@ import { WIDGET_SLOT, WINDOW_SLOT, readDeclaredViewIds } from "./catalogue.js";
  * @param ctx - the Cordis client context.
  */
 export function apply(ctx: Context): void {
+  /** The widget plugin's face, available once it has loaded (see `ctx.inject`). */
+  let widgetsFace: BoardDropFace | undefined;
   ensureStyles();
   // The frame reports a close request through the store; this set is what carries it to
   // whoever declared the view (the face's `onDidRequestCloseItem`).
@@ -285,6 +288,7 @@ export function apply(ctx: Context): void {
         contentHosts,
         boardLayouts,
         windowActions,
+        widgets: () => widgetsFace,
       }),
     );
     const disposePanelInfo = ctx.slots.provideRoot({ hooks: { panelInfo } });
@@ -327,6 +331,16 @@ export function apply(ctx: Context): void {
     const stopSlots = ([WINDOW_SLOT, WIDGET_SLOT] as const).map((slot) =>
       ctx.slots.subscribe(slot, bumpCatalogue),
     );
+    // A board's drop target reports to the widget plugin. This plugin cannot list
+    // that service in `inject` (the widget plugin injects this one), so it waits
+    // for it through `ctx.inject`; the frame reads the holder lazily, at the time a
+    // board renders, which is after the widget plugin has loaded.
+    ctx.inject(["pracWidgets"], (scope) => {
+      widgetsFace = (scope as unknown as { pracWidgets: BoardDropFace }).pracWidgets;
+      return () => {
+        widgetsFace = undefined;
+      };
+    });
     // The page-level probe surface: the bundle's `require` resolves only
     // registered bundle ids, so a driver script cannot reach the Cordis
     // context. Probes are published through one module; removal is scoped to

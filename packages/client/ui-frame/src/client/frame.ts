@@ -90,7 +90,7 @@ import type {
 import { createPortal } from "react-dom";
 import type { UsePanelInfo } from "@deepseek-ai/dsh-client-ui-layout/client";
 
-import { LayoutItem, type ItemRenderSlot } from "./layout-item.js";
+import { LayoutItem, type BoardDropFace, type ItemRenderSlot } from "./layout-item.js";
 
 import { createFrameChrome } from "./frame-chrome.js";
 
@@ -600,6 +600,8 @@ export function createFrame(
     readonly boardLayouts?: import("prac-ui-kit-workbench").BoardLayoutRegistry;
     readonly chrome?: ChromeRegistry<ItemRecord>;
     readonly windowActions: PracWindowActionsFace;
+    /** The widget registry a board's drop target reports to (when its plugin is loaded). */
+    readonly widgets?: () => BoardDropFace | undefined;
   },
 ): (props: FrameProps) => ReactElement {
   return function PracFrame({ renderSlot, useSessions, usePanelInfo }: FrameProps): ReactElement {
@@ -769,6 +771,7 @@ export function createFrame(
                 board: sources.boardLayouts?.get(state.items[viewId]!.boardId!),
               }),
           itemFacts,
+          ...(sources.widgets === undefined ? {} : { widgets: sources.widgets }),
           renderSlot: renderSlot as unknown as ItemRenderSlot,
           ...(sources.windows?.windowContentFor(viewId) === undefined
             ? {}

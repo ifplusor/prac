@@ -13,7 +13,7 @@
 import { publishProbe } from "prac-ui-kit-workbench/probes";
 
 import type { PracLayoutFace, PracSpacesFace, PracWindowActionsFace } from "./contract.js";
-import type { BoardLayoutRegistry } from "prac-ui-kit-workbench/probes";
+import type { BoardLayoutRegistry } from "prac-ui-kit-workbench";
 
 /** The faces this plugin publishes, by probe name. */
 export interface PracProbes {

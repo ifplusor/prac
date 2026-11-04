@@ -46,6 +46,8 @@ export interface LayoutItemProps {
   readonly contentHost?: ContentHost;
   /** A board window's live layout root and chrome. */
   readonly board?: BoardLayout;
+  /** The widget registry a board's drop target reports to (when its plugin is loaded). */
+  readonly widgets?: () => BoardDropFace | undefined;
   /** The container's declared facts about an item (title / icon / pane header). */
   readonly itemFacts?: (itemId: string) => ChromeItemFacts;
   readonly renderSlot: ItemRenderSlot;
@@ -81,7 +83,7 @@ function renderDshView(
  * and not the whole frame; the chrome gets the container's slot face for widget
  * actions.
  */
-interface BoardDropFace {
+export interface BoardDropFace {
   boards(): readonly {
     readonly id: string;
     readonly boardId: string;
@@ -101,8 +103,11 @@ interface BoardDropFace {
   ): boolean;
 }
 
-function boardDropDecoration(board: BoardLayout, regionId: string): LayoutDecoration {
-  const face = (globalThis as { __pracWidgets?: BoardDropFace }).__pracWidgets;
+function boardDropDecoration(
+  board: BoardLayout,
+  regionId: string,
+  face: BoardDropFace | undefined,
+): LayoutDecoration {
   return {
     attrs: { "data-prac-widget-drop": regionId, "data-prac-board": board.boardId },
     onDragOver: (event) => {
@@ -152,10 +157,12 @@ function BoardItem({
   board,
   itemFacts,
   renderSlot,
+  widgets,
 }: {
   board: BoardLayout;
   itemFacts?: (itemId: string) => ChromeItemFacts;
   renderSlot: ItemRenderSlot;
+  widgets?: () => BoardDropFace | undefined;
 }): ReactNode {
   const state = useSyncExternalStore(board.subscribe, board.getState, board.getState);
   return LayoutRenderer({
@@ -164,7 +171,7 @@ function BoardItem({
     slotFace: renderSlot,
     ...(itemFacts === undefined ? {} : { itemFacts }),
     decorate: (ctx) =>
-      ctx.kind === "region" ? boardDropDecoration(board, ctx.regionId) : undefined,
+      ctx.kind === "region" ? boardDropDecoration(board, ctx.regionId, widgets?.()) : undefined,
     renderItem: (_record: WidgetRecord, widgetId: string) =>
       renderSlot("prac.widget", {}, { only: widgetId }),
   } as LayoutRendererProps<WidgetRecord>);
@@ -175,21 +182,23 @@ export function LayoutItem({
   viewId,
   viewKind: contentKind,
   contentHost,
-  board,
   itemFacts,
   renderSlot,
   windowContent,
+  board: boardProp,
+  widgets,
   box,
   viewportWidth,
 }: LayoutItemProps): ReactNode {
   if (contentHost !== undefined) {
     return createElement(ContentHostMount, { host: contentHost, contentId: viewId });
   }
-  if (board !== undefined) {
+  if (boardProp !== undefined) {
     return createElement(BoardItem, {
-      board,
+      board: boardProp,
       ...(itemFacts === undefined ? {} : { itemFacts }),
       renderSlot,
+      ...(widgets === undefined ? {} : { widgets }),
     });
   }
   const kind = viewKind(viewId);
