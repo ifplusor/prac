@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 ---
 
 # Agent Note: partner 机制（VS Code 与 DSH 作为基座伙伴）
