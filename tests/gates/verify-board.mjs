@@ -14,7 +14,7 @@ const BOARD = "left/container:workbench.view.explorer";
 
 await page.waitForFunction(
   (boardId) => {
-    const boards = globalThis.__pracWidgets?.boards?.() ?? [];
+    const boards = globalThis.__pracTest?.widgets?.boards?.() ?? [];
     return boards.some((board) =>
       board.id === boardId && typeof board.widgetOrder === "function"
         ? board.widgetOrder().length > 1
@@ -27,7 +27,7 @@ await page.waitForFunction(
 
 const read = () =>
   page.evaluate((boardId) => {
-    const board = globalThis.__pracWidgets.boards().find((candidate) => candidate.id === boardId);
+    const board = globalThis.__pracTest?.widgets?.boards().find((candidate) => candidate.id === boardId);
     const host = document.querySelector(`[data-prac-view-id="${boardId}/board"]`);
     const root = host?.shadowRoot;
     return {
@@ -47,7 +47,7 @@ const read = () =>
 const initial = await read();
 
 const selected = await page.evaluate((boardId) => {
-  const board = globalThis.__pracWidgets.boards().find((candidate) => candidate.id === boardId);
+  const board = globalThis.__pracTest?.widgets?.boards().find((candidate) => candidate.id === boardId);
   const next = board.widgetOrder()[1];
   board.selectWidget(next);
   return { expected: next, active: board.content.activeWidget };
@@ -57,7 +57,7 @@ await page.waitForTimeout(300);
 const afterSelect = await read();
 
 const reordered = await page.evaluate((boardId) => {
-  const board = globalThis.__pracWidgets.boards().find((candidate) => candidate.id === boardId);
+  const board = globalThis.__pracTest?.widgets?.boards().find((candidate) => candidate.id === boardId);
   const reversed = [...board.widgetOrder()].reverse();
   board.reorderWidgets(reversed);
   return { expected: reversed, actual: [...board.widgetOrder()] };
@@ -67,7 +67,7 @@ await page.waitForTimeout(300);
 const afterReorder = await read();
 
 const added = await page.evaluate(() => {
-  const board = globalThis.__pracWidgets.createBoardWindow("gate:board", "Gate");
+  const board = globalThis.__pracTest?.widgets?.createBoardWindow("gate:board", "Gate");
   board.addWidget("gate:board-widget");
   const inBoard = board.widgetOrder().includes("gate:board-widget");
   board.removeWidget("gate:board-widget");
@@ -80,7 +80,7 @@ const added = await page.evaluate(() => {
 // dropping it on another board region moves it (center) or splits the target board
 // (edge). This is the UI path, not the service call.
 const dragBoard = await page.evaluate(async () => {
-  const board = globalThis.__pracWidgets.createBoardWindow("gate:drag-board", "Drag");
+  const board = globalThis.__pracTest?.widgets?.createBoardWindow("gate:drag-board", "Drag");
   board.addWidget("gate:drag-a");
   board.addWidget("gate:drag-b");
   globalThis.__pracTest?.frame.place(board.windowId, "center");
@@ -140,12 +140,12 @@ const dragBoard = await page.evaluate(async () => {
 // Cross-board UI drop: a widget from a temporary stage board is dropped on the
 // Explorer board's region; the service moves it, the source loses it.
 const crossDrag = await page.evaluate(async (targetBoardId) => {
-  const source = globalThis.__pracWidgets.createBoardWindow("gate:drag-cross", "Cross");
+  const source = globalThis.__pracTest?.widgets?.createBoardWindow("gate:drag-cross", "Cross");
   source.addWidget("gate:cross-a");
   globalThis.__pracTest?.frame.place(source.windowId, "center");
   globalThis.__pracTest?.frame.setItemBoard(source.windowId, source.boardId);
   await new Promise((resolve) => setTimeout(resolve, 800));
-  const target = globalThis.__pracWidgets.boards().find((board) => board.id === targetBoardId);
+  const target = globalThis.__pracTest?.widgets?.boards().find((board) => board.id === targetBoardId);
   const host =
     target === undefined
       ? null
@@ -186,11 +186,11 @@ const crossDrag = await page.evaluate(async (targetBoardId) => {
 
 // Cross-board is move-only; an optional split is completed inside the **target** board root.
 const moved = await page.evaluate(() => {
-  const a = globalThis.__pracWidgets.createBoardWindow("gate:move-a", "A");
-  const b = globalThis.__pracWidgets.createBoardWindow("gate:move-b", "B");
+  const a = globalThis.__pracTest?.widgets?.createBoardWindow("gate:move-a", "A");
+  const b = globalThis.__pracTest?.widgets?.createBoardWindow("gate:move-b", "B");
   a.addWidget("gate:w1");
   b.addWidget("gate:w2");
-  const ok = globalThis.__pracWidgets.moveWidget("gate:w1", "gate:move-a", "gate:move-b", {
+  const ok = globalThis.__pracTest?.widgets?.moveWidget("gate:w1", "gate:move-a", "gate:move-b", {
     split: "right",
   });
   const record = b.boardState.items["gate:w1"];
@@ -226,7 +226,7 @@ const stage = await page.evaluate(
       if (fileId !== undefined) break;
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    const board = globalThis.__pracWidgets.createBoardWindow("gate:stage-board", "Gate Stage");
+    const board = globalThis.__pracTest?.widgets?.createBoardWindow("gate:stage-board", "Gate Stage");
     globalThis.__pracTest?.frame.place(board.windowId, "center");
     globalThis.__pracTest?.frame.setItemBoard(board.windowId, board.boardId);
     await new Promise((resolve) => setTimeout(resolve, 600));
@@ -246,7 +246,7 @@ const stage = await page.evaluate(
 
 await page.evaluate(
   ({ boardId, order, active }) => {
-    const board = globalThis.__pracWidgets.boards().find((candidate) => candidate.id === boardId);
+    const board = globalThis.__pracTest?.widgets?.boards().find((candidate) => candidate.id === boardId);
     board.reorderWidgets(order);
     if (active !== undefined) board.selectWidget(active);
   },
@@ -308,7 +308,7 @@ report({
       JSON.stringify(restored.order) === JSON.stringify(initial.order) &&
       restored.active === initial.active,
     "no prac-owned console errors":
-      own("__pracTest").length === 0 && own("__pracWidgets").length === 0,
+      own("__pracTest").length === 0 && own("__pracTest").length === 0,
   },
   ok: "OK: the Explorer board window owns widget order / active / add / remove and renders them",
 });

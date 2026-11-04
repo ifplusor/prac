@@ -4,6 +4,7 @@
  * @module prac-client-ui-widget/client/service
  */
 
+import { publishProbe } from "prac-ui-kit-workbench";
 import type { Context } from "@deepseek-ai/cordis";
 // Type-only, for the frame plugin's `Context` / `SlotMap` merges.
 import type {} from "prac-client-ui-frame/client";
@@ -53,8 +54,13 @@ export function apply(ctx: Context): void {
     },
   };
   ctx.provide("pracWidgets", face);
+  // The frame's board-drop decoration reads this global (a production seam; the
+  // frame cannot depend on this plugin's service without a cycle).
   globalThis.__pracWidgets = face;
+  // The page-level probe: gates read the same face through one registry.
+  const disposeProbe = publishProbe("widgets", face);
   ctx.effect(() => () => {
+    disposeProbe();
     if (globalThis.__pracWidgets === face) delete globalThis.__pracWidgets;
   });
 }

@@ -77,7 +77,7 @@ const read = () =>
         id: entry.getAttribute("data-prac-stack-entry"),
         height: Math.round(entry.getBoundingClientRect().height),
       })),
-      widgetBoards: (globalThis.__pracWidgets?.boards?.() ?? []).map((board) => ({
+      widgetBoards: (globalThis.__pracTest?.widgets?.boards?.() ?? []).map((board) => ({
         id: board.id,
         window: board.state.active,
         widgets: typeof board.widgetOrder === "function" ? [...board.widgetOrder()] : [],
@@ -146,7 +146,7 @@ await page.evaluate(
 await page.waitForTimeout(2500);
 
 const sidebarWindow = await page.evaluate((boardId) => {
-  const board = globalThis.__pracWidgets.boards().find((candidate) => candidate.id === boardId);
+  const board = globalThis.__pracTest?.widgets?.boards().find((candidate) => candidate.id === boardId);
   const deep = (selector) => {
     const found = [...document.querySelectorAll(selector)];
     const walk = (root) => {
@@ -179,7 +179,7 @@ const sidebarWindow = await page.evaluate((boardId) => {
 const boardMapped = await page
   .waitForFunction(
     (boardId) => {
-      const board = globalThis.__pracWidgets.boards().find((candidate) => candidate.id === boardId);
+      const board = globalThis.__pracTest?.widgets?.boards().find((candidate) => candidate.id === boardId);
       return (
         board !== undefined && globalThis.__pracVscodeFace.mappedWindows().includes(board.windowId)
       );

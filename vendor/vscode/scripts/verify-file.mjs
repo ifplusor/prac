@@ -288,7 +288,7 @@ const viewKinds = await page.evaluate(() => {
   const views = globalThis.__pracTest?.frame.getState().items;
   const file = Object.entries(views).find(([id]) => id.startsWith("vscode:file:"));
   // A contributed view lives on its container's **board** now, not in the frame's view table.
-  const boards = globalThis.__pracWidgets?.boards?.() ?? [];
+  const boards = globalThis.__pracTest?.widgets?.boards?.() ?? [];
   const widget = boards
     .map((board) => Object.entries(board.boardState?.items ?? {}))
     .flat()

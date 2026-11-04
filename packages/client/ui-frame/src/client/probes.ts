@@ -1,23 +1,21 @@
 /**
- * The page-level probe surface the live gates reach the client model through.
+ * The probe surface the live gates read the frame's model through.
  *
- * A driver script runs in the page, where the bundle's `require` resolves only
- * registered bundle ids — it cannot reach the Cordis context. Publishing the
- * faces on `globalThis` is the honest door, and this module owns it: the shape
- * is declared once, publication is one call, and removal is scoped to the
- * instance that published it.
- *
- * Adding a probe is adding a field here (and its reader in the gate), not
- * another ad-hoc global with its own declaration, publish and cleanup.
+ * The faces are published through the kit's registry (`publishProbe`): one
+ * object, `globalThis.__pracTest`, one entry per name, instance-scoped cleanup.
+ * A driver script runs in the page and cannot reach the Cordis context, so this
+ * is the door — but adding a probe is a field here plus a reader in the gate, not
+ * another ad-hoc global.
  *
  * @module prac-client-ui-frame/client/probes
  */
 
-import type { BoardLayoutRegistry } from "prac-ui-kit-workbench";
+import { publishProbe } from "prac-ui-kit-workbench";
 
 import type { PracLayoutFace, PracSpacesFace, PracWindowActionsFace } from "./contract.js";
+import type { BoardLayoutRegistry } from "prac-ui-kit-workbench";
 
-/** The faces a gate reads from the page. */
+/** The faces this plugin publishes, by probe name. */
 export interface PracProbes {
   /** The placement model: items, regions, placement and front. */
   readonly frame: PracLayoutFace;
@@ -35,23 +33,15 @@ export interface PracProbes {
   readonly windowActions: PracWindowActionsFace;
 }
 
-declare global {
-  /**
-   * The probe surface, published by the `prac-client-ui-frame` instance that is
-   * installed and removed by the same instance.
-   */
-  var __pracTest: PracProbes | undefined;
-}
-
 /**
- * Publish the probe surface for the page's drivers.
+ * Publish the frame's probes for the page's drivers.
  *
  * @param probes - the faces this instance publishes.
- * @returns cleanup that only removes the object if this instance still owns it.
+ * @returns cleanup for every field this instance published.
  */
 export function publishPracProbes(probes: PracProbes): () => void {
-  globalThis.__pracTest = probes;
+  const disposers = Object.entries(probes).map(([name, value]) => publishProbe(name, value));
   return () => {
-    if (globalThis.__pracTest === probes) delete globalThis.__pracTest;
+    for (const dispose of disposers) dispose();
   };
 }

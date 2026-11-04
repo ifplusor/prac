@@ -39,7 +39,7 @@ const state = () =>
         walk(document);
         return count;
       };
-      const boards = (globalThis.__pracWidgets?.boards?.() ?? []).map((board) =>
+      const boards = (globalThis.__pracTest?.widgets?.boards?.() ?? []).map((board) =>
         typeof board.widgetOrder === "function" ? [...board.widgetOrder()] : [],
       );
       return {

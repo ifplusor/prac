@@ -45,7 +45,7 @@ const state = () =>
         walk(document);
         return count;
       };
-      const boards = (globalThis.__pracWidgets?.boards?.() ?? []).map((board) => ({
+      const boards = (globalThis.__pracTest?.widgets?.boards?.() ?? []).map((board) => ({
         id: board.id,
         widgets: typeof board.widgetOrder === "function" ? [...board.widgetOrder()] : [],
       }));
