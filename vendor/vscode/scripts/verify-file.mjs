@@ -126,7 +126,12 @@ const analyse = async (base64) => {
  *
  * @param phase - the phase's name.
  */
-const step = (phase) => process.stderr.write(`[verify-file] ${phase}\n`);
+let stepStarted = Date.now();
+const step = (phase) => {
+  const now = Date.now();
+  process.stderr.write(`[verify-file] +${((now - stepStarted) / 1000).toFixed(1)}s ${phase}\n`);
+  stepStarted = now;
+};
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
@@ -675,6 +680,8 @@ const copied = await page.evaluate(
 step("focus the group to the left and to the right");
 const focusRegion = async (command) => {
   await page.evaluate((name) => globalThis.__vscodeEmbed.commands.executeCommand(name), command);
+  // The workbench's focus commands are geometry-owned and do not necessarily move
+  // document.activeElement in a single step; a short settle is the honest wait.
   await page.waitForTimeout(2500);
   return page.evaluate(() => {
     const element = document.activeElement;
@@ -711,24 +718,36 @@ const closedOne = await page.evaluate(async (resource) => {
 step("project the frame's active window");
 const activeProjection = await page.evaluate(
   async ({ conversation, file }) => {
-    const wait = () => new Promise((resolve) => setTimeout(resolve, 1600));
+    const face = globalThis.__vscodeEmbed.face;
+    const waitFor = async (predicate, timeout = 3000) => {
+      const deadline = Date.now() + timeout;
+      while (Date.now() < deadline) {
+        if (predicate()) return true;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return false;
+    };
     const front = globalThis.__pracFrame.activeItem();
     if (front !== null && front !== conversation) globalThis.__pracFrame.hide(front);
     globalThis.__pracFrame.setFront(conversation);
-    await wait();
-    const chat = globalThis.__vscodeEmbed.face.activeWindow();
-    const chatOrder = globalThis.__vscodeEmbed.face.windowOrder();
+    await waitFor(() => face.activeWindow() === conversation);
+    const chat = face.activeWindow();
+    const chatOrder = face.windowOrder();
     globalThis.__pracFrame.place(conversation, "right");
-    await wait();
-    const rightOrder = globalThis.__vscodeEmbed.face.windowOrder("right");
-    globalThis.__vscodeEmbed.face.openFile(file);
-    await wait();
+    await waitFor(() => face.windowOrder("right").includes(conversation));
+    const rightOrder = face.windowOrder("right");
+    face.openFile(file);
+    await waitFor(() =>
+      face
+        .listPlacements()
+        .some((placement) => placement.resource === file),
+    );
     globalThis.__pracFrame.hide(conversation);
-    await wait();
-    const hiddenMapped = globalThis.__vscodeEmbed.face.mappedWindows();
+    await waitFor(() => !face.mappedWindows().includes(conversation));
+    const hiddenMapped = face.mappedWindows();
     globalThis.__pracFrame.show(conversation);
     globalThis.__pracFrame.setFront(conversation);
-    await wait();
+    await waitFor(() => face.activeWindow() === conversation);
     return {
       chat,
       frame: globalThis.__pracFrame.activeItem(),

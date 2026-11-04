@@ -168,6 +168,9 @@ async function runGate(name, script, extra = {}) {
     .split("\n")
     .find((entry) => entry.startsWith("OK:") || entry.startsWith("SKIPPED:"));
   process.stdout.write(`${line ?? "no OK line"}\n`);
+  // A gate writes its phase progress to stderr ("so a hang leaves evidence");
+  // forward it, it is short and it carries the step timings.
+  if (result.stderr !== "") process.stderr.write(result.stderr);
   if (result.code === 0) return true;
   // Full output, not a tail: a gate's diagnostics (a probe, a console error, the
   // report JSON) are usually at the front, and a truncated tail is what made a
