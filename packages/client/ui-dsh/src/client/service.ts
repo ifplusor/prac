@@ -5,6 +5,7 @@
  */
 
 import type { Context } from "@deepseek-ai/cordis";
+import type {} from "prac-client-ui-frame/client";
 import {
   DSH_CONVERSATION_VIEW,
   DSH_MAIN_PREFIX,
@@ -17,6 +18,20 @@ import type { PracDshFace } from "./contract.js";
 
 /** Install the DSH adapter service. */
 export function apply(ctx: Context): void {
+  ctx.effect(
+    () =>
+      ctx.pracApplications.register({
+        id: "chat",
+        label: "Chat",
+        instances: "single",
+        defaultRegion: "center",
+      }),
+    "prac-client-ui-dsh: chat app",
+  );
+  ctx.effect(() => {
+    ctx.pracWindows.admit("chat", { windowId: DSH_CONVERSATION_VIEW, title: "Chat" });
+    return () => ctx.pracWindows.close(DSH_CONVERSATION_VIEW);
+  }, "prac-client-ui-dsh: chat window");
   const face: PracDshFace = {
     sidebar: DSH_SIDEBAR_VIEW,
     rightbar: DSH_RIGHTBAR_VIEW,
@@ -29,4 +44,4 @@ export function apply(ctx: Context): void {
 }
 
 export const name = "prac-client-ui-dsh";
-export const inject: readonly string[] = [];
+export const inject: readonly string[] = ["pracApplications", "pracWindows"];

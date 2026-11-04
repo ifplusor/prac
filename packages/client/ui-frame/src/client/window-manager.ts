@@ -208,6 +208,8 @@ export class WindowManager {
     },
   ): void {
     if (this.seat === undefined || this.#seats.has(windowId)) return;
+    const content = app.content?.(windowId);
+    if (content === undefined) return;
     this.#seats.set(
       windowId,
       this.seat.register(
@@ -219,7 +221,7 @@ export class WindowManager {
           ...(app.icon === undefined ? {} : { icon: app.icon }),
           ...(app.paneHeader === undefined ? {} : { paneHeader: app.paneHeader }),
         },
-        app.content(windowId),
+        content,
       ),
     );
   }
@@ -256,7 +258,7 @@ export class WindowManager {
   windowContentFor(windowId: string): (() => ReactNode) | undefined {
     const appId = this.#appOf.get(windowId);
     if (appId === undefined) return undefined;
-    return this.apps.get(appId)?.content(windowId);
+    return this.apps.get(appId)?.content?.(windowId);
   }
 
   /** The first group bound in a region (or a sub-region of it). */

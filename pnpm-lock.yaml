@@ -271,6 +271,9 @@ importers:
       '@deepseek-ai/cordis':
         specifier: 'catalog:'
         version: 4.0.5-alpha.1
+      prac-client-ui-frame:
+        specifier: workspace:*
+        version: link:../ui-frame
 
   packages/client/ui-frame:
     devDependencies:

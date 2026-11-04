@@ -47,7 +47,7 @@ export interface ApplicationDefinition {
    * @param windowId - the window instance id.
    * @returns the component that renders the instance.
    */
-  content(windowId: string): () => ReactNode;
+  content?(windowId: string): () => ReactNode;
 }
 
 /** The application table: who can be launched. */

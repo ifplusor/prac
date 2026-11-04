@@ -26,7 +26,8 @@
     "test": "vp test run"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "catalog:"
+    "@deepseek-ai/cordis": "catalog:",
+    "prac-client-ui-frame": "workspace:*"
   },
   "dsh": {
     "client": {

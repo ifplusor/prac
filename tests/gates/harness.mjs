@@ -154,7 +154,8 @@ export async function openPrac(url, options = {}) {
   try {
     await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
   } catch (error) {
-    process.stderr.write(`frame never rendered; console errors:\n${consoleErrors.join("\n")}\n`);
+    const text = await page.evaluate(() => document.body?.innerText?.slice(0, 1200) ?? "");
+    process.stderr.write(`frame never rendered; console errors:\n${consoleErrors.join("\n")}\nbody:\n${text}\n`);
     throw error;
   }
   // A fresh rig has no workspace; the project picker would make every click hit
