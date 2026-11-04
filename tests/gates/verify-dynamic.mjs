@@ -87,16 +87,16 @@ await page.evaluate((view) => globalThis.__pracFrame?.setFront(view), VIEW);
 await page.evaluate(() =>
   document.querySelector('[data-prac-container="left/container:workbench.view.explorer"]')?.click(),
 );
-await page.waitForTimeout(1200);
-const shown = await state();
+// The container click mounts the host: wait for it rather than for a settle.
+const shown = await waitFor((current) => current.hosts > 0);
 
 await run("prac.gate.hide");
-const hidden = await waitFor((current) => current.catalogue.length === 0);
-await page.waitForTimeout(800);
+const hidden = await waitFor((current) => current.catalogue.length === 0 && current.hosts === 0);
 
 await run("prac.gate.show");
-const shownAgain = await waitFor((current) => current.catalogue.length === 1);
-await page.waitForTimeout(800);
+const shownAgain = await waitFor(
+  (current) => current.catalogue.length === 1 && current.hosts > 0,
+);
 
 await close();
 

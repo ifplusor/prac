@@ -136,6 +136,7 @@ The run prints per-gate wall time at the end. Measured on 2026-11-03:
 | editor:close          | 9s         |
 | grid × 6              | ~6s each   |
 | resize / space        | ~4s each   |
+| dynamic               | 5.3s       |
 | containers            | 7s         |
 | file                  | 60s        |
 | full roster           | ~3.4 min   |
