@@ -151,7 +151,12 @@ export async function openPrac(url, options = {}) {
   // `inert`, which would make every click and every drag below land nowhere.
   await installShellModalAccommodation(page);
   await page.goto(url, { waitUntil: "load", timeout: 60_000 });
-  await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
+  try {
+    await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
+  } catch (error) {
+    process.stderr.write(`frame never rendered; console errors:\n${consoleErrors.join("\n")}\n`);
+    throw error;
+  }
   // A fresh rig has no workspace; the project picker would make every click hit
   // the overlay instead of the frame. Pick the fixture project when present.
   if ((await page.locator("[data-prac-firstrun]").count()) > 0) {

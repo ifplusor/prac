@@ -15,7 +15,7 @@ import { openPrac, report, requireUrl } from "./harness.mjs";
 
 const url = requireUrl();
 const { page, own, close } = await openPrac(url);
-await page.waitForFunction(() => globalThis.__pracVscodeFace !== undefined, null, {
+await page.waitForFunction(() => globalThis.__pracTest?.vscode !== undefined, null, {
   timeout: 30_000,
 });
 // The fixture's command is registered when its extension activates; give the
@@ -50,7 +50,7 @@ const state = () =>
         widgets: typeof board.widgetOrder === "function" ? [...board.widgetOrder()] : [],
       }));
       return {
-        catalogue: globalThis.__pracVscodeFace
+        catalogue: globalThis.__pracTest?.vscode
           ?.catalogue()
           .filter((entry) => entry.view === view || entry.appId === appView),
         frames: globalThis.__pracTest?.frame?.listItems().filter((entry) => entry.id === view) ?? [],
@@ -75,7 +75,7 @@ async function waitFor(predicate) {
 /** Invoke the fixture command; the gate's only control surface. */
 const run = (command) =>
   page.evaluate(async (name) => {
-    const face = globalThis.__pracVscodeFace;
+    const face = globalThis.__pracTest?.vscode;
     if (face === undefined) throw new Error("pracVscode face is not published");
     await face.runCommand(name);
   }, command);

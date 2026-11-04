@@ -4,7 +4,7 @@
  * @module prac-client-ui-widget/client/service
  */
 
-import { publishProbe } from "prac-ui-kit-workbench";
+import { publishProbe } from "prac-ui-kit-workbench/probes";
 import type { Context } from "@deepseek-ai/cordis";
 // Type-only, for the frame plugin's `Context` / `SlotMap` merges.
 import type {} from "prac-client-ui-frame/client";

@@ -16,5 +16,13 @@ export default defineConfig({
         neverBundle: ["react", "react-dom", "prac-ui-kit-content", "prac-ui-kit-layout"],
       },
     },
+    // A subpath entry: the page-probe registry is imported by client bundles that
+    // must not pull the whole kit (and its React surface) into their chunk.
+    {
+      entry: { probes: "src/probes.ts" },
+      format: ["esm"],
+      platform: "browser",
+      outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
+    },
   ],
 });

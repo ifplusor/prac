@@ -230,13 +230,13 @@ const stage = await page.evaluate(
     globalThis.__pracTest?.frame.place(board.windowId, "center");
     globalThis.__pracTest?.frame.setItemBoard(board.windowId, board.boardId);
     await new Promise((resolve) => setTimeout(resolve, 600));
-    globalThis.__pracVscodeFace.mapWindow(board.windowId, "Gate Stage", "center");
+    globalThis.__pracTest?.vscode?.mapWindow(board.windowId, "Gate Stage", "center");
     await new Promise((resolve) => setTimeout(resolve, 1200));
     const result = {
-      mapped: globalThis.__pracVscodeFace.mappedWindows().includes(board.windowId),
+      mapped: globalThis.__pracTest?.vscode?.mappedWindows().includes(board.windowId),
       record: globalThis.__pracTest?.frame.getState().items[board.windowId] ?? null,
     };
-    globalThis.__pracVscodeFace.unmapWindow(board.windowId);
+    globalThis.__pracTest?.vscode?.unmapWindow(board.windowId);
     globalThis.__pracTest?.frame.removeItem(board.windowId);
     board.dispose();
     return result;

@@ -181,7 +181,7 @@ const boardMapped = await page
     (boardId) => {
       const board = globalThis.__pracTest?.widgets?.boards().find((candidate) => candidate.id === boardId);
       return (
-        board !== undefined && globalThis.__pracVscodeFace.mappedWindows().includes(board.windowId)
+        board !== undefined && globalThis.__pracTest?.vscode?.mappedWindows().includes(board.windowId)
       );
     },
     "left/container:workbench.view.explorer",

@@ -13,7 +13,7 @@ const APP_VIEW = "pracGateView";
 
 const url = requireUrl();
 const { page, close } = await openPrac(url);
-await page.waitForFunction(() => globalThis.__pracVscodeFace !== undefined, null, {
+await page.waitForFunction(() => globalThis.__pracTest?.vscode !== undefined, null, {
   timeout: 30_000,
 });
 await page.waitForTimeout(2500);
@@ -44,7 +44,7 @@ const state = () =>
       );
       return {
         catalogue:
-          globalThis.__pracVscodeFace?.catalogue().filter((entry) => entry.view === view) ?? [],
+          globalThis.__pracTest?.vscode?.catalogue().filter((entry) => entry.view === view) ?? [],
         frames: globalThis.__pracTest?.frame?.listItems().filter((entry) => entry.id === view) ?? [],
         owners: boards.filter((widgets) => widgets.includes(view)).length,
         hosts: deepHosts(),
@@ -73,7 +73,7 @@ async function command(id) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     try {
       await page.evaluate(async (commandId) => {
-        await globalThis.__pracVscodeFace.runCommand(commandId);
+        await globalThis.__pracTest?.vscode?.runCommand(commandId);
       }, id);
       return;
     } catch (cause) {

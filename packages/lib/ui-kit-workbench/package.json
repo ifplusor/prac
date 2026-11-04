@@ -15,7 +15,11 @@
       "types": "./dist/index.d.mts",
       "default": "./dist/index.mjs"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./probes": {
+      "types": "./dist/probes.d.mts",
+      "default": "./dist/probes.mjs"
+    }
   },
   "scripts": {
     "build": "vp pack",

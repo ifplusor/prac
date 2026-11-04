@@ -40,6 +40,7 @@ import type {} from "prac-client-ui-frame/client";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
 import type { SlotRegistry } from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { ILayout } from "@deepseek-ai/dsh-client-ui-layout/client";
+import { publishProbe } from "prac-ui-kit-workbench/probes";
 import { createVscodeEmbed } from "prac-vscode-embed/client";
 import { EXTENSIONS_GALLERY } from "prac-vscode";
 import type { PracVscodeFace, VscodeCatalogueEntry } from "./contract.js";
@@ -454,9 +455,10 @@ export function apply(ctx: Context): void {
   }, `${name}: active editor group`);
 
   ctx.effect(() => ctx.provide("pracVscode", face), `${name}: pracVscode service`);
-  // Diagnostics hook: lets a live gate exercise the command path directly,
-  // without pretending a DOM click reached the workbench.
-  (globalThis as { __pracVscodeFace?: PracVscodeFace }).__pracVscodeFace = face;
+  // The page probe: lets a live gate exercise the command path directly, without
+  // pretending a DOM click reached the workbench. Published through the shared
+  // registry, so removal is scoped to this instance (the old assignment leaked).
+  ctx.effect(() => publishProbe("vscode", face), `${name}: page probe`);
 
   // The app's own root goes into the frame's floating layer. Registering it here
   // (and not in a consumer) is the mechanism's business: the layer is where the
