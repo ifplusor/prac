@@ -285,7 +285,7 @@ step("first file");
 const mounted = await measure(uriOf(FILE_A));
 const oneSurface = await liveSurfaces();
 const viewKinds = await page.evaluate(() => {
-  const views = globalThis.__pracFrame.getState().items;
+  const views = globalThis.__pracTest?.frame.getState().items;
   const file = Object.entries(views).find(([id]) => id.startsWith("vscode:file:"));
   // A contributed view lives on its container's **board** now, not in the frame's view table.
   const boards = globalThis.__pracWidgets?.boards?.() ?? [];
@@ -325,7 +325,7 @@ const afterSecond = await liveSurfaces();
 const twoFiles = await tabsOf();
 const frontAudit = await page.evaluate(async (uri) => {
   const before = globalThis.__vscodeEmbed.face.editorModelWriteAudit();
-  globalThis.__pracFrame.setFront(globalThis.__pracFileView(uri));
+  globalThis.__pracTest?.frame.setFront(globalThis.__pracFileView(uri));
   await new Promise((resolve) => setTimeout(resolve, 1600));
   return { before, after: globalThis.__vscodeEmbed.face.editorModelWriteAudit() };
 }, uriOf(FILE_A));
@@ -354,7 +354,7 @@ const activeAfterClick = await page.evaluate(
 // one surface each — VS Code's model, with prac's regions as its grid.
 step("split region");
 await page.evaluate(
-  (resource) => globalThis.__pracFrame.splitItem(globalThis.__pracFileView(resource), "right"),
+  (resource) => globalThis.__pracTest?.frame.splitItem(globalThis.__pracFileView(resource), "right"),
   uriOf(FILE_A),
 );
 await waitForSurface(uriOf(FILE_A));
@@ -363,7 +363,7 @@ const split = await liveSurfaces();
 // …and moving it back leaves one region, so one group shows it again.
 step("merge region");
 await page.evaluate(
-  (resource) => globalThis.__pracFrame.place(globalThis.__pracFileView(resource), "center"),
+  (resource) => globalThis.__pracTest?.frame.place(globalThis.__pracFileView(resource), "center"),
   uriOf(FILE_A),
 );
 await waitForSurface(uriOf(FILE_A));
@@ -453,7 +453,7 @@ if (activeResource === null) throw new Error("no active editor to exercise the c
 // `activate`. Both halves matter: prac's front view and the app's active editor are
 // two states, and the UI keeps them in step through this action.
 await page.evaluate(
-  (resource) => globalThis.__pracFrame.place(globalThis.__pracFileView(resource), "center"),
+  (resource) => globalThis.__pracTest?.frame.place(globalThis.__pracFileView(resource), "center"),
   activeResource,
 );
 await page.waitForTimeout(1500);
@@ -488,7 +488,7 @@ if (surfaceResource === null) {
       children: element.children.length,
       monaco: element.querySelectorAll(".monaco-editor").length,
     })),
-    records: Object.entries(globalThis.__pracFrame.getState().items)
+    records: Object.entries(globalThis.__pracTest?.frame.getState().items)
       .filter(([id]) => id.startsWith("vscode:file:"))
       .map(([id, view]) => `${id.split("/").pop()}@${view.region}${view.hidden ? "(hidden)" : ""}`),
     open: globalThis.__vscodeEmbed.face.listOpenFiles().map((r) => r.split("/").pop()),
@@ -520,7 +520,7 @@ const capabilityUndone = await capability();
 // which also *releases* that file's surface (the seat unmounts), so the app is the
 // only thing left that knows the file is open.
 await page.evaluate((resource) => {
-  globalThis.__pracFrame.hide(globalThis.__pracFileView(resource));
+  globalThis.__pracTest?.frame.hide(globalThis.__pracFileView(resource));
 }, surfaceResource);
 await page.waitForTimeout(1500);
 const capabilityHidden = await capability();
@@ -593,7 +593,7 @@ const reloaded = await page.evaluate(() => ({
     .map((element) => element.getAttribute("data-prac-tab"))
     .filter((id) => id !== null && id.startsWith("vscode:file:")),
   conversationRegion:
-    globalThis.__pracFrame.getState().items["dsh:main:conversation"]?.region ?? null,
+    globalThis.__pracTest?.frame.getState().items["dsh:main:conversation"]?.region ?? null,
 }));
 
 // The unit of a view is the **placement** — a file in one of the app's editor groups
@@ -611,7 +611,7 @@ await page.waitForTimeout(2000);
 // prac owns the region tree, so a group the workbench makes on its own would have no
 // region until the frame renders a view for it.)
 await page.evaluate(
-  (resource) => globalThis.__pracFrame.splitItem(globalThis.__pracFileView(resource), "right"),
+  (resource) => globalThis.__pracTest?.frame.splitItem(globalThis.__pracFileView(resource), "right"),
   uriOf(FILE_B),
 );
 await page.waitForTimeout(3000);
@@ -619,7 +619,7 @@ await page.waitForTimeout(3000);
 // group the app's **active** one — which is what decides whose editor the command copies
 // (a split copies the active editor, and the split just made the other group active).
 await page.evaluate(
-  (resource) => globalThis.__pracFrame.place(globalThis.__pracFileView(resource), "center"),
+  (resource) => globalThis.__pracTest?.frame.place(globalThis.__pracFileView(resource), "center"),
   uriOf(FILE_A),
 );
 await waitForSurface(uriOf(FILE_A));
@@ -727,13 +727,13 @@ const activeProjection = await page.evaluate(
       }
       return false;
     };
-    const front = globalThis.__pracFrame.activeItem();
-    if (front !== null && front !== conversation) globalThis.__pracFrame.hide(front);
-    globalThis.__pracFrame.setFront(conversation);
+    const front = globalThis.__pracTest?.frame.activeItem();
+    if (front !== null && front !== conversation) globalThis.__pracTest?.frame.hide(front);
+    globalThis.__pracTest?.frame.setFront(conversation);
     await waitFor(() => face.activeWindow() === conversation);
     const chat = face.activeWindow();
     const chatOrder = face.windowOrder();
-    globalThis.__pracFrame.place(conversation, "right");
+    globalThis.__pracTest?.frame.place(conversation, "right");
     await waitFor(() => face.windowOrder("right").includes(conversation));
     const rightOrder = face.windowOrder("right");
     face.openFile(file);
@@ -742,15 +742,15 @@ const activeProjection = await page.evaluate(
         .listPlacements()
         .some((placement) => placement.resource === file),
     );
-    globalThis.__pracFrame.hide(conversation);
+    globalThis.__pracTest?.frame.hide(conversation);
     await waitFor(() => !face.mappedWindows().includes(conversation));
     const hiddenMapped = face.mappedWindows();
-    globalThis.__pracFrame.show(conversation);
-    globalThis.__pracFrame.setFront(conversation);
+    globalThis.__pracTest?.frame.show(conversation);
+    globalThis.__pracTest?.frame.setFront(conversation);
     await waitFor(() => face.activeWindow() === conversation);
     return {
       chat,
-      frame: globalThis.__pracFrame.activeItem(),
+      frame: globalThis.__pracTest?.frame.activeItem(),
       fileView: globalThis.__pracFileView(file),
       fileActive: globalThis.__vscodeEmbed.face.activeWindow(),
       chatOrder,
@@ -766,15 +766,15 @@ const activeProjection = await page.evaluate(
 step("audit the window projection writes");
 const projectionAudit = await page.evaluate(async () => {
   const before = globalThis.__vscodeEmbed.face.projectionWriteAudit();
-  globalThis.__pracFrame.setFront(globalThis.__pracFrame.activeItem());
+  globalThis.__pracTest?.frame.setFront(globalThis.__pracTest?.frame.activeItem());
   await new Promise((resolve) => setTimeout(resolve, 1400));
   return { before, after: globalThis.__vscodeEmbed.face.projectionWriteAudit() };
 });
 
 step("close the conversation tab");
 const closedChat = await page.evaluate(async (conversation) => {
-  if (globalThis.__pracFrame.getState().items[conversation]?.region !== "center") {
-    globalThis.__pracFrame.place(conversation, "center");
+  if (globalThis.__pracTest?.frame.getState().items[conversation]?.region !== "center") {
+    globalThis.__pracTest?.frame.place(conversation, "center");
     await new Promise((resolve) => setTimeout(resolve, 1200));
   }
   const button = globalThis.__deep.one(`[data-prac-tab-close="${conversation}"]`);
@@ -784,21 +784,21 @@ const closedChat = await page.evaluate(async (conversation) => {
   return {
     clicked: true,
     mapped: globalThis.__vscodeEmbed.face.mappedWindows(),
-    hidden: globalThis.__pracFrame.getState().items[conversation]?.hidden === true,
+    hidden: globalThis.__pracTest?.frame.getState().items[conversation]?.hidden === true,
   };
 }, "dsh:main:conversation");
 step("preview survives close/reopen conversation");
 const previewAfterReopen = await page.evaluate(
   async ({ conversation, file }) => {
     const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    globalThis.__pracFrame.show(conversation);
-    globalThis.__pracFrame.setFront(conversation);
+    globalThis.__pracTest?.frame.show(conversation);
+    globalThis.__pracTest?.frame.setFront(conversation);
     await wait(1200);
     const close = globalThis.__deep.one(`[data-prac-tab-close="${conversation}"]`);
     close?.click();
     await wait(1200);
-    globalThis.__pracFrame.show(conversation);
-    globalThis.__pracFrame.setFront(conversation);
+    globalThis.__pracTest?.frame.show(conversation);
+    globalThis.__pracTest?.frame.setFront(conversation);
     await wait(1200);
     globalThis.__vscodeEmbed.face.openPreviewFile(file);
     await wait(2200);

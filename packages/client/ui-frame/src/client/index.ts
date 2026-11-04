@@ -65,41 +65,15 @@ import { workspaceScope } from "prac-ui-kit-content";
 
 import type { Context } from "@deepseek-ai/cordis";
 import type { ThemeSnapshot } from "@deepseek-ai/dsh-client-ui-theme/client";
-import type {
-  PracLayoutFace,
-  PracSpacesFace,
-  PracWindowActionsFace,
-  WindowActionModel,
-} from "./contract.js";
+import type { PracSpacesFace, PracWindowActionsFace, WindowActionModel } from "./contract.js";
 import { createFrame, ensureStyles } from "./frame.js";
 import { createServices } from "./services.js";
 
 import { createFrameStore, createSpaceStore } from "./store.js";
 import { WindowGroupAdapter } from "./window-group-adapter.js";
+import { publishPracProbes } from "./probes.js";
 import { ThemePresenter } from "./theme.js";
 
-declare global {
-  /**
-   * Page-level probe the verification drivers reach the layout face through
-   * (`vendor/vscode/scripts/verify-{layout,items}.mjs` read it).
-   *
-   * Published by this module's `apply`; removal is scoped to the instance that
-   * published it.
-   */
-  var __pracFrame: PracLayoutFace | undefined;
-  /** The board layout registry, for the live gates / a page-level probe. */
-  var __pracBoardLayouts: import("prac-ui-kit-workbench").BoardLayoutRegistry | undefined;
-  /** The Space registry, for the live gates / a page-level probe. */
-  var __pracSpaces: PracSpacesFace | undefined;
-  /**
-   * The window-actions face, for the live gates / a page-level probe.
-   *
-   * Gates wait on the **model event** (`subscribe` + `get`) rather than on the
-   * rendered buttons: a tab strip can be present a frame before its actions are
-   * published, and waiting on the DOM then measures the renderer's timing.
-   */
-  var __pracWindowActions: PracWindowActionsFace | undefined;
-}
 import { WIDGET_SLOT, WINDOW_SLOT, readDeclaredViewIds } from "./catalogue.js";
 
 /**
@@ -353,21 +327,18 @@ export function apply(ctx: Context): void {
     const stopSlots = ([WINDOW_SLOT, WIDGET_SLOT] as const).map((slot) =>
       ctx.slots.subscribe(slot, bumpCatalogue),
     );
-    // A page-level probe for verification: the bundle's `require` resolves
-    // only registered bundle ids, so a driver script cannot reach the
-    // Cordis context. Publishing the face is the minimal honest door —
-    // removal is scoped to the instance we published.
-    globalThis.__pracFrame = pracFrame;
-    // The board layout registry, published for the live gates (a board's state is not
-    // reachable through the frame's view table).
-    globalThis.__pracBoardLayouts = boardLayouts;
-    globalThis.__pracSpaces = pracSpaces;
-    globalThis.__pracWindowActions = windowActions;
+    // The page-level probe surface: the bundle's `require` resolves only
+    // registered bundle ids, so a driver script cannot reach the Cordis
+    // context. Probes are published through one module; removal is scoped to
+    // the instance that published them.
+    const disposeProbes = publishPracProbes({
+      frame: pracFrame,
+      boardLayouts,
+      spaces: pracSpaces,
+      windowActions,
+    });
     return () => {
-      if (globalThis.__pracFrame === pracFrame) delete globalThis.__pracFrame;
-      if (globalThis.__pracBoardLayouts === boardLayouts) delete globalThis.__pracBoardLayouts;
-      if (globalThis.__pracSpaces === pracSpaces) delete globalThis.__pracSpaces;
-      if (globalThis.__pracWindowActions === windowActions) delete globalThis.__pracWindowActions;
+      disposeProbes();
       for (const stop of stopSlots) stop();
       offMain();
       disposeWindowActions();

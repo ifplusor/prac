@@ -32,7 +32,7 @@ const read = () =>
     const root = host?.shadowRoot;
     return {
       window: board === undefined ? null : board.state.active,
-      record: globalThis.__pracFrame.getState().items[`${boardId}/board`] ?? null,
+      record: globalThis.__pracTest?.frame.getState().items[`${boardId}/board`] ?? null,
       order: board === undefined ? [] : [...board.widgetOrder()],
       active: board === undefined ? undefined : board.content.activeWidget,
       rows:
@@ -83,8 +83,8 @@ const dragBoard = await page.evaluate(async () => {
   const board = globalThis.__pracWidgets.createBoardWindow("gate:drag-board", "Drag");
   board.addWidget("gate:drag-a");
   board.addWidget("gate:drag-b");
-  globalThis.__pracFrame.place(board.windowId, "center");
-  globalThis.__pracFrame.setItemBoard(board.windowId, board.boardId);
+  globalThis.__pracTest?.frame.place(board.windowId, "center");
+  globalThis.__pracTest?.frame.setItemBoard(board.windowId, board.boardId);
   await new Promise((resolve) => setTimeout(resolve, 800));
   const host = document.querySelector(`[data-prac-view-id="${board.windowId}"]`);
   const root = host?.shadowRoot;
@@ -132,7 +132,7 @@ const dragBoard = await page.evaluate(async () => {
     hasWidget: board.hasWidget("gate:drag-b"),
     prevented: dragPrevented,
   };
-  globalThis.__pracFrame.removeItem(board.windowId);
+  globalThis.__pracTest?.frame.removeItem(board.windowId);
   board.dispose();
   return result;
 });
@@ -142,8 +142,8 @@ const dragBoard = await page.evaluate(async () => {
 const crossDrag = await page.evaluate(async (targetBoardId) => {
   const source = globalThis.__pracWidgets.createBoardWindow("gate:drag-cross", "Cross");
   source.addWidget("gate:cross-a");
-  globalThis.__pracFrame.place(source.windowId, "center");
-  globalThis.__pracFrame.setItemBoard(source.windowId, source.boardId);
+  globalThis.__pracTest?.frame.place(source.windowId, "center");
+  globalThis.__pracTest?.frame.setItemBoard(source.windowId, source.boardId);
   await new Promise((resolve) => setTimeout(resolve, 800));
   const target = globalThis.__pracWidgets.boards().find((board) => board.id === targetBoardId);
   const host =
@@ -179,7 +179,7 @@ const crossDrag = await page.evaluate(async (targetBoardId) => {
     sourceHas = source.hasWidget("gate:cross-a");
     target.removeWidget("gate:cross-a");
   }
-  globalThis.__pracFrame.removeItem(source.windowId);
+  globalThis.__pracTest?.frame.removeItem(source.windowId);
   source.dispose();
   return { targetHas, sourceHas };
 }, BOARD);
@@ -220,24 +220,24 @@ const stage = await page.evaluate(
   async ({ uri }) => {
     await globalThis.__vscodeEmbed.face.openFile(uri);
     for (let attempt = 0; attempt < 80; attempt += 1) {
-      const fileId = Object.keys(globalThis.__pracFrame.getState().items).find((id) =>
+      const fileId = Object.keys(globalThis.__pracTest?.frame.getState().items).find((id) =>
         id.startsWith("vscode:file:"),
       );
       if (fileId !== undefined) break;
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
     const board = globalThis.__pracWidgets.createBoardWindow("gate:stage-board", "Gate Stage");
-    globalThis.__pracFrame.place(board.windowId, "center");
-    globalThis.__pracFrame.setItemBoard(board.windowId, board.boardId);
+    globalThis.__pracTest?.frame.place(board.windowId, "center");
+    globalThis.__pracTest?.frame.setItemBoard(board.windowId, board.boardId);
     await new Promise((resolve) => setTimeout(resolve, 600));
     globalThis.__pracVscodeFace.mapWindow(board.windowId, "Gate Stage", "center");
     await new Promise((resolve) => setTimeout(resolve, 1200));
     const result = {
       mapped: globalThis.__pracVscodeFace.mappedWindows().includes(board.windowId),
-      record: globalThis.__pracFrame.getState().items[board.windowId] ?? null,
+      record: globalThis.__pracTest?.frame.getState().items[board.windowId] ?? null,
     };
     globalThis.__pracVscodeFace.unmapWindow(board.windowId);
-    globalThis.__pracFrame.removeItem(board.windowId);
+    globalThis.__pracTest?.frame.removeItem(board.windowId);
     board.dispose();
     return result;
   },
@@ -308,7 +308,7 @@ report({
       JSON.stringify(restored.order) === JSON.stringify(initial.order) &&
       restored.active === initial.active,
     "no prac-owned console errors":
-      own("__pracFrame").length === 0 && own("__pracWidgets").length === 0,
+      own("__pracTest").length === 0 && own("__pracWidgets").length === 0,
   },
   ok: "OK: the Explorer board window owns widget order / active / add / remove and renders them",
 });

@@ -22,7 +22,7 @@ import { writeFixtures } from "./gate-fixtures.mjs";
  * @param view - the view id to open.
  */
 async function unfold(view) {
-  await page.evaluate((id) => globalThis.__pracFrame.setItemCollapsed(id, false), view);
+  await page.evaluate((id) => globalThis.__pracTest?.frame.setItemCollapsed(id, false), view);
   await page.waitForTimeout(600);
 }
 
@@ -103,7 +103,7 @@ if (stackSpot !== null) await press(stackSpot);
 await unfold("vscode:view:timeline");
 // A section that starts folded comes back at its floor; give it room the way a person would drag it
 // open, so the pane has somewhere to render (the claim itself is a face call, not a layout guess).
-await page.evaluate((id) => globalThis.__pracFrame.setItemSize(id, 320), "vscode:view:timeline");
+await page.evaluate((id) => globalThis.__pracTest?.frame.setItemSize(id, 320), "vscode:view:timeline");
 await page.waitForTimeout(800);
 const withAlpha = await timeline();
 

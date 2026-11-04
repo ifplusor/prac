@@ -29,7 +29,7 @@ that was wrong instead of a 30-second timeout.
 
 What to wait on, in order of preference:
 
-1. **the model** the assertion reads — `__pracFrame.listItems()` / `activeItem()`
+1. **the model** the assertion reads — `__pracTest.frame.listItems()` / `activeItem()`
    / `listRegions()`, or a capability snapshot (`editorActions()`,
    `capabilities.editors.snapshot()`);
 2. **a stable DOM fact** — a tab exists, a surface has a non-zero box and text;
@@ -49,7 +49,7 @@ Every live check is one of two kinds:
 
 - **behaviour** — a person can see it: a surface with text, a tab that activates,
   a fold that persists, a clean console.
-- **probe** — it reads an internal: `__pracFrame.listItems()`, the slot registry,
+- **probe** — it reads an internal: `__pracTest.frame.listItems()`, the slot registry,
   the embed face, a DOM shape.
 
 Probes are allowed: some contracts (a window per placement, the projection order)

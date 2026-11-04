@@ -12,7 +12,7 @@ await clearLayoutState(page);
 await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForSelector("[data-prac-grid-cell]", { timeout: 60_000 });
-await page.evaluate((view) => globalThis.__pracFrame.splitItem(view, "right"), CONVERSATION);
+await page.evaluate((view) => globalThis.__pracTest?.frame.splitItem(view, "right"), CONVERSATION);
 await page.waitForTimeout(1500);
 
 await page.keyboard.press("Control+Alt+KeyV");
@@ -59,7 +59,7 @@ await page.keyboard.press("Escape");
 await page.waitForTimeout(1200);
 
 const placed = await page.evaluate((view) => {
-  const record = globalThis.__pracFrame.getState().items[view];
+  const record = globalThis.__pracTest?.frame.getState().items[view];
   return record === undefined ? null : { region: record.region, hidden: record.hidden };
 }, VIEW);
 
@@ -67,7 +67,7 @@ await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForSelector("[data-prac-grid-cell]", { timeout: 60_000 });
 const restored = await page.evaluate((view) => {
-  const record = globalThis.__pracFrame.getState().items[view];
+  const record = globalThis.__pracTest?.frame.getState().items[view];
   return record === undefined ? null : { region: record.region, hidden: record.hidden };
 }, VIEW);
 

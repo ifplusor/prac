@@ -12,16 +12,16 @@ await clearLayoutState(page);
 await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForSelector("[data-prac-grid-cell]", { timeout: 60_000 });
-await page.evaluate((view) => globalThis.__pracFrame.splitItem(view, "right"), CONVERSATION);
+await page.evaluate((view) => globalThis.__pracTest?.frame.splitItem(view, "right"), CONVERSATION);
 await page.waitForTimeout(1500);
 
 const target = await page.evaluate(
   () =>
-    globalThis.__pracFrame
+    globalThis.__pracTest?.frame
       .listRegions()
       .map((region) => region.id)
       .find((id) => id !== "center" && id.startsWith("center/")) ??
-    globalThis.__pracFrame
+    globalThis.__pracTest?.frame
       .listRegions()
       .map((region) => region.id)
       .find((id) => id.startsWith("region-")),
@@ -53,7 +53,7 @@ await page.evaluate(
 );
 await page.waitForTimeout(1200);
 const placed = await page.evaluate((view) => {
-  const record = globalThis.__pracFrame.getState().items[view];
+  const record = globalThis.__pracTest?.frame.getState().items[view];
   return record === undefined ? null : { region: record.region, hidden: record.hidden };
 }, CONVERSATION);
 
@@ -61,7 +61,7 @@ await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForSelector("[data-prac-grid-cell]", { timeout: 60_000 });
 const restored = await page.evaluate((view) => {
-  const record = globalThis.__pracFrame.getState().items[view];
+  const record = globalThis.__pracTest?.frame.getState().items[view];
   return record === undefined ? null : { region: record.region, hidden: record.hidden };
 }, CONVERSATION);
 

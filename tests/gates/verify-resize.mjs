@@ -202,7 +202,7 @@ const checks = {
   // 5. A double click on the boundary evens the two blocks out.
   resetEvensesThePair: Math.abs((reset.left?.w ?? 0) - (reset.center?.w ?? 0)) <= 1,
   noErrors:
-    own("__pracFrame").length === 0 &&
+    own("__pracTest").length === 0 &&
     own("prac-client-ui-frame").length === 0 &&
     own("vscode-embed:").length === 0,
 };

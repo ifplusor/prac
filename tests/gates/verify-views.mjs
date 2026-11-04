@@ -27,7 +27,7 @@ const catalogue = await page.evaluate(() => ({
   rows: [...document.querySelectorAll("[data-prac-recall-row]")].map((row) =>
     row.getAttribute("data-prac-recall-row"),
   ),
-  views: globalThis.__pracFrame
+  views: globalThis.__pracTest?.frame
     .listItems()
     .filter((view) => view.kind !== "widget")
     .map((view) => view.id),
@@ -42,19 +42,19 @@ const catalogue = await page.evaluate(() => ({
 // view table, so the recall surface must not offer them (a second home would double-render).
 const target = "dsh:main:conversation";
 const before = await page.evaluate(
-  (id) => globalThis.__pracFrame.listItems().find((view) => view.id === id),
+  (id) => globalThis.__pracTest?.frame.listItems().find((view) => view.id === id),
   target,
 );
 await page.click(`[data-prac-recall-toggle="${target}"]`);
 await page.waitForTimeout(500);
 const hidden = await page.evaluate(
-  (id) => globalThis.__pracFrame.listItems().find((view) => view.id === id),
+  (id) => globalThis.__pracTest?.frame.listItems().find((view) => view.id === id),
   target,
 );
 await page.click(`[data-prac-recall-toggle="${target}"]`);
 await page.waitForTimeout(500);
 const restored = await page.evaluate(
-  (id) => globalThis.__pracFrame.listItems().find((view) => view.id === id),
+  (id) => globalThis.__pracTest?.frame.listItems().find((view) => view.id === id),
   target,
 );
 
@@ -79,7 +79,7 @@ report({
     "show restores it": restored?.hidden !== true,
     "Escape closes the surface": closed,
     "no prac-owned console errors":
-      own("__pracFrame").length === 0 && own("prac-client-ui-frame").length === 0,
+      own("__pracTest").length === 0 && own("prac-client-ui-frame").length === 0,
   },
   ok: "OK: the recall surface opens, lists the catalogue, hides / shows a view, and closes with Escape",
 });

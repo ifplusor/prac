@@ -11,7 +11,7 @@ const { page, close } = await openPrac(url);
 
 async function settle() {
   await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
-  await page.waitForFunction(() => !!globalThis.__pracFrame, null, { timeout: 60_000 });
+  await page.waitForFunction(() => !!globalThis.__pracTest?.frame, null, { timeout: 60_000 });
   // The stage's regions are what this gate reads; wait for one to be laid out.
   await until(
     page,
@@ -26,7 +26,7 @@ async function settle() {
 
 const stage = () =>
   page.evaluate(() => {
-    const state = globalThis.__pracFrame.getState();
+    const state = globalThis.__pracTest?.frame.getState();
     const find = (node, id) => {
       if (node.id === id) return node;
       for (const child of node.children ?? []) {
@@ -51,19 +51,19 @@ const leftWidth = () =>
 
 const spaces = () =>
   page.evaluate(() => ({
-    list: globalThis.__pracSpaces.list(),
-    active: globalThis.__pracSpaces.active(),
+    list: globalThis.__pracTest?.spaces.list(),
+    active: globalThis.__pracTest?.spaces.active(),
   }));
 
 await clearLayoutState(page);
 await page.reload({ waitUntil: "load" });
 await settle();
 
-await page.evaluate((view) => globalThis.__pracFrame.splitItem(view, "right"), CONVERSATION);
+await page.evaluate((view) => globalThis.__pracTest?.frame.splitItem(view, "right"), CONVERSATION);
 await until(
   page,
   () => {
-    const state = globalThis.__pracFrame.getState();
+    const state = globalThis.__pracTest?.frame.getState();
     const find = (node, id) => {
       if (node.id === id) return node;
       for (const child of node.children ?? []) {
@@ -80,7 +80,7 @@ await until(
   null,
   { timeout: 10_000 },
 );
-await page.evaluate(() => globalThis.__pracFrame.setWidth("left", 340));
+await page.evaluate(() => globalThis.__pracTest?.frame.setWidth("left", 340));
 await until(
   page,
   () => {
@@ -92,8 +92,8 @@ await until(
 );
 
 const first = { stage: await stage(), left: await leftWidth(), spaces: await spaces() };
-const created = await page.evaluate(() => globalThis.__pracSpaces.create("Space 2"));
-await until(page, (id) => globalThis.__pracSpaces.list().length === 2 && globalThis.__pracSpaces.active() === id, created, {
+const created = await page.evaluate(() => globalThis.__pracTest?.spaces.create("Space 2"));
+await until(page, (id) => globalThis.__pracTest?.spaces.list().length === 2 && globalThis.__pracTest?.spaces.active() === id, created, {
   timeout: 5000,
 });
 const second = { stage: await stage(), left: await leftWidth(), spaces: await spaces() };
@@ -102,8 +102,8 @@ await page.reload({ waitUntil: "load" });
 await settle();
 const reloaded = { stage: await stage(), left: await leftWidth(), spaces: await spaces() };
 
-await page.evaluate((id) => globalThis.__pracSpaces.switchTo(id), first.spaces.active);
-await until(page, (id) => globalThis.__pracSpaces.active() === id, first.spaces.active, {
+await page.evaluate((id) => globalThis.__pracTest?.spaces.switchTo(id), first.spaces.active);
+await until(page, (id) => globalThis.__pracTest?.spaces.active() === id, first.spaces.active, {
   timeout: 5000,
 });
 const back = { stage: await stage(), left: await leftWidth(), spaces: await spaces() };

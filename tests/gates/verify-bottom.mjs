@@ -31,7 +31,7 @@ await page.waitForTimeout(1500);
 // everything it placed — the region and its container children.
 await page.waitForFunction(
   (bottom) =>
-    Object.values(globalThis.__pracFrame.getState().items).some((record) =>
+    Object.values(globalThis.__pracTest?.frame.getState().items).some((record) =>
       (record.region ?? "").startsWith(`${bottom}/`),
     ),
   BOTTOM,
@@ -55,10 +55,10 @@ async function emptyTheBar() {
     await page.evaluate((bottom) => {
       // A container's surface is a board window record; the widget views live on the
       // board, so emptying the bar means hiding the records the frame actually has.
-      for (const [id, record] of Object.entries(globalThis.__pracFrame.getState().items)) {
+      for (const [id, record] of Object.entries(globalThis.__pracTest?.frame.getState().items)) {
         const region = record.region ?? "";
         if (region === bottom || region.startsWith(`${bottom}/`)) {
-          globalThis.__pracFrame.hide(id);
+          globalThis.__pracTest?.frame.hide(id);
         }
       }
     }, BOTTOM);
@@ -124,8 +124,8 @@ const initial = await sample();
 // Fill the bar: place the view, then open the region.
 await page.evaluate(
   ({ bottom, view }) => {
-    globalThis.__pracFrame.place(view, bottom);
-    globalThis.__pracFrame.setCollapsed(bottom, false);
+    globalThis.__pracTest?.frame.place(view, bottom);
+    globalThis.__pracTest?.frame.setCollapsed(bottom, false);
   },
   { bottom: BOTTOM, view: VIEW },
 );
@@ -141,7 +141,7 @@ await page.waitForTimeout(800);
 const shortcutOpen = await sample();
 
 // Collapse it again: the row takes the room back.
-await page.evaluate((bottom) => globalThis.__pracFrame.setCollapsed(bottom, true), BOTTOM);
+await page.evaluate((bottom) => globalThis.__pracTest?.frame.setCollapsed(bottom, true), BOTTOM);
 await page.waitForTimeout(800);
 const collapsed = await sample();
 
@@ -182,7 +182,7 @@ const checks = {
     (collapsed.bottom?.h ?? 0) <= 2 && near(collapsed.stage?.h, initial.stage?.h, 8),
   // Only this feature's own failures; the page's known noise is not ours.
   noErrors:
-    own("__pracFrame").length === 0 &&
+    own("__pracTest").length === 0 &&
     own("prac-client-ui-frame").length === 0 &&
     own("vscode-embed:").length === 0,
 };

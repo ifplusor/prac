@@ -71,7 +71,7 @@ const state = async () =>
           active: entry.active,
         }),
       ),
-      frameViews: (globalThis.__pracFrame?.listItems() ?? [])
+      frameViews: (globalThis.__pracTest?.frame?.listItems() ?? [])
         .filter((view) => view.id.includes(uri))
         .map((view) => ({ id: view.id, region: view.region, hidden: view.hidden, front: view.front })),
     };

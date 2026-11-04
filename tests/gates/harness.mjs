@@ -168,7 +168,7 @@ export async function openPrac(url, options = {}) {
     }
     await page.waitForTimeout(1000);
   }
-  await page.waitForFunction(() => !!globalThis.__pracFrame, null, { timeout: 60_000 });
+  await page.waitForFunction(() => !!globalThis.__pracTest?.frame, null, { timeout: 60_000 });
   lastConsoleErrors = consoleErrors;
   return {
     browser,

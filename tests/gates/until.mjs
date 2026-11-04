@@ -52,7 +52,7 @@ export function windowActionsReady(page, view, { timeout = 5000 } = {}) {
   return page.evaluate(
     ({ view: id, timeout: bound }) =>
       new Promise((resolve) => {
-        const face = globalThis.__pracWindowActions;
+        const face = globalThis.__pracTest?.windowActions;
         if (face === undefined) return resolve(false);
         const ready = () => face.get(id) !== undefined;
         if (ready()) return resolve(true);

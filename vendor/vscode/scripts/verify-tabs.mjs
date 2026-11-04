@@ -73,7 +73,7 @@ await installDeepDom(page);
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face && !!globalThis.__deep, null, {
   timeout: 60_000,
 });
-await until(page, () => globalThis.__pracFrame.listRegions().length > 0, null, { timeout: 10_000 });
+await until(page, () => globalThis.__pracTest?.frame.listRegions().length > 0, null, { timeout: 10_000 });
 await page.waitForTimeout(200);
 
 /**
@@ -91,7 +91,7 @@ const facts = () =>
       tabs: [...globalThis.__deep.all("[data-prac-tab]")]
         .map((tab) => (tab.getAttribute("data-prac-tab") ?? "").split("/").pop())
         .filter((name) => ["a.txt", "b.txt", "c.txt"].includes(name ?? "")),
-      front: (globalThis.__pracFrame.activeItem() ?? "").split("/").pop(),
+      front: (globalThis.__pracTest?.frame.activeItem() ?? "").split("/").pop(),
       surface: (surface?.getAttribute("data-vscode-embed-file") ?? "").split("/").pop() ?? null,
       app: (
         globalThis.__vscodeEmbed.face.capabilities.editors.snapshot().find((entry) => entry.active)
@@ -111,7 +111,7 @@ const facts = () =>
 const tabIdOf = (file) =>
   page.evaluate(
     (name) =>
-      globalThis.__pracFrame
+      globalThis.__pracTest?.frame
         .listItems()
         .map((view) => view.id)
         .find((id) => id.startsWith("vscode:file:") && id.endsWith(name)) ?? null,
@@ -148,7 +148,7 @@ for (const file of [A, B, C]) {
 await until(
   page,
   () =>
-    (globalThis.__pracFrame.activeItem() ?? "").endsWith("c.txt") &&
+    (globalThis.__pracTest?.frame.activeItem() ?? "").endsWith("c.txt") &&
     globalThis.__deep
       .all("[data-vscode-embed-file]")
       .some(
@@ -170,7 +170,7 @@ await page.click(`[data-prac-tab="${bView}"]`);
 await until(
   page,
   (name) =>
-    (globalThis.__pracFrame.activeItem() ?? "").endsWith(name) &&
+    (globalThis.__pracTest?.frame.activeItem() ?? "").endsWith(name) &&
     globalThis.__deep
       .all("[data-vscode-embed-file]")
       .some(
@@ -193,7 +193,7 @@ await page.evaluate(
 await until(
   page,
   (name) =>
-    (globalThis.__pracFrame.activeItem() ?? "").endsWith(name) &&
+    (globalThis.__pracTest?.frame.activeItem() ?? "").endsWith(name) &&
     globalThis.__deep
       .all("[data-vscode-embed-file]")
       .some(
@@ -236,15 +236,15 @@ const dragAuditAfter = await page.evaluate(() =>
 );
 
 step("split via the tab-strip action");
-const regionsBefore = await page.evaluate(() => globalThis.__pracFrame.listRegions().length);
+const regionsBefore = await page.evaluate(() => globalThis.__pracTest?.frame.listRegions().length);
 await page
   .locator('[data-prac-window-action="workbench.action.splitEditor"]')
   .first()
   .click();
-await until(page, (before) => globalThis.__pracFrame.listRegions().length > before, regionsBefore, {
+await until(page, (before) => globalThis.__pracTest?.frame.listRegions().length > before, regionsBefore, {
   timeout: 10_000,
 });
-const regionsAfter = await page.evaluate(() => globalThis.__pracFrame.listRegions().length);
+const regionsAfter = await page.evaluate(() => globalThis.__pracTest?.frame.listRegions().length);
 const splitActionHosts = await page.evaluate(
   () => globalThis.__deep.all("[data-prac-window-actions]").length,
 );

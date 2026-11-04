@@ -171,7 +171,7 @@ async function sample(page) {
         };
       };
       const host = globalThis.__deep.one(editorHost);
-      const state = globalThis.__pracFrame.getState();
+      const state = globalThis.__pracTest?.frame.getState();
       const sizes = {};
       const walk = (node) => {
         if (node.type === "region") sizes[node.id] = { size: node.size, collapsed: node.collapsed };
@@ -209,7 +209,7 @@ async function sample(page) {
         // conversation a view like any other it moves, so a gate that cares
         // about "the track stayed alive" has to read the placement, not infer it.
         conversationRegion:
-          globalThis.__pracFrame?.getState?.().items?.["dsh:main:conversation"]?.region ?? null,
+          globalThis.__pracTest?.frame?.getState?.().items?.["dsh:main:conversation"]?.region ?? null,
         overlay: box(globalThis.__deep.one("[data-prac-recall]")),
         strip: !!globalThis.__deep.one("[data-prac-focus-strip]"),
         rows: [...globalThis.__deep.all(rowSelector)].map((element) => ({
@@ -232,8 +232,8 @@ async function sample(page) {
           document
             .querySelector("[data-prac-recall-selected]")
             ?.getAttribute("data-prac-recall-row") ?? null,
-        catalogue: globalThis.__pracFrame.listItems(),
-        regionInfos: globalThis.__pracFrame.listRegions(),
+        catalogue: globalThis.__pracTest?.frame.listItems(),
+        regionInfos: globalThis.__pracTest?.frame.listRegions(),
         catalogueVersion: state.catalogueVersion,
         modelSizes: sizes,
         modelViews: state.items,
@@ -297,18 +297,18 @@ await page.waitForTimeout(3000);
 
 const probeReady = await page.evaluate(
   () =>
-    typeof globalThis.__pracFrame?.listItems === "function" &&
-    typeof globalThis.__pracFrame?.listRegions === "function" &&
-    typeof globalThis.__pracFrame?.place === "function" &&
-    typeof globalThis.__pracFrame?.hide === "function" &&
-    typeof globalThis.__pracFrame?.show === "function" &&
-    typeof globalThis.__pracFrame?.splitItem === "function",
+    typeof globalThis.__pracTest?.frame?.listItems === "function" &&
+    typeof globalThis.__pracTest?.frame?.listRegions === "function" &&
+    typeof globalThis.__pracTest?.frame?.place === "function" &&
+    typeof globalThis.__pracTest?.frame?.hide === "function" &&
+    typeof globalThis.__pracTest?.frame?.show === "function" &&
+    typeof globalThis.__pracTest?.frame?.splitItem === "function",
 );
-if (!probeReady) throw new Error("globalThis.__pracFrame is missing the catalogue/placement face");
+if (!probeReady) throw new Error("globalThis.__pracTest?.frame is missing the catalogue/placement face");
 
 const FILE_VIEW = await page.evaluate(
   (prefix) =>
-    globalThis.__pracFrame
+    globalThis.__pracTest?.frame
       .listItems()
       .map((view) => view.id)
       .find((id) => id.startsWith(prefix)) ?? null,

@@ -37,7 +37,7 @@ import { installDeepDom } from "./deep-dom.mjs";
  * @param view - the view id to open.
  */
 async function unfold(view) {
-  await page.evaluate((id) => globalThis.__pracFrame.setItemCollapsed(id, false), view);
+  await page.evaluate((id) => globalThis.__pracTest?.frame.setItemCollapsed(id, false), view);
   await page.waitForTimeout(600);
 }
 
@@ -168,7 +168,7 @@ async function opened(fixture) {
     await unfold("vscode:view:outline");
     // A section that starts folded comes back at its floor; give it room the way a person would drag it
     // open, so the pane has somewhere to render (the claim itself is a face call, not a layout guess).
-    await page.evaluate((id) => globalThis.__pracFrame.setItemSize(id, 320), "vscode:view:outline");
+    await page.evaluate((id) => globalThis.__pracTest?.frame.setItemSize(id, 320), "vscode:view:outline");
     await page.waitForTimeout(800);
     const facts = await outline();
     if (facts.symbols.filter((row) => row !== "").length >= wanted) return facts;
@@ -193,7 +193,7 @@ async function focusFirstFixture() {
   const viewOf = (fixture) =>
     page.evaluate((resource) => globalThis.__pracFileView(resource), uriOf(fixture));
   const fileViews = () =>
-    globalThis.__pracFrame
+    globalThis.__pracTest?.frame
       .listItems()
       .filter((entry) => entry.id.startsWith("vscode:file:"))
       .map(
@@ -205,12 +205,12 @@ async function focusFirstFixture() {
   // on whichever file was opened last and prove nothing.
   const others = [await viewOf(FIXTURES.delta), await viewOf(FIXTURES.typescript)];
   await page.evaluate((views) => {
-    for (const view of views) globalThis.__pracFrame.place(view, "right");
+    for (const view of views) globalThis.__pracTest?.frame.place(view, "right");
   }, others);
   await page.waitForTimeout(3000);
   const spot = await page.evaluate(
     (view) => {
-      const region = globalThis.__pracFrame.listItems().find((entry) => entry.id === view)?.region;
+      const region = globalThis.__pracTest?.frame.listItems().find((entry) => entry.id === view)?.region;
       const host = region
         ? document.querySelector(`[data-prac-region="${region}"] [data-prac-view-host]`)
         : null;

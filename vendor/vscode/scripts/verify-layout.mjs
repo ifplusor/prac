@@ -13,7 +13,7 @@
  * host's clip, decode it in the page, count distinct colours, and compare against
  * the same clip with the host hidden.
  *
- * The layout mechanism is driven from the page through `globalThis.__pracFrame`
+ * The layout mechanism is driven from the page through `globalThis.__pracTest?.frame`
  * (see the comment in `prac-client-ui-frame/src/client.ts`): a DSH client bundle's
  * `require` resolves only registered bundle ids, so a driver script cannot reach
  * the Cordis context any other way. `split`/`setCollapsed` are the mechanism's
@@ -150,7 +150,7 @@ async function sample(page, fileView) {
       };
 
       const host = globalThis.__deep.one("[data-vscode-embed-file]");
-      const state = globalThis.__pracFrame?.getState?.();
+      const state = globalThis.__pracTest?.frame?.getState?.();
       const regionOf = (node, id) => {
         if (!node) return null;
         if (node.type === "region") return node.id === id ? node : null;
@@ -262,16 +262,16 @@ await page.waitForTimeout(3000);
 
 const probeReady = await page.evaluate(
   () =>
-    typeof globalThis.__pracFrame?.splitItem === "function" &&
-    typeof globalThis.__pracFrame?.setCollapsed === "function" &&
-    typeof globalThis.__pracFrame?.place === "function",
+    typeof globalThis.__pracTest?.frame?.splitItem === "function" &&
+    typeof globalThis.__pracTest?.frame?.setCollapsed === "function" &&
+    typeof globalThis.__pracTest?.frame?.place === "function",
 );
 if (!probeReady)
-  throw new Error("globalThis.__pracFrame is not reachable; the page probe is missing");
+  throw new Error("globalThis.__pracTest?.frame is not reachable; the page probe is missing");
 
 const fileView = await page.evaluate(
   (prefix) =>
-    globalThis.__pracFrame
+    globalThis.__pracTest?.frame
       .listItems()
       .map((view) => view.id)
       .find((id) => id.startsWith(prefix)) ?? null,
@@ -281,7 +281,7 @@ if (!fileView) throw new Error("no file view was declared after opening a file")
 
 /** Call one method on the plugin's own layout face. */
 const act = (name, ...args) =>
-  page.evaluate(({ method, params }) => globalThis.__pracFrame[method](...params), {
+  page.evaluate(({ method, params }) => globalThis.__pracTest?.frame[method](...params), {
     method: name,
     params: args,
   });

@@ -82,7 +82,7 @@ report({
     "clicking again reopens the file tree":
       fileOf(reopened)?.collapsed === false && (fileOf(reopened)?.body ?? 0) > 0,
     "no prac-owned console errors":
-      own("__pracFrame").length === 0 && own("prac-client-ui-frame").length === 0,
+      own("__pracTest").length === 0 && own("prac-client-ui-frame").length === 0,
   },
   ok: "OK: the Explorer stack has its rows, the header folds, and reopening restores the body",
 });

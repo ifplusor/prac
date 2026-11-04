@@ -20,7 +20,7 @@ const { page, close } = await openPrac(url);
 
 async function settle() {
   await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
-  await page.waitForFunction(() => !!globalThis.__pracFrame, null, { timeout: 60_000 });
+  await page.waitForFunction(() => !!globalThis.__pracTest?.frame, null, { timeout: 60_000 });
   await page.waitForTimeout(1200);
 }
 
@@ -77,7 +77,7 @@ const initial = await sample();
 
 await page.evaluate(
   ({ left, view, width, boardId }) => {
-    globalThis.__pracFrame.setWidth(left, width);
+    globalThis.__pracTest?.frame.setWidth(left, width);
     const board = globalThis.__pracWidgets.boards().find((candidate) => candidate.id === boardId);
     board.content.setWidgetCollapsed(view, true);
   },
