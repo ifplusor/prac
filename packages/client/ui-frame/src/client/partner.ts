@@ -70,12 +70,64 @@ export function createPartnerRegistry(ctx: Context): PracPartnersFace {
             });
           }
         };
+        // Apps the partner contributes: register each definition once and keep the
+        // windows it asks for open in step (open on appearance, close on removal).
+        const apps = new Map<string, { dispose: () => void; windows: Set<string> }>();
+        const syncApps = (): void => {
+          const wanted = new Map(
+            (partner.applications?.() ?? []).map((app) => [app.id, app] as const),
+          );
+          for (const [id, record] of Array.from(apps)) {
+            const app = wanted.get(id);
+            if (app !== undefined && app.windows().length > 0) continue;
+            for (const windowId of record.windows) ctx.pracWindows.close(windowId);
+            record.dispose();
+            apps.delete(id);
+          }
+          for (const app of wanted.values()) {
+            let record = apps.get(app.id);
+            if (record === undefined) {
+              record = {
+                dispose: ctx.pracApplications.register({
+                  id: app.id,
+                  label: app.label,
+                  instances: app.instances,
+                  ...(app.defaultRegion === undefined ? {} : { defaultRegion: app.defaultRegion }),
+                  ...(app.paneHeader === true ? { paneHeader: true } : {}),
+                  content: (windowId) => app.content(windowId),
+                }),
+                windows: new Set(),
+              };
+              apps.set(app.id, record);
+            }
+            const open = new Set(app.windows().map((window) => window.id));
+            for (const windowId of record.windows) {
+              if (open.has(windowId)) continue;
+              ctx.pracWindows.close(windowId);
+              record.windows.delete(windowId);
+            }
+            for (const window of app.windows()) {
+              if (record.windows.has(window.id)) continue;
+              ctx.pracWindows.admit(app.id, { windowId: window.id, title: window.title });
+              record.windows.add(window.id);
+            }
+          }
+        };
         sync();
-        const stop = partner.onDidChange(sync);
+        syncApps();
+        const stop = partner.onDidChange(() => {
+          sync();
+          syncApps();
+        });
         return () => {
           stop();
           for (const { dispose } of registered.values()) dispose();
           registered.clear();
+          for (const record of apps.values()) {
+            for (const windowId of record.windows) ctx.pracWindows.close(windowId);
+            record.dispose();
+          }
+          apps.clear();
         };
       });
     },

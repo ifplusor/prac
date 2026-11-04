@@ -36,6 +36,7 @@ import type {
 } from "prac-client-vscode-host/client";
 import type {
   PracLayoutFace,
+  PracPartnersFace,
   PracWindowActionsFace,
   WindowAction,
   WindowActionModel,
@@ -54,8 +55,6 @@ export function apply(ctx: Context): void {
   // The mechanism comes from the service registry; naming its published face here
   // is what keeps this slot's use of it checked.
   const host: PracVscodeFace = ctx.pracVscode;
-  const applications = ctx.pracApplications;
-  const windows = ctx.pracWindows;
   const windowActions: PracWindowActionsFace = ctx.pracWindowActions;
   // The type-only import and the ambient merge can come through different
   // declaration copies (vscode-host bundles its own), so cast at the boundary.
@@ -236,47 +235,35 @@ export function apply(ctx: Context): void {
       stopClose();
     };
   }, "prac-client-ui-vscode-editor: chrome + active editor");
+  // The editor app and its windows go through the partner contract: the adapter
+  // says which instances exist (one per open file placement) and what one renders;
+  // the runner registers the app and opens / closes the windows.
+  const partners: PracPartnersFace = ctx.pracPartners;
   ctx.effect(
     () =>
-      applications.register({
-        id: "editor",
-        label: "Editor",
-        instances: "multi",
-        defaultRegion: "center",
-        paneHeader: true,
-        content: (windowId) => host.hostFor(windowId) ?? (() => null),
+      partners.register({
+        name: "vscode-editor",
+        contributions: () => [],
+        onDidChange: (listener: () => void) => host.onDidChangeCatalogue(listener),
+        hostFor: (id: string) => host.hostFor(id) ?? (() => null),
+        applications: () => [
+          {
+            id: "editor",
+            label: "Editor",
+            instances: "multi",
+            defaultRegion: "center",
+            paneHeader: true,
+            content: (windowId: string) => host.hostFor(windowId) ?? (() => null),
+            windows: () => fileEntries().map(({ view, title }) => ({ id: view, title })),
+          },
+        ],
       }),
-    "prac-client-ui-vscode-editor: editor app",
+    "prac-client-ui-vscode-editor: editor app + windows",
   );
-  ctx.effect(() => {
-    const sync = (): void => {
-      const entries = fileEntries();
-      const wanted = new Set(entries.map((entry) => entry.view));
-      for (const info of windows.windows("editor")) {
-        if (wanted.has(info.id)) continue;
-        windows.close(info.id);
-      }
-      for (const { view, title } of entries) {
-        windows.admit("editor", { windowId: view, title });
-      }
-    };
-    sync();
-    const stop = host.onDidChangeCatalogue(sync);
-    return () => {
-      stop();
-      for (const info of windows.windows("editor")) windows.close(info.id);
-    };
-  }, "prac-client-ui-vscode-editor: one window per open file");
 }
 
 /** The cordis plugin name used by loader diagnostics. */
 export const name = "prac-client-ui-vscode-editor";
 
 /** The DSH services this plugin needs: the app + window faces, the mechanism and the layout. */
-export const inject = [
-  "pracApplications",
-  "pracWindows",
-  "pracVscode",
-  "pracFrame",
-  "pracWindowActions",
-];
+export const inject = ["pracPartners", "pracVscode", "pracFrame", "pracWindowActions"];
