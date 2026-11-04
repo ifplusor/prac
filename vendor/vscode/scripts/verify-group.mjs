@@ -14,6 +14,7 @@
  */
 import { createRequire } from "node:module";
 import { installDeepDom, waitDeep } from "./deep-dom.mjs";
+import { until } from "../../../tests/gates/until.mjs";
 import { writeFixtures } from "./gate-fixtures.mjs";
 
 const require = createRequire("/Volumes/Dev/prac/prac-dev/.build/vscode/package.json");
@@ -93,7 +94,25 @@ await installDeepDom(page);
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 90_000 });
 await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), FILE.uri);
 await waitDeep(page, "[data-vscode-embed-file] .monaco-editor");
-await page.waitForTimeout(5000);
+// The starting case is one group with one painted surface; wait for the model
+// to agree instead of letting it settle for 5s.
+await until(
+  page,
+  (uri) => {
+    const face = globalThis.__vscodeEmbed.face;
+    const placements = face.listPlacements().filter((placement) => placement.resource === uri);
+    const lines = globalThis.__deep
+      .all(`[data-vscode-embed-file="${uri}"]`)
+      .map((element) => element.querySelectorAll(".view-line").length);
+    return (
+      placements.length === 1 &&
+      globalThis.__pracFileViews(uri).length === 1 &&
+      (lines[0] ?? 0) > 0
+    );
+  },
+  FILE.uri,
+  { timeout: 10_000 },
+);
 const before = await state();
 
 const commandRan = await page
@@ -108,7 +127,32 @@ const commandRan = await page
     }
   })
   .catch((error) => `threw: ${String(error).slice(0, 120)}`);
-await page.waitForTimeout(4000);
+await until(
+  page,
+  (uri) =>
+    globalThis.__vscodeEmbed.face
+      .listPlacements()
+      .filter((placement) => placement.resource === uri).length === 2,
+  FILE.uri,
+  { timeout: 10_000 },
+);
+// Two placements can exist before the new region has geometry; the directional
+// focus commands read that geometry, so wait for both regions to have a box.
+await until(
+  page,
+  () => {
+    const regions = globalThis.__deep.all("[data-prac-region]");
+    return (
+      regions.length >= 2 &&
+      regions.every((region) => {
+        const box = region.getBoundingClientRect();
+        return box.width > 0 && box.height > 0;
+      })
+    );
+  },
+  null,
+  { timeout: 10_000 },
+);
 const after = await state();
 
 // The focus commands are geometry too: LEFT/RIGHT have to land in the region that sits there.
@@ -117,8 +161,21 @@ for (const [side, command] of [
   ["left", "workbench.action.focusLeftGroup"],
   ["right", "workbench.action.focusRightGroup"],
 ]) {
+  const previous = (await state()).activeRegion;
   await page.evaluate((name) => globalThis.__vscodeEmbed.commands.executeCommand(name), command);
-  await page.waitForTimeout(2500);
+  await until(
+    page,
+    (previousRegion) => {
+      const element = document.activeElement;
+      const region = element ? globalThis.__deep.closest(element, "[data-prac-region]") : null;
+      return (
+        region !== null &&
+        (region.getAttribute("data-prac-region") ?? null) !== previousRegion
+      );
+    },
+    previous,
+    { timeout: 5000 },
+  );
   focused[side] = (await state()).activeRegion;
 }
 
@@ -143,15 +200,38 @@ const focusAndTyping = await page.evaluate((view) => {
 // (`closeEmptyGroups`); in prac that means removing the **region**, which is what this pair of
 // assertions locks. Without it the empty group stayed on screen with no way to close it, and —
 // because it held the active-editor slot — the next split silently did nothing.
+const beforeClose = await page.evaluate(
+  (uri) =>
+    globalThis.__vscodeEmbed.face
+      .listPlacements()
+      .filter((placement) => placement.resource === uri).length,
+  FILE.uri,
+);
 await page.evaluate(() =>
   globalThis.__vscodeEmbed.commands.executeCommand("workbench.action.closeActiveEditor"),
 );
-await page.waitForTimeout(3000);
+await until(
+  page,
+  ({ uri, before }) =>
+    globalThis.__vscodeEmbed.face
+      .listPlacements()
+      .filter((placement) => placement.resource === uri).length < before,
+  { uri: FILE.uri, before: beforeClose },
+  { timeout: 10_000 },
+);
 const emptied = await state();
 await page.evaluate(() =>
   globalThis.__vscodeEmbed.commands.executeCommand("workbench.action.splitEditorToNextGroup"),
 );
-await page.waitForTimeout(3000);
+await until(
+  page,
+  (uri) =>
+    globalThis.__vscodeEmbed.face
+      .listPlacements()
+      .filter((placement) => placement.resource === uri).length > 1,
+  FILE.uri,
+  { timeout: 10_000 },
+);
 const splitAgain = await state();
 
 // 2d. A **temporary** (preview) editor is temporary in its own group only. `Open to the Side`
@@ -162,7 +242,15 @@ await page.evaluate(
   (uri) => globalThis.__vscodeEmbed.commands.executeCommand("vscode.open", uri, { preview: true }),
   FILE.uri,
 );
-await page.waitForTimeout(2500);
+await until(
+  page,
+  () =>
+    globalThis.__deep
+      .all("[data-prac-tab]")
+      .some((tab) => tab.getAttribute("data-prac-tab-preview") === "true"),
+  null,
+  { timeout: 5000 },
+);
 const readPreviewTabs = () =>
   page.evaluate(() =>
     globalThis.__deep
@@ -179,7 +267,13 @@ await page.evaluate(
   (uri) => globalThis.__vscodeEmbed.commands.executeCommand("explorer.openToSide", uri),
   FILE.uri,
 );
-await page.waitForTimeout(3500);
+const tabsBefore = await readPreviewTabs();
+await until(
+  page,
+  (count) => globalThis.__deep.all("[data-prac-tab]").length > count,
+  tabsBefore.length,
+  { timeout: 5000 },
+);
 const afterSide = await readPreviewTabs();
 
 await browser.close();

@@ -132,8 +132,10 @@ The run prints per-gate wall time at the end. Measured on 2026-11-03:
 | --------------------- | ---------- |
 | stack / split / views | ~5.5s each |
 | tabs                  | 5s         |
+| editor:group          | 24s        |
+| editor:close          | 9s         |
 | file                  | 65s        |
-| full roster           | ~4.3 min   |
+| full roster           | ~4 min     |
 
 The dominant cost was **fixed sleeps**: the roster had ~177
 `page.waitForTimeout(…)` calls (~236s of pure waiting). Condition waits cut

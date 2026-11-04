@@ -23,6 +23,7 @@ import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { installDeepDom } from "./deep-dom.mjs";
+import { until } from "../../../tests/gates/until.mjs";
 import { writeFixtures } from "./gate-fixtures.mjs";
 
 const packageDir = resolve(import.meta.dirname, "..");
@@ -73,7 +74,7 @@ await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face && !!globalThi
   timeout: 60_000,
 });
 // The editor must be able to open at all before any of this means anything.
-await page.waitForTimeout(5000);
+await until(page, () => globalThis.__pracFrame.listRegions().length > 0, null, { timeout: 10_000 });
 
 /** The state this gate is about: what is open, what is dirty, what is being asked. */
 const state = () =>
@@ -134,6 +135,20 @@ async function clickButton(label) {
 
 /** Focus the editor and type one character, so the file has unsaved changes. */
 async function makeDirty() {
+  // The placement exists before its surface is laid out; typing needs the body.
+  await until(
+    page,
+    (uri) => {
+      const element = globalThis.__deep
+        .all(`[data-vscode-embed-file="${uri}"]`)
+        .find((candidate) => candidate.querySelector(".monaco-editor"));
+      if (element === undefined) return false;
+      const box = element.getBoundingClientRect();
+      return box.width > 0 && box.height > 0;
+    },
+    DIRTY.uri,
+    { timeout: 10_000 },
+  );
   const spot = await page.evaluate((uri) => {
     const element = globalThis.__deep
       .all(`[data-vscode-embed-file="${uri}"]`)
@@ -144,12 +159,28 @@ async function makeDirty() {
   if (spot === null) throw new Error("no visible editor to type into");
   await page.mouse.click(spot.x, spot.y);
   await page.keyboard.type("x");
-  await page.waitForTimeout(1200);
+  await until(
+    page,
+    (uri) =>
+      globalThis.__vscodeEmbed.face.capabilities.editors
+        .snapshot()
+        .some((entry) => entry.resource === uri && entry.dirty),
+    DIRTY.uri,
+    { timeout: 5000 },
+  );
 }
 
 step("open the fixture");
 await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), DIRTY.uri);
-await page.waitForTimeout(3000);
+await until(
+  page,
+  (uri) =>
+    globalThis.__vscodeEmbed.face
+      .listPlacements()
+      .some((placement) => placement.resource === uri),
+  DIRTY.uri,
+  { timeout: 10_000 },
+);
 const opened = await state();
 
 step("type into it");
@@ -161,12 +192,16 @@ await page.evaluate((uri) => {
   const placement = globalThis.__vscodeEmbed.face.listPlacements().find((p) => p.resource === uri);
   globalThis.__vscodeEmbed.face.capabilities.editors.actions.close(placement.placement, uri);
 }, DIRTY.uri);
-await page.waitForTimeout(2000);
+await until(page, () => globalThis.__deep.one(".monaco-dialog-box") !== undefined, null, {
+  timeout: 10_000,
+});
 const asked = await state();
 
 step("cancel");
 const cancelled = await clickButton("Cancel");
-await page.waitForTimeout(1500);
+await until(page, () => globalThis.__deep.one(".monaco-dialog-box") === undefined, null, {
+  timeout: 5000,
+});
 const afterCancel = await state();
 
 step("close again and discard");
@@ -174,10 +209,20 @@ await page.evaluate((uri) => {
   const placement = globalThis.__vscodeEmbed.face.listPlacements().find((p) => p.resource === uri);
   globalThis.__vscodeEmbed.face.capabilities.editors.actions.close(placement.placement, uri);
 }, DIRTY.uri);
-await page.waitForTimeout(2000);
+await until(page, () => globalThis.__deep.one(".monaco-dialog-box") !== undefined, null, {
+  timeout: 10_000,
+});
 const askedAgain = await state();
 const discarded = await clickButton("Don't Save");
-await page.waitForTimeout(2000);
+await until(
+  page,
+  (uri) =>
+    !globalThis.__vscodeEmbed.face
+      .listPlacements()
+      .some((placement) => placement.resource === uri),
+  DIRTY.uri,
+  { timeout: 10_000 },
+);
 const afterDiscard = await state();
 
 await browser.close();
