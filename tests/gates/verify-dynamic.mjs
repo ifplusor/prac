@@ -34,7 +34,9 @@ const state = () =>
         const walk = (root) => {
           for (const element of root.querySelectorAll("*")) {
             if (element.shadowRoot) {
-              count += element.shadowRoot.querySelectorAll(`[data-vscode-embed-view="${appView}"]`).length;
+              count += element.shadowRoot.querySelectorAll(
+                `[data-vscode-embed-view="${appView}"]`,
+              ).length;
               walk(element.shadowRoot);
             }
           }
@@ -45,8 +47,7 @@ const state = () =>
       };
       const boards = (globalThis.__pracWidgets?.boards?.() ?? []).map((board) => ({
         id: board.id,
-        widgets:
-          typeof board.widgetOrder === "function" ? [...board.widgetOrder()] : [],
+        widgets: typeof board.widgetOrder === "function" ? [...board.widgetOrder()] : [],
       }));
       return {
         catalogue: globalThis.__pracVscodeFace

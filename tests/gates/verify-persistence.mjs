@@ -40,7 +40,9 @@ const sample = () =>
       const row = rows.find(
         (candidate) => candidate.getAttribute("data-prac-stack-entry") === view,
       );
-      const board = globalThis.__pracWidgets?.boards?.().find((candidate) => candidate.id === boardId);
+      const board = globalThis.__pracWidgets
+        ?.boards?.()
+        .find((candidate) => candidate.id === boardId);
       const tree = board?.boardState?.tree;
       return {
         leftWidth: region ? Math.round(region.getBoundingClientRect().width) : null,

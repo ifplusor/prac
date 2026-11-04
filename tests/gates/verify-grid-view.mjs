@@ -11,9 +11,9 @@ const { page, close } = await openPrac(url);
 await clearLayoutState(page);
 await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
-await page.waitForTimeout(2500);
+await page.waitForSelector("[data-prac-grid-cell]", { timeout: 60_000 });
 await page.evaluate((view) => globalThis.__pracFrame.splitItem(view, "right"), CONVERSATION);
-await page.waitForTimeout(1200);
+await page.waitForTimeout(1500);
 
 await page.keyboard.press("Control+Alt+KeyV");
 await page.waitForSelector(`[data-prac-recall-row="${VIEW}"]`, { timeout: 10_000 });
@@ -65,7 +65,7 @@ const placed = await page.evaluate((view) => {
 
 await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
-await page.waitForTimeout(2500);
+await page.waitForSelector("[data-prac-grid-cell]", { timeout: 60_000 });
 const restored = await page.evaluate((view) => {
   const record = globalThis.__pracFrame.getState().items[view];
   return record === undefined ? null : { region: record.region, hidden: record.hidden };

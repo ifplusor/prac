@@ -88,9 +88,10 @@ const dragBoard = await page.evaluate(async () => {
   await new Promise((resolve) => setTimeout(resolve, 800));
   const host = document.querySelector(`[data-prac-view-id="${board.windowId}"]`);
   const root = host?.shadowRoot;
-  const zones = root === null || root === undefined
-    ? []
-    : [...root.querySelectorAll("[data-prac-widget-drop]")];
+  const zones =
+    root === null || root === undefined
+      ? []
+      : [...root.querySelectorAll("[data-prac-widget-drop]")];
   const before = board.content.get().items["gate:drag-b"]?.region ?? null;
   const beforeOrder = board.content.get().items["gate:drag-b"]?.order ?? null;
   const target = zones.find((zone) => zone.getAttribute("data-prac-widget-drop") !== before);
@@ -145,9 +146,10 @@ const crossDrag = await page.evaluate(async (targetBoardId) => {
   globalThis.__pracFrame.setItemBoard(source.windowId, source.boardId);
   await new Promise((resolve) => setTimeout(resolve, 800));
   const target = globalThis.__pracWidgets.boards().find((board) => board.id === targetBoardId);
-  const host = target === undefined
-    ? null
-    : document.querySelector(`[data-prac-view-id="${target.windowId}"]`);
+  const host =
+    target === undefined
+      ? null
+      : document.querySelector(`[data-prac-view-id="${target.windowId}"]`);
   const targetRoot = host?.shadowRoot;
   const zone = targetRoot?.querySelector("[data-prac-widget-drop]") ?? null;
   let targetHas = false;
@@ -214,30 +216,33 @@ const moved = await page.evaluate(() => {
 const [stageFixture] = writeFixtures("board-stage", url, [
   { name: "stage.md", body: (token) => `# stage ${token}\n` },
 ]);
-const stage = await page.evaluate(async ({ uri }) => {
-  await globalThis.__vscodeEmbed.face.openFile(uri);
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    const fileId = Object.keys(globalThis.__pracFrame.getState().items).find((id) =>
-      id.startsWith("vscode:file:"),
-    );
-    if (fileId !== undefined) break;
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  const board = globalThis.__pracWidgets.createBoardWindow("gate:stage-board", "Gate Stage");
-  globalThis.__pracFrame.place(board.windowId, "center");
-  globalThis.__pracFrame.setItemBoard(board.windowId, board.boardId);
-  await new Promise((resolve) => setTimeout(resolve, 600));
-  globalThis.__pracVscodeFace.mapWindow(board.windowId, "Gate Stage", "center");
-  await new Promise((resolve) => setTimeout(resolve, 1200));
-  const result = {
-    mapped: globalThis.__pracVscodeFace.mappedWindows().includes(board.windowId),
-    record: globalThis.__pracFrame.getState().items[board.windowId] ?? null,
-  };
-  globalThis.__pracVscodeFace.unmapWindow(board.windowId);
-  globalThis.__pracFrame.removeItem(board.windowId);
-  board.dispose();
-  return result;
-}, { uri: stageFixture.uri });
+const stage = await page.evaluate(
+  async ({ uri }) => {
+    await globalThis.__vscodeEmbed.face.openFile(uri);
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      const fileId = Object.keys(globalThis.__pracFrame.getState().items).find((id) =>
+        id.startsWith("vscode:file:"),
+      );
+      if (fileId !== undefined) break;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    const board = globalThis.__pracWidgets.createBoardWindow("gate:stage-board", "Gate Stage");
+    globalThis.__pracFrame.place(board.windowId, "center");
+    globalThis.__pracFrame.setItemBoard(board.windowId, board.boardId);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    globalThis.__pracVscodeFace.mapWindow(board.windowId, "Gate Stage", "center");
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const result = {
+      mapped: globalThis.__pracVscodeFace.mappedWindows().includes(board.windowId),
+      record: globalThis.__pracFrame.getState().items[board.windowId] ?? null,
+    };
+    globalThis.__pracVscodeFace.unmapWindow(board.windowId);
+    globalThis.__pracFrame.removeItem(board.windowId);
+    board.dispose();
+    return result;
+  },
+  { uri: stageFixture.uri },
+);
 
 await page.evaluate(
   ({ boardId, order, active }) => {

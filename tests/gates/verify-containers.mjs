@@ -148,7 +148,9 @@ const boardMapped = await page
   .waitForFunction(
     (boardId) => {
       const board = globalThis.__pracWidgets.boards().find((candidate) => candidate.id === boardId);
-      return board !== undefined && globalThis.__pracVscodeFace.mappedWindows().includes(board.windowId);
+      return (
+        board !== undefined && globalThis.__pracVscodeFace.mappedWindows().includes(board.windowId)
+      );
     },
     "left/container:workbench.view.explorer",
     { timeout: 15_000 },

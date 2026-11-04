@@ -12,7 +12,7 @@ const { page, close } = await openPrac(url);
 await clearLayoutState(page);
 await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
-await page.waitForTimeout(2500);
+await page.waitForSelector("[data-prac-grid-cell]", { timeout: 60_000 });
 
 await page.evaluate((view) => globalThis.__pracFrame.splitItem(view, "right"), CONVERSATION);
 await page.waitForTimeout(1500);
@@ -66,7 +66,7 @@ const moved = await cells();
 
 await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
-await page.waitForTimeout(2500);
+await page.waitForSelector("[data-prac-grid-cell]", { timeout: 60_000 });
 const restored = await cells();
 
 await close();

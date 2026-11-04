@@ -91,9 +91,7 @@ if (phase === "absent") {
 } else {
   await command("prac.gate.show");
   await activateView();
-  await waitFor(
-    (value) => value.catalogue.length === 1 && value.owners === 1 && value.hosts > 0,
-  );
+  await waitFor((value) => value.catalogue.length === 1 && value.owners === 1 && value.hosts > 0);
   facts = await state();
 }
 
