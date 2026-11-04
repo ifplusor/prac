@@ -20,6 +20,8 @@ application 层还不存在：window 记录里只有 `appId` 字符串（`prac.b
 
 ### 1 `PracPartner`：伙伴向 prac 贡献什么
 
+伙伴**有且只有两个**：VS Code 与 DSH。每个伙伴是**一组插件**，不是一个插件：`ui-vscode-views` 与 `ui-vscode-editor` 都注册为 `"vscode"` 伙伴的 provider，DSH 的 host 注册为 `"dsh"` 的 provider。runner 按 name 归组，但不把不同插件的贡献当成不同伙伴——`ctx.pracPartners.partners()` 只应列出 `vscode` / `dsh`。
+
 VS Code 与 DSH 是 prac 的两个**基座伙伴**：它们向 prac 贡献功能（views / slots 与它们的内容），prac 只拥有组合。
 
 ```ts
@@ -36,7 +38,7 @@ interface PracContribution {
 }
 
 interface PracPartner {
-  readonly name: string;                                   // "vscode" | "dsh"
+  readonly name: "vscode" | "dsh";                          // 两个基座伙伴；一个伙伴可由多个插件注册
   contributions(): readonly PracContribution[];            // 现在贡献了什么
   onDidChange(listener: () => void): () => void;           // 何时变
   /** 一项贡献的内容。每次**注册**解析一次，不在每次渲染时调用。 */

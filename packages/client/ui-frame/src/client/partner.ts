@@ -33,9 +33,18 @@ const shapeOf = (contribution: PracContribution): string =>
  * @returns the registry; `register` returns a disposer for one partner.
  */
 export function createPartnerRegistry(ctx: Context): PracPartnersFace {
+  /** The plugins joined to each base partner (one partner may span plugins). */
+  const joined = new Map<string, Set<PracPartner>>();
   return {
     register(partner: PracPartner): () => void {
-      return ctx.slots.inject(WIDGET_SLOT, () => {
+      const providers = joined.get(partner.name) ?? new Set<PracPartner>();
+      providers.add(partner);
+      joined.set(partner.name, providers);
+      const leave = (): void => {
+        providers.delete(partner);
+        if (providers.size === 0) joined.delete(partner.name);
+      };
+      const dispose = ctx.slots.inject(WIDGET_SLOT, () => {
         const registered = new Map<string, { shape: string; dispose: () => void }>();
         const sync = (): void => {
           const contributions = partner
@@ -78,8 +87,10 @@ export function createPartnerRegistry(ctx: Context): PracPartnersFace {
             (partner.applications?.() ?? []).map((app) => [app.id, app] as const),
           );
           for (const [id, record] of Array.from(apps)) {
-            const app = wanted.get(id);
-            if (app !== undefined && app.windows().length > 0) continue;
+            // An app lives as long as the partner still lists it; its having no
+            // open window right now is normal (a file app between files), not a
+            // reason to unregister it.
+            if (wanted.has(id)) continue;
             for (const windowId of record.windows) ctx.pracWindows.close(windowId);
             record.dispose();
             apps.delete(id);
@@ -130,6 +141,15 @@ export function createPartnerRegistry(ctx: Context): PracPartnersFace {
           apps.clear();
         };
       });
+      return () => {
+        leave();
+        dispose();
+      };
     },
+    partners: () =>
+      [...joined.entries()].map(([name, providers]) => ({
+        name: name as PracPartner["name"],
+        providers: providers.size,
+      })),
   };
 }

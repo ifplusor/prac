@@ -160,7 +160,8 @@ export interface PracPartnerApplication {
 
 /** A base partner (VS Code, DSH) and how prac reads what it contributes. */
 export interface PracPartner {
-  readonly name: string;
+  /** Which base partner this plugin contributes to. */
+  readonly name: PracPartnerName;
   contributions(): readonly PracContribution[];
   onDidChange(listener: () => void): () => void;
   /**
@@ -176,9 +177,18 @@ export interface PracPartner {
   applications?(): readonly PracPartnerApplication[];
 }
 
+/**
+ * The base partners. There are exactly two, and each is a **group of plugins**
+ * (VS Code: the views and editor plugins; DSH: its host), not one plugin.
+ */
+export type PracPartnerName = "vscode" | "dsh";
+
 /** The partner registry the frame provides. */
 export interface PracPartnersFace {
+  /** Join a base partner; several plugins may register under the same name. */
   register(partner: PracPartner): () => void;
+  /** The base partners currently joined, with their provider count. */
+  partners(): readonly { readonly name: PracPartnerName; readonly providers: number }[];
 }
 
 export interface PracWindowActionsFace {

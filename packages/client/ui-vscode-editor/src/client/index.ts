@@ -242,7 +242,7 @@ export function apply(ctx: Context): void {
   ctx.effect(
     () =>
       partners.register({
-        name: "vscode-editor",
+        name: "vscode",
         contributions: () => [],
         onDidChange: (listener: () => void) => host.onDidChangeCatalogue(listener),
         hostFor: (id: string) => host.hostFor(id) ?? (() => null),
