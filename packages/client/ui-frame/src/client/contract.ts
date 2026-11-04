@@ -15,6 +15,8 @@ import type {
   ItemFlags,
   RegionInfo,
 } from "prac-ui-kit-content";
+import type { ReactNode } from "react";
+
 import type { RegionChild, RegionSelector, Side } from "prac-ui-kit-layout";
 /**
  * The frame plugin's DSH contract.
@@ -93,6 +95,8 @@ declare module "@deepseek-ai/cordis" {
     pracSpaces: PracSpacesFace;
     /** The active window's resolved actions, rendered in the tab strip. */
     pracWindowActions: PracWindowActionsFace;
+    /** The partner registry: a base partner contributes app / widget entries. */
+    pracPartners: PracPartnersFace;
     /** The frame's surface socket registry. */
     pracSurfaces: RegionContentRegistry<WindowGroup>;
   }
@@ -122,6 +126,45 @@ export interface WindowActionModel {
 }
 
 /** The frame's window-action registry (keyed by view id). */
+/** One thing a base partner contributes to prac. */
+export interface PracContribution {
+  /** Global id (`vscode:view:*`, `dsh:main:*`, `vscode:file:*`). */
+  readonly id: string;
+  /**
+   * `app` — the contribution opens windows through the application layer;
+   * `widget` — it is a composable unit a board renders. A window is prac's
+   * **instance**, never the partner's unit of contribution.
+   */
+  readonly kind: "app" | "widget";
+  readonly label?: string;
+  readonly icon?: string;
+  /** The content brings its own native header; the frame must not draw a second row. */
+  readonly paneHeader?: boolean;
+  /** The contribution's own actions; they ride the registration (not a separate seat). */
+  readonly actions?: () => ReactNode;
+}
+
+/** A base partner (VS Code, DSH) and how prac reads what it contributes. */
+export interface PracPartner {
+  readonly name: string;
+  contributions(): readonly PracContribution[];
+  onDidChange(listener: () => void): () => void;
+  /**
+   * One contribution's content.
+   *
+   * Resolved once per **registration**, never per render: a fresh component on
+   * every render would remount the whole view and its header.
+   */
+  hostFor(id: string): () => ReactNode;
+  /** The partner's own wrapping of a contribution (e.g. observing its pane title). */
+  wrap?(contribution: PracContribution, host: () => ReactNode): () => ReactNode;
+}
+
+/** The partner registry the frame provides. */
+export interface PracPartnersFace {
+  register(partner: PracPartner): () => void;
+}
+
 export interface PracWindowActionsFace {
   /** Set (or replace) the model for one view. */
   set(viewId: string, model: WindowActionModel, run: (id: string) => void): void;

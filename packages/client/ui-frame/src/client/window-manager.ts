@@ -204,7 +204,7 @@ export class WindowManager {
     app: {
       readonly icon?: string;
       readonly paneHeader?: boolean;
-      content(id: string): () => ReactNode;
+      content?(id: string): () => ReactNode;
     },
   ): void {
     if (this.seat === undefined || this.#seats.has(windowId)) return;
