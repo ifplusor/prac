@@ -151,6 +151,7 @@ Frame shell（frame 级）
 - `EditorWindow` 是 window 在 adapter 侧的表示；`PracEditorPaneHost` 是 per-window pane runtime；pane active-only，inactive 卸载 DOM；
 - **frame 拥有 window 的 order / active / region**；`EditorGroupModel` 是 adapter 侧投影，不是第二权威；frame 来源的窗口/文件顺序写走 `PracWindowProjection`，app / editor 命令写记为 external；
 - editor group 是 window group 的 adapter runtime，不拥有 tab strip / breadcrumbs / actions；
+- **stage grid 的每个 region 都映射为 editor group（region ⇄ group 1:1，含暂时没有 file window 的空 region）**：映射按 stage 的 region 集合做，不按「是否已有 file window」过滤；frame 为每个 stage region 渲染 host，embed 为每个 region 建组并挂载，空 region 的组同样可聚焦（方向焦点依赖这条）；
 - **actions 在 window group tab strip 右端**：adapter 解析 `MenuId.EditorTitle` 等为 resolved action model，frame 渲染并回调；
 - **breadcrumbs 属于 editor application window / pane**，不属于 group tab strip；
 - widget board 的 header / actions 归 board / widget；非 editor widget 没有 breadcrumbs；

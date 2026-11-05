@@ -131,7 +131,9 @@ board 仍然是 **widget 的容器**：`BoardContent` 持有 widget 的 order / 
 - 投影（`PracWindowInput` / `mapWindow`）只读窗口管理器的记录（window → region / group / active），不读 group order。
 
 这条模型同时解掉三处耦合：`board.hostedWindows`、`syncBoardWindowProjection` 的 `hostedRegion` 反推、workbench 里 conversation 的 `mapWindow`。
-conversation 的 `mapWindow` 这条**保留**（已决）：去掉后 `file`/`tabs`/`containers` 绿，但 `editor:group` 的 `focusRightLandsInTheNewRegion` 红（方向焦点停在 centre）。根因在 embed overlay：`PracWindowGroupHost.groupForRegion` 只认已注册的 group，split 出来的 region 没有 group，方向焦点找不到邻居。把 editor grid 的 group 改成由 frame 的区域/窗口组决定是独立的后续工作（改动 `vendor/vscode/overlay`，属架构级）；在此之前，conversation 保留一个空 `PracWindowInput` 作为编辑器模型的锚点。
+conversation 的 `mapWindow` 这条**保留**（已决）：去掉后 `file`/`tabs`/`containers` 绿，但 `editor:group` 的 `focusRightLandsInTheNewRegion` 红（方向焦点停在 centre）。根因在 embed overlay：`PracWindowGroupHost.groupForRegion` 只认已注册的 group，split 出来的 region 没有 group，方向焦点找不到邻居。
+
+正解（已记录的设计，见 `docs/architecture.md` 的 adapter 一节）：**vscode 的 editor group 与 stage grid 的每个 region 1:1 映射**，按 stage 的 region 集合做，**不按「是否已有 file window」过滤**；空 region 也有 group 与可聚焦的 host。实现顺序：frame 为每个 stage region 渲染 host → embed 为每个 region 建组并挂载（`groupRegions()` 返回 stage 的 region 集合，而不是 file window 的 region）→ 删掉 conversation 的投影。在此之前，conversation 保留一个空 `PracWindowInput` 作为编辑器模型的锚点。
 
 ### 5 内容座位由谁写
 
