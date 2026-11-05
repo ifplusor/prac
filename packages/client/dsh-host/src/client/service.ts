@@ -1,7 +1,7 @@
 /**
  * DSH adapter service.
  *
- * @module prac-client-ui-dsh/client/service
+ * @module prac-client-dsh-host/client/service
  */
 
 import type { Context } from "@deepseek-ai/cordis";
@@ -26,12 +26,12 @@ export function apply(ctx: Context): void {
         instances: "single",
         defaultRegion: "center",
       }),
-    "prac-client-ui-dsh: chat app",
+    "prac-client-dsh-host: chat app",
   );
   ctx.effect(() => {
     ctx.pracWindows.admit("chat", { windowId: DSH_CONVERSATION_VIEW, title: "Chat" });
     return () => ctx.pracWindows.close(DSH_CONVERSATION_VIEW);
-  }, "prac-client-ui-dsh: chat window");
+  }, "prac-client-dsh-host: chat window");
   const face: PracDshFace = {
     sidebar: DSH_SIDEBAR_VIEW,
     rightbar: DSH_RIGHTBAR_VIEW,
@@ -43,5 +43,5 @@ export function apply(ctx: Context): void {
   ctx.provide("pracDsh", face);
 }
 
-export const name = "prac-client-ui-dsh";
+export const name = "prac-client-dsh-host";
 export const inject: readonly string[] = ["pracApplications", "pracWindows"];

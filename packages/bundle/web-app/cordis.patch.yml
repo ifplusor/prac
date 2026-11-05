@@ -21,8 +21,8 @@
       name: "prac-client-ui-widget"
 
     # DSH slot vocabulary / keyed-main helpers.
-    - id: prac-client-ui-dsh
-      name: "prac-client-ui-dsh"
+    - id: prac-client-dsh-host
+      name: "prac-client-dsh-host"
 
     # The shared VS Code client mechanism: the single VS Code boot (the
     # app may be created only once per page) and the part-host element

@@ -31,7 +31,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "prac-client-ui-changed-files": "workspace:*",
-    "prac-client-ui-dsh": "workspace:*",
+    "prac-client-dsh-host": "workspace:*",
     "prac-client-ui-frame": "workspace:*",
     "prac-client-ui-vscode-editor": "workspace:*",
     "prac-client-ui-vscode-views": "workspace:*",

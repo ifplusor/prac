@@ -56,6 +56,27 @@ const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 manifest.dependencies ??= {};
 const modules = join(profileDir, "node_modules");
 mkdirSync(modules, { recursive: true });
+// A renamed local package leaves a stale `link:` entry and symlink behind; the
+// profile must reflect the repo, not the history of its package names.
+const known = new Set(packages.map((pkg) => pkg.json.name));
+for (const [name, spec] of Object.entries(manifest.dependencies)) {
+  if (typeof spec !== "string" || !spec.startsWith("link:") || known.has(name)) continue;
+  delete manifest.dependencies[name];
+  try {
+    unlinkSync(join(modules, name));
+  } catch {
+    // Already gone.
+  }
+}
+for (const name of readdirSync(modules)) {
+  if (known.has(name)) continue;
+  const target = join(modules, name);
+  try {
+    if (!existsSync(target)) unlinkSync(target);
+  } catch {
+    // Not ours to remove.
+  }
+}
 for (const pkg of packages) {
   const name = pkg.json.name;
   manifest.dependencies[name] = `link:${pkg.dir}`;

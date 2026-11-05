@@ -46,7 +46,7 @@ import type { Context } from "@deepseek-ai/cordis";
 // Type-only, for the frame plugin's `Context` / `SlotMap` merges.
 import type {} from "prac-client-ui-frame/client";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
-import type { PracDshFace } from "prac-client-ui-dsh/client";
+import type { PracDshFace } from "prac-client-dsh-host/client";
 // Type-only, for its declarations: `ui-renderer` owns `Context.slots` (its `SlotRegistry`),
 // and naming the plugin whose service this file drives is what puts that member — and the
 // registration surface hanging off it — in this program. The slot *keys* are declared by

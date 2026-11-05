@@ -29,7 +29,7 @@ const RULES: Record<string, Rule> = {
       "prac-client-ui-frame",
       "prac-client-ui-widget",
       "prac-client-ui-workbench",
-      "prac-client-ui-dsh",
+      "prac-client-dsh-host",
       "prac-client-vscode-host",
       "prac-client-ui-vscode-views",
       "prac-client-ui-vscode-editor",
@@ -44,7 +44,7 @@ const RULES: Record<string, Rule> = {
       "prac-client-ui-frame",
       "prac-client-ui-widget",
       "prac-client-ui-workbench",
-      "prac-client-ui-dsh",
+      "prac-client-dsh-host",
       "prac-client-vscode-host",
       "prac-client-ui-vscode-views",
       "prac-client-ui-vscode-editor",
@@ -58,7 +58,7 @@ const RULES: Record<string, Rule> = {
       "prac-client-ui-frame",
       "prac-client-ui-widget",
       "prac-client-ui-workbench",
-      "prac-client-ui-dsh",
+      "prac-client-dsh-host",
       "prac-client-vscode-host",
       "prac-client-ui-vscode-views",
       "prac-client-ui-vscode-editor",
@@ -72,7 +72,7 @@ const RULES: Record<string, Rule> = {
     forbidden: [
       "prac-client-ui-widget",
       "prac-client-ui-workbench",
-      "prac-client-ui-dsh",
+      "prac-client-dsh-host",
       "prac-client-vscode-host",
       "prac-client-ui-vscode-views",
       "prac-client-ui-vscode-editor",
@@ -83,7 +83,7 @@ const RULES: Record<string, Rule> = {
   "prac-client-ui-widget": {
     forbidden: [
       "prac-client-ui-workbench",
-      "prac-client-ui-dsh",
+      "prac-client-dsh-host",
       "prac-client-vscode-host",
       "prac-client-ui-vscode-views",
       "prac-client-ui-vscode-editor",
@@ -95,7 +95,7 @@ const RULES: Record<string, Rule> = {
     forbidden: ["prac-web-app"],
     why: "bundle is a composition root and must stay a leaf",
   },
-  "prac-client-ui-dsh": {
+  "prac-client-dsh-host": {
     forbidden: ["prac-web-app"],
     why: "bundle is a composition root and must stay a leaf",
   },

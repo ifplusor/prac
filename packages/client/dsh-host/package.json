@@ -1,5 +1,5 @@
 {
-  "name": "prac-client-ui-dsh",
+  "name": "prac-client-dsh-host",
   "version": "0.0.0",
   "private": true,
   "description": "DSH slot vocabulary and source mapping helpers.",

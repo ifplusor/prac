@@ -3,9 +3,9 @@
  *
  * The vocabulary and the mapping helpers are internal (`dsh.ts`); consumers
  * reach them through the `ctx.pracDsh` service, and take the face type from
- * `prac-client-ui-dsh/client`.
+ * `prac-client-dsh-host/client`.
  *
- * @module prac-client-ui-dsh/client
+ * @module prac-client-dsh-host/client
  */
 
 export { apply, inject, name } from "./service.js";

@@ -205,12 +205,12 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 18.3.31
+      prac-client-dsh-host:
+        specifier: workspace:*
+        version: link:../../client/dsh-host
       prac-client-ui-changed-files:
         specifier: workspace:*
         version: link:../../client/ui-changed-files
-      prac-client-ui-dsh:
-        specifier: workspace:*
-        version: link:../../client/ui-dsh
       prac-client-ui-frame:
         specifier: workspace:*
         version: link:../../client/ui-frame
@@ -245,6 +245,15 @@ importers:
         specifier: 'catalog:'
         version: 1.0.0(@types/node@24.13.3)(@vitest/ui@5.0.1)(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@5.0.10)
 
+  packages/client/dsh-host:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: 'catalog:'
+        version: 4.0.5-alpha.1
+      prac-client-ui-frame:
+        specifier: workspace:*
+        version: link:../ui-frame
+
   packages/client/ui-changed-files:
     devDependencies:
       '@deepseek-ai/cordis':
@@ -265,15 +274,6 @@ importers:
       react:
         specifier: 'catalog:'
         version: 18.3.1
-
-  packages/client/ui-dsh:
-    devDependencies:
-      '@deepseek-ai/cordis':
-        specifier: 'catalog:'
-        version: 4.0.5-alpha.1
-      prac-client-ui-frame:
-        specifier: workspace:*
-        version: link:../ui-frame
 
   packages/client/ui-frame:
     devDependencies:
@@ -439,12 +439,12 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 18.3.31
+      prac-client-dsh-host:
+        specifier: workspace:*
+        version: link:../dsh-host
       prac-client-ui-changed-files:
         specifier: workspace:*
         version: link:../ui-changed-files
-      prac-client-ui-dsh:
-        specifier: workspace:*
-        version: link:../ui-dsh
       prac-client-ui-frame:
         specifier: workspace:*
         version: link:../ui-frame

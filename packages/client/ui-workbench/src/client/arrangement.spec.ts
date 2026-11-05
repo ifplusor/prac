@@ -1,7 +1,7 @@
 import type { ItemRecord, LayoutState } from "prac-ui-kit-workbench";
 import { describe, expect, it } from "vite-plus/test";
 
-import type { PracDshFace } from "prac-client-ui-dsh/client";
+import type { PracDshFace } from "prac-client-dsh-host/client";
 import type { ItemInfo } from "prac-client-ui-frame/client";
 import type { PracLayoutFace, RoleBindings } from "prac-client-ui-frame/client";
 import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";

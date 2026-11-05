@@ -6,7 +6,7 @@
  * banner/footer and cannot ship a declaration file, while consumers still need
  * the `Context` merge in their own program.
  *
- * @module prac-client-ui-dsh/client/contract
+ * @module prac-client-dsh-host/client/contract
  */
 
 import type {} from "@deepseek-ai/cordis";

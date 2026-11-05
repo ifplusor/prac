@@ -12,7 +12,7 @@ import type { ItemRecord } from "prac-ui-kit-workbench";
  * @module prac-client-ui-workbench/client/arrangement
  */
 
-import type { PracDshFace } from "prac-client-ui-dsh/client";
+import type { PracDshFace } from "prac-client-dsh-host/client";
 import type { PracLayoutFace } from "prac-client-ui-frame/client";
 import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 

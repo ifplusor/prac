@@ -18,13 +18,13 @@ export default defineConfig({
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
       deps: { neverBundle: ["@deepseek-ai/cordis"] },
     },
-    clientPack("prac-client-ui-dsh", { entry: "src/client/index.ts" }),
+    clientPack("prac-client-dsh-host", { entry: "src/client/index.ts" }),
   ],
   run: {
     tasks: {
       "check:client": {
         command:
-          "node ../../../scripts/bundle-client.mjs --artifact dist/client.js --id prac-client-ui-dsh" +
+          "node ../../../scripts/bundle-client.mjs --artifact dist/client.js --id prac-client-dsh-host" +
           ` --allow ${PLATFORM_MODULES.join(" --allow ")} --exports apply,name,inject`,
         dependsOn: ["build"],
       },

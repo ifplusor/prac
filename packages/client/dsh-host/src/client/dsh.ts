@@ -4,7 +4,7 @@
  * This package is the DSH source adapter surface; the workbench consumes these
  * names instead of restating DSH's slot ids.
  *
- * @module prac-client-ui-dsh/client/dsh
+ * @module prac-client-dsh-host/client/dsh
  */
 
 /** DSH's sidebar slot as a prac view id. */
