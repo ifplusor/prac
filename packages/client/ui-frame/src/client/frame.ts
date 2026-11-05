@@ -1,6 +1,4 @@
 import {
-  ItemActions,
-  type RenderItemAction,
   type GroupBarItem,
   SASH_SIZE,
   type StyleObject,
@@ -73,7 +71,6 @@ import {
 
 import {
   createElement,
-  Fragment,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -133,15 +130,7 @@ interface PointerDragEvent {
  * keys, so a dispatch to a key the frame did not declare is a type error.
  */
 type RenderSlot = import("@deepseek-ai/dsh-client-ui-slots").PropsRenderSlots<
-  | "sidebar"
-  | "main"
-  | "rightbar"
-  | "shell.overlay"
-  | "prac.window"
-  | "prac.widget"
-  | "prac.viewActions"
-  | "prac.windowActions"
-  | "prac.widgetActions"
+  "sidebar" | "main" | "rightbar" | "shell.overlay" | "prac.window" | "prac.widget"
 >["renderSlot"];
 
 // ── the frame ─────────────────────────────────────────────────────────
@@ -722,20 +711,7 @@ export function createFrame(
         onReorder: (id: string, dragged: string, target: string) =>
           store.update((current) => reorderTab(current, id, dragged, target)),
         renderActions: (viewId: string | undefined) =>
-          createElement(
-            Fragment,
-            null,
-            createElement(TabActions, { face: sources.windowActions, viewId: viewId ?? "" }),
-            createElement(ItemActions, {
-              itemId: viewId ?? "",
-              slots:
-                (viewId === undefined ? "window" : (state.items[viewId]?.kind ?? "window")) ===
-                "widget"
-                  ? ["prac.widgetActions", "prac.viewActions"]
-                  : ["prac.windowActions", "prac.viewActions"],
-              renderSlot: renderSlot as unknown as RenderItemAction,
-            }),
-          ),
+          createElement(TabActions, { face: sources.windowActions, viewId: viewId ?? "" }),
       });
     };
 
@@ -889,6 +865,7 @@ export function createFrame(
         folded: node.collapsed === true,
         label: viewLabel(viewId),
         icon: viewIconNode(viewId),
+        renderActions: createElement(TabActions, { face: sources.windowActions, viewId }),
         onToggle: (event) => {
           const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
           const height = row?.getBoundingClientRect().height;
@@ -901,14 +878,6 @@ export function createFrame(
           const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
           beginReorder(event as unknown as PointerDragEvent, node.id, row?.parentElement ?? null);
         },
-        renderActions: createElement(ItemActions, {
-          itemId: viewId,
-          slots:
-            (state.items[viewId]?.kind ?? "window") === "widget"
-              ? ["prac.widgetActions", "prac.viewActions"]
-              : ["prac.windowActions", "prac.viewActions"],
-          renderSlot: renderSlot as unknown as RenderItemAction,
-        }),
       });
 
     /**

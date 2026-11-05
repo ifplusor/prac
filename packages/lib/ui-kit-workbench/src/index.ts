@@ -23,6 +23,5 @@ export * from "./window-group-model.js";
 export * from "./applications.js";
 export * from "./content-host-registry.js";
 export * from "./board-layouts.js";
-export * from "./layout-actions.js";
 export * from "./layout-drop.js";
 export * from "./probes.js";

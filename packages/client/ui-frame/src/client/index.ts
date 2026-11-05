@@ -275,10 +275,6 @@ export function apply(ctx: Context): void {
           // (`vscode:*`) register into; an entry's declared id is its view id.
           "prac.window": { kind: "list", scope: "root" },
           "prac.widget": { kind: "list", scope: "root" },
-          // The action surface a view may fill; keyed by its view id.
-          "prac.viewActions": { kind: "keyed", scope: "root" },
-          "prac.windowActions": { kind: "keyed", scope: "root" },
-          "prac.widgetActions": { kind: "keyed", scope: "root" },
           // The action surface a container may fill; keyed by its container id.
         },
       },

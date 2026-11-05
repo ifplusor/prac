@@ -64,12 +64,6 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
     "prac.window": { kind: "list"; scope: "root" };
     /** Widget content: VS Code view / DSH widget content. */
     "prac.widget": { kind: "list"; scope: "root" };
-    /** The action surface a view's owner may fill; keyed by view id. */
-    "prac.viewActions": { kind: "keyed"; scope: "root" };
-    /** Window content actions (chat / board), keyed by window id. */
-    "prac.windowActions": { kind: "keyed"; scope: "root" };
-    /** Widget content actions, keyed by widget id. */
-    "prac.widgetActions": { kind: "keyed"; scope: "root" };
     // The child slots of the `root` slot prac registers — declared by their
     // **owner**, which is the frame (see the `ui-slots` contract: a slot table is
     // merged by the plugin that owns the slot, and reading entries stays

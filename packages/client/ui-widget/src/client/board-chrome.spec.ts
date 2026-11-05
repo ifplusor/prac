@@ -46,7 +46,7 @@ describe("createBoardChrome", () => {
     expect(markup).toContain('data-widget="vscode:view:timeline"');
   });
 
-  it("renders the tab strip with widget actions from the slot face", () => {
+  it("renders the tab strip without per-item action seats", () => {
     const content = new BoardContent("board");
     const slots: string[] = [];
     const markup = renderToStaticMarkup(
@@ -69,7 +69,8 @@ describe("createBoardChrome", () => {
     );
     expect(markup).toContain("data-prac-tab-strip");
     expect(markup).toContain('data-prac-tab="w1"');
-    expect(slots).toContain("prac.widgetActions");
+    // Actions ride the item registration, not a parallel seat.
+    expect(slots).not.toContain("prac.widgetActions");
   });
 
   it("renders a draggable sash between the board's regions", () => {

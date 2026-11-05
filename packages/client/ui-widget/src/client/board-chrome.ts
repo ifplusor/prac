@@ -1,6 +1,4 @@
 import {
-  ItemActions,
-  type ItemActionsProps,
   type ItemRecord,
   type WidgetRecord,
   type LayoutStore,
@@ -82,15 +80,8 @@ export function createBoardChrome(
   const hasPaneHeader = (ctx: ChromeContext<WidgetRecord>, viewId: string): boolean =>
     ctx.itemFacts?.(viewId).paneHeader === true;
 
-  /** The widget's own actions, dispatched through the container's slot face. */
-  const renderActions = (ctx: ChromeContext<WidgetRecord>, viewId: string): ReactNode => {
-    if (ctx.slotFace === undefined) return null;
-    return createElement(ItemActions, {
-      itemId: viewId,
-      slots: ["prac.widgetActions", "prac.viewActions"],
-      renderSlot: ctx.slotFace as unknown as ItemActionsProps["renderSlot"],
-    });
-  };
+  /** No per-item action seats: actions ride the item's own registration. */
+  const renderActions = (_ctx: ChromeContext<WidgetRecord>, _viewId: string): ReactNode => null;
 
   const renderTabs = (ctx: ChromeContext<WidgetRecord>): ReactNode => {
     if (ctx.node.type !== "region") return null;

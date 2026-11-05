@@ -44,6 +44,7 @@ import {
 import type { ReactElement } from "react";
 import type { Context } from "@deepseek-ai/cordis";
 // Type-only, for the frame plugin's `Context` / `SlotMap` merges.
+import type { PracWindowActionsFace, WindowActionModel } from "prac-client-ui-frame/client";
 import type {} from "prac-client-ui-frame/client";
 import type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
 import type { PracDshFace } from "prac-client-dsh-host/client";
@@ -476,41 +477,6 @@ function RecallSurface({ layout, onFocus }: RecallSurfaceProps): ReactElement | 
     header,
     ...rows,
     regionBar,
-  );
-}
-
-/**
- * One action for the conversation view, rendered by the frame's
- * `prac.viewActions` slot.
- *
- * This is the arrangement's action, not a VS Code menu: the frame owns the row
- * header, the view owner supplies the actions, and the two only meet through
- * the slot.
- *
- * @param props - the action to run.
- */
-function ConversationAction({ onShow }: { onShow: () => void }): ReactElement {
-  return createElement(
-    "button",
-    {
-      type: "button",
-      "data-prac-view-action": "conversation",
-      title: "Bring the conversation forward",
-      "aria-label": "Bring the conversation forward",
-      onClick: onShow,
-      style: {
-        font: "inherit",
-        fontSize: "12px",
-        lineHeight: "1",
-        height: "100%",
-        padding: "0 6px",
-        border: 0,
-        background: "transparent",
-        color: "inherit",
-        cursor: "pointer",
-      },
-    },
-    "对话",
   );
 }
 
@@ -1124,12 +1090,26 @@ export function apply(ctx: Context): void {
 
   // The environment layer: additive, and the only slot a prac surface of our
   // own may float in (registering into `root` would shadow the whole frame).
-  // The conversation's action, in the frame's per-view header slot.
-  slots.inject("prac.windowActions", () =>
-    slots.register({ name: "prac.windowActions", key: conversation }, () =>
-      createElement(ConversationAction, { onShow: () => layout.show(conversation) }),
-    ),
-  );
+  // The conversation's action is the window-actions model (the same surface the
+  // app's tab actions use), not a separate seat.
+  const conversationAction: WindowActionModel = {
+    primary: [
+      {
+        id: "conversation.show",
+        label: "Bring the conversation forward",
+        enabled: true,
+        checked: false,
+      },
+    ],
+    secondary: [],
+  };
+  ctx.inject(["pracWindowActions"], (scope) => {
+    const windowActions: PracWindowActionsFace = scope.pracWindowActions;
+    scope.effect(() => {
+      windowActions.set(conversation, conversationAction, () => layout.show(conversation));
+      return () => windowActions.remove(conversation);
+    }, "prac-web-app: conversation action");
+  });
 
   // The recall surface: the same slot, a second additive entry, so the strip
   // keeps working untouched. It owns its own keybinding (`Cmd/Ctrl+Alt+V`).
