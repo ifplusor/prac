@@ -119,7 +119,7 @@ EditorWindow
 
 - window group tab strip 由 frame 画；tab 是 window；
 - **actions 在 window group tab strip 右端**：adapter 把 active window 的 actions 解析成 resolved action model（editor window 用 `MenuId.EditorTitle`；chat / board 由各自 content 提供），frame 渲染并回调；group header 不再画 actions；
-- **契约**：frame 暴露 keyed 的 window action model（per `viewId` 的 resolved actions + `onDidChange`）；adapter 在 active window 变化时推送；frame 渲染 primary + overflow，并回调 action id。`prac.viewActions` 只承载 view 自有的 React 动作。
+- **契约**：frame 暴露 keyed 的 window action model（per `viewId` 的 resolved actions + `onDidChange`）；adapter 在 active window 变化时推送；frame 渲染 primary + overflow，并回调 action id。view 自有的 React 动作随贡献注册（`PracContribution.actions`）进入 item facts，由 frame chrome 渲染；独立的动作座位已删除。
 - **呈现**：primary 用 codicon icon（`action.icon` 的 class，document 的 codicon 样式已对 frame 生效），secondary 收进 `⋯` 菜单；没有 icon 的动作回退到文字 label。
 - **overflow 不被裁剪**：菜单渲染到 `document.body`（`createPortal` + `position: fixed`），因为 tab strip 和 region 都 `overflow: hidden` / `contain: paint`。
 - **每个 group 自己的 actions**：model 按 file placement 取该 group 的 actions，不只全局 active view；split 出来的新 group 立刻有自己的 tab strip actions。
@@ -153,7 +153,7 @@ EditorWindow
 - `EditorPanes` 不作为 group 级过渡复用；拆为 `EditorWindowModel` + per-window `EditorPaneHost`；group 只保留 active window 的 mount / progress / focus；pane active-only，inactive 卸载 DOM。
 - frame 拥有 window order / active / tab strip；group 是投影；不做 focusin 反向驱动。
 - breadcrumbs 属于 editor window；actions 在 window group tab strip 右端，frame 渲染 action model。
-- actions 由 adapter 解析成 resolved model，frame 渲染；`prac.viewActions` 继续承载 view 自有的 React 动作，不复用它承载 editor action model（槽契约见 Open questions）。
+- actions 由 adapter 解析成 resolved model，frame 渲染；view 自有的 React 动作随贡献注册（`PracContribution.actions`），不复用 editor action model（座位已删除）。
 - group 生命周期跟 window group，不跟 region；空 group 对齐上游：非最后一个空 group 移除，最后一个保留（见 §5）。
 - window 外层隔离；混排保留 per-widget root。
 

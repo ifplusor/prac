@@ -31,7 +31,7 @@ prac 同时使用 DSH、VS Code 和自己的工作台词汇。边界原则只有
 
 ## 2. 决定
 
-1. **包名允许来源词**：`ui-vscode-host` / `ui-vscode-views` / `ui-vscode-editor` / `ui-dsh` 是边界包，包名出现来源是诚实的。
+1. **包名允许来源词**：`prac-client-vscode-host` / `prac-client-ui-vscode-views` / `prac-client-ui-vscode-editor` / `prac-client-dsh-host`（原 `ui-dsh`）是边界包，包名出现来源是诚实的。
 2. **跨平面契约用共享常量模块 + 构建期内联**，不引入运行期耦合。
 3. **`part` 只做边界词**：对外 `partHost`，机制内部只用 region / surface / window / widget；`ui-frame` 内部没有 `part` 类型。
 4. **机制不知道来源**：frame 判“是不是一个 widget”按注册表成员，不按 id 前缀。
@@ -42,13 +42,13 @@ prac 同时使用 DSH、VS Code 和自己的工作台词汇。边界原则只有
 ## 3. 出界检查
 
 - 上游内部标识只出现在边界：`workbench.parts.*`、`monaco-workbench`、`vs` / `vs-dark`、`_VSCODE_FILE_ROOT`、`remoteAuthority` / `serverBasePath` / `callbackRoute` / `productConfiguration` / `workspaceProvider`、`workbench.web.main.internal.js`；
-- 越界到 prac 的只能是 prac 词：`prac.view`、`prac.viewActions`、同源路由 path、带来源标签的 id；
+- 越界到 prac 的只能是 prac 词：`prac.view`、`prac.widget`、同源路由 path、带来源标签的 id；
 - 机制 / frame 的源码不出现 `vscode:` / `dsh:` 分支；
 - 一个越界契约只定义一次。
 
 ## 4. 开放问题
 
-- `ui-vscode-*` / `ui-dsh` 包名是否在落地时保留来源词（当前是）。
+- `ui-vscode-*` / `prac-client-dsh-host` 包名是否在落地时保留来源词（当前是）。
 - `ctx.pracLayout` 兼容别名何时删除。
 - `prac.view` 是否改名为 widget 注册面（代码层）。
 - 来源 id 前缀是否在 catalogue 外继续使用。
@@ -57,7 +57,7 @@ prac 同时使用 DSH、VS Code 和自己的工作台词汇。边界原则只有
 
 - `ui-frame` / `ui-window` / `ui-widget` 源码无 `vscode:` / `dsh:` 分支。
 - frame 只按注册表成员识别 view / widget。
-- `ui-vscode-*` / `ui-dsh` 的 API 不泄漏上游内部类型到核心包。
+- `ui-vscode-*` / `prac-client-dsh-host` 的 API 不泄漏上游内部类型到核心包。
 - `prac-ui-kit-workbench` 不导出 `part` 类型。
 - `prac.view` 只注册 widget；window / board 通过各自注册面。
 

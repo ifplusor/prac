@@ -22,7 +22,7 @@ status: in-progress
 |---|---|---|
 | **frame**（`prac-ui-kit-workbench` + `ui-frame`） | Space、region、surface、dock rail、sidebar / panel、window group / board 的布局 | VS Code 的 part / container / pane / editor 语义 |
 | **ui-window** | window、window group、tab strip、active window | VS Code 的 editor input / ViewPane |
-| **ui-widget** | widget、board、`prac.view` / `prac.viewActions` | VS Code 的 container / view 生命周期 |
+| **ui-widget** | widget、board、`prac.widget`（含贡献的 actions） | VS Code 的 container / view 生命周期 |
 | **vscode-host（adaptor）** | VS Code 的 editor / container / view / action / overlay / webview 语义；catalogue；binding；host；生命周期 | prac 的 layout / window / widget placement |
 | **vendor/vscode-embed** | boot、资产、宿主元素、命令面、bridge | 政策：哪些 view、怎么摆 |
 | **vendor/vscode** | 上游 workbench（pin + patch + overlay） | prac 的词与政策 |
@@ -131,6 +131,7 @@ board lifecycle：board 创建 → binding 挂到内容组；widget mount → `V
 - editor input → application window；ViewContainer → widget board；View → widget。
 - 每个 stage window 在 adaptor 侧有 1:1 `EditorInput` 投影（含 chat / widget）；window 是 frame 权威，projection 是派生。
 - editor group ↔ window group 的 adapter runtime；不拥有 UI chrome。
+- **stage grid 的每个 region ⇄ editor group 1:1（含暂时没有 file window 的空 region）**：frame 为每个 stage region 渲染 host，空 region 的组也可聚焦；映射按 stage 的 region 集合做，不按 file window 过滤。
 - 没有通用 CRD；widget 用 typed descriptor / host factory，binding 是 board / group context，不是 UI chrome。
 - actions 由 adaptor 解析成 resolved model，frame 渲染。
 - webview / integrated browser 的可用性按 web / Electron 分别说明。

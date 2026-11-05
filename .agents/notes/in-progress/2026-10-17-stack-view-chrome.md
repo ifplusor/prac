@@ -13,7 +13,7 @@ status: in-progress
 - `dsh:*` widget 使用同一个 prac 行头；
 - 折叠权威是 frame 的 `entry.collapsed`；
 - 行高以 VS Code 的 22px 视觉为准；
-- 动作槽由 widget 自持：VS Code 用 `.actions`，DSH 用 `prac.viewActions`；frame 不做统一 action bar。
+- 动作随 widget 的贡献注册（`PracContribution.actions`）进入 item facts；VS Code 的 `.actions` 留在自己的 pane；frame 不做统一 action bar。
 
 ## Problem
 
@@ -32,7 +32,7 @@ Stack 的一行出现两条标题：
 | widget 内部内容区 | widget / source |
 | VS Code pane header 的 title / icon / twisty | **隐藏** |
 | VS Code `.actions`（`view/title` 扩展动作） | 保留在 action slot |
-| DSH `prac.viewActions` | 保留在 action slot |
+| DSH 贡献注册的 actions | 由 frame chrome 渲染（不再有独立座位） |
 | 单 widget bare 时的 pane header | 按 bare 规则保留 |
 
 ## 2. 决策
@@ -55,7 +55,7 @@ Stack 的一行出现两条标题：
 - `vscode:*` 行头：frame 画 title / twisty / fold / drag；pane `.title` / `.icon` / `.twisty` 隐藏，`.actions` 保留；
 - 折叠：frame 的 `entry.collapsed` 权威；pane twisty 隐藏；
 - 拖拽：pane header 标题区加 frame 拖拽落点，避开右侧 actions；重排走 `moveEntry`；
-- 动作：VS Code `.actions` 与 DSH `prac.viewActions` 各自渲染；frame 不统一 action bar；
+- 动作：VS Code `.actions` 与 DSH 贡献注册的 actions 各自渲染；frame 不统一 action bar；
 - 22px 行高与 container label / group-binding actions 已落地；
 - 视觉边界：动作条可以完全不同源；frame 的 title / twisty / icon 不承诺与 VS Code 像素级一致。
 
@@ -65,7 +65,7 @@ Stack 的一行出现两条标题：
 - mixed stack 的 DSH / VS Code 行头基线、padding、chevron 对齐；
 - 折叠行的 `showActions`（WhenExpanded）；
 - 动作 slot 宽度 / overflow；toggle / submenu；
-- 插件生态测试：VS Code `view/title` 与 DSH `prac.viewActions` 各一条 live 贡献；
+- 插件生态测试：VS Code `view/title` 与 DSH 贡献注册的 actions 各一条 live 贡献；
 - 单 widget bare ↔ stack 切换时 pane header 显隐是否造成布局跳动。
 
 ## 5. Decisions

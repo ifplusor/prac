@@ -4,7 +4,7 @@ status: in-progress
 
 # Agent Note: partner 机制（VS Code 与 DSH 作为基座伙伴）
 
-> VS Code 与 DSH 是 prac 的两个基座伙伴：它们各自贡献 app 与 widget，prac 只拥有组合。共用机制是一个 `PracPartner` 契约 + 一个把贡献投影成注册的 runner，加一层只由 app 打开 window 的 application 层。frame 只保留 `prac.widget` 一个内容座位（window 的内容由 app 提供），加一个由伙伴持有的渲染位置（范围见 Open questions 4），不认识任何来源。
+> VS Code 与 DSH 是 prac 的两个基座伙伴：它们各自贡献 app 与 widget，prac 只拥有组合。共用机制是一个 `PracPartner` 契约 + 一个把贡献投影成注册的 runner，加一层只由 app 打开 window 的 application 层。frame 保留两个**内部**内容座位：`prac.widget`（伙伴贡献）与 `prac.window`（只由 application 层写的渲染登记表）；window 的内容由 app 提供，frame 不认识任何来源。
 
 ## Problem
 
@@ -146,13 +146,13 @@ conversation 的 `mapWindow` 这条**保留**（已决）：去掉后 `file`/`ta
 - frame 删除 `DSH_*` 词汇、`viewKind` 的 `"dsh"` 分支、`renderDshView`，catalogue 不再读 DSH 键；
 - item 的 body 需要盒子尺寸时，由 frame 通过 box context 给出（DSH 的 sidebar / rightbar 用它，VS Code 的 pane 自量）。
 
-因此 frame 的 item 来源变成三处：窗口管理器（window，内容经 app）、`prac.widget`（widget，内容经 slot 派发）、DSH 宿主（迁移期内的三个子槽）。`ItemRecord.kind` 仍是 `window | widget`。
+因此 frame 的 item 来源变成两处：窗口管理器（window，内容经 app）与 `prac.widget`（widget，内容经 slot 派发）；DSH 的三个面板也是 app 窗口（content 用宿主 renderer 渲染 slot），不是 frame 特判的第四类。`ItemRecord.kind` 仍是 `window | widget`。
 
 ### 6 两个实例
 
 | | `prac-client-vscode-host` | `prac-client-dsh-host`（原 `ui-dsh`） |
 | --- | --- | --- |
-| 角色 | 机制宿主：boot / part host / pane；发布 `ctx.pracVscode`（一个 `PracPartner`） | DSH 宿主：声明并渲染 `main` / `sidebar` / `rightbar`；发布自己的 `PracPartner` |
+| 角色 | 机制宿主：boot / part host / pane；发布 `ctx.pracVscode`（一个 `PracPartner`） | DSH 宿主：贡献 `chat` / `dsh.sidebar` / `dsh.rightbar` 等 app（content 用 frame 交给的 renderer 渲染 `main` / `sidebar` / `rightbar`）；发布自己的 `PracPartner` |
 | 来源 | 应用视图注册表 + 打开的文件 | slot registry（`main` 每个 key、`sidebar`、`rightbar`） |
 | 变更 | `onDidChangeCatalogue` | `ctx.slots.subscribe("main")` |
 | 适配器 | `ui-vscode-views`（widget 贡献）、`ui-vscode-editor`（editor app） | 同一个包内的 `registerContributions` |
@@ -174,7 +174,7 @@ conversation 的 `mapWindow` 这条**保留**（已决）：去掉后 `file`/`ta
 1. **application 层 + 窗口管理器**（kit + `ui-frame`）：`PracApplication` / `ApplicationRegistry`（含单测）→ `ctx.pracApplications`；`PracWindowManager` 接管 window 记录、group 归属、放置、active（`WindowGroupAdapter` 的内核上移为服务）。此步不改变现有行为，只建立边界。
 2. **editor 成为 app**：`ui-vscode-editor` 从「按 placement 注册 `prac.window`」改为「贡献 editor app + 按 placement `admit` / `close`」；管理器负责写座位与回收；`mapWindow` 退化为管理器事件的消费者。判据：live gate 的 `file` / `editor:*` / `tabs` / `board` 全绿。
 3. **合流**：抽出 `PracPartner` + `registerContributions`；`ui-vscode-views` 变薄壳；editor 的 app 贡献走同一契约。
-4. **DSH 成为 host**：声明 DSH 子槽、实现 `PracPartner`（chat 为 app，sidebar / rightbar / main keys 按 kind 贡献），删 frame 的 `dsh:` 路径。
+4. **DSH 成为 host**：实现 `PracPartner`，把 chat / sidebar / rightbar / main keys 作为 app 贡献（content 用 frame 的 renderer 渲染宿主 slot）；删 frame 的 `dsh:` 路径与 DSH id 词表。
 5. **动作收口**：三个动作座位与 `ItemActions` 删除。
 6. **改名**：→ `prac-client-dsh-host`；重新 link profile；跑 live gate。
 
@@ -184,7 +184,7 @@ conversation 的 `mapWindow` 这条**保留**（已决）：去掉后 `file`/`ta
 
 - 多一层间接：读一个适配器的代码要从 `PracPartner` 实现和 runner 两处看；来源特有的怪癖（`ViewWithTitle`、几何）被挤进 `wrap` 与 box context。
 - 来源座位给 frame 引入一个新概念（「问来源要内容」），它本身也可能被滥用成万能逃生口。
-- 步骤 2 依赖一个未验证的假设（见 Open questions 1），失败就要退到另一形态。
+- 步骤 4 曾依赖一个未验证的假设；Open questions 1 已以 V2 关闭（app content 拿宿主 renderer），不再需要 V1 的来源位置。
 
 ## Open questions
 
@@ -200,9 +200,9 @@ conversation 的 `mapWindow` 这条**保留**（已决）：去掉后 `file`/`ta
 
 ## Validation
 
-- 步骤 1：live gate 全绿；同一份临时探针在改前 / 改后读 `slots.entries("prac.widget")`，id / label / icon / paneHeader 集合逐条相等；`prac.window` 的条目数在改后为 0（座位已删）。
-- 步骤 2：frame 源码不再出现 `dsh:` 字面量与 `DSH_*`；live gate（含 `views` / `file` / `editor:*` / `tabs`）全绿；`pnpm verify:entries` 通过。
-- 步骤 4（board 模型）：`BoardWindowAdapter` 不再有 `group` / `hostedWindows`；`board window` 是 `prac.board` app 打开的 window；`containers` 的「editor window in the sidebar WindowGroup」断言改为读窗口管理器的 group 成员；`syncChat` 的 `mapWindow` 删除后 `file` / `containers` / `board` 全绿。
+- 步骤 1：live gate 全绿；同一份临时探针在改前 / 改后读 `slots.entries("prac.widget")`，id / label / icon / paneHeader 集合逐条相等；`prac.window` 座位保留（只由 application 层写，伙伴不再注册）。
+- 步骤 4：frame 源码不再出现 `dsh:` 字面量与 `DSH_*`（`selectPanel` 经宿主 face 取 id）；live gate（含 `views` / `file` / `editor:*` / `tabs`）全绿；`pnpm verify:entries` 通过。
+- 步骤 1（board 模型）：`BoardWindowAdapter` 不再有 `group` / `hostedWindows`；`board window` 是 `prac.board` app 打开的 window；`containers` 的「editor window in the sidebar WindowGroup」断言改为读窗口管理器的 group 成员；conversation 的编辑器投影保留（editor grid 依赖，见 ② 的记录），board 投影读窗口记录。
 - 步骤 3：三个动作座位在源码与 `SlotMap` 中消失；带 actions 的 item 在 tab strip / widget 行渲染出动作；不带的不渲染。
 - 步骤 4：bundle 行按新 id 加载；`pnpm profile:link` 后 rig 起得来；`dsh-types` 比较通过。
 - 全程：`pnpm build` / `test` / `check`（本次改动范围）/ `verify:ui`。

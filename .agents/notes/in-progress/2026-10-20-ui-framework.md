@@ -150,6 +150,7 @@ Window 是 app 打开的实例，有 placement、生命周期、active。
 
 - **所有 window 在 adapter 侧都有 1:1 的 `EditorInput` 投影（含 chat / board window）；投影只承载身份 / 元数据，内容仍由 frame 渲染**；application window 与 widget board window 只是内容不同；
 - sidebar 的 WindowGroup 可以 host 一个 editor window（file placement 是 workbench 的记录，group 只列出它，`owned: false`）；board window 的身份投影落在这个 group 上（region 有 editor group 时），否则 `mapWindow` 是 no-op；
+- **stage grid 的每个 region ⇄ editor group 1:1（含空 region）**：frame 为每个 stage region 渲染 host，映射按 stage 的 region 集合做，不按是否已有 file window 过滤；
 - window group 的 tab 是 window，不是 widget；
 - application window 内部可以有 app-owned view / section，但 MVP 不承载可重组的 widget board；
 - widget window 由 board host app 打开；board composition 可改，window identity 不变。
@@ -163,7 +164,7 @@ window group → window → content(board) → widget
 ```
 
 - board 是 **widget board window** 的内容；board window 可以在 stage / sidebar / panel；
-- sidebar / panel 的内容区域是 window group，里面承载 board window；dock 的 rail 是 launcher，不是内容面；`BoardWindow` 是那个 window，`BoardWindowAdapter` 用 `WindowGroupModel` 承载它和可选的额外 window；
+- sidebar / panel 的内容区域是 window group，里面承载 board window；dock 的 rail 是 launcher，不是内容面；`BoardWindow` 是那个 window；region 的 window group 承载它（board 是 group 的普通成员），adapter 只持有 window，不拥有 group；
 - board window 的记录由 window group 投影进 frame；board 的 widget 顺序 / 行高 / 折叠归 board 自己的 store，并随 workspace 持久化；
 - board 负责 widget placement、布局、active widget；
 - board 拥有自己的 **LayoutRoot**，和 frame 的外层 layout 共用同一套 LayoutEngine；
@@ -488,7 +489,7 @@ UI 按**层**拆包，不按 window / board 领域拆；每一层都能独立使
 | `prac-client-ui-frame` | **核心 DSH host**：持久化 store、DSH slot catalogue、`SlotMap` / `Context` 契约（`./client` 的 types 入口）、slot 声明、`ctx.pracFrame` / `ctx.pracSpaces` / `ctx.layout`、theme presenter；同时注册 `window-group` surface 工厂；window / window-group 小模型也在本包 | `prac-ui-kit-workbench`、DSH store / renderer / slots |
 | `prac-client-ui-widget` | **prac 的 board / widget 适配器**：`BoardWindow` / `BoardWindowAdapter` / `BoardContent`、widget registry、DSH / VS Code widget source；通用 `Board` / `Widget` 在 kit | `prac-ui-kit-workbench` |
 | `prac-client-ui-workbench` | 默认 Space / window / board 放置、arrangement、recall、持久化 defaults、open policy | 核心 + adapters |
-| `prac-client-ui-dsh` | DSH slot → application window / widget board window / widget / action | 核心、DSH slots |
+| `prac-client-dsh-host` | DSH slot → application window / widget board window / widget / action | 核心、DSH slots |
 | `prac-client-vscode-host` | VS Code embed bridge / face / catalogue | 核心 |
 | `prac-client-ui-vscode-editor` | VS Code editor input → application window，`EditorWindow` + `EditorPane` | `prac-client-ui-frame`、`prac-client-vscode-host` |
 | feature 包 | changed-files、review 等 | 核心 / adapter |
@@ -612,7 +613,7 @@ ctx.layout           // DSH compat shim（放 ui-frame）
 
 - VS Code editor input → application window；ViewContainer → board；ViewDescriptor → widget。
 - DSH `main` → application window；`sidebar` / `rightbar` → board；内部 slot → widget；shell → frame。
-- breadcrumbs 属于 editor window；actions 在 window group tab strip 右端，frame 渲染 resolved action model；`prac.viewActions` 不复用作 editor action model。
+- breadcrumbs 属于 editor window；actions 在 window group tab strip 右端，frame 渲染 resolved action model；widget 的动作随贡献注册（`PracContribution.actions`），不复用作 editor action model。
 - Space 状态按 project folder（workspace）隔离；对齐 VS Code 的 workspace storage。
 - Dock = rail/launcher；不是 region / ContentRoot。Sidebar / panel 是内容区域，承载 widget board window；不与 stage 同类。
 

@@ -214,7 +214,7 @@ geometry 节点类型（split / grid / region / stack）不开放给 chrome 扩�
 - 外层与 board 内容共用 LayoutEngine；board root 是 window content 的 layout hole。
 - 跨 board 拖拽是 move；split 只在目标 board root 内发生。
 - frame chrome 与 window / widget chrome 分层，不互相画。
-- 包归属：`ui-frame` 是 DSH 插件行；model / renderer / chrome 在 `prac-ui-kit-workbench`，window 契约在 `prac-ui-kit-core`。
+- 包归属：`prac-client-ui-frame` 是 DSH 插件行；model / renderer / chrome 在 `prac-ui-kit-workbench`；window / group 模型在 `prac-ui-kit-workbench`，window manager 在 `prac-client-ui-frame`。
 
 ## 8. Open questions
 
@@ -234,7 +234,7 @@ geometry 节点类型（split / grid / region / stack）不开放给 chrome 扩�
 - board 内部 split / resize / 跨 board move 与 frame 外层使用同一套 layout 手势。
 - inactive window / board 移除内容根后，重新激活恢复 layout / focus / scroll。
 - 刷新后屏幕与状态一致：rows / columns / weights / collapse / maximize 恢复。
-- 包依赖 gate：`ui-frame` 不 import `ui-window` / `ui-widget` / `vscode` / `dsh`。
+- 包依赖 gate：`prac-client-ui-frame` 不 import `prac-client-ui-widget` / `prac-client-vscode-host` / `prac-client-dsh-host`。
 
 ## 10. Related
 

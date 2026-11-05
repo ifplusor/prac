@@ -53,16 +53,15 @@ Space
 完整划分见 10-20 的 Package architecture：
 
 ```text
-prac-ui-kit-core
+prac-ui-kit-content
+prac-ui-kit-layout
 prac-ui-kit-workbench
-ui-frame
-ui-application
-ui-window
-ui-widget
-ui-workbench
-ui-dsh
-ui-vscode-host / ui-vscode-views / ui-vscode-editor
-bundle/web-app  // composition root only
+prac-client-ui-frame
+prac-client-ui-widget
+prac-client-ui-workbench
+prac-client-dsh-host
+prac-client-vscode-host / prac-client-ui-vscode-views / prac-client-ui-vscode-editor
+prac-web-app  // composition root only
 ```
 
 - `ui-frame` 只认 surface registry；
