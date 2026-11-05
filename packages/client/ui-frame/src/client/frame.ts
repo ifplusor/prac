@@ -71,6 +71,7 @@ import {
 
 import {
   createElement,
+  Fragment,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -92,7 +93,12 @@ import { LayoutItem, type BoardDropFace, type ItemRenderSlot } from "./layout-it
 import { createFrameChrome } from "./frame-chrome.js";
 
 import type { UseSessions } from "@deepseek-ai/dsh-client-ui-session/client";
-import { declaredViewIcon, declaredViewLabel, declaredViewPaneHeader } from "./catalogue.js";
+import {
+  declaredViewActionsFor,
+  declaredViewIcon,
+  declaredViewLabel,
+  declaredViewPaneHeader,
+} from "./catalogue.js";
 
 import type { PracWindowActionsFace, WindowAction } from "./contract.js";
 
@@ -711,7 +717,12 @@ export function createFrame(
         onReorder: (id: string, dragged: string, target: string) =>
           store.update((current) => reorderTab(current, id, dragged, target)),
         renderActions: (viewId: string | undefined) =>
-          createElement(TabActions, { face: sources.windowActions, viewId: viewId ?? "" }),
+          createElement(
+            Fragment,
+            null,
+            viewId === undefined ? null : declaredViewActionsFor(viewId)?.(),
+            createElement(TabActions, { face: sources.windowActions, viewId: viewId ?? "" }),
+          ),
       });
     };
 
@@ -865,7 +876,12 @@ export function createFrame(
         folded: node.collapsed === true,
         label: viewLabel(viewId),
         icon: viewIconNode(viewId),
-        renderActions: createElement(TabActions, { face: sources.windowActions, viewId }),
+        renderActions: createElement(
+          Fragment,
+          null,
+          declaredViewActionsFor(viewId)?.(),
+          createElement(TabActions, { face: sources.windowActions, viewId }),
+        ),
         onToggle: (event) => {
           const row = (event.currentTarget as HTMLElement).closest("[data-prac-region]");
           const height = row?.getBoundingClientRect().height;

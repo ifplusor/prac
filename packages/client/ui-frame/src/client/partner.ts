@@ -72,6 +72,7 @@ export function createPartnerRegistry(ctx: Context): PracPartnersFace {
               ...(contribution.label === undefined ? {} : { label: contribution.label }),
               ...(contribution.icon === undefined ? {} : { icon: contribution.icon }),
               ...(contribution.paneHeader === true ? { paneHeader: true } : {}),
+              ...(contribution.actions === undefined ? {} : { actions: contribution.actions }),
             } as const;
             registered.set(contribution.id, {
               shape: shapeOf(contribution),

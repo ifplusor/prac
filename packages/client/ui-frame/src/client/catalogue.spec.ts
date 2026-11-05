@@ -6,6 +6,7 @@ import {
   catalogueViewIds,
   isDeclaredView,
   declaredViewLabel,
+  declaredViewActionsFor,
   declaredViewPaneHeader,
   readDeclaredViewIds,
   viewKind,
@@ -24,6 +25,7 @@ type SlotEntry = {
     readonly label?: string;
     readonly icon?: string;
     readonly paneHeader?: boolean;
+    readonly actions?: () => unknown;
   };
 };
 
@@ -67,6 +69,14 @@ describe("catalogueViewIds", () => {
       "vscode:view:a",
       "vscode:view:b",
     ]);
+  });
+
+  it("collects the actions a declaration carries", () => {
+    const action = (): null => null;
+    const slots = registry({ [WIDGET_SLOT]: [{ options: { id: "act", actions: action } }] });
+    readDeclaredViewIds(slots);
+    expect(declaredViewActionsFor("act")).toBe(action);
+    expect(declaredViewActionsFor("missing")).toBeUndefined();
   });
 
   it("is stable regardless of registration order", () => {

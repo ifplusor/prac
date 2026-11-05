@@ -10,6 +10,8 @@
  * @module prac-client-ui-frame/client/catalogue
  */
 
+import type { ReactNode } from "react";
+
 /** Window content slot. */
 export const WINDOW_SLOT = "prac.window";
 /** Widget content slot. */
@@ -71,6 +73,7 @@ let declaredViewLabels: ReadonlyMap<string, string> = new Map<string, string>();
 let declaredViewIcons: ReadonlyMap<string, string> = new Map<string, string>();
 /** Which declared items bring a native pane header. */
 let declaredViewPaneHeaders: ReadonlySet<string> = new Set<string>();
+let declaredViewActions: ReadonlyMap<string, () => ReactNode> = new Map<string, () => ReactNode>();
 
 /**
  * Re-read the slot registries into {@link declaredViewIds}.
@@ -83,6 +86,7 @@ export function readDeclaredViewIds(slots: CatalogueSlots): ReadonlySet<string> 
   const labels = new Map<string, string>();
   const icons = new Map<string, string>();
   const paneHeaders = new Set<string>();
+  const actionsById = new Map<string, () => ReactNode>();
   const slotsById = new Map<string, "window" | "widget">();
   for (const [slot, kind] of [
     [WINDOW_SLOT, "window"],
@@ -95,9 +99,16 @@ export function readDeclaredViewIds(slots: CatalogueSlots): ReadonlySet<string> 
       slotsById.set(id, kind);
       const label = entry.options.label;
       if (typeof label === "string" && label !== "") labels.set(id, label);
-      const options = entry.options as { icon?: unknown; paneHeader?: unknown };
+      const options = entry.options as {
+        icon?: unknown;
+        paneHeader?: unknown;
+        actions?: unknown;
+      };
       if (typeof options.icon === "string" && options.icon !== "") icons.set(id, options.icon);
       if (options.paneHeader === true) paneHeaders.add(id);
+      if (typeof options.actions === "function") {
+        actionsById.set(id, options.actions as () => ReactNode);
+      }
     }
   }
   declaredViewIds = ids;
@@ -105,6 +116,7 @@ export function readDeclaredViewIds(slots: CatalogueSlots): ReadonlySet<string> 
   declaredViewLabels = labels;
   declaredViewIcons = icons;
   declaredViewPaneHeaders = paneHeaders;
+  declaredViewActions = actionsById;
   return ids;
 }
 
@@ -121,6 +133,11 @@ export function declaredViewLabel(viewId: string): string | undefined {
 /** The icon class a content-slot entry declared, if any. */
 export function declaredViewIcon(viewId: string): string | undefined {
   return declaredViewIcons.get(viewId);
+}
+
+/** The actions a content-slot entry declared for its view, if any. */
+export function declaredViewActionsFor(viewId: string): (() => ReactNode) | undefined {
+  return declaredViewActions.get(viewId);
 }
 
 /** Whether a declared view brings a native pane header of its own. */
