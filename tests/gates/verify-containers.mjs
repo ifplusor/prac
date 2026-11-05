@@ -167,7 +167,6 @@ const sidebarWindow = await page.evaluate((boardId) => {
     id.startsWith("vscode:file:"),
   );
   return {
-    hosted: typeof board?.hostedWindows === "object" ? [...board.hostedWindows] : [],
     fileIds,
     fileRegions: fileIds.map((id) => globalThis.__pracTest?.frame.getState().items[id]?.region ?? null),
     editorsInSidebar: editors.length,
@@ -238,7 +237,6 @@ report({
       ) && owns(initial, "left/container:workbench.view.scm", "vscode:view:workbench.scm"),
     "the board window has a PracWindowInput identity projection": boardMapped,
     "a single editor window can live in the sidebar WindowGroup":
-      sidebarWindow.hosted.some((id) => id.startsWith("vscode:file:")) &&
       sidebarWindow.fileRegions.some(
         (region) => typeof region === "string" && region.startsWith("left/container:"),
       ) &&

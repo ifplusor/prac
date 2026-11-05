@@ -30,6 +30,17 @@ export function apply(ctx: Context): void {
       ),
     setItemBoard: (viewId, boardId) => frame.setItemBoard(viewId, boardId),
   };
+  // The board is an app window: the region's window group holds it like any other
+  // window, and its identity comes from the application layer.
+  ctx.effect(
+    () =>
+      ctx.pracApplications.register({
+        id: "prac.board",
+        label: "Board",
+        instances: "multi",
+      }),
+    "prac-client-ui-widget: board app",
+  );
   const face: PracWidgetsFace = {
     registry: new WidgetRegistry(),
     createBoardWindow: (id, label) => {
@@ -37,6 +48,7 @@ export function apply(ctx: Context): void {
       if (existing !== undefined) return existing;
       const board = new BoardWindowAdapter(id, label, windowFace);
       boards.set(id, board);
+      ctx.pracWindows.admit("prac.board", { windowId: board.boardId, title: label ?? "Board" });
       return board;
     },
     boards: () => [...boards.values()].filter((board) => !board.disposed),
@@ -63,4 +75,4 @@ export function apply(ctx: Context): void {
 /** Cordis plugin name. */
 export const name = "prac-client-ui-widget";
 /** The widget plugin needs the frame's placement face. */
-export const inject = ["pracFrame", "pracSurfaces"];
+export const inject = ["pracFrame", "pracSurfaces", "pracApplications", "pracWindows"];

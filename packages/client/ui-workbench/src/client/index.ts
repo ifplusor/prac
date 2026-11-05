@@ -644,7 +644,7 @@ export function apply(ctx: Context): void {
     }
     if (entry.registered) return entry.board;
     try {
-      layout.registerContent(entry.board, region);
+      layout.registerWindowGroup(entry.board.group, region);
       layout.setItemBoard(entry.board.windowId, entry.board.boardId);
       entry.registered = true;
       return entry.board;

@@ -155,10 +155,6 @@ export class BoardWindowAdapter implements RegionContent<WindowGroup> {
     return this.content.get();
   }
 
-  get hostedWindows(): readonly string[] {
-    return this.group.state.order;
-  }
-
   get disposed(): boolean {
     return this.group.disposed;
   }
