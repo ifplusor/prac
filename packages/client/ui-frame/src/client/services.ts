@@ -134,6 +134,19 @@ export function createServices(
   // one-view rows. Hiding the last visible view, placing one, folding one — they all change the shape
   // (a stack that falls back to one row melts, an empty leftover holds no space), so the normaliser
   // runs on the way out of each change rather than only on placements.
+  /** The DSH host face, when a host is present (the frame does not require one). */
+  let dshHost: { conversation: string; mainView(key: string): string } | undefined;
+  ctx.inject(["pracDsh"], (scope) => {
+    dshHost = (
+      scope as unknown as {
+        pracDsh: { conversation: string; mainView(key: string): string };
+      }
+    ).pracDsh;
+    return () => {
+      dshHost = undefined;
+    };
+  });
+
   const applications = new ApplicationRegistry();
   const windows = new WindowManager(new WindowGroupBindings(store), applications, {
     register: (windowId, facts, content) => {
@@ -217,17 +230,13 @@ export function createServices(
       navigation = new AbortController();
       store.update((state) => {
         // The host owns its panel ids (the DSH host provides the face); the
-        // frame only places the window the host names. Structurally typed so the
-        // frame does not import the DSH host's package.
-        const dsh = (
-          ctx as unknown as {
-            pracDsh?: { conversation: string; mainView(key: string): string };
-          }
-        ).pracDsh;
-        if (dsh === undefined) {
+        // frame only places the window the host names. Captured through a
+        // dynamic inject: a plain property read on a context that does not
+        // declare the service throws in Cordis.
+        if (dshHost === undefined) {
           throw new Error("layout.selectPanel: the DSH host face is not available");
         }
-        const viewId = panelId === null ? dsh.conversation : dsh.mainView(panelId);
+        const viewId = panelId === null ? dshHost.conversation : dshHost.mainView(panelId);
         // The chosen view goes where the *arrangement* placed it, or to the
         // centre when it has no home of its own — never to "wherever the panel
         // on show happened to sit". A view parked in the track counts as having
