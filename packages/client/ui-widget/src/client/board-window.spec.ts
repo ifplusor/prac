@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import { WindowGroupModel } from "prac-ui-kit-workbench";
 
 import { BoardWindow, BoardWindowAdapter } from "./board-window.js";
 
@@ -10,16 +11,19 @@ describe("BoardWindow", () => {
     expect(board.content.kind).toBe("board");
   });
 
-  it("is hosted by a generic window group", () => {
+  it("is the primary member of the region's window group", () => {
+    // The group belongs to the region; the workbench creates it and the board
+    // window is its primary. The adapter itself owns no group.
     const adapter = new BoardWindowAdapter("board", "Board");
-    expect(adapter.group.primary).toBe(adapter.boardWindow);
-    expect(adapter.windows).toEqual([adapter.boardWindow]);
+    const group = new WindowGroupModel("board", adapter.boardWindow, "Board");
+    expect(group.primary).toBe(adapter.boardWindow);
+    expect(group.state.order).toEqual(["board/board"]);
 
-    adapter.openWindow("editor:1");
-    expect(adapter.state.order).toEqual(["board/board", "editor:1"]);
-    expect(adapter.state.active).toBe("editor:1");
+    group.openWindow("editor:1");
+    expect(group.state.order).toEqual(["board/board", "editor:1"]);
+    expect(group.state.active).toBe("editor:1");
 
-    adapter.closeWindow("board/board");
-    expect(adapter.state.order).toEqual(["board/board", "editor:1"]);
+    group.closeWindow("board/board");
+    expect(group.state.order).toEqual(["board/board", "editor:1"]);
   });
 });

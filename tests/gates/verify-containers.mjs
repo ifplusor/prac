@@ -79,7 +79,7 @@ const read = () =>
       })),
       widgetBoards: (globalThis.__pracTest?.widgets?.boards?.() ?? []).map((board) => ({
         id: board.id,
-        window: board.state.active,
+        window: board.windowId,
         widgets: typeof board.widgetOrder === "function" ? [...board.widgetOrder()] : [],
       })),
       surfaces: [...document.querySelectorAll("[data-prac-region-content]")].map((element) => ({

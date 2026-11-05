@@ -31,7 +31,7 @@ const read = () =>
     const host = document.querySelector(`[data-prac-view-id="${boardId}/board"]`);
     const root = host?.shadowRoot;
     return {
-      window: board === undefined ? null : board.state.active,
+      window: board === undefined ? null : board.windowId,
       record: globalThis.__pracTest?.frame.getState().items[`${boardId}/board`] ?? null,
       order: board === undefined ? [] : [...board.widgetOrder()],
       active: board === undefined ? undefined : board.content.activeWidget,

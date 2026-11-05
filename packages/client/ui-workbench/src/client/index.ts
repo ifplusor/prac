@@ -55,6 +55,7 @@ import type { PracDshFace } from "prac-client-ui-dsh/client";
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 
 import type { PracWidgetsFace } from "prac-client-ui-widget/client";
+import { WindowGroupModel } from "prac-ui-kit-workbench";
 // Types only, for its `Context` merge (`ctx.pracVscode`): the arrangement follows
 // the app's open-file set, and naming the face puts that service in this program.
 import type { PracVscodeFace, VscodeCatalogueEntry } from "prac-client-vscode-host/client";
@@ -627,6 +628,8 @@ export function apply(ctx: Context): void {
   type ContainerBoard = ReturnType<PracWidgetsFace["createBoardWindow"]>;
   interface ContainerEntry {
     readonly board: ContainerBoard;
+    /** The region's window group; the board window is its primary member. */
+    readonly group: WindowGroupModel;
     /** Whether the surface registration has succeeded (the region may come later). */
     registered: boolean;
   }
@@ -636,7 +639,12 @@ export function apply(ctx: Context): void {
     if (entry === undefined || entry.board.disposed) {
       try {
         // A container region's surface is a window group whose one window is a board.
-        entry = { board: widgets.pracWidgets.createBoardWindow(region, label), registered: false };
+        const board = widgets.pracWidgets.createBoardWindow(region, label);
+        entry = {
+          board,
+          group: new WindowGroupModel(region, board.boardWindow, label),
+          registered: false,
+        };
       } catch {
         return undefined;
       }
@@ -644,7 +652,7 @@ export function apply(ctx: Context): void {
     }
     if (entry.registered) return entry.board;
     try {
-      layout.registerWindowGroup(entry.board.group, region);
+      layout.registerWindowGroup(entry.group, region);
       layout.setItemBoard(entry.board.windowId, entry.board.boardId);
       entry.registered = true;
       return entry.board;
@@ -732,7 +740,8 @@ export function apply(ctx: Context): void {
     const offered = new Set([...wanted.values()].flatMap((target) => target.items));
     for (const [region, entry] of containerBoards) {
       if (wanted.has(region)) continue;
-      if (entry.registered) layout.unregisterWindowGroup(entry.board.id);
+      if (entry.registered) layout.unregisterWindowGroup(entry.group.id);
+      entry.group.dispose();
       entry.board.dispose();
       containerBoards.delete(region);
     }
@@ -758,7 +767,8 @@ export function apply(ctx: Context): void {
   ctx.effect(
     () => () => {
       for (const entry of containerBoards.values()) {
-        if (entry.registered) layout.unregisterWindowGroup(entry.board.id);
+        if (entry.registered) layout.unregisterWindowGroup(entry.group.id);
+        entry.group.dispose();
         entry.board.dispose();
       }
       containerBoards.clear();
@@ -1023,11 +1033,11 @@ export function apply(ctx: Context): void {
       // same window record in the target.
       const entry = containerBoards.get(sourceChild);
       if (entry?.registered === true) {
-        layout.unregisterWindowGroup(entry.board.id);
+        layout.unregisterWindowGroup(entry.group.id);
         entry.registered = false;
         containerBoards.delete(sourceChild);
         try {
-          layout.registerContent(entry.board, targetChild);
+          layout.registerWindowGroup(entry.group, targetChild);
           layout.setItemBoard(entry.board.windowId, entry.board.boardId);
           entry.registered = true;
           containerBoards.set(targetChild, entry);

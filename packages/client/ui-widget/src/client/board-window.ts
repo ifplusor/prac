@@ -1,12 +1,5 @@
 import type { ContentHost } from "prac-ui-kit-content";
-import {
-  type RegionContent,
-  type Window,
-  type WindowGroup,
-  type WidgetRecord,
-  type LayoutState,
-  WindowGroupModel,
-} from "prac-ui-kit-workbench";
+import type { Window, WidgetRecord, LayoutState } from "prac-ui-kit-workbench";
 import type { Side } from "prac-ui-kit-layout";
 /**
  * A board window and the surface that hosts it.
@@ -48,16 +41,20 @@ export class BoardWindow implements Window {
   }
 }
 
-/** A board window hosted as a surface with a generic window group. */
-export class BoardWindowAdapter implements RegionContent<WindowGroup> {
-  readonly kind = "window-group";
+/**
+ * A board window (its content is a board) and its widget management.
+ *
+ * The board is a window: the region's window group owns it as its primary member,
+ * and the workbench creates that group. This adapter does not own a group.
+ */
+export class BoardWindowAdapter {
   readonly boardWindow: BoardWindow;
-  readonly group: WindowGroupModel;
   readonly content: BoardContent;
   readonly windowId: string;
   readonly boardId: string;
   readonly label?: string;
   readonly #unregister: () => void;
+  #disposed = false;
 
   constructor(
     readonly id: string,
@@ -69,56 +66,9 @@ export class BoardWindowAdapter implements RegionContent<WindowGroup> {
     this.boardId = this.windowId;
     this.boardWindow = new BoardWindow(this.windowId);
     this.content = this.boardWindow.content;
-    this.group = new WindowGroupModel(id, this.boardWindow, label);
     this.#unregister =
       frame?.registerBoardLayout(this.boardId, this.content, createBoardChrome(this.content)) ??
       (() => {});
-  }
-
-  get state(): WindowGroup["state"] {
-    return this.group.state;
-  }
-
-  get placements(): WindowGroup["placements"] {
-    return this.group.placements;
-  }
-
-  get windows(): WindowGroup["windows"] {
-    return this.group.windows;
-  }
-
-  #element: HTMLElement | undefined;
-
-  get element(): HTMLElement | undefined {
-    return this.#element;
-  }
-
-  attach(element: HTMLElement): void {
-    this.#element = element;
-  }
-
-  detach(element: HTMLElement): void {
-    if (this.#element === element) this.#element = undefined;
-  }
-
-  onDidChange(listener: () => void): () => void {
-    return this.group.onDidChange(listener);
-  }
-
-  reorder(order: readonly string[]): void {
-    this.group.reorder(order);
-  }
-
-  openWindow(itemId: string): void {
-    this.group.openWindow(itemId);
-  }
-
-  closeWindow(itemId: string): void {
-    this.group.closeWindow(itemId);
-  }
-
-  activateWindow(itemId: string): void {
-    this.group.activateWindow(itemId);
   }
 
   addWidget(widgetId: string, options?: WidgetPlacementOptions): void {
@@ -156,13 +106,13 @@ export class BoardWindowAdapter implements RegionContent<WindowGroup> {
   }
 
   get disposed(): boolean {
-    return this.group.disposed;
+    return this.#disposed;
   }
 
   dispose(): void {
-    if (this.group.disposed) return;
+    if (this.#disposed) return;
+    this.#disposed = true;
     this.#unregister();
-    this.group.dispose();
     this.content.dispose();
   }
 }
