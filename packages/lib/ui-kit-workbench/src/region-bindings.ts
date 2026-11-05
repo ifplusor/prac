@@ -17,6 +17,7 @@ import type {
 } from "./workbench-model.js";
 import type { LayoutStore } from "./store.js";
 import { WindowGroupLayoutBridge } from "./group-bridge.js";
+import { WindowGroupModel } from "./window-group-model.js";
 import type { GroupRegionContent } from "./region-content.js";
 
 /** One bar entry projected from a hosted group. */
@@ -127,6 +128,29 @@ export class WindowGroupBindings {
         entry.group.reorder(visible);
       }
     }
+  }
+
+  /**
+   * Add one window to a group's order without a manager runtime.
+   *
+   * A group registered as a region content (a board's surface) is owned by the
+   * bindings, not by the window manager; a window placed into that region still
+   * belongs to the group, so membership has to be writable here.
+   */
+  join(groupId: string, windowId: string): void {
+    const group = this.#groups.get(groupId)?.group;
+    if (group instanceof WindowGroupModel) group.openWindow(windowId);
+  }
+
+  /** Remove one window from a group's order (the inverse of {@link join}). */
+  leave(groupId: string, windowId: string): void {
+    const group = this.#groups.get(groupId)?.group;
+    if (group instanceof WindowGroupModel) group.closeWindow(windowId);
+  }
+
+  /** The region a window's item record currently sits in, if any. */
+  regionOf(windowId: string): string | undefined {
+    return this.store.get().items[windowId]?.region ?? undefined;
   }
 
   /** The region content registered for a region, if any. */

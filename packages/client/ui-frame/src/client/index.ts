@@ -229,6 +229,7 @@ export function apply(ctx: Context): void {
     surfaces,
     contentHosts,
     boardLayouts,
+    stopMembership,
   } = createServices(ctx, store, closeListeners);
   const disposeWindowGroupRegionContent = surfaces.register("window-group", {
     create: ({ nodeId }) => new WindowGroupAdapter(nodeId),
@@ -363,6 +364,7 @@ export function apply(ctx: Context): void {
       disposePracSpaces();
       disposeWindowGroupRegionContent.dispose();
       disposePracSurfaces();
+      stopMembership();
       disposeWindows();
       disposeApplications();
       disposePracFrame();
