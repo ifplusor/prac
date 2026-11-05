@@ -45,10 +45,26 @@ export interface ApplicationDefinition {
    * resolving content is a rendering decision, not a registration one.
    *
    * @param windowId - the window instance id.
+   * @param render - the host's slot renderer, bound to the host's declared
+   *   child slots; an app whose body is a host panel renders it through this.
    * @returns the component that renders the instance.
    */
-  content?(windowId: string): () => ReactNode;
+  content?(windowId: string, render?: ApplicationSlotRenderer): () => ReactNode;
 }
+
+/**
+ * The host's slot renderer, handed to an app whose body is a host-owned panel.
+ *
+ * @param slot - the child slot name (`main`, `sidebar`, …).
+ * @param props - the slot's props.
+ * @param options - the entry key / options the host's binding expects.
+ * @returns the rendered slot.
+ */
+export type ApplicationSlotRenderer = (
+  slot: string,
+  props: Record<string, unknown>,
+  options?: { readonly entryKey?: string },
+) => ReactNode;
 
 /** The application table: who can be launched. */
 export class ApplicationRegistry {

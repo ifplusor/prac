@@ -93,6 +93,7 @@ import { LayoutItem, type BoardDropFace, type ItemRenderSlot } from "./layout-it
 import { createFrameChrome } from "./frame-chrome.js";
 
 import type { UseSessions } from "@deepseek-ai/dsh-client-ui-session/client";
+import type { ApplicationSlotRenderer } from "prac-ui-kit-workbench";
 import {
   declaredViewActionsFor,
   declaredViewIcon,
@@ -732,8 +733,15 @@ export function createFrame(
      * @param viewId - the view to render.
      * @param box - the box of the region holding it.
      */
-    const viewBody = (viewId: string, box: Box, chrome?: "frame"): ReactElement =>
-      createElement(
+    const viewBody = (viewId: string, box: Box, chrome?: "frame"): ReactElement => {
+      // An app's content may render a host panel; the host offers its slot
+      // renderer here, so the app decides its body without the frame hard-coding
+      // a slot path for it.
+      const windowContent = sources.windows?.windowContentFor(
+        viewId,
+        renderSlot as unknown as ApplicationSlotRenderer,
+      );
+      return createElement(
         LayoutIsolation,
         { key: viewId, itemId: viewId, ...(chrome === undefined ? {} : { chrome }) },
         createElement(LayoutItem, {
@@ -760,13 +768,12 @@ export function createFrame(
           itemFacts,
           ...(sources.widgets === undefined ? {} : { widgets: sources.widgets }),
           renderSlot: renderSlot as unknown as ItemRenderSlot,
-          ...(sources.windows?.windowContentFor(viewId) === undefined
-            ? {}
-            : { windowContent: sources.windows.windowContentFor(viewId)! }),
+          ...(windowContent === undefined ? {} : { windowContent }),
           box,
           viewportWidth: state.viewportWidth,
         }),
       );
+    };
 
     /**
      * The **container bar**: one entry per child of a selector region.

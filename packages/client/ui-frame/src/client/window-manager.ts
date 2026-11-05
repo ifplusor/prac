@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type {
+  ApplicationSlotRenderer,
   ApplicationRegistry,
   GroupBarItem,
   GroupRegionContent,
@@ -209,7 +210,7 @@ export class WindowManager {
     app: {
       readonly icon?: string;
       readonly paneHeader?: boolean;
-      content?(id: string): () => ReactNode;
+      content?(id: string, render?: ApplicationSlotRenderer): () => ReactNode;
     },
   ): void {
     if (this.seat === undefined || this.#seats.has(windowId)) return;
@@ -258,12 +259,16 @@ export class WindowManager {
    * a DSH slot: content follows the app that opened the window, not a registration.
    *
    * @param windowId - the window instance.
+   * @param render - the host's slot renderer, for an app whose body is a host panel.
    * @returns the app's component factory, or `undefined` for a non-app window.
    */
-  windowContentFor(windowId: string): (() => ReactNode) | undefined {
+  windowContentFor(
+    windowId: string,
+    render?: ApplicationSlotRenderer,
+  ): (() => ReactNode) | undefined {
     const appId = this.#appOf.get(windowId);
     if (appId === undefined) return undefined;
-    return this.apps.get(appId)?.content?.(windowId);
+    return this.apps.get(appId)?.content?.(windowId, render);
   }
 
   /**

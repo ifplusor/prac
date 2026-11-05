@@ -186,15 +186,14 @@ board 仍然是 **widget 的容器**：`BoardContent` 持有 widget 的 order / 
 ## Open questions
 
 1. **DSH 内容渲染的形态**（决定步骤 4）：
-   - V2：`prac-client-dsh-host` 在自己的座位注册里声明子槽，拿到绑定的 `renderSlot`；window 的 body 用它渲染 `main` 内容。结构上允许（绑定是闭包，校验 `isLive(entry)` 与 `entry.children`，不依赖 React context 位置），但 outlet 是否依赖渲染位置（scope / 顺序 / 卸载清理）未验证。
-   - V1：body 不由适配器给；frame 对没有内容的 item 渲染来源位置，适配器在**自己的位置**渲染 DSH 内容。一定安全，但 item 的「内容」归属变模糊。
-   - 关闭条件：一个最小 spike（座位里声明 `main`，在一棵由 frame 渲染的子树里调用该绑定，观察渲染 / 切换 / 卸载与 console），通过则 V2，否则 V1。
+   - **已决：V2。** 承载 DSH 面板的不是「适配器的座位」，而是 app 的 content：frame 把**自己的** `renderSlot` 作为 `ApplicationSlotRenderer` 传给 `content(windowId, render)`，app 用它渲染 `main` / `sidebar` / `rightbar`。绑定仍属于声明子槽的那次注册（frame 的 root），app 只是拿到该绑定的宿主；`chat` 已按此渲染 `main`（`dsh:main:conversation` 的 `main` 面板），file / tabs / containers 与全量验收绿，`windowContentFor` 单测锁定「renderer 被交给 content」。
+   - V1 不再需要：不引入「来源位置」这种归属模糊的 item。
 
 2. **conversation 的「bring forward」动作去留**：它是产品动作而非伙伴动作。候选：(a) 删除（recall 面已能 show/hide）；(b) 由 frame chrome 提供通用 affordance；(c) 由 dsh-host 的 entry 声明（名不正）。当前倾向 (a)。
 
 3. **runner 的落点与命名**：需要同时被两个伙伴的插件使用，又必须 DSH-free（结构化 `SlotRegistry` face）。候选：`packages/lib/ui-kit-source`（新），或并入某个现有 lib。关闭条件：确定包与名字后写进 `docs/client-packages.md` 的包表。
 
-4. **来源渲染位置是否也承载 vscode 的内容**：VS Code 的内容由 `hostFor` 提供，不需要位置；只有 DSH 需要「声明子槽 + 渲染」的宿主能力。若 V2 成立，位置可能只需要给 DSH。
+4. ~~**来源渲染位置是否也承载 vscode 的内容**~~：V2 已决，不存在「来源渲染位置」；DSH 的宿主能力是 app content 拿到宿主 renderer，VS Code 仍由 `hostFor` 提供内容。
 
 ## Validation
 

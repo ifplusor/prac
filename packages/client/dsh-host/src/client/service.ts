@@ -25,6 +25,11 @@ export function apply(ctx: Context): void {
         label: "Chat",
         instances: "single",
         defaultRegion: "center",
+        content: (windowId, render) => {
+          if (render === undefined) return () => null;
+          const key = dshMainKey(windowId) ?? "conversation";
+          return () => render("main", {}, { entryKey: key });
+        },
       }),
     "prac-client-dsh-host: chat app",
   );

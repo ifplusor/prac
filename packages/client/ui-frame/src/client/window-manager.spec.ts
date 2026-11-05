@@ -207,6 +207,18 @@ describe("WindowManager.admit", () => {
     expect(manager.windowContentFor("f1")).toBeUndefined();
   });
 
+  it("hands the host's renderer to an app whose body is a host panel", () => {
+    const apps = new ApplicationRegistry();
+    const render = (_slot: string, _props: Record<string, unknown>, _options?: unknown) => "panel";
+    apps.register(
+      app("host", { content: (_windowId, renderSlot) => () => renderSlot?.("main", {}) ?? null }),
+    );
+    const manager = new WindowManager(fakeBindings(), apps);
+    manager.admit("host", { windowId: "h1" });
+    const resolved = manager.windowContentFor("h1", render as never);
+    expect(resolved?.()).toBe("panel");
+  });
+
   it("hands the source's handle to the group when one is given", () => {
     const { apps, manager } = managerWith();
     apps.register(app("editor"));
