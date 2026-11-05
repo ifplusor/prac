@@ -49,7 +49,11 @@ export interface ApplicationDefinition {
    *   child slots; an app whose body is a host panel renders it through this.
    * @returns the component that renders the instance.
    */
-  content?(windowId: string, render?: ApplicationSlotRenderer): () => ReactNode;
+  content?(
+    windowId: string,
+    render?: ApplicationSlotRenderer,
+    view?: ApplicationViewport,
+  ): () => ReactNode;
 }
 
 /**
@@ -65,6 +69,12 @@ export type ApplicationSlotRenderer = (
   props: Record<string, unknown>,
   options?: { readonly entryKey?: string },
 ) => ReactNode;
+
+/** The box an app window renders into (a host panel uses it for its props). */
+export interface ApplicationViewport {
+  readonly width: number;
+  readonly viewportWidth: number;
+}
 
 /** The application table: who can be launched. */
 export class ApplicationRegistry {

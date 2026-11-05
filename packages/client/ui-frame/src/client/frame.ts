@@ -740,6 +740,7 @@ export function createFrame(
       const windowContent = sources.windows?.windowContentFor(
         viewId,
         renderSlot as unknown as ApplicationSlotRenderer,
+        { width: box.width, viewportWidth: state.viewportWidth },
       );
       return createElement(
         LayoutIsolation,

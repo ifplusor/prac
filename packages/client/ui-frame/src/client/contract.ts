@@ -1,5 +1,6 @@
 import type {
   ApplicationSlotRenderer,
+  ApplicationViewport,
   BoardLayoutSource,
   RegionBinding,
   ItemKind,
@@ -148,7 +149,11 @@ export interface PracPartnerApplication {
   /** The content brings its own native header (the frame overlays controls only). */
   readonly paneHeader?: boolean;
   /** One window's content; resolved per instance id. */
-  content(windowId: string, render?: ApplicationSlotRenderer): () => ReactNode;
+  content(
+    windowId: string,
+    render?: ApplicationSlotRenderer,
+    view?: ApplicationViewport,
+  ): () => ReactNode;
   /** The instances the partner wants open right now. */
   windows(): readonly { readonly id: string; readonly title: string }[];
 }

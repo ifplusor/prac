@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type {
   ApplicationSlotRenderer,
+  ApplicationViewport,
   ApplicationRegistry,
   GroupBarItem,
   GroupRegionContent,
@@ -210,7 +211,11 @@ export class WindowManager {
     app: {
       readonly icon?: string;
       readonly paneHeader?: boolean;
-      content?(id: string, render?: ApplicationSlotRenderer): () => ReactNode;
+      content?(
+        id: string,
+        render?: ApplicationSlotRenderer,
+        view?: ApplicationViewport,
+      ): () => ReactNode;
     },
   ): void {
     if (this.seat === undefined || this.#seats.has(windowId)) return;
@@ -265,10 +270,11 @@ export class WindowManager {
   windowContentFor(
     windowId: string,
     render?: ApplicationSlotRenderer,
+    view?: ApplicationViewport,
   ): (() => ReactNode) | undefined {
     const appId = this.#appOf.get(windowId);
     if (appId === undefined) return undefined;
-    return this.apps.get(appId)?.content?.(windowId, render);
+    return this.apps.get(appId)?.content?.(windowId, render, view);
   }
 
   /**
