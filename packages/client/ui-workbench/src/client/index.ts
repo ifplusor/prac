@@ -676,11 +676,12 @@ export function apply(ctx: Context): void {
       // The editor group of a sidebar lives at the **window's** region (the stack row),
       // not the container region the board window's record sits in: project into the
       // group that already hosts this group's other windows.
-      // A **window** whose record sits under this board's region: the sidebar
-      // editor case. Widget rows are not editor groups and must not be picked.
-      const hostedRegion = Object.values(layout.getState().items)
-        .filter((record) => record.kind === "window")
-        .map((record) => record.region)
+      // A **file window** whose record sits under this board's region: the sidebar
+      // editor case. Widget rows are not editor groups, and the host's own panels
+      // (sidebar / rightbar windows) are not files.
+      const hostedRegion = Object.entries(layout.getState().items)
+        .filter(([id, record]) => record.kind === "window" && id.startsWith("vscode:file:"))
+        .map(([, record]) => record.region)
         .find((region) => typeof region === "string" && region.startsWith(`${entry.board.id}/`));
       if (hostedRegion === undefined) continue;
       vscode.mapWindow(id, entry.board.label ?? "Board", hostedRegion);
@@ -778,6 +779,17 @@ export function apply(ctx: Context): void {
       layout.setItemFlags(conversation, { closable: true });
       if (layout.activeItem() === conversation) vscode.activateWindow(conversation);
     };
+    // A window's region lives in the frame's records; a placement is a layout
+    // change, so the board projection follows the layout (not only the catalogue).
+    scope.effect(() =>
+      layout.subscribe(() => {
+        try {
+          syncBoardWindowProjection(vscode);
+        } catch {
+          // The next layout change retries.
+        }
+      }),
+    );
     scope.effect(() => {
       syncChat();
       const offLayout = layout.subscribe(syncChat);
