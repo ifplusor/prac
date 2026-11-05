@@ -131,6 +131,7 @@ board 仍然是 **widget 的容器**：`BoardContent` 持有 widget 的 order / 
 - 投影（`PracWindowInput` / `mapWindow`）只读窗口管理器的记录（window → region / group / active），不读 group order。
 
 这条模型同时解掉三处耦合：`board.hostedWindows`、`syncBoardWindowProjection` 的 `hostedRegion` 反推、workbench 里 conversation 的 `mapWindow`。
+conversation 的 `mapWindow` 这条尚未解：去掉后 `file`/`tabs`/`containers` 绿，但 `editor:group` 的 `focusRightLandsInTheNewRegion` 红（方向焦点停在 centre）——embed 的 editor grid 依赖 conversation 在编辑器模型里占一个 group。要解它，得先让 editor grid 的 group 由 frame 的窗口组/区域决定，而不是由被投影的窗口决定。
 
 ### 5 内容座位由谁写
 
