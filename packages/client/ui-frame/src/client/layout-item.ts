@@ -30,7 +30,7 @@ import { createElement, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 
 import { WIDGET_SLOT, WINDOW_SLOT } from "./catalogue.js";
-import { DSH_MAIN_PREFIX, DSH_RIGHTBAR_VIEW, DSH_SIDEBAR_VIEW, viewKind } from "./catalogue.js";
+import { viewKind } from "./catalogue.js";
 
 /** The slot face an item needs; frame and board can both satisfy it. */
 export type ItemRenderSlot = (
@@ -55,25 +55,6 @@ export interface LayoutItemProps {
   readonly windowContent?: () => ReactNode;
   readonly box: Box;
   readonly viewportWidth: number;
-}
-
-/** Render a DSH-owned slot item. */
-function renderDshView(
-  viewId: string,
-  renderSlot: ItemRenderSlot,
-  box: Box,
-  viewportWidth: number,
-): ReactNode {
-  if (viewId.startsWith(DSH_MAIN_PREFIX)) {
-    return renderSlot("main", {}, { entryKey: viewId.slice(DSH_MAIN_PREFIX.length) });
-  }
-  if (viewId === DSH_SIDEBAR_VIEW) {
-    return renderSlot("sidebar", { collapsed: box.width === 0, width: box.width });
-  }
-  if (viewId === DSH_RIGHTBAR_VIEW) {
-    return renderSlot("rightbar", { width: box.width, viewportWidth, canShow: box.width > 0 });
-  }
-  return null;
 }
 
 /**
@@ -187,8 +168,6 @@ export function LayoutItem({
   windowContent,
   board: boardProp,
   widgets,
-  box,
-  viewportWidth,
 }: LayoutItemProps): ReactNode {
   if (contentHost !== undefined) {
     return createElement(ContentHostMount, { host: contentHost, contentId: viewId });
@@ -205,7 +184,6 @@ export function LayoutItem({
   if (kind === "declared") {
     return renderSlot(contentKind === "widget" ? WIDGET_SLOT : WINDOW_SLOT, {}, { only: viewId });
   }
-  if (kind === "dsh") return renderDshView(viewId, renderSlot, box, viewportWidth);
   // An app window: content follows the app that opened it, not a slot declaration.
   if (windowContent !== undefined) return createElement(windowContent);
   return null;

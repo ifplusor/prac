@@ -33,6 +33,26 @@ export function apply(ctx: Context): void {
       }),
     "prac-client-dsh-host: chat app",
   );
+  // The sidebar is a host panel too (the arrangement hides it by default; it
+  // still exists as a window so a layout can show it).
+  ctx.effect(
+    () =>
+      ctx.pracApplications.register({
+        id: "dsh.sidebar",
+        label: "Sidebar",
+        instances: "single",
+        defaultRegion: "left",
+        content: (_windowId, render, view) => {
+          if (render === undefined) return () => null;
+          return () =>
+            render("sidebar", {
+              collapsed: (view?.width ?? 0) === 0,
+              width: view?.width ?? 0,
+            });
+        },
+      }),
+    "prac-client-dsh-host: sidebar app",
+  );
   // The right rail is a host panel: an app window whose body renders the host's
   // `rightbar` slot with the box the frame hands to the app content.
   ctx.effect(
@@ -57,9 +77,11 @@ export function apply(ctx: Context): void {
   ctx.effect(() => {
     ctx.pracWindows.admit("chat", { windowId: DSH_CONVERSATION_VIEW, title: "Chat" });
     ctx.pracWindows.admit("dsh.rightbar", { windowId: DSH_RIGHTBAR_VIEW, title: "Right bar" });
+    ctx.pracWindows.admit("dsh.sidebar", { windowId: DSH_SIDEBAR_VIEW, title: "Sidebar" });
     return () => {
       ctx.pracWindows.close(DSH_CONVERSATION_VIEW);
       ctx.pracWindows.close(DSH_RIGHTBAR_VIEW);
+      ctx.pracWindows.close(DSH_SIDEBAR_VIEW);
     };
   }, "prac-client-dsh-host: host windows");
   const face: PracDshFace = {

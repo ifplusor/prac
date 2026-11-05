@@ -42,20 +42,6 @@ export interface CatalogueSlots {
   }>;
 }
 
-/** The `dsh:` source: a slot DSH's own plugins register into. */
-export const DSH_VIEW_SOURCE = "dsh:";
-/**
- * DSH's `sidebar` slot as a view id. The mechanism renders the slot; the
- * arrangement decides which region it occupies.
- */
-export const DSH_SIDEBAR_VIEW = "dsh:sidebar";
-/** DSH's `rightbar` slot as a view id (see {@link DSH_SIDEBAR_VIEW}). */
-export const DSH_RIGHTBAR_VIEW = "dsh:rightbar";
-/** Prefix of DSH's keyed `main` slot ids (`dsh:main:<key>`). */
-export const DSH_MAIN_PREFIX = "dsh:main:";
-/** DSH's main-slot key for the current conversation (`selectPanel(null)`). */
-export const DSH_CONVERSATION_KEY = "conversation";
-
 /**
  * The view ids the content slots currently declare.
  *
@@ -153,23 +139,20 @@ export function declaredViewPaneHeader(viewId: string): boolean {
  * ids, so a prefix is not a dispatch rule). `dsh:` is only the fallback for
  * DSH's own slots, which are not declared into `prac.window` / `prac.widget`.
  */
-export type ViewKind = "declared" | "dsh" | "unknown";
+export type ViewKind = "declared" | "unknown";
 
 /**
  * Classify a view id for rendering.
  *
  * @param viewId - the view identity.
- * @returns `"declared"` for a content-slot entry, `"dsh"` for one of DSH's own
- *   slots, `"unknown"` otherwise.
+ * @returns `"declared"` for a content-slot entry, `"unknown"` otherwise.
  */
 export function viewKind(viewId: string): ViewKind {
-  if (isDeclaredView(viewId)) return "declared";
-  return viewSource(viewId) === DSH_VIEW_SOURCE ? "dsh" : "unknown";
+  return isDeclaredView(viewId) ? "declared" : "unknown";
 }
 
 /**
- * Whether a view id is declared by a content slot (rather than being one of
- * DSH's own slots).
+ * Whether a view id is declared by a content slot.
  *
  * @param viewId - the view identity.
  */
@@ -178,25 +161,15 @@ export function isDeclaredView(viewId: string): boolean {
 }
 
 /**
- * The view ids the frame can currently offer, in a deterministic order.
+ * The view ids the content slots currently declare, in a deterministic order.
  *
- * The catalogue is the union of two live sources, never a hard-coded list:
- * DSH's own slots (`sidebar`, `rightbar`, and one id per currently registered
- * `main` key) and every entry of the content slots. Sorting each group keeps
- * the offered order stable across re-reads.
+ * The catalogue is a live join, never a hard-coded list: the host's own panels
+ * are app windows (they appear through the window records), and every entry of
+ * the content slots is offered here. Sorting keeps the order stable across
+ * re-reads.
  *
  * @param slots - the slot registry face the frame holds.
  */
 export function catalogueViewIds(slots: CatalogueSlots): string[] {
-  const mainKeys = new Set<string>();
-  for (const entry of slots.entries("main")) {
-    if (entry.options.key !== undefined) mainKeys.add(entry.options.key);
-  }
-  const declaredIds = readDeclaredViewIds(slots);
-  return [
-    DSH_SIDEBAR_VIEW,
-    ...[...mainKeys].sort().map((key) => `${DSH_MAIN_PREFIX}${key}`),
-    DSH_RIGHTBAR_VIEW,
-    ...[...declaredIds].sort(),
-  ];
+  return [...readDeclaredViewIds(slots)].sort();
 }

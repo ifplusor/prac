@@ -217,6 +217,9 @@ export function placeCatalogue(
     // selector) move into a child of their own, ahead of the containers.
     for (const record of layout.listItems()) {
       if (record.region !== region) continue;
+      // The DSH sidebar is hidden by the arrangement; moving it into a child
+      // would give it a visible home (and take the board's room).
+      if (record.id === dsh.sidebar) continue;
       children.set(childRegionId(region, record.id), {
         id: childRegionId(region, record.id),
         label: viewLabel(record.id),

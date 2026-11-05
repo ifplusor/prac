@@ -2,7 +2,6 @@ import { describe, expect, it } from "vite-plus/test";
 import "./contract.js";
 import { WIDGET_SLOT, viewSource } from "./catalogue.js";
 import {
-  DSH_CONVERSATION_KEY,
   catalogueViewIds,
   isDeclaredView,
   declaredViewLabel,
@@ -50,25 +49,12 @@ describe("viewSource", () => {
 });
 
 describe("catalogueViewIds", () => {
-  it("lists DSH's own slots around the live main keys, then the declared items", () => {
+  it("lists the declared items, sorted — not in registration order", () => {
     const slots = registry({
-      main: [
-        { options: { key: DSH_CONVERSATION_KEY } },
-        { options: { key: "alpha" } },
-        // A main entry with no key is not a view: it has no id to offer.
-        { options: {} },
-      ],
+      main: [{ options: { key: "conversation" } }],
       [WIDGET_SLOT]: [{ options: { id: "vscode:view:b" } }, { options: { id: "vscode:view:a" } }],
     });
-    expect(catalogueViewIds(slots)).toEqual([
-      "dsh:sidebar",
-      "dsh:main:alpha",
-      `dsh:main:${DSH_CONVERSATION_KEY}`,
-      "dsh:rightbar",
-      // Declared items come last, sorted — not in registration order.
-      "vscode:view:a",
-      "vscode:view:b",
-    ]);
+    expect(catalogueViewIds(slots)).toEqual(["vscode:view:a", "vscode:view:b"]);
   });
 
   it("collects the actions a declaration carries", () => {
@@ -85,18 +71,11 @@ describe("catalogueViewIds", () => {
       [WIDGET_SLOT]: [{ options: { id: "z" } }, { options: { id: "a" } }],
     });
     expect(catalogueViewIds(slots)).toEqual(catalogueViewIds(slots));
-    expect(catalogueViewIds(slots)).toEqual([
-      "dsh:sidebar",
-      "dsh:main:alpha",
-      "dsh:main:beta",
-      "dsh:rightbar",
-      "a",
-      "z",
-    ]);
+    expect(catalogueViewIds(slots)).toEqual(["a", "z"]);
   });
 
-  it("offers nothing from an empty registry but DSH's fixed slots", () => {
-    expect(catalogueViewIds(registry({}))).toEqual(["dsh:sidebar", "dsh:rightbar"]);
+  it("offers nothing from an empty registry", () => {
+    expect(catalogueViewIds(registry({}))).toEqual([]);
   });
 });
 
@@ -156,7 +135,7 @@ describe("viewKind", () => {
     readDeclaredViewIds(registry({ [WIDGET_SLOT]: [{ options: { id: "dsh:declared" } }] }));
     // The producer owns its ids; a `dsh:` prefix is not a dispatch rule.
     expect(viewKind("dsh:declared")).toBe("declared");
-    expect(viewKind("dsh:sidebar")).toBe("dsh");
+    expect(viewKind("dsh:sidebar")).toBe("unknown");
     expect(viewKind("vscode:view:outline")).toBe("unknown");
     readDeclaredViewIds(registry({}));
   });

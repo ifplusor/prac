@@ -80,12 +80,7 @@ import {
 import type { Context } from "@deepseek-ai/cordis";
 import type { MainPanelId, PanelInfo } from "@deepseek-ai/dsh-client-ui-layout/client";
 import type { HostObservable } from "@deepseek-ai/dsh-client-ui-renderer/client";
-import {
-  DSH_CONVERSATION_KEY,
-  DSH_MAIN_PREFIX,
-  catalogueViewIds,
-  declaredViewSlot,
-} from "./catalogue.js";
+import { catalogueViewIds, declaredViewSlot } from "./catalogue.js";
 
 import type { LayoutFace, PracLayoutFace, RoleBindings } from "./contract.js";
 
@@ -221,7 +216,18 @@ export function createServices(
       navigation.abort();
       navigation = new AbortController();
       store.update((state) => {
-        const viewId = `${DSH_MAIN_PREFIX}${panelId ?? DSH_CONVERSATION_KEY}`;
+        // The host owns its panel ids (the DSH host provides the face); the
+        // frame only places the window the host names. Structurally typed so the
+        // frame does not import the DSH host's package.
+        const dsh = (
+          ctx as unknown as {
+            pracDsh?: { conversation: string; mainView(key: string): string };
+          }
+        ).pracDsh;
+        if (dsh === undefined) {
+          throw new Error("layout.selectPanel: the DSH host face is not available");
+        }
+        const viewId = panelId === null ? dsh.conversation : dsh.mainView(panelId);
         // The chosen view goes where the *arrangement* placed it, or to the
         // centre when it has no home of its own — never to "wherever the panel
         // on show happened to sit". A view parked in the track counts as having
