@@ -17,7 +17,6 @@ import type {
 } from "./workbench-model.js";
 import type { LayoutStore } from "./store.js";
 import { WindowGroupLayoutBridge } from "./group-bridge.js";
-import { WindowGroupModel } from "./window-group-model.js";
 import type { GroupRegionContent } from "./region-content.js";
 
 /** One bar entry projected from a hosted group. */
@@ -138,14 +137,20 @@ export class WindowGroupBindings {
    * belongs to the group, so membership has to be writable here.
    */
   join(groupId: string, windowId: string): void {
-    const group = this.#groups.get(groupId)?.group;
-    if (group instanceof WindowGroupModel) group.openWindow(windowId);
+    // Structural, not `instanceof`: the kit is inlined into every client bundle,
+    // so the group may come from another copy of this module.
+    const group = this.#groups.get(groupId)?.group as {
+      openWindow?(id: string): void;
+    };
+    group.openWindow?.(windowId);
   }
 
   /** Remove one window from a group's order (the inverse of {@link join}). */
   leave(groupId: string, windowId: string): void {
-    const group = this.#groups.get(groupId)?.group;
-    if (group instanceof WindowGroupModel) group.closeWindow(windowId);
+    const group = this.#groups.get(groupId)?.group as {
+      closeWindow?(id: string): void;
+    };
+    group.closeWindow?.(windowId);
   }
 
   /** The region a window's item record currently sits in, if any. */

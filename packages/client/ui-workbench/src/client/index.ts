@@ -702,10 +702,12 @@ export function apply(ctx: Context): void {
       // The editor group of a sidebar lives at the **window's** region (the stack row),
       // not the container region the board window's record sits in: project into the
       // group that already hosts this group's other windows.
-      const hostedRegion = entry.board.hostedWindows
-        .filter((windowId) => windowId !== id)
-        .map((windowId) => layout.getState().items[windowId]?.region)
-        .find((region) => typeof region === "string");
+      // A **window** whose record sits under this board's region: the sidebar
+      // editor case. Widget rows are not editor groups and must not be picked.
+      const hostedRegion = Object.values(layout.getState().items)
+        .filter((record) => record.kind === "window")
+        .map((record) => record.region)
+        .find((region) => typeof region === "string" && region.startsWith(`${entry.board.id}/`));
       if (hostedRegion === undefined) continue;
       vscode.mapWindow(id, entry.board.label ?? "Board", hostedRegion);
       mappedBoards.add(id);
@@ -750,27 +752,6 @@ export function apply(ctx: Context): void {
         } catch {
           // The board went away between passes; the next sync rebuilds it.
         }
-      }
-    }
-    // A single editor window can live in the sidebar's WindowGroup: a file the frame
-    // placed in a container's region is a **window** of that group (the workbench owns
-    // its record; the group hosts it).
-    const records = layout.getState().items;
-    for (const [region, entry] of containerBoards) {
-      if (!entry.registered) continue;
-      const hosted = Object.entries(records)
-        .filter(
-          ([id, record]) =>
-            id.startsWith("vscode:file:") &&
-            typeof record.region === "string" &&
-            (record.region === region || record.region.startsWith(`${region}/`)),
-        )
-        .sort((a, b) => a[1].order - b[1].order)
-        .map(([id]) => id);
-      try {
-        entry.board.syncWindows(hosted);
-      } catch {
-        // A disposed board is removed on the next pass.
       }
     }
   };

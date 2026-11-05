@@ -121,10 +121,6 @@ export class BoardWindowAdapter implements RegionContent<WindowGroup> {
     this.group.activateWindow(itemId);
   }
 
-  syncWindows(itemIds: readonly string[]): void {
-    this.group.syncWindows(itemIds);
-  }
-
   addWidget(widgetId: string, options?: WidgetPlacementOptions): void {
     this.content.placeWidget(widgetId, this.boardId, options);
   }
