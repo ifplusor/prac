@@ -1,169 +1,167 @@
 # prac 的概念
 
 > 这份是**词表与体系**：prac 用哪些词、每个词指什么、哪些**不是**。它是现在时的参考。
-> 设计在 [architecture.md](architecture.md)；完整组合模型见 [2026-10-20-ui-framework.md](../.agents/notes/in-progress/2026-10-20-ui-framework.md)。
+> 架构在 [architecture.md](architecture.md)；扩展模型在 [.agents/notes/proposed/2026-11-05-tech-extension.md](../.agents/notes/proposed/2026-11-05-tech-extension.md)。
 
 ## 一句话
 
-> prac 的 UI 由 **Application / Window / Widget board / Widget** 四类对象组成；frame 拥有 Space、布局、surface、window group / board 与 chrome；来源拥有内容；机制不认识来源。
+> prac 是建立在 **Cordis / DSH** 上的 agent workspace：**extension** 贡献 app / widget 定义，**catalog** 是派生索引，**PracWindow / PracWidget** 是运行时对象，**placement** 是持久化状态。
 
-## 一、对象
+## 1. 基座
+
+- **Cordis** 是 prac 和 DSH 共同的 plugin runtime；
+- **DSH plugin** 是基于 Cordis 的产品级插件包；
+- **prac extension** 是一个 Cordis plugin + 一组 contribution 对象，不是新的 loader；
+- VS Code 是外部 host，通过 `prac.vscodeHost` 能力接进来；
+- DSH 通过 `prac.dshHost` 能力接进来。
 
 ```text
-Application（启动身份）
-Window（app 打开的实例）
-Widget board（布局面）
-Widget（可组合内容）
-
-Application --opens(1..N)--> Window
-Window --hosts(0..1)--> Widget board
-Dock --rail--> Application（launcher）
-Dock --content--> Sidebar
-Sidebar / Panel --hosts(0..N)--> Widget board
-Widget board --places(0..N)--> Widget
-Window group --contains--> Window
+Cordis plugin
+  apply(ctx)
+    → ctx.pracExtensions.register(extension)
+    → ctx.effect(dispose)
 ```
 
-| 对象             | 是什么                                                                                   | 不是                                     |
-| ---------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------- |
-| **Application**  | 启动身份；定义 window kind / single-multi / 默认 placement / 默认 composition / launcher | 不是内容容器；不直接进 window group      |
-| **Window**       | app 打开的实例；有 placement / lifecycle / active                                        | 不是 tab；不是 widget                    |
-| **Widget board** | 一种 **window**：内容是一块摆放 widget 的 board                                          | 不是 app；不是 window group；不是 region |
-| **Widget**       | 可组合内容                                                                               | 不是 window；不直接进 window group       |
-| **Window group** | windows 的容器；tab strip 的 tab 是 window                                               | 不是 editor group；不是 board            |
-| **Space**        | stage 的虚拟桌面；拥有一个 `space root`；状态按 project folder 存                        | 不是 project folder；不是 layout root    |
+## 2. 三层
 
-### Window 两种
+```mermaid
+flowchart LR
+  D["声明<br/>PracExtensionManifest / PracAppDef / PracWidgetDef"]
+  C["catalog<br/>PracCatalog"]
+  R["运行时<br/>PracExtension / PracWindow / PracWidget / host"]
+  S["状态<br/>WindowPlacement / WidgetPlacement"]
 
-| kind                    | 内容              | 例子                                                           |
-| ----------------------- | ----------------- | -------------------------------------------------------------- |
-| **application window**  | app-owned 内容    | editor（一个文件）、chat、diff、terminal、browser、settings    |
-| **widget board window** | 一个 widget board | stage / sidebar / panel 上的 Explorer board、单 Timeline board |
+  D --> C --> R --> S
+```
 
-- window 是 frame 权威；每个 stage window 在 adapter 侧有 1:1 `EditorInput` 投影（含 chat / widget）；`EditorWindow` 是它在 adapter 侧的表示；
-- application window 与 widget window 只是内容不同；
-- adapter 的 `PracWindowProjection` 是 frame-owned window 的唯一写入口；`EditorGroupModel` 是它的投影。写审计区分 projection（frame 发起）与 external（app / editor 命令）；`EditorGroupModel` 仍由 upstream editor service 写，不是字面只读。
-- widget window 由 board host app 打开；board composition 可改，window identity 不变。
+- **声明**：可序列化、可比较；不放函数 / 句柄 / ReactNode；
+- **catalog**：派生快照 + 索引；不持久化；
+- **运行时**：Cordis plugin、host、window、widget、content root；
+- **状态**：placement / active / Space；持久化，但不是声明。
 
-### 关系约束
+## 3. 对象图
 
-- window 可以没有 board（application window）；board 本身就是一个 window；
-- widget 可以没有 board（未放置）；widget 不单独成为 window；
-- board window 可以在 stage / sidebar / panel；位置不改变它是 window；
-- **dock 是 rail / launcher，不是 surface**；sidebar 是它的内容区域，不是 dock 本身；
-- window group 只包含 window；
-- window owner（appId）与 widget source 是两件事；
-- widget 在兼容 board 之间移动；placement 改、source 不变；
-- 默认 move-only；copy 需要显式能力。
+```mermaid
+flowchart LR
+  E["PracExtension"]
+  AD["PracAppDef"]
+  AA["ApplicationDefinition<br/>(runtime)"]
+  W["PracWindow"]
+  WD["PracWidgetDef"]
+  PW["PracWidget<br/>(runtime)"]
+  WP["WidgetPlacement"]
+  WP2["WindowPlacement"]
 
-## 二、布局
+  E --> AD --> AA --> W
+  E --> WD --> PW
+  W --> WP2
+  PW --> WP
+```
+
+- `PracAppDef` + `contentFor` → `ApplicationDefinition`；app layer 再开 `PracWindow`；
+- `PracWidgetDef` + `hostFor` → `PracWidget`；board 里放 `WidgetPlacement`；
+- `WindowPlacement` 只描述窗口在 space root 的位置。
+
+## 4. 对象
+
+| 对象 | 是什么 | 不是什么 |
+|---|---|---|
+| **PracExtension** | Cordis plugin + contribution；`apps()` / `widgets()` / `hostFor` / `contentFor` | 不是新的 plugin runtime |
+| **PracAppDef** | app 的声明：id / label / instances / defaultRegion | 不是 window；不含 content |
+| **ApplicationDefinition** | app 的运行时定义：`PracAppDef` + `content(windowId)` | 不是 window 实例 |
+| **PracWindow** | 一个窗口实例：身份 / 生命周期 / appId / title | 不是 DOM window；不是 tab |
+| **PracWidgetDef** | widget 的声明：id / title / defaultBoard / defaultRegion | 不含 content / hostFor |
+| **PracWidget** | widget 的运行时：`PracWidgetDef` + source + content | 不是 window；不直接进 group |
+| **WindowPlacement** | window 在 space root 的 placement | 不是 window；不属于 `PracWindow` |
+| **WidgetPlacement** | widget 在 board root 的 placement | 不是 widget |
+| **PracCatalog** | 声明 / 定义的派生快照 + 索引 | 不是第二权威；不持久化 |
+| **Window group** | 一组 window；tab strip 的 tab 是 window | 不是 editor group |
+| **Space** | stage 的虚拟桌面；拥有一个 space root | 不是 project folder |
+| **board** | widget 的布局内容 | 不是 window；board window 才是 window |
+
+## 5. 关系约束
+
+- **一个正在编辑的文件 = 一个 `PracWindow`**；tab 是 window group 的 window，不是 window 内的 tab；
+- **一个 conversation = 一个 `PracWindow`**（当前）；
+- `PracWindow` 只属于一个 window group / region；
+- `WindowPlacement` 可以暂不在 group；
+- `WidgetPlacement` 只在一个 board root；
+- window group 的成员只能是 `PracWindow`；
+- board window 是 content 为 board 的 `PracWindow`，不是 `PracWindow` 的子类；
+- widget 不成为 tab；
+- `active` 有两级：group 的 active window、board 的 active widget。
+
+## 6. 来源
+
+| 来源 | prac |
+|---|---|
+| VS Code editor input（文件 / diff / custom editor / webview） | `PracAppDef` + `PracWindow` |
+| VS Code `ViewContainer` | board / board window |
+| VS Code `ViewDescriptor` | `PracWidgetDef` / `PracWidget` |
+| VS Code editor group | window group 的 adapter runtime |
+| VS Code 菜单 / 命令 | action model |
+| DSH `main` keyed entry | app / `PracWindow` |
+| DSH `sidebar` / `rightbar` | app / board（后续） |
+| DSH 内部 slot | widget |
+| DSH `shell.overlay` | frame overlay |
+
+- VS Code / DSH 是**内容来源**，不是 prac 的原生对象；
+- `PracExtension` 负责转换；frame 不认识 `vscode:` / `dsh:`；
+- adaptor 不拥有 placement / active / WM。
+
+## 7. 布局
 
 ```text
-Frame shell（frame 级）
+Frame shell
   dock / sidebar / panel / chrome
   stage
-    └─ Space（stage 的虚拟桌面）
+    └─ Space
          └─ space root
               split / grid / region
                    └─ surface
                         └─ window group
+                             └─ PracWindow
+                                  └─ content
 ```
 
-- **split / grid / region** 是几何节点；region 是叶子盒子；
-- **Space** 是 stage 的虚拟桌面，拥有一个 `space root`；**sidebar / panel / dock 是 frame 级，和 stage 平级**，不随 Space 切换；
-- **surface** 是 region 的内容根：
-  - stage cell → window group（属于当前 Space）；
-  - panel / sidebar → window group（内含 board window，frame 级）；
-  - opaque host → 外部内容；
-- **placement 有两条边**：
-  - window → window group；
-  - widget → board root；
-- **active 有两级**：
-  - window group 的 active window；
-  - board 的 active widget；
-- **widget window** 是 window，内容是 board，不是 region；
-- **layout roots**：frame 和 board 共用同一个 LayoutEngine；frame root 的 item 是 window，board root 的 item 是 widget；
-- **board hole**：board root 是 window content 里的 layout hole，参与 frame 的 hit-test / 拖拽 / split；
-- **跨 root 拖拽**：允许 move widget；split 只在目标 board root 内完成。
+- `frame root` 只放 shell；
+- `space root` 放 `WindowPlacement`；
+- `board root` 放 `WidgetPlacement`；
+- 一个 root 同时只有一个 writer；
+- `surface` 是 region 的内容根；
+- board root 是 window content 里的 layout hole，可 hit-test / drag / size / split；
+- 跨 root 只允许 move。
 
-## 三、Chrome / isolation
+## 8. 术语
 
-- window group tab strip / actions → frame + `prac-client-ui-frame`；
-- widget header / actions → board / `ui-widget`；
-- breadcrumbs → editor application window；不是 group tab strip；
-- overlay：
-  - 应用级 workbench overlay → frame float layer；
-  - widget 内部 overlay → widget-local；
-- window 是外层 containment / stacking / theme / focus 边界；
-- 混排 VS Code + DSH 保留 per-widget root / source-scoped 子树；
-- webview / iframe 自己的 browsing context。
+| canonical | 不要用 | 说明 |
+|---|---|---|
+| **PracExtension** | partner | Cordis plugin + contribution |
+| **PracCatalog** | catalogue | 派生快照 / 索引 |
+| **PracWindow** | WindowInstance / WindowRecord | 窗口运行时 |
+| **PracWidget** | WidgetInstance / WidgetItem | widget 运行时 |
+| **PracAppDef** | — | app 声明 |
+| **PracWidgetDef** | — | widget 声明 |
+| **WindowPlacement** | WindowItem | window 位置 |
+| **WidgetPlacement** | WidgetItem | widget 位置 |
+| **application window** | editor view / editor group | editor / chat / diff / terminal 的 window |
+| **editor group** | prac window group | VS Code adapter runtime |
+| **source adapter** | — | 把 VS Code / DSH 内容投影成 prac 对象 |
 
-## 四、来源
+## 9. 已退役
 
-| 来源                                                          | prac                                                  |
-| ------------------------------------------------------------- | ----------------------------------------------------- |
-| VS Code editor input（文件 / diff / custom editor / webview） | application window                                    |
-| VS Code `ViewContainer`                                       | widget board / widget window                          |
-| VS Code `ViewDescriptor`                                      | widget                                                |
-| VS Code editor group                                          | window group 的 adapter runtime（`IEditorGroupView`） |
-| VS Code 菜单 / 命令                                           | action model                                          |
-| DSH `main` keyed entry                                        | application window                                    |
-| DSH `sidebar` / `rightbar`                                    | widget board                                          |
-| DSH 内部 slot                                                 | widget / section                                      |
-| DSH `shell.overlay`                                           | frame overlay                                         |
+- **partner**：已被 extension 取代；
+- **catalogue**：统一为 catalog；
+- **WindowInstance / WindowRecord**：统一为 `PracWindow`；
+- **WidgetInstance / WidgetItem**：统一为 `PracWidget` / `WidgetPlacement`；
+- **view 是 prac 原生对象**：view 只属于 adapter / source；
+- **board 是 window**：board 是内容；board window 才是 window；
+- **seat / view group**：不是独立对象。
 
-- frame 不认识 `vscode:` / `dsh:`；
-- adaptor 只翻译，不拥有 frame / window / widget 的 layout / active / placement；
-- 注册面按 kind 分：widget 走 `prac.widget`，window 走 `prac.window`（`prac.view` 这个通用座位已删除）；board 有各自的注册面。
-- **view 是 adapter / source 术语，不是 prac 的原生对象**；VS Code `ViewDescriptor`、DSH slot 都在 adapter 侧落到 widget。
+## 10. 相关
 
-## 五、术语
-
-| canonical               | 不要用                           | 说明                                                          |
-| ----------------------- | -------------------------------- | ------------------------------------------------------------- |
-| **application**         | app instance / container         | 启动身份；window 由 app 打开                                  |
-| **window**              | tab / view                       | app 的实例；application window 或 widget window               |
-| **window group**        | editor group / view group        | windows 的容器                                                |
-| **widget board**        | container / view group / panel   | 摆放 widget 的布局面                                          |
-| **widget**              | view / tab                       | 可组合内容；在 board 里；是 VS Code view / DSH slot 的落点    |
-| **placement**           | membership                       | window→group；widget→board                                    |
-| **dock / rail**         | dock as surface / stage          | launcher 条；不是 region / surface，不与 stage 同类           |
-| **sidebar / panel**     | dock                             | 内容区域，承载 widget board window；不是 dock rail            |
-| **surface**             | region content                   | region 的内容根                                               |
-| **application window**  | editor view / editor group       | editor / chat / diff / terminal 的 window                     |
-| **widget board window** | container window / widget window | 承载 board 的 window；board 是 window，widget 是 view         |
-| **editor group**        | prac window group                | `IEditorGroupView`，adapter runtime                           |
-| **editor window**       | separate window type             | editor application window 的简称                              |
-| **catalogue**           | registry                         | 合并后的 widget / window 目录                                 |
-| **source adapter**      | —                                | 把来源投影成 application / window / widget / action / overlay |
-
-## 六、已退役
-
-- **view group / container record**：board 的内部内容组 / 早期名字；不是独立对象；
-- **seat**：没有独立对象；
-- **region tree 直接以 view 为 child**：region 的 child 是 surface，不是 view；
-- **editor group 作为 prac UI 类型**：只是 adapter runtime；
-- **“view 是唯一单位”**：window 是编排单位，widget 是内容单元；
-- **把 view 当作 prac 的原生对象**：view 只属于 adapter / source；prac 侧是 window / board / widget。
-
-## 七、包
-
-```text
-prac-ui-kit-layout / prac-ui-kit-content / prac-ui-kit-workbench  // libraries
-ui-frame                // DSH plugin row only
-prac-client-ui-frame
-ui-widget
-ui-workbench
-ui-dsh
-ui-vscode-host / ui-vscode-views / ui-vscode-editor
-bundle/web-app  // composition root only
-```
-
-完整依赖见 10-20 的 Package architecture。`ui-frame` 是只做插件的 DSH 行，不再导出 `./lib`；共享的 content protocols / placement / store 在 **DSH-free** 的 `prac-ui-kit-content`，model / renderer / region content 在 **DSH-free** 的 `prac-ui-kit-workbench`，而持久化 store、DSH slot catalogue 与 `SlotMap` / `Context` 契约在插件（契约只做 `./client` 的 type-only 入口）。
-
-## 八、相关
-
-- [architecture.md](architecture.md)：目标架构。
+- [architecture.md](architecture.md)：部署 / 进程 / Browser-Server / 状态。
+- [window-model.md](window-model.md)：window / group / placement。
 - [ui-surface-map.md](ui-surface-map.md)：来源 → 对象映射。
 - [ui-acceptance.md](ui-acceptance.md)：UI 验收。
-- [2026-10-20-ui-framework.md](../.agents/notes/in-progress/2026-10-20-ui-framework.md)：组合模型 / package architecture。
+- [.agents/notes/proposed/2026-11-05-tech-extension.md](../.agents/notes/proposed/2026-11-05-tech-extension.md)：extension / catalog / runtime。

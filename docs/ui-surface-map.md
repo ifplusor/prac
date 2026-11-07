@@ -1,108 +1,111 @@
 # UI surface map（参考）
 
-> 两个生态的 UI 贡献面 → prac 的对象，以及 UI 术语表。决策与理由见 [2026-10-20-ui-framework.md](../.agents/notes/in-progress/2026-10-20-ui-framework.md)；本文只做参考映射，不承担决策。
+> 两个生态的 UI 贡献面 → prac 对象。决策 / 理由在 `.agents/notes/proposed/`；本文只做现在时的映射参考。
+> 词表见 [concepts.md](concepts.md)；架构见 [architecture.md](architecture.md)。
 
 ## 1. 对象
 
 ```text
-Application（启动身份）
-Window（app 打开的实例）
-Widget board（window 的一种内容）
-Widget（可组合内容）
-
-Space
-  split / grid / region
-    surface: window group（stage）/ widget board window（sidebar / panel）
+PracAppDef / PracWidgetDef        // 声明
+  → ApplicationDefinition / PracWidget  // runtime
+    → PracWindow / WidgetPlacement      // window 与位置
+      → WindowPlacement                // window 在 space root 的位置
 ```
 
-- window 由 application 打开，没有无主 window；
-- window 两种：application window（editor / chat / terminal）与 widget board window（承载 board）；
-- window group 的 tab 是 window，不是 widget；
-- widget 在 board 里，不直接进 window group；
-- board 本身就是 window；它可以放在 stage / sidebar / panel；window 可以没有 board（application window）。
+- window 由 app 打开；没有无主 window；
+- window group 的 tab 是 `PracWindow`；
+- widget 在 board root；不直接进 window group；
+- board 是内容；board window 才是 `PracWindow`；
+- `PracCatalog` 是声明 / 定义的派生索引。
 
 ## 2. VS Code
 
-| 贡献面                                                                  | 上游形态                                | prac                                                              |
-| ----------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
-| 文件 / diff / custom editor / webview editor                            | editor input                            | **application window**                                            |
-| `viewsContainers`                                                       | `ViewContainer` + `IViewContainerModel` | **widget board window**（sidebar / panel / stage）   |
-| `views`（tree / webview view）                                          | `ViewPane` / `WebviewViewPane`          | **widget**，`hostKind = view-pane`                                |
-| `viewsWelcome`                                                          | 空状态内容                              | widget 级空态，留在 widget host                                   |
-| `view/title` / `view/item/context` / `editor/title` / `menus`           | 菜单项引用命令                          | **action model**；window tab strip / widget header / frame chrome |
-| `commands` / `keybindings`                                              | 命令与键位注册表                        | command / keybinding，不是 widget                                 |
-| webview panel / `customEditors`                                         | editor part                             | **application window**，`EditorPane`                              |
-| 通知 / Quick Pick / Dialog / Context View / Hover                       | workbench 浮层服务                      | **frame overlay**（source-managed）                               |
-| completion / 编辑器内 hover / decorations / CodeLens / inlay / comments | widget 自己的 DOM                       | **widget-local**；被盒子裁剪是正确行为                            |
-| settings / keybindings UI / extension details                           | `EditorPane`                            | **application window**（editor placement）                        |
-| activity bar                                                            | 选 container 的部件                     | frame chrome / dock rail；不是 widget                                  |
-| themes / icons                                                          | 主题服务                                | frame / widget token；见隔离 note                                 |
+| 贡献面 | 上游形态 | prac |
+|---|---|---|
+| 文件 / diff / custom editor / webview editor | editor input | `PracAppDef` + `PracWindow` |
+| `viewsContainers` | `ViewContainer` | board / board window |
+| `views`（tree / webview view） | `ViewPane` / `WebviewViewPane` | `PracWidgetDef` / `PracWidget` |
+| `viewsWelcome` | 空状态 | widget 级空态 |
+| `view/title` / `view/item/context` / `editor/title` / `menus` | 菜单项引用命令 | action model |
+| `commands` / `keybindings` | 命令 / 键位 | command / keybinding |
+| webview panel / `customEditors` | editor part | `PracWindow` + `EditorPane` |
+| 通知 / Quick Pick / Dialog / Context View / Hover | workbench 浮层 | frame overlay |
+| completion / hover / decorations / CodeLens / inlay / comments | widget DOM | widget-local |
+| settings / keybindings UI / extension details | `EditorPane` | `PracWindow` |
+| activity bar | 选 container 的部件 | frame chrome / dock rail |
+| themes / icons | 主题服务 | frame / widget token |
 
-**判据**：VS Code 的 UI 至少有 **part / container / view / editor / action / overlay / status item / host-local** 八类。prac 只把 editor input、container、view 映射成组合对象；part / overlay / action / status item 各自归格，不塞进 widget。
+**判据**：VS Code 的 UI 至少有 part / container / view / editor / action / overlay / status item / host-local 八类；prac 只把 editor input、container、view 映射成组合对象，其余各归各格。
 
 ## 3. DSH
 
-| 贡献面                                                             | 上游形态               | prac                                              |
-| ------------------------------------------------------------------ | ---------------------- | ------------------------------------------------- |
-| `main` keyed entry（conversation / plugin manager / task manager） | keyed slot             | **application window**                            |
-| `sidebar` / `rightbar`                                             | 单 / keyed 槽          | **widget board window**（sidebar / panel）                  |
-| 内部 slot（conversation.* / sidebar.* / settings.* / plugins.*）   | slot entry / React     | **widget / section**，属于对应 app window / board |
-| `shell.overlay` / toast / quota notice                             | 应用级浮层             | **frame overlay**                                 |
-| `shell.leading` / `shell.bottom`                                   | 窗口 chrome 座位       | frame chrome / part seat                          |
-| `prac.window` / `prac.widget` / `prac.viewActions`                 | 自定义 window / widget 内容与 action | **window / widget / action slot**     |
-| `ctx.layout`                                                       | DSH layout compat      | `ctx.layout` compat，放 `ui-frame`                |
-| client graph / loader / HMR                                        | 代码到达与替换         | lifecycle；frame 只订阅注册                       |
-| store / locale / theme / 组件库                                    | 来源运行时             | source runtime；不进入 frame 模型                 |
+| 贡献面 | 上游形态 | prac |
+|---|---|---|
+| `main` keyed entry（conversation / plugin manager / task manager） | keyed slot | `PracAppDef` + `PracWindow` |
+| `sidebar` / `rightbar` | 单 / keyed 槽 | app / board（后续） |
+| 内部 slot（conversation.* / sidebar.* / settings.* / plugins.*） | slot entry / React | `PracWidgetDef` / `PracWidget` |
+| `shell.overlay` / toast / quota notice | 应用级浮层 | frame overlay |
+| `shell.leading` / `shell.bottom` | 窗口 chrome 座位 | frame chrome / status |
+| client graph / loader / HMR | 代码到达与替换 | lifecycle；frame 只订阅注册 |
+| store / locale / theme | 来源运行时 | source runtime；不进入 frame 模型 |
 
-**判据**：DSH 的槽不是来源，而是 host 词表。`sidebar` / `rightbar` 由 frame 渲染成 board；`main` 是 application window；内部 slot 是 widget；`shell.overlay` 是 frame overlay。
+**判据**：DSH plugin 是 Cordis plugin 包；prac 只消费 DSH plugin 级贡献，不读 Cordis 内部列表。
 
 ## 4. 摆放
 
-- **placement 有两条边**：
-  - `window → window group`；
-  - `widget → widget board`。
-- **active 有两级**：
+- **placement**：
+  - `PracWindow → window group`（`WindowPlacement`）；
+  - `PracWidget → board root`（`WidgetPlacement`）。
+- **active**：
   - window group 的 active window；
   - board 的 active widget。
 - **surface**：
   - stage cell → window group；
-  - sidebar / panel → widget board window；
-  - widget board window 是 window，内容是 board，不是 region；它可以在 stage / sidebar / panel。
+  - sidebar / panel → board window；
+  - board window 是 `PracWindow`，内容是 board。
 - **chrome**：
   - window group tab strip / actions → frame + window；
   - widget header / actions → board / widget；
-  - breadcrumbs → editor application window；
+  - breadcrumbs → editor window；
   - overlay → frame float layer / widget-local。
 
 ## 5. 术语
 
-| canonical              | 不要用                         | 说明                                                              |
-| ---------------------- | ------------------------------ | ----------------------------------------------------------------- |
-| **application**        | container / app instance       | 启动身份；window 由 app 打开                                      |
-| **window**             | tab / view                     | app 的实例；application window 或 widget board window             |
-| **window group**       | editor group / view group      | windows 的容器；editor group 是 adapter runtime                   |
-| **widget board**       | container / view group / panel | 一个 window 的内容面；board 是 window                              |
-| **widget**             | view / tab                     | 可组合内容；在 board 里                                           |
-| **placement**          | membership                     | window → group；widget → board                                    |
-| **surface**            | region content                 | region 的内容根；window group / board / opaque                    |
-| **application window** | editor view / editor group     | editor / chat / diff / terminal 的 window                         |
-| **widget board window** | container window / widget window | 承载 board 的 window；board 是 window，widget 是 view              |
-| **editor group**       | prac window group              | `IEditorGroupView`，adapter runtime                               |
-| **editor window**      | separate window type           | editor application window 的简称                                  |
-| **catalogue**          | registry                       | 合并后的 widget / window 目录                                     |
-| **source adapter**     | —                              | 把一个生态投影成 application / window / widget / action / overlay |
+| canonical | 不要用 | 说明 |
+|---|---|---|
+| **PracExtension** | partner | Cordis plugin + contribution |
+| **PracCatalog** | catalogue | 派生索引 |
+| **PracAppDef** | application record | app 声明 |
+| **PracWidgetDef** | widget record | widget 声明 |
+| **PracWindow** | WindowInstance / WindowRecord | window runtime |
+| **PracWidget** | WidgetInstance / WidgetItem | widget runtime |
+| **WindowPlacement** | WindowItem | window 位置 |
+| **WidgetPlacement** | WidgetItem | widget 位置 |
+| **window group** | editor group / view group | window 容器；editor group 是 adapter runtime |
+| **board** | container / view group / panel | 内容面；board window 才是 window |
+| **source adapter** | — | VS Code / DSH → prac 对象 |
 
 ## 6. 包
 
-| 包                 | 职责                                              |
-| ------------------ | ------------------------------------------------- |
-| `ui-frame`         | Space / split / grid / region / dock rail / sidebar / panel |
-| `ui-widget`        | widget / board / `prac.widget` / `prac.viewActions` |
-| `ui-workbench`     | 默认放置 / arrangement / recall                   |
-| `ui-dsh`           | DSH slot → application / window / widget / action |
-| `ui-vscode-host`   | VS Code bridge / face / catalogue                 |
-| `ui-vscode-views`  | ViewContainer → board；ViewPane → widget          |
-| `ui-vscode-editor` | editor input → application window                 |
-| `bundle/web-app`   | composition root only                             |
+| 包 | 职责 |
+|---|---|
+| `prac-ui-kit-layout` | geometry / allocation / grid |
+| `prac-ui-kit-content` | content root / item / placement / store / renderer |
+| `prac-ui-kit-workbench` | app / window / group / board / widget / frame shell |
+| `prac-client-ui-frame` | WM / frame / services / persistence / extension registry |
+| `prac-client-ui-widget` | board / widget adapters |
+| `prac-client-ui-workbench` | arrangement / default placement / recall / first-run |
+| `prac-client-vscode-host` | VS Code bridge / face / catalog / commands |
+| `prac-client-ui-vscode-views` | ViewContainer → board；View → widget |
+| `prac-client-ui-vscode-editor` | editor input → window |
+| `prac-client-dsh-host` | DSH slot / app / internal slot |
+| `prac-web-app` | composition root only |
 
-完整依赖与迁移见 10-20 的 Package architecture。
+完整职责 / 目标新增见 [.agents/notes/proposed/2026-11-05-tech-packages.md](../.agents/notes/proposed/2026-11-05-tech-packages.md)。
+
+## 7. 相关
+
+- [concepts.md](concepts.md)
+- [architecture.md](architecture.md)
+- [window-model.md](window-model.md)
+- [ui-acceptance.md](ui-acceptance.md)

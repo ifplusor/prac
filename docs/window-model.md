@@ -1,75 +1,77 @@
-# Window / Board / Widget model (target)
+# Window / Board / Widget model（当前）
 
-The frame renders this model now. `FrameView` / `ViewGroup` remain the stage
-editor group's runtime vocabulary; they are not a board's widget model, and
-`WidgetBoardGroup` is gone.
+> 概念词表见 [concepts.md](concepts.md)；架构见 [architecture.md](architecture.md)；扩展 / catalog 见 [.agents/notes/proposed/2026-11-05-tech-extension.md](../.agents/notes/proposed/2026-11-05-tech-extension.md)。
+> 本文只写 window / board / widget 的对象关系与 placement；不写 UI 交互文案。
 
-```text
-WindowGroup
-  └─ Window
-       └─ ContentHost
-            ├─ editor
-            ├─ chat
-            └─ board (BoardContent)
-                 └─ WidgetHost
+## 1. 对象关系
+
+```mermaid
+flowchart LR
+  AD["PracAppDef"] --> AA["ApplicationDefinition"]
+  AA --> W["PracWindow"]
+  W --> WP["WindowPlacement"]
+  W --> B["board content"]
+  B --> BR["board root"]
+  BR --> BP["WidgetPlacement"]
+  BP --> PW["PracWidget"]
+  PW --> WD["PracWidgetDef"]
 ```
 
-- **WindowGroup** owns window order and the active window.
-- **Window** owns one content host. A window is not a tab and not a widget.
-- **ContentHost** is the mount / release / focus boundary. Editor, chat and board
-  implement it.
-- **BoardContent** is a window content: it owns widget order, the active widget,
-  and a **LayoutRoot** for the board's own split / grid / region tree.
-- **LayoutEngine** is shared by the frame root and each board root. The frame root
-  lays out windows; a board root lays out widgets. A board root is a _layout hole_
-  inside a window content: window is the lifecycle / focus / theme boundary, but
-  the board root participates in frame hit-testing, drag, resize and split.
-- Cross-root widget drag is **move** only. A split is completed inside the target
-  board root; widgets from two different windows are never merged into one
-  cross-window region.
-- **WidgetHost** is a child of a board; it is the landing point of a VS Code view
-  or DSH slot. A widget is not a window.
+- `PracAppDef` 是声明；`ApplicationDefinition` 是 runtime（多 `content(windowId)`）；
+- `PracWindow` 是窗口运行时；`WindowPlacement` 是它在 space root 的位置；
+- board 是 window 的 content；`board root` 是 board 自己的 layout root；
+- `WidgetPlacement` 是 widget 在 board root 的位置；`PracWidget` 是 runtime；
+- `PracWidgetDef` 是 widget 的声明。
 
-## What is legacy
+## 2. Window
 
-- `FrameView` / `View`: removed. The product has no view object; a source adapter
-  owns its own view handle.
-- `ViewGroup`: removed. The frame speaks `WindowGroup`; a board is not a group.
-- `WidgetBoardGroup`: removed. A container's board is the content of a **board
-  window** (`BoardWindow`); `BoardWindowAdapter` composes it with the generic
-  `WindowGroupModel`. Widgets are its `LayoutState<WidgetRecord>` rows, rendered
-  through the same `LayoutRenderer` as the frame.
+- 一个正在编辑的文件 = 一个 `PracWindow`；
+- 一个 conversation = 一个 `PracWindow`（当前）；
+- tab strip 的 tab 是 **window group 里的 window**，不是 window 内的 tab；
+- window group 只包含 `PracWindow`；
+- `PracWindow` 的身份 / 生命周期 / appId / title 由 WM 持有；
+- `PracWindow` 的内容由 app 提供：editor / chat / terminal / board；
+- `WindowPlacement` 只描述位置 / region / order / hidden / size，不拥有 window；
+- window 可以没有 board（application window）；board window 是 content 为 board 的普通 `PracWindow`，不是子类。
 
-## Migration order
+## 3. Board
 
-1. frame renders `ContentHost` for a window instead of a generic `FrameView`; **the
-   content-host seam exists** and the board window uses its live board instead;
-2. `BoardContent` mounts the board surface directly — **done**: the frame's
-   `BoardItem` renders the board root and subscribes to the board's store;
-3. sidebar / panel surfaces become `WindowGroup` — **done**:
-   `BoardWindowAdapter` is the surface; the region holds one board-window record;
-4. a single editor window can live in a sidebar window group — **done**: a file view
-   placed in a container region is hosted by that region's `BoardWindowAdapter`
-   (`syncWindows`); the workbench owns its record, the group only lists it
-   (`WindowGroupPlacement.owned: false`);
-5. board window gets a `PracWindowInput` identity projection (empty pane) — **done
-   where an editor group exists**: the workbench maps a board window into the
-   group that hosts its sidebar's editor window; a region with no editor group has
-   nowhere to project into, so the projection is a no-op there.
+- **board 不是 window**：board 是内容；
+- **board window** 是 content 为 board 的 `PracWindow`；它可以放在 stage / sidebar / panel；
+- board 拥有自己的 `board root`：`LayoutState<WidgetPlacement>`；
+- board root 是 window content 里的 **layout hole**：frame 可以 hit-test / drag / size / split，但 window 仍是 content / lifecycle / focus / theme 的边界；
+- 跨 root 只允许 **move**；split / combine 在目标 board root 内完成；
+- widget 不直接进 window group。
 
-## Frame renderer rewrite (approved)
+## 4. Widget
 
-The current renderer is `region → surface → ViewGroup → FrameView → slot`. The
-rewrite replaces the last two steps with a window content host:
+- `PracWidgetDef`：声明（id / title / icon / defaultBoard / defaultRegion）；
+- `PracWidget`：runtime（def + source + content，content 由 extension 的 `hostFor` 提供）；
+- `WidgetPlacement`：board root 里的位置 / order / hidden / collapsed / size / sourceId；
+- 一个 widget 同时只在一个 board root；
+- widget 可以被放在兼容 board 之间；placement 改，source 不变；
+- widget 不是 tab，也不单独成为 window。
 
-1. A window record carries a `contentId`, not a `FrameView`.
-2. A `ContentHostRegistry` maps `contentId` → `ContentHost` (`Window`/`BoardContent`).
-3. A `WindowGroupSurface` renders windows in order and mounts the active window's
-   content host into its content element.
-4. `BoardContent` mounts a board surface directly; widgets stay board children,
-   not frame `ViewGroup` members.
-5. `WidgetBoardGroup` and the generic `FrameView` domain semantics left the board
-   path: a board's widgets are `WidgetRecord`s in its own `LayoutState`, and a
-   container's surface is a `WindowGroup` of board windows.
+## 5. Placement / root
 
-This is a frame-layer rewrite, not an adapter.
+- **frame root**：shell；只放 dock / sidebar / panel / chrome 的 shell item，不放 window；
+- **space root**：stage；放 `WindowPlacement`；
+- **board root**：board 内容；放 `WidgetPlacement`；
+- 每个 root 同时只有一个 writer；
+- `WindowPlacement` 可以暂不在 group（`placed` 未归组）；
+- `WidgetPlacement.region` 必须存在于 board root tree。
+
+## 6. 持久化
+
+- `prac-frame/v1/<scope>`：shell；
+- `prac-space/v1/<scope>/<space>`：space root / `WindowPlacement`；
+- `prac-board/v1/<scope>/<board>`：board root / `WidgetPlacement`；
+- `scope` 是 `?workspace=` 哈希；不同 project folder 不共享；
+- maximized 不持久化；注意力栈 / 返回栈 / 区域内 z-order 不持久化。
+
+## 7. 相关
+
+- [concepts.md](concepts.md)：词表。
+- [architecture.md](architecture.md)：部署 / 进程 / Browser-Server。
+- [ui-surface-map.md](ui-surface-map.md)：来源 → 对象。
+- [ui-acceptance.md](ui-acceptance.md)：UI 验收。
