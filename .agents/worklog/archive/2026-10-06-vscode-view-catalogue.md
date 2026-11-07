@@ -1,6 +1,6 @@
 # VS Code 的视图进 prac —— 工作记录（依据）
 
-> **这不是 note**：它是这项工作（[2026-10-06-vscode-view-catalogue.md](../notes/abandoned/2026-10-06-vscode-view-catalogue.md)）的**依据**——实测清单、上游注册点、踩坑。
+> **这不是 note**：它是这项工作（[2026-10-06-vscode-view-catalogue.md](../../notes/abandoned/2026-10-06-vscode-view-catalogue.md)）的**依据**——实测清单、上游注册点、踩坑。
 > 没有状态轴、不签字。
 
 ## 可借用的东西：按**上游注册点**分类

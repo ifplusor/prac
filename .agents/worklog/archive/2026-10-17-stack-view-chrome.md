@@ -1,6 +1,6 @@
 # stack view chrome —— 工作记录（依据）
 
-> **这不是 note**：它是这项工作（[note](../notes/abandoned/2026-10-17-stack-view-chrome.md)）的**过程记忆**。
+> **这不是 note**：它是这项工作（[note](../../notes/abandoned/2026-10-17-stack-view-chrome.md)）的**过程记忆**。
 > 它**没有状态轴、不签字**：这里只有“当时发生了什么、试过什么、证据是什么”。决定与开放问题在 note。
 > 与 note 的对应由**约定**负责（按工作命名）；note 不引用这里（`AGENTS.md`）。
 

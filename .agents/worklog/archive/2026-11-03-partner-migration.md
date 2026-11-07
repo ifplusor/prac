@@ -1,6 +1,6 @@
 # Worklog: partner 机制迁移（过程/证据）
 
-> 过程/证据，不签字；设计见 [.agents/notes/proposed/2026-11-03-partner-mechanism.md](../notes/abandoned/2026-11-03-partner-mechanism.md)。
+> 过程/证据，不签字；设计见 [.agents/notes/proposed/2026-11-03-partner-mechanism.md](../../notes/abandoned/2026-11-03-partner-mechanism.md)。
 
 ## 1. 窗口管理器（round 1–2）
 

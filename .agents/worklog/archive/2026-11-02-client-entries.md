@@ -1,6 +1,6 @@
 # Worklog: client 包入口归一（implementation）
 
-> 过程/证据，不签字；设计见 `.agents/notes/resolved/2026-11-02-client-package-convention.md`，稳定参考见 [docs/client-packages.md](../../docs/client-packages.md)。
+> 过程/证据，不签字；设计见 `.agents/notes/resolved/2026-11-02-client-package-convention.md`，稳定参考见 [docs/client-packages.md](../../../docs/client-packages.md)。
 
 ## 1. 入口归一：`plugin.ts` → `index.ts`
 
