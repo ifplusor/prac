@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: abandoned:superseded
 ---
 
 # UI — user stories（first launch → daily work）

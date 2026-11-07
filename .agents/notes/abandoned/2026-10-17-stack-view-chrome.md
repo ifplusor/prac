@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: abandoned:superseded
 ---
 
 # Agent Note: stack / widget header 的标题归属

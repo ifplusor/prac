@@ -4,16 +4,16 @@ status: abandoned:superseded
 
 # Agent Note: vscode-host adaptor surfaces —— 一张归属图
 
-> **Superseded**：本 note 的 surface inventory 已并入 [vscode-host architecture](../in-progress/2026-10-17-vscode-host-architecture.md) 的 “Surface ownership” 一节；这里只保留为历史。
+> **Superseded**：本 note 的 surface inventory 已并入 [vscode-host architecture](../abandoned/2026-10-17-vscode-host-architecture.md) 的 “Surface ownership” 一节；这里只保留为历史。
 >
-> **这是哪件工作**：`vscode-host` 是 prac 与 VS Code 之间的 adaptor；这张 note 只做**归属图**，把每个 UI surface 的 owner、现有 step、缺口列清楚。umbrella 见 [2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)。
+> **这是哪件工作**：`vscode-host` 是 prac 与 VS Code 之间的 adaptor；这张 note 只做**归属图**，把每个 UI surface 的 owner、现有 step、缺口列清楚。umbrella 见 [2026-09-09-vscode-dsh-integration.md](../abandoned/2026-09-09-vscode-dsh-integration.md)。
 > **状态**：已由 architecture 取代。这是一张 map，不是设计；具体设计留给各 surface 自己的 step。
 
 ## Problem
 
 当前 adaptor 侧只有两个 step：
 
-- [2026-10-07-editor-host.md](../in-progress/2026-10-07-editor-host.md)：编辑器宿主；
+- [2026-10-07-editor-host.md](../abandoned/2026-10-07-editor-host.md)：编辑器宿主；
 - [2026-10-17-vscode-host-view-container-context.md](2026-10-17-vscode-host-view-container-context.md)：view container context。
 
 其余 UI surface 没有 owner：
@@ -128,13 +128,13 @@ SCM / comments / timeline / tests / debug / task / terminal / notebook / chat �
 
 ## Related
 
-- [2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)：umbrella。
+- [2026-09-09-vscode-dsh-integration.md](../abandoned/2026-09-09-vscode-dsh-integration.md)：umbrella。
 - [docs/architecture.md](../../../docs/architecture.md) §2.2 / §3.1 / §3.2：frame 与 adaptor 的分层。
 - [docs/concepts.md](../../../docs/concepts.md) 七：容器是具名子区域，不是 owner。
 - [docs/vscode.md](../../../docs/vscode.md) §3：frame / part / container / pane / view。
 - [docs/vscode.md](../../../docs/vscode.md) §4：扩展的 UI 能力范围。
-- [2026-10-05-vscode-dsh-layout-boundary.md](../in-progress/2026-10-05-vscode-dsh-layout-boundary.md)：视图是单位、隔离与对等。
-- [2026-10-06-vscode-view-catalogue.md](../in-progress/2026-10-06-vscode-view-catalogue.md)：视图目录与容器元数据。
-- [2026-10-07-editor-host.md](../in-progress/2026-10-07-editor-host.md)：编辑器宿主。
+- [2026-10-05-vscode-dsh-layout-boundary.md](../abandoned/2026-10-05-vscode-dsh-layout-boundary.md)：视图是单位、隔离与对等。
+- [2026-10-06-vscode-view-catalogue.md](../abandoned/2026-10-06-vscode-view-catalogue.md)：视图目录与容器元数据。
+- [2026-10-07-editor-host.md](../abandoned/2026-10-07-editor-host.md)：编辑器宿主。
 - [2026-10-17-vscode-host-view-container-context.md](2026-10-17-vscode-host-view-container-context.md)：view container / view step。
-- [2026-10-17-stack-view-chrome.md](../in-progress/2026-10-17-stack-view-chrome.md)：frame 侧的 stack chrome step。
+- [2026-10-17-stack-view-chrome.md](../abandoned/2026-10-17-stack-view-chrome.md)：frame 侧的 stack chrome step。

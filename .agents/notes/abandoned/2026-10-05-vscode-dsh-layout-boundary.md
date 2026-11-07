@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: abandoned:superseded
 ---
 
 # Agent Note: UI surface 与隔离 — window 外层、widget 内部

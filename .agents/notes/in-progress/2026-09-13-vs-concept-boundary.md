@@ -4,7 +4,7 @@ status: in-progress
 
 # Agent Note: prac 与 VS Code 的概念边界与命名
 
-> 组合模型：[2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)。VS Code adaptor：[2026-10-17-vscode-host-architecture.md](2026-10-17-vscode-host-architecture.md)。
+> 组合模型：[2026-10-20-ui-framework.md](../abandoned/2026-10-20-ui-framework.md)。VS Code adaptor：[2026-10-17-vscode-host-architecture.md](../abandoned/2026-10-17-vscode-host-architecture.md)。
 
 ## Summary
 
@@ -63,6 +63,6 @@ prac 同时使用 DSH、VS Code 和自己的工作台词汇。边界原则只有
 
 ## 6. Related
 
-- [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)：组合模型 / package architecture。
-- [2026-10-17-vscode-host-architecture.md](2026-10-17-vscode-host-architecture.md)：VS Code adaptor。
-- [2026-09-09-vscode-dsh-integration.md](2026-09-09-vscode-dsh-integration.md)：总 umbrella。
+- [2026-10-20-ui-framework.md](../abandoned/2026-10-20-ui-framework.md)：组合模型 / package architecture。
+- [2026-10-17-vscode-host-architecture.md](../abandoned/2026-10-17-vscode-host-architecture.md)：VS Code adaptor。
+- [2026-09-09-vscode-dsh-integration.md](../abandoned/2026-09-09-vscode-dsh-integration.md)：总 umbrella。

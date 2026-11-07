@@ -4,9 +4,9 @@ status: abandoned:superseded
 
 # Agent Note: 把 VS Code 的能力拆散带入 prac
 
-> **状态：作为主线已被取代**（2026-09-19「从需求出发重做架构」，见 [../in-progress/2026-09-19-architecture.md](../in-progress/2026-09-19-architecture.md)）。「view 是单位」「机制层不认识视图名」等结论已被继承；**能力面（capabilities）那部分待裁**。
+> **状态：作为主线已被取代**（2026-09-19「从需求出发重做架构」，见 [../abandoned/2026-09-19-architecture.md](../abandoned/2026-09-19-architecture.md)）。「view 是单位」「机制层不认识视图名」等结论已被继承；**能力面（capabilities）那部分待裁**。
 >
-> 位置：umbrella 见 [../in-progress/2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)；命名与 lib 抽取（已完成的那一步）见 [../in-progress/2026-09-13-vs-concept-boundary.md](../in-progress/2026-09-13-vs-concept-boundary.md)。
+> 位置：umbrella 见 [../abandoned/2026-09-09-vscode-dsh-integration.md](../abandoned/2026-09-09-vscode-dsh-integration.md)；命名与 lib 抽取（已完成的那一步）见 [../in-progress/2026-09-13-vs-concept-boundary.md](../in-progress/2026-09-13-vs-concept-boundary.md)。
 
 ## Problem
 

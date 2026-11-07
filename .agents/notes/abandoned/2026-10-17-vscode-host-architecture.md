@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: abandoned:superseded
 ---
 
 # Agent Note: vscode-host — 把 VS Code 的 UI 贡献翻译成 prac 的资源

@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: abandoned:superseded
 ---
 
 # Agent Note: editor window host — window group 的 editor runtime 与 per-window pane host

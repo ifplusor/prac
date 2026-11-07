@@ -1,10 +1,10 @@
 ---
-status: in-progress
+status: abandoned:superseded
 ---
 
 # Agent Note: P1 第一条链 —— 让主干接上 VS Code 的扩展宿主（实现计划）
 
-> **这是哪件工作**：umbrella [2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md) 的第一步。设计与理由见 [2026-09-19-architecture.md](../in-progress/2026-09-19-architecture.md)（§2.10 / §4.2 / §5）与 [`docs/architecture.md`](../../../docs/architecture.md)（§4.2 / §5.2 / §7.1）。
+> **这是哪件工作**：umbrella [2026-09-09-vscode-dsh-integration.md](../abandoned/2026-09-09-vscode-dsh-integration.md) 的第一步。设计与理由见 [2026-09-19-architecture.md](../abandoned/2026-09-19-architecture.md)（§2.10 / §4.2 / §5）与 [`docs/architecture.md`](../../../docs/architecture.md)（§4.2 / §5.2 / §7.1）。
 > **状态**：三个点**已裁**（James，2026-09-21，见 §3）；工作在进行中——第一步是"让VS Code 内建扩展变成可加载的"。
 > **本次范围**：只把两边现有的东西接起来（`docs/architecture.md` §1.4）——不往 DSH 加能力、不改上游 VS Code。
 
@@ -148,7 +148,7 @@ status: in-progress
 
 ## Related
 
-- [../in-progress/2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)：umbrella。
-- [../in-progress/2026-09-19-architecture.md](../in-progress/2026-09-19-architecture.md)：设计怎么从需求推出来（§4.2 是这条链的落点）。
+- [../abandoned/2026-09-09-vscode-dsh-integration.md](../abandoned/2026-09-09-vscode-dsh-integration.md)：umbrella。
+- [../abandoned/2026-09-19-architecture.md](../abandoned/2026-09-19-architecture.md)：设计怎么从需求推出来（§4.2 是这条链的落点）。
 - [../../../docs/architecture.md](../../../docs/architecture.md)：目标设计（§4.2 语义服务、§5.2 谁起谁关、§7.1 第一条链）。
 - [../../../docs/vscode.md](../../../docs/vscode.md) / [../../../docs/dsh.md](../../../docs/dsh.md)：两个系统的内部结构（事实参考）。

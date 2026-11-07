@@ -215,6 +215,6 @@ status: resolved:implemented
 
 ## Related
 
-- [2026-10-05-vscode-dsh-layout-boundary.md](../in-progress/2026-10-05-vscode-dsh-layout-boundary.md)：区域骨架、隔离与对等；它保留"区域可以按 `stack` 模式同时显示多条视图"这条设计。
-- [../in-progress/2026-10-15-ui-layout-grid.md](../in-progress/2026-10-15-ui-layout-grid.md)：区域的分栏与调整尺寸对齐 VS Code Grid（`max` / `priority` / `Sizing` / snap）——与本 note 是**两件事**，只在"借用 VS Code 形状"上偶然同向。
+- [2026-10-05-vscode-dsh-layout-boundary.md](../abandoned/2026-10-05-vscode-dsh-layout-boundary.md)：区域骨架、隔离与对等；它保留"区域可以按 `stack` 模式同时显示多条视图"这条设计。
+- [../abandoned/2026-10-15-ui-layout-grid.md](../abandoned/2026-10-15-ui-layout-grid.md)：区域的分栏与调整尺寸对齐 VS Code Grid（`max` / `priority` / `Sizing` / snap）——与本 note 是**两件事**，只在"借用 VS Code 形状"上偶然同向。
 - `packages/client/ui-layout/DESIGN.md`：这个包的当前设计。

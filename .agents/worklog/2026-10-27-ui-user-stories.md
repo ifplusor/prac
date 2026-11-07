@@ -1,11 +1,11 @@
 # Worklog: UI user stories（grounding）
 
-> 过程/证据，不签字；设计与决策见 `.agents/notes/in-progress/2026-10-27-ui-user-stories.md`。本文件记录 first-launch stories、grounding 与修正。
+> 过程/证据，不签字；设计与决策见 `.agents/notes/abandoned/2026-10-27-ui-user-stories.md`。本文件记录 first-launch stories、grounding 与修正。
 
 ## 19. 用户故事 peer note（2026-10-27）
 
 - James: UI scheme 里 complex assumptions 跑在 user stories 前面；从第一次启动开始 ground；做一个 peer note。
-- 新建 `.agents/notes/in-progress/2026-10-27-ui-user-stories.md`（status: proposed）：S0 first launch（no workspace）→ S1 first workspace → S2 first session/plan → S3 first file/attention → S4 first review → S5 first Work → S6 desktop switch → S7 failure/takeover → S8 plugin → S9 workspace switch → S10 return → S11 768/keyboard。
+- 新建 `.agents/notes/abandoned/2026-10-27-ui-user-stories.md`（status: proposed）：S0 first launch（no workspace）→ S1 first workspace → S2 first session/plan → S3 first file/attention → S4 first review → S5 first Work → S6 desktop switch → S7 failure/takeover → S8 plugin → S9 workspace switch → S10 return → S11 768/keyboard。
 - Findings: workspace 是 first-run 的第一个问题；single stage + focus/reference 就够（virtual desktops 是 later）；review（plan/checks/approve/request changes/takeover/revert）是当前 app 缺得最多的；Work 是 preset；OS-like/app registry/freeform 是 later。
 - MVP: S0/S1/S2/S3/S4/S7 must；S5/S10/S11/S8 should；S6/multi-desktop/freeform/app registry later。Smallest next：attention + review + Work。
 - UI scheme note 现在标为 target；Summary/Motivation/Decisions 加了 MVP vs later 和 peer note 链接；Related 加了 user-stories。

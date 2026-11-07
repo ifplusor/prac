@@ -4,9 +4,9 @@ status: abandoned:superseded
 
 # Agent Note: vscode-host 作为 adaptor —— view container context
 
-> **Superseded**：本 note 先于 [vscode-host architecture](../in-progress/2026-10-17-vscode-host-architecture.md) 写成，把 collapse 的修法上升成 container context 并先选了 B。它的观察保留为证据；container/view 将作为 architecture 之后的 step 重新推导。
+> **Superseded**：本 note 先于 [vscode-host architecture](../abandoned/2026-10-17-vscode-host-architecture.md) 写成，把 collapse 的修法上升成 container context 并先选了 B。它的观察保留为证据；container/view 将作为 architecture 之后的 step 重新推导。
 >
-> **这是哪件工作**：prac 的 frame 按 view/region 组合；VS Code 的 view container/part 语义需要由 `vscode-host` 这个 adaptor 接住。umbrella 见 [2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md)。
+> **这是哪件工作**：prac 的 frame 按 view/region 组合；VS Code 的 view container/part 语义需要由 `vscode-host` 这个 adaptor 接住。umbrella 见 [2026-09-09-vscode-dsh-integration.md](../abandoned/2026-09-09-vscode-dsh-integration.md)。
 > **状态**：已由 architecture 取代。
 
 ## Problem
@@ -178,9 +178,9 @@ frame 侧：
 
 - [docs/architecture.md](../../../docs/architecture.md) §2.2 / §3.1 / §3.2：view 是单位；容器是具名子区域；part 是可选高级形态。
 - [docs/concepts.md](../../../docs/concepts.md) 七：容器 = 区域的孩子；不是新对象。
-- [2026-09-09-vscode-dsh-integration.md](../in-progress/2026-09-09-vscode-dsh-integration.md) §3.2：容纳单位 = view；container/part 不是 prac 组合的单位。
-- [2026-10-05-vscode-dsh-layout-boundary.md](../in-progress/2026-10-05-vscode-dsh-layout-boundary.md)：容器 = 具名子区域；activity bar 不继承。
-- [2026-10-06-vscode-view-catalogue.md](../in-progress/2026-10-06-vscode-view-catalogue.md)：容器本身不进目录；`containerId` 只是元数据。
-- [2026-10-07-editor-host.md](../in-progress/2026-10-07-editor-host.md)：编辑器组是另一条 owner 链。
+- [2026-09-09-vscode-dsh-integration.md](../abandoned/2026-09-09-vscode-dsh-integration.md) §3.2：容纳单位 = view；container/part 不是 prac 组合的单位。
+- [2026-10-05-vscode-dsh-layout-boundary.md](../abandoned/2026-10-05-vscode-dsh-layout-boundary.md)：容器 = 具名子区域；activity bar 不继承。
+- [2026-10-06-vscode-view-catalogue.md](../abandoned/2026-10-06-vscode-view-catalogue.md)：容器本身不进目录；`containerId` 只是元数据。
+- [2026-10-07-editor-host.md](../abandoned/2026-10-07-editor-host.md)：编辑器组是另一条 owner 链。
 - [docs/vscode.md](../../../docs/vscode.md) §3：frame / part / container / pane / view 的 UI 布局模型。
 - [docs/vscode.md](../../../docs/vscode.md) §4：扩展的 UI 能力范围（声明式贡献 + 运行时 API + 边界）。

@@ -1,6 +1,6 @@
 # Worklog: UI framework implementation plan
 
-> 过程/计划，不签字、不进当前方向。决策与设计见 `.agents/notes/in-progress/2026-10-20-ui-framework.md`；本文件只保存实现顺序、gate 与质量面检查表。
+> 过程/计划，不签字、不进当前方向。决策与设计见 `.agents/notes/abandoned/2026-10-20-ui-framework.md`；本文件只保存实现顺序、gate 与质量面检查表。
 
 ## Slice 0 — 两个来源、一个区域、两个 host
 

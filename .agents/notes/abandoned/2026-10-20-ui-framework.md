@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: abandoned:superseded
 ---
 
 # Agent Note: UI framework — 分层、对象与包
@@ -606,7 +606,7 @@ ctx.layout           // DSH compat shim（放 ui-frame）
 - kit 的 “view” 词汇已清：`ItemRecord` / `ItemFlags` / `ItemKind` / `itemId` / `items`；`prac.view` 等 source slot 留在 plugin。持久化不升 v2，旧 `views` 字段由 store heal 时读成 `items`。
 - plugin face 也改用 `Item*`：`listItems` / `activeItem` / `splitItem` / `setItemKind` / `setItemBoard` / `onDidRequestCloseItem`；source adapter 的 `viewId` 仍保留。
 - 包入口按层：`prac-ui-kit-*` 是库，只出 `.`，且不 import DSH；`prac-client-*` 是 DSH 插件行，出 `./client`。
-- 文件名规范：TS 模块 / 测试 / 公共 subpath 用 kebab-case；符号仍用 PascalCase / camelCase。由 `unicorn/filename-case`（Vite+ / Oxlint）在根 `vite.config.ts` 强制，`vendor/**` 例外；见 [docs/file-naming.md](../../docs/file-naming.md)。`ui-frame` 的 `./client` 出 loader artifact，其 `types` 条件承载 DSH 契约类型；root 是 host 半。
+- 文件名规范：TS 模块 / 测试 / 公共 subpath 用 kebab-case；符号仍用 PascalCase / camelCase。由 `unicorn/filename-case`（Vite+ / Oxlint）在根 `vite.config.ts` 强制，`vendor/**` 例外；见 [docs/file-naming.md](../../../docs/file-naming.md)。`ui-frame` 的 `./client` 出 loader artifact，其 `types` 条件承载 DSH 契约类型；root 是 host 半。
 - 包划分与 bundle 规则见「包与依赖」。
 
 ### 映射、Chrome 与隔离

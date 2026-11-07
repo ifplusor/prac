@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: abandoned:superseded
 ---
 
 # Agent Note: partner 机制（VS Code 与 DSH 作为基座伙伴）
@@ -209,10 +209,10 @@ conversation 的 `mapWindow` 这条**保留**（已决）：去掉后 `file`/`ta
 
 ## Related
 
-- [2026-10-20-ui-framework.md](../in-progress/2026-10-20-ui-framework.md)：包分层、包表、frame 与来源的边界；本文改它的 `ui-dsh` 角色与动作条款。
+- [2026-10-20-ui-framework.md](../abandoned/2026-10-20-ui-framework.md)：包分层、包表、frame 与来源的边界；本文改它的 `ui-dsh` 角色与动作条款。
 - [2026-09-13-vs-concept-boundary.md](../in-progress/2026-09-13-vs-concept-boundary.md)：「包名允许来源词」与 adapter 只翻译的边界；本文关掉其中「是否保留来源词」的开放项。
 - [2026-10-12-dsh-anchor.md](../in-progress/2026-10-12-dsh-anchor.md)：「键由拥有者声明」——DSH 三个键的 owner 将从 frame 变为 dsh-host。
-- [2026-10-17-stack-view-chrome.md](../in-progress/2026-10-17-stack-view-chrome.md)、[2026-10-07-editor-host.md](../in-progress/2026-10-07-editor-host.md)：动作通道的分工，本文把它们收敛到 item 注册。
-- [2026-10-17-vscode-host-architecture.md](../in-progress/2026-10-17-vscode-host-architecture.md)：VS Code 侧作为实例 1 的现状描述。
+- [2026-10-17-stack-view-chrome.md](../abandoned/2026-10-17-stack-view-chrome.md)、[2026-10-07-editor-host.md](../abandoned/2026-10-07-editor-host.md)：动作通道的分工，本文把它们收敛到 item 注册。
+- [2026-10-17-vscode-host-architecture.md](../abandoned/2026-10-17-vscode-host-architecture.md)：VS Code 侧作为实例 1 的现状描述。
 - [2026-11-02-client-package-convention.md](../resolved/2026-11-02-client-package-convention.md)：包形状（一个 loader 入口、无 `./lib`、无跨包 value import），本文的 runner 落点必须满足它。
 - DSH checkout：`packages/client/ui-slots/src/index.ts`（`StoredEntry` / `children`）、`packages/client/ui-renderer/src/client/scoped-slots.tsx`（`boundRenderSlot`）、`packages/client/AGENTS.md:36-44`（`/client` 即公开 API、feature plugin 不得 runtime-import 别的插件值）。

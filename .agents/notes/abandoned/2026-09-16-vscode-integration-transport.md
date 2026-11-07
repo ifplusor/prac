@@ -4,7 +4,7 @@ status: abandoned:superseded
 
 # Agent Note: VS Code 集成进 prac 的通信协议
 
-> **状态：作为计划已被取代**（2026-09-19「从需求出发重做架构」，见 [../in-progress/2026-09-19-architecture.md](../in-progress/2026-09-19-architecture.md)）。这份 broker 设计现在是那条架构里的 **P1**（主干自己当主线程），内容不作废；协议事实已归入 [`docs/vscode.md`](../../../docs/vscode.md)。
+> **状态：作为计划已被取代**（2026-09-19「从需求出发重做架构」，见 [../abandoned/2026-09-19-architecture.md](../abandoned/2026-09-19-architecture.md)）。这份 broker 设计现在是那条架构里的 **P1**（主干自己当主线程），内容不作废；协议事实已归入 [`docs/vscode.md`](../../../docs/vscode.md)。
 >
 > 下面的数字与行号都指 pinned VS Code **1.137.0** checkout 与 DSH checkout（事实核实于 2026-09-16 / 09-17）。
 
@@ -12,7 +12,7 @@ status: abandoned:superseded
 
 prac 的目标（`docs/architecture.md` §1.2）要求：**IDE 能力在 server 侧**（agent 要能用），**UI 组件在 client 侧**。而 VS Code 的两个半边按它自己的切法通信（渲染器 ↔ code server），中间还有一层"主线程 ↔ 扩展宿主"的关系。
 
-现状是**透传**（`/prac-vscode` 静态 + 把 VS Code 自己的 WS/HTTP 原样转发），浏览器直接讲 VS Code 的协议 ⇒ 能力与状态被页面把关，agent 够不着。这正是 [umbrella §4](../in-progress/2026-09-09-vscode-dsh-integration.md) 里那两行差距：**两半之间的通信层还是透传**、**client 侧嵌的是整个 workbench app 而不是 UI 组件**。
+现状是**透传**（`/prac-vscode` 静态 + 把 VS Code 自己的 WS/HTTP 原样转发），浏览器直接讲 VS Code 的协议 ⇒ 能力与状态被页面把关，agent 够不着。这正是 [umbrella §4](../abandoned/2026-09-09-vscode-dsh-integration.md) 里那两行差距：**两半之间的通信层还是透传**、**client 侧嵌的是整个 workbench app 而不是 UI 组件**。
 
 要设计的是：**两半之间走什么、谁回答什么、消息什么形状。**
 
