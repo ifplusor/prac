@@ -15,6 +15,8 @@ export type WindowKind = "application" | "widget";
 export interface WindowRecord {
   readonly id: string;
   readonly appId: string;
+  /** The app definition version pinned when this window was opened. */
+  readonly appVersion?: string;
   readonly kind: WindowKind;
   readonly title: string;
   readonly icon?: string;

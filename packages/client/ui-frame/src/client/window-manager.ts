@@ -28,6 +28,8 @@ import type {
 export interface PracWindowInfo {
   readonly id: string;
   readonly appId: string;
+  /** The app definition version pinned when this window was admitted. */
+  readonly appVersion?: string;
   /** The group holding the window; absent when the arrangement placed it directly. */
   readonly groupId?: string;
 }
@@ -38,6 +40,8 @@ export interface AdmitWindowOptions {
   readonly windowId: string;
   /** The window title the chrome shows until the app provides one. */
   readonly title?: string;
+  /** The app definition version to pin for this window. */
+  readonly appVersion?: string;
   /** Which group takes it; otherwise the manager picks the group bound in `region`. */
   readonly groupId?: string;
   /**
@@ -117,6 +121,8 @@ export class WindowManager {
   readonly #appOf = new Map<string, string>();
   /** The title each app gave its window. */
   readonly #titles = new Map<string, string>();
+  /** The app definition version pinned by each window. */
+  readonly #appVersions = new Map<string, string>();
   readonly #listeners = new Set<() => void>();
   /** The seat registration per admitted window. */
   readonly #seats = new Map<string, () => void>();
@@ -199,6 +205,8 @@ export class WindowManager {
     // A window with no group is still an app window: the arrangement may place it
     // directly in a region (file windows), so the manager only records it.
     this.#appOf.set(windowId, appId);
+    const appVersion = options.appVersion ?? app.version;
+    if (appVersion !== undefined) this.#appVersions.set(windowId, appVersion);
     if (options.title !== undefined) this.#titles.set(windowId, options.title);
     this.#bindSeat(windowId, app);
     this.#notify();
@@ -371,7 +379,14 @@ export class WindowManager {
     for (const [id, opener] of this.#appOf) {
       if (appId !== undefined && opener !== appId) continue;
       const groupId = this.groupOf(id)?.id;
-      infos.push({ id, appId: opener, ...(groupId === undefined ? {} : { groupId }) });
+      infos.push({
+        id,
+        appId: opener,
+        ...(this.#appVersions.get(id) === undefined
+          ? {}
+          : { appVersion: this.#appVersions.get(id) }),
+        ...(groupId === undefined ? {} : { groupId }),
+      });
     }
     return infos;
   }
@@ -407,6 +422,7 @@ export class WindowManager {
     this.#handles.delete(windowId);
     this.#appOf.delete(windowId);
     this.#titles.delete(windowId);
+    this.#appVersions.delete(windowId);
     const runtime = this.groupOf(windowId);
     if (runtime === undefined) {
       // A window the arrangement placed directly is only an app window: dropping
@@ -489,6 +505,7 @@ export class WindowManager {
     this.#handles.clear();
     this.#appOf.clear();
     this.#titles.clear();
+    this.#appVersions.clear();
     this.bindings.dispose();
   }
 

@@ -18,6 +18,8 @@ import type { ReactNode } from "react";
 export interface ApplicationDefinition {
   /** Stable id (`editor`, `chat`, `board`, …). */
   readonly id: string;
+  /** Definition version; a window pins the version it was opened with. */
+  readonly version?: string;
   /** Human label used by launchers and window titles. */
   readonly label: string;
   /**

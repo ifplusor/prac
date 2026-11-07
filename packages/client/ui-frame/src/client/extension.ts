@@ -97,6 +97,7 @@ function project(ctx: Context, extension: PracExtension): Projection | undefined
         record = {
           dispose: ctx.pracApplications.register({
             id: app.id,
+            version: app.version,
             label: app.label,
             instances: app.instances,
             ...(app.defaultRegion === undefined ? {} : { defaultRegion: app.defaultRegion }),

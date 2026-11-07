@@ -195,13 +195,20 @@ describe("WindowManager.admit", () => {
     apps.register(app("editor"));
     const manager = new WindowManager(fakeBindings(), apps);
     manager.register(new FakeRuntime("center"), "center");
-    manager.admit("editor", { windowId: "f1", groupId: "center", title: "main.ts" });
+    manager.admit("editor", {
+      windowId: "f1",
+      groupId: "center",
+      title: "main.ts",
+      appVersion: "2",
+    });
     expect(manager.ids()).toEqual(["f1"]);
     expect(manager.titleOf("f1")).toBe("main.ts");
     const resolved = manager.windowContentFor("f1");
     expect(typeof resolved).toBe("function");
     expect(resolved?.()).toBeNull();
-    expect(manager.windows("editor")).toEqual([{ id: "f1", appId: "editor", groupId: "center" }]);
+    expect(manager.windows("editor")).toEqual([
+      { id: "f1", appId: "editor", appVersion: "2", groupId: "center" },
+    ]);
     manager.close("f1");
     expect(manager.ids()).toEqual([]);
     expect(manager.windowContentFor("f1")).toBeUndefined();
