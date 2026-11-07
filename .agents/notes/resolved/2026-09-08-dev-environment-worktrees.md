@@ -1,5 +1,5 @@
 ---
-status: abandoned:superseded
+status: resolved:settled
 ---
 
 # Agent Note: 开发环境自指稳定性 — bare 仓库 + worktrees（蓝绿冻结）
@@ -12,11 +12,11 @@ status: abandoned:superseded
 
 给 prac 建 **bare 中心仓库 + worktrees**，蓝绿冻结：
 
-- `prac-main`（分支 `main`）：**used/稳定**，冻结。装进 DSH profile、被 HMR 盯着的就是这份；**不在里面改**。
-- `prac-dev`（分支 `dev`）：**development**，不稳定都留在这里。
-- 推进：在 `prac-dev` 开发 + 验证 → 稳定后合到 `main` → 更新 `prac-main` 并重装进 `dsh-master` 基底上的 profile → HMR 载入已知良好版本。
+- `prac-main`（分支 `main`）：**稳定基线**，冻结；**不在里面改**，只作为 promote 目标。
+- `prac-dev`（开发 worktree）：不稳定都留在这里；当前承载 `feat/vscode-dsh-integration`，不是长期 `dev`。
+- 推进：在 `prac-dev` 开发 + 验证 → 稳定后合到 `main` → 更新 `prac-main`；DSH 锚点 `dsh-prac-dev` 从该 worktree 加载。
 - 定向修复：prac 的 profile 用 `patchReload: startup`（不用 live），从根上去掉热重载抖动。
-- 基底：prac 插件编译到 DSH，用 `dsh-master`（master worktree，稳定）作为对齐的框架版本；`dsh-master` 是只读基底、不改。
+- 基底：prac 插件编译到 DSH 锚点 `dsh-prac-dev`；`dsh-master` 只作为上游参考，不是运行基底。
 
 ### 环境结构（镜像 DSH，已核对）
 
@@ -25,12 +25,18 @@ flowchart TB
   root["/Volumes/Dev/prac/<br/>← bare 中心仓库"]
   git[".git/<br/>（主配置无 core.bare + worktreeConfig=true；.git/config.worktree 里 core.bare=true）"]
   main["prac-main/ [main]<br/>← used/stable（冻结）"]
-  dev["prac-dev/ [dev]<br/>← development（不稳定在此）"]
+  dev["prac-dev/ [feat/*]<br/>← development（不稳定在此）"]
   root --> git
   root --> main
   root --> dev
   remote["remote: origin → git@github.com:ifplusor/prac.git（当前为空）"]
 ```
+
+### 现状（2026-11-07）
+
+- `prac-main` / `main` 是稳定基线；开发 worktree 当前在 `feat/vscode-dsh-integration`。
+- `dev` 分支仍在 `main` 的同一点，本阶段没有承担开发角色。
+- 运行与类型锚点是 `dsh-prac-dev`；当前 profile 的 prac 包链接到 `prac-dev`，`dsh-master` 仅作上游参考。
 
 ### 复现步骤（含 worktreeConfig trick）
 
@@ -57,4 +63,4 @@ flowchart TB
 
 - 开发在 `prac-dev`，遵循 prac 的纪律（决策优先、审决策、记 `.agents/notes/`）；稳定后 promote 到 `prac-main`。
 - 开发会话根应设在 `/Volumes/Dev/prac/prac-dev`（加载 prac 的 AGENTS.md + 决策记忆 + 参考），而非裸库根或 `prac-main`。
-- DSH 基底用 `dsh-master`；工作树可并行扩展（feature worktree）。
+- DSH 锚点用 `dsh-prac-dev`，`dsh-master` 只作参考；工作树可并行扩展（feature worktree）。

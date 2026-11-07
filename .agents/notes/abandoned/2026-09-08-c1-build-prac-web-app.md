@@ -55,6 +55,6 @@ C2：决策空间工具（基于已可运行的 web surface）。优先复用 `p
 ## Related
 
 - [2026-09-08-first-increment-c1.md](2026-09-08-first-increment-c1.md)（选 C1 的原因）
-- [2026-09-08-dev-environment-worktrees.md](2026-09-08-dev-environment-worktrees.md)（开发环境：prac-main 冻结 / prac-dev 开发；DSH 基底 dsh-master 只读）
+- [../resolved/2026-09-08-dev-environment-worktrees.md](../resolved/2026-09-08-dev-environment-worktrees.md)（开发环境：prac-main 冻结 / prac-dev 开发；DSH 基底 dsh-master 只读）
 - [../../../docs/architecture.md](../../../docs/architecture.md)（bundle/profile/plugin 映射）
 - 源码：`packages/prac-web-app/`（src/index.ts、src/dsh.d.ts、tests/、cordis.patch.yml、package.json、vite.config.ts）

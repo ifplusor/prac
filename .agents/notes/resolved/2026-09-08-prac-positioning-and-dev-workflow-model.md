@@ -1,5 +1,5 @@
 ---
-status: abandoned:superseded
+status: resolved:settled
 ---
 
 # Agent Note: prac 的定位、`.agents/notes` 形态与开发工作流模型
@@ -100,6 +100,6 @@ flowchart LR
 
 ## Related
 
-- [2026-09-08-first-increment-c1.md](2026-09-08-first-increment-c1.md)
+- [../abandoned/2026-09-08-first-increment-c1.md](../abandoned/2026-09-08-first-increment-c1.md)
 - [2026-09-08-dev-environment-worktrees.md](2026-09-08-dev-environment-worktrees.md)
 - [../../../docs/philosophy.md](../../../docs/philosophy.md)
