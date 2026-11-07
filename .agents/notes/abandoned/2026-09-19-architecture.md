@@ -173,7 +173,7 @@ code server 归主干起停：空闲端口、等就绪、随 DSH 插件 dispose 
 | `proposed/2026-09-19-integration-replan.md`            | **已并进这篇**（文件改名成 `2026-09-19-architecture.md`）                                            |
 | `proposed/2026-09-16-vscode-integration-transport.md`  | **已搬进 `abandoned/`**，`status: abandoned:superseded`（作为计划作废；里面的 **P1 内容保留**）       |
 | `proposed/2026-09-15-vscode-capabilities-into-prac.md` | **已搬进 `abandoned/`**，`status: abandoned:superseded`（作为主线作废；"view 是单位"等结论已继承）   |
-| `in-progress/2026-09-13-vs-concept-boundary.md`        | 保留（实现边界和 lib 抽取仍是现在的分层）                                                            |
+| `abandoned/2026-09-13-vs-concept-boundary.md`        | 保留（实现边界和 lib 抽取仍是现在的分层）                                                            |
 | `abandoned/2026-09-09-vscode-dsh-integration.md`     | 保留为 umbrella；**§1 与 §4 已按这篇重写**                                                           |
 | `docs/architecture.md`                                 | **已按这篇整篇重写**（现在时的目标设计）                                                             |
 

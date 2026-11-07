@@ -210,7 +210,7 @@ conversation 的 `mapWindow` 这条**保留**（已决）：去掉后 `file`/`ta
 ## Related
 
 - [2026-10-20-ui-framework.md](../abandoned/2026-10-20-ui-framework.md)：包分层、包表、frame 与来源的边界；本文改它的 `ui-dsh` 角色与动作条款。
-- [2026-09-13-vs-concept-boundary.md](../in-progress/2026-09-13-vs-concept-boundary.md)：「包名允许来源词」与 adapter 只翻译的边界；本文关掉其中「是否保留来源词」的开放项。
+- [2026-09-13-vs-concept-boundary.md](../abandoned/2026-09-13-vs-concept-boundary.md)：「包名允许来源词」与 adapter 只翻译的边界；本文关掉其中「是否保留来源词」的开放项。
 - [2026-10-12-dsh-anchor.md](../in-progress/2026-10-12-dsh-anchor.md)：「键由拥有者声明」——DSH 三个键的 owner 将从 frame 变为 dsh-host。
 - [2026-10-17-stack-view-chrome.md](../abandoned/2026-10-17-stack-view-chrome.md)、[2026-10-07-editor-host.md](../abandoned/2026-10-07-editor-host.md)：动作通道的分工，本文把它们收敛到 item 注册。
 - [2026-10-17-vscode-host-architecture.md](../abandoned/2026-10-17-vscode-host-architecture.md)：VS Code 侧作为实例 1 的现状描述。

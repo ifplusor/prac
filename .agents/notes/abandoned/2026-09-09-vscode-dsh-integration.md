@@ -118,7 +118,7 @@ prac-web-app  // composition root only
 
 ## 8. Related
 
-- [2026-09-13-vs-concept-boundary.md](../in-progress/2026-09-13-vs-concept-boundary.md)：术语边界。
+- [2026-09-13-vs-concept-boundary.md](../abandoned/2026-09-13-vs-concept-boundary.md)：术语边界。
 - [2026-09-19-architecture.md](2026-09-19-architecture.md)：需求 → 架构。
 - [2026-10-20-ui-framework.md](2026-10-20-ui-framework.md)：UI 组合模型。
 - [2026-10-23-ui-scheme.md](2026-10-23-ui-scheme.md)：产品设计。

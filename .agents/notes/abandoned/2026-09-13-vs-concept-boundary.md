@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: abandoned:superseded
 ---
 
 # Agent Note: prac 与 VS Code 的概念边界与命名
