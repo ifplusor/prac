@@ -7,6 +7,10 @@ export default defineConfig({
   // is formatted and checked.
   fmt: { ignorePatterns: [".agents/notes/**", ".agents/worklog/**"] },
   lint: {
+    // The vendored VS Code overlay imports VS Code's own internal modules; it is
+    // typechecked against that checkout by `vscode:typecheck-overlay`, not by the
+    // prac root check (which has no resolution for those modules).
+    ignorePatterns: ["vendor/vscode/**"],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",

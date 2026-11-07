@@ -125,7 +125,7 @@ function differingFiles(installedDir, checkoutDir) {
   for (const rel of theirs.keys()) {
     if (!mine.has(rel)) differing.push(`${rel} (only in the checkout)`);
   }
-  return differing.sort();
+  return differing.sort((a, b) => a.localeCompare(b));
 }
 
 /**
@@ -176,7 +176,7 @@ function compare(checkout) {
   let drifted = 0;
   let stale = 0;
   let compared = 0;
-  for (const [name, where] of [...dshDependencies()].sort()) {
+  for (const [name, where] of [...dshDependencies()].sort(([a], [b]) => a.localeCompare(b))) {
     // Resolve from the package that declares the dependency: these are
     // per-package devDependencies, not hoisted to the workspace root.
     let installedDir;

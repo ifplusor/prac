@@ -145,10 +145,7 @@ await page.evaluate(
 );
 await page.waitForTimeout(2500);
 
-const sidebarWindow = await page.evaluate((boardId) => {
-  const board = globalThis.__pracTest?.widgets
-    ?.boards()
-    .find((candidate) => candidate.id === boardId);
+const sidebarWindow = await page.evaluate(() => {
   const deep = (selector) => {
     const found = [...document.querySelectorAll(selector)];
     const walk = (root) => {
@@ -175,7 +172,7 @@ const sidebarWindow = await page.evaluate((boardId) => {
     ),
     editorsInSidebar: editors.length,
   };
-}, "left/container:workbench.view.explorer");
+});
 
 // The board window gets a `PracWindowInput` identity projection once its sidebar
 // has an editor group (the frame still renders the board; the app only knows it exists).
