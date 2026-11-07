@@ -9,6 +9,7 @@ import type { Context } from "@deepseek-ai/cordis";
 // Type-only, for the frame plugin's `Context` / `SlotMap` merges.
 import type {} from "prac-client-ui-frame/client";
 
+import type { PracAppDef, PracExtension, PracExtensionsFace } from "prac-client-ui-frame/client";
 import type { BoardWindowFrameFace } from "./board-window.js";
 import { BoardWindowAdapter } from "./board-window.js";
 import { WidgetRegistry } from "./widget.js";
@@ -31,16 +32,19 @@ export function apply(ctx: Context): void {
     setItemBoard: (viewId, boardId) => frame.setItemBoard(viewId, boardId),
   };
   // The board is an app window: the region's window group holds it like any other
-  // window, and its identity comes from the application layer.
-  ctx.effect(
-    () =>
-      ctx.pracApplications.register({
-        id: "prac.board",
-        label: "Board",
-        instances: "multi",
-      }),
-    "prac-client-ui-widget: board app",
-  );
+  // window. It is a core extension contribution, not a direct registry write.
+  const boardApp: PracAppDef = {
+    id: "prac.board",
+    version: "1",
+    label: "Board",
+    instances: "multi",
+  };
+  const coreExtension: PracExtension = {
+    manifest: { id: "prac.core.board", origin: "prac", version: "1" },
+    apps: () => [boardApp],
+  };
+  const extensions: PracExtensionsFace = ctx.pracExtensions;
+  ctx.effect(() => extensions.register(coreExtension), "prac-client-ui-widget: board app");
   const face: PracWidgetsFace = {
     registry: new WidgetRegistry(),
     createBoardWindow: (id, label) => {
@@ -75,4 +79,4 @@ export function apply(ctx: Context): void {
 /** Cordis plugin name. */
 export const name = "prac-client-ui-widget";
 /** The widget plugin needs the frame's placement face. */
-export const inject = ["pracFrame", "pracSurfaces", "pracApplications", "pracWindows"];
+export const inject = ["pracFrame", "pracSurfaces", "pracExtensions", "pracWindows"];
