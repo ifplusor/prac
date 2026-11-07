@@ -354,7 +354,8 @@ const activeAfterClick = await page.evaluate(
 // one surface each — VS Code's model, with prac's regions as its grid.
 step("split region");
 await page.evaluate(
-  (resource) => globalThis.__pracTest?.frame.splitItem(globalThis.__pracFileView(resource), "right"),
+  (resource) =>
+    globalThis.__pracTest?.frame.splitItem(globalThis.__pracFileView(resource), "right"),
   uriOf(FILE_A),
 );
 await waitForSurface(uriOf(FILE_A));
@@ -611,7 +612,8 @@ await page.waitForTimeout(2000);
 // prac owns the region tree, so a group the workbench makes on its own would have no
 // region until the frame renders a view for it.)
 await page.evaluate(
-  (resource) => globalThis.__pracTest?.frame.splitItem(globalThis.__pracFileView(resource), "right"),
+  (resource) =>
+    globalThis.__pracTest?.frame.splitItem(globalThis.__pracFileView(resource), "right"),
   uriOf(FILE_B),
 );
 await page.waitForTimeout(3000);
@@ -737,11 +739,7 @@ const activeProjection = await page.evaluate(
     await waitFor(() => face.windowOrder("right").includes(conversation));
     const rightOrder = face.windowOrder("right");
     face.openFile(file);
-    await waitFor(() =>
-      face
-        .listPlacements()
-        .some((placement) => placement.resource === file),
-    );
+    await waitFor(() => face.listPlacements().some((placement) => placement.resource === file));
     globalThis.__pracTest?.frame.hide(conversation);
     await waitFor(() => !face.mappedWindows().includes(conversation));
     const hiddenMapped = face.mappedWindows();

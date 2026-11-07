@@ -74,7 +74,9 @@ await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face && !!globalThi
   timeout: 60_000,
 });
 // The editor must be able to open at all before any of this means anything.
-await until(page, () => globalThis.__pracTest?.frame.listRegions().length > 0, null, { timeout: 10_000 });
+await until(page, () => globalThis.__pracTest?.frame.listRegions().length > 0, null, {
+  timeout: 10_000,
+});
 
 /** The state this gate is about: what is open, what is dirty, what is being asked. */
 const state = () =>
@@ -175,9 +177,7 @@ await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), DIRTY.
 await until(
   page,
   (uri) =>
-    globalThis.__vscodeEmbed.face
-      .listPlacements()
-      .some((placement) => placement.resource === uri),
+    globalThis.__vscodeEmbed.face.listPlacements().some((placement) => placement.resource === uri),
   DIRTY.uri,
   { timeout: 10_000 },
 );
@@ -217,9 +217,7 @@ const discarded = await clickButton("Don't Save");
 await until(
   page,
   (uri) =>
-    !globalThis.__vscodeEmbed.face
-      .listPlacements()
-      .some((placement) => placement.resource === uri),
+    !globalThis.__vscodeEmbed.face.listPlacements().some((placement) => placement.resource === uri),
   DIRTY.uri,
   { timeout: 10_000 },
 );

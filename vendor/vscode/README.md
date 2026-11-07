@@ -49,7 +49,7 @@ import { EMBED_BRIDGE } from "prac-vscode";
 | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | 服务构建产物（同源路由 `/prac-vscode` + code server 的 HTTP/WS 代理） | **机制**在 `prac-vscode-embed`（`vendor/vscode-embed`）；**策略**在 `prac-host-vscode`（`packages/host/vscode`） |
 | 在 DSH 页里启动 VS Code（每页一次）+ 目录（id 约定与挂载入口）        | **机制**在 `prac-vscode-embed/client`；**何时启动 + 目录怎么拼**在 `prac-client-vscode-host`                     |
-| 把目录注册成 `prac.widget`                                           | `prac-client-ui-vscode-editor`（打开的文件） / `prac-client-ui-vscode-views`（视图注册表里的视图）               |
+| 把目录注册成 `prac.widget`                                            | `prac-client-ui-vscode-editor`（打开的文件） / `prac-client-ui-vscode-views`（视图注册表里的视图）               |
 | 落位（谁放哪、注意力、快捷键）                                        | `prac-web-app`（bundle 的编排半边）                                                                              |
 
 拆开的原因：两个消费者必须能**各自单独**使用，所以启动 VS Code 的机制不能属于任何一个消费者；而「谁服务产物」是 host 面的事，与「怎么改上游」是两件事。

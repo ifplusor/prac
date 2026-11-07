@@ -23,9 +23,9 @@ const { page, own, close } = await openPrac(url);
 await until(
   page,
   () => {
-    const items = [...document.querySelectorAll('[data-prac-activity="left"] [data-prac-rail-item]')].map(
-      (item) => item.getAttribute("data-prac-rail-item"),
-    );
+    const items = [
+      ...document.querySelectorAll('[data-prac-activity="left"] [data-prac-rail-item]'),
+    ].map((item) => item.getAttribute("data-prac-rail-item"));
     return [
       "workbench.view.explorer",
       "workbench.view.search",
@@ -146,7 +146,9 @@ await page.evaluate(
 await page.waitForTimeout(2500);
 
 const sidebarWindow = await page.evaluate((boardId) => {
-  const board = globalThis.__pracTest?.widgets?.boards().find((candidate) => candidate.id === boardId);
+  const board = globalThis.__pracTest?.widgets
+    ?.boards()
+    .find((candidate) => candidate.id === boardId);
   const deep = (selector) => {
     const found = [...document.querySelectorAll(selector)];
     const walk = (root) => {
@@ -168,7 +170,9 @@ const sidebarWindow = await page.evaluate((boardId) => {
   );
   return {
     fileIds,
-    fileRegions: fileIds.map((id) => globalThis.__pracTest?.frame.getState().items[id]?.region ?? null),
+    fileRegions: fileIds.map(
+      (id) => globalThis.__pracTest?.frame.getState().items[id]?.region ?? null,
+    ),
     editorsInSidebar: editors.length,
   };
 }, "left/container:workbench.view.explorer");
@@ -178,9 +182,12 @@ const sidebarWindow = await page.evaluate((boardId) => {
 const boardMapped = await page
   .waitForFunction(
     (boardId) => {
-      const board = globalThis.__pracTest?.widgets?.boards().find((candidate) => candidate.id === boardId);
+      const board = globalThis.__pracTest?.widgets
+        ?.boards()
+        .find((candidate) => candidate.id === boardId);
       return (
-        board !== undefined && globalThis.__pracTest?.vscode?.mappedWindows().includes(board.windowId)
+        board !== undefined &&
+        globalThis.__pracTest?.vscode?.mappedWindows().includes(board.windowId)
       );
     },
     "left/container:workbench.view.explorer",
@@ -239,8 +246,7 @@ report({
     "a single editor window can live in the sidebar WindowGroup":
       sidebarWindow.fileRegions.some(
         (region) => typeof region === "string" && region.startsWith("left/container:"),
-      ) &&
-      sidebarWindow.editorsInSidebar > 0,
+      ) && sidebarWindow.editorsInSidebar > 0,
     "no prac-owned console errors":
       own("__pracTest").length === 0 && own("vscode-embed:").length === 0,
   },

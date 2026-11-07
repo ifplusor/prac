@@ -73,7 +73,9 @@ await until(
       return undefined;
     };
     const count = (node) =>
-      node.type === "region" ? 1 : (node.children ?? []).reduce((sum, child) => sum + count(child), 0);
+      node.type === "region"
+        ? 1
+        : (node.children ?? []).reduce((sum, child) => sum + count(child), 0);
     const root = find(state.tree, "stage");
     return count(root) === 2;
   },
@@ -93,9 +95,16 @@ await until(
 
 const first = { stage: await stage(), left: await leftWidth(), spaces: await spaces() };
 const created = await page.evaluate(() => globalThis.__pracTest?.spaces.create("Space 2"));
-await until(page, (id) => globalThis.__pracTest?.spaces.list().length === 2 && globalThis.__pracTest?.spaces.active() === id, created, {
-  timeout: 5000,
-});
+await until(
+  page,
+  (id) =>
+    globalThis.__pracTest?.spaces.list().length === 2 &&
+    globalThis.__pracTest?.spaces.active() === id,
+  created,
+  {
+    timeout: 5000,
+  },
+);
 const second = { stage: await stage(), left: await leftWidth(), spaces: await spaces() };
 
 await page.reload({ waitUntil: "load" });

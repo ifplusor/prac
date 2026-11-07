@@ -209,7 +209,8 @@ async function sample(page) {
         // conversation a view like any other it moves, so a gate that cares
         // about "the track stayed alive" has to read the placement, not infer it.
         conversationRegion:
-          globalThis.__pracTest?.frame?.getState?.().items?.["dsh:main:conversation"]?.region ?? null,
+          globalThis.__pracTest?.frame?.getState?.().items?.["dsh:main:conversation"]?.region ??
+          null,
         overlay: box(globalThis.__deep.one("[data-prac-recall]")),
         strip: !!globalThis.__deep.one("[data-prac-focus-strip]"),
         rows: [...globalThis.__deep.all(rowSelector)].map((element) => ({
@@ -304,7 +305,8 @@ const probeReady = await page.evaluate(
     typeof globalThis.__pracTest?.frame?.show === "function" &&
     typeof globalThis.__pracTest?.frame?.splitItem === "function",
 );
-if (!probeReady) throw new Error("globalThis.__pracTest?.frame is missing the catalogue/placement face");
+if (!probeReady)
+  throw new Error("globalThis.__pracTest?.frame is missing the catalogue/placement face");
 
 const FILE_VIEW = await page.evaluate(
   (prefix) =>

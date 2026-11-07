@@ -1273,9 +1273,7 @@ export class PracWindowGroup extends Disposable implements IEditorGroupView {
   private hostFor(editor: EditorInput): PracEditorPaneHost {
     let host = this.paneHosts.get(editor);
     if (host !== undefined) return host;
-    host = this._register(
-      this.paneInstantiationService.createInstance(PracEditorPaneHost, this),
-    );
+    host = this._register(this.paneInstantiationService.createInstance(PracEditorPaneHost, this));
     this.paneHosts.set(editor, host);
     this._register(
       host.onDidFocus(() => {

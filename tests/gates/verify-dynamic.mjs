@@ -53,7 +53,8 @@ const state = () =>
         catalogue: globalThis.__pracTest?.vscode
           ?.catalogue()
           .filter((entry) => entry.view === view || entry.appId === appView),
-        frames: globalThis.__pracTest?.frame?.listItems().filter((entry) => entry.id === view) ?? [],
+        frames:
+          globalThis.__pracTest?.frame?.listItems().filter((entry) => entry.id === view) ?? [],
         boards,
         owners: boards.filter((board) => board.widgets.includes(view)).map((board) => board.id),
         hosts: deepHosts(),
@@ -94,9 +95,7 @@ await run("prac.gate.hide");
 const hidden = await waitFor((current) => current.catalogue.length === 0 && current.hosts === 0);
 
 await run("prac.gate.show");
-const shownAgain = await waitFor(
-  (current) => current.catalogue.length === 1 && current.hosts > 0,
-);
+const shownAgain = await waitFor((current) => current.catalogue.length === 1 && current.hosts > 0);
 
 await close();
 

@@ -168,7 +168,10 @@ async function opened(fixture) {
     await unfold("vscode:view:outline");
     // A section that starts folded comes back at its floor; give it room the way a person would drag it
     // open, so the pane has somewhere to render (the claim itself is a face call, not a layout guess).
-    await page.evaluate((id) => globalThis.__pracTest?.frame.setItemSize(id, 320), "vscode:view:outline");
+    await page.evaluate(
+      (id) => globalThis.__pracTest?.frame.setItemSize(id, 320),
+      "vscode:view:outline",
+    );
     await page.waitForTimeout(800);
     const facts = await outline();
     if (facts.symbols.filter((row) => row !== "").length >= wanted) return facts;
@@ -210,7 +213,9 @@ async function focusFirstFixture() {
   await page.waitForTimeout(3000);
   const spot = await page.evaluate(
     (view) => {
-      const region = globalThis.__pracTest?.frame.listItems().find((entry) => entry.id === view)?.region;
+      const region = globalThis.__pracTest?.frame
+        .listItems()
+        .find((entry) => entry.id === view)?.region;
       const host = region
         ? document.querySelector(`[data-prac-region="${region}"] [data-prac-view-host]`)
         : null;

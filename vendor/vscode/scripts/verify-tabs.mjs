@@ -73,7 +73,9 @@ await installDeepDom(page);
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face && !!globalThis.__deep, null, {
   timeout: 60_000,
 });
-await until(page, () => globalThis.__pracTest?.frame.listRegions().length > 0, null, { timeout: 10_000 });
+await until(page, () => globalThis.__pracTest?.frame.listRegions().length > 0, null, {
+  timeout: 10_000,
+});
 await page.waitForTimeout(200);
 
 /**
@@ -237,13 +239,15 @@ const dragAuditAfter = await page.evaluate(() =>
 
 step("split via the tab-strip action");
 const regionsBefore = await page.evaluate(() => globalThis.__pracTest?.frame.listRegions().length);
-await page
-  .locator('[data-prac-window-action="workbench.action.splitEditor"]')
-  .first()
-  .click();
-await until(page, (before) => globalThis.__pracTest?.frame.listRegions().length > before, regionsBefore, {
-  timeout: 10_000,
-});
+await page.locator('[data-prac-window-action="workbench.action.splitEditor"]').first().click();
+await until(
+  page,
+  (before) => globalThis.__pracTest?.frame.listRegions().length > before,
+  regionsBefore,
+  {
+    timeout: 10_000,
+  },
+);
 const regionsAfter = await page.evaluate(() => globalThis.__pracTest?.frame.listRegions().length);
 const splitActionHosts = await page.evaluate(
   () => globalThis.__deep.all("[data-prac-window-actions]").length,

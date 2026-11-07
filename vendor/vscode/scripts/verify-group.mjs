@@ -55,7 +55,10 @@ const state = async () =>
           placement: host.placement,
           connected: host.element.isConnected,
           lines: host.element.querySelectorAll(".view-line").length,
-          parentRegion: host.element.parentElement?.closest("[data-prac-region]")?.getAttribute("data-prac-region") ?? null,
+          parentRegion:
+            host.element.parentElement
+              ?.closest("[data-prac-region]")
+              ?.getAttribute("data-prac-region") ?? null,
           width: Math.round(host.element.getBoundingClientRect().width),
         })),
       domRegions: globalThis.__deep
@@ -73,7 +76,12 @@ const state = async () =>
       ),
       frameViews: (globalThis.__pracTest?.frame?.listItems() ?? [])
         .filter((view) => view.id.includes(uri))
-        .map((view) => ({ id: view.id, region: view.region, hidden: view.hidden, front: view.front })),
+        .map((view) => ({
+          id: view.id,
+          region: view.region,
+          hidden: view.hidden,
+          front: view.front,
+        })),
     };
   }, FILE.uri);
 
@@ -105,9 +113,7 @@ await until(
       .all(`[data-vscode-embed-file="${uri}"]`)
       .map((element) => element.querySelectorAll(".view-line").length);
     return (
-      placements.length === 1 &&
-      globalThis.__pracFileViews(uri).length === 1 &&
-      (lines[0] ?? 0) > 0
+      placements.length === 1 && globalThis.__pracFileViews(uri).length === 1 && (lines[0] ?? 0) > 0
     );
   },
   FILE.uri,
@@ -130,9 +136,8 @@ const commandRan = await page
 await until(
   page,
   (uri) =>
-    globalThis.__vscodeEmbed.face
-      .listPlacements()
-      .filter((placement) => placement.resource === uri).length === 2,
+    globalThis.__vscodeEmbed.face.listPlacements().filter((placement) => placement.resource === uri)
+      .length === 2,
   FILE.uri,
   { timeout: 10_000 },
 );
@@ -169,8 +174,7 @@ for (const [side, command] of [
       const element = document.activeElement;
       const region = element ? globalThis.__deep.closest(element, "[data-prac-region]") : null;
       return (
-        region !== null &&
-        (region.getAttribute("data-prac-region") ?? null) !== previousRegion
+        region !== null && (region.getAttribute("data-prac-region") ?? null) !== previousRegion
       );
     },
     previous,
@@ -202,9 +206,8 @@ const focusAndTyping = await page.evaluate((view) => {
 // because it held the active-editor slot — the next split silently did nothing.
 const beforeClose = await page.evaluate(
   (uri) =>
-    globalThis.__vscodeEmbed.face
-      .listPlacements()
-      .filter((placement) => placement.resource === uri).length,
+    globalThis.__vscodeEmbed.face.listPlacements().filter((placement) => placement.resource === uri)
+      .length,
   FILE.uri,
 );
 await page.evaluate(() =>
@@ -213,9 +216,8 @@ await page.evaluate(() =>
 await until(
   page,
   ({ uri, before }) =>
-    globalThis.__vscodeEmbed.face
-      .listPlacements()
-      .filter((placement) => placement.resource === uri).length < before,
+    globalThis.__vscodeEmbed.face.listPlacements().filter((placement) => placement.resource === uri)
+      .length < before,
   { uri: FILE.uri, before: beforeClose },
   { timeout: 10_000 },
 );
@@ -226,9 +228,8 @@ await page.evaluate(() =>
 await until(
   page,
   (uri) =>
-    globalThis.__vscodeEmbed.face
-      .listPlacements()
-      .filter((placement) => placement.resource === uri).length > 1,
+    globalThis.__vscodeEmbed.face.listPlacements().filter((placement) => placement.resource === uri)
+      .length > 1,
   FILE.uri,
   { timeout: 10_000 },
 );

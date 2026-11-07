@@ -27,7 +27,9 @@ await page.waitForFunction(
 
 const read = () =>
   page.evaluate((boardId) => {
-    const board = globalThis.__pracTest?.widgets?.boards().find((candidate) => candidate.id === boardId);
+    const board = globalThis.__pracTest?.widgets
+      ?.boards()
+      .find((candidate) => candidate.id === boardId);
     const host = document.querySelector(`[data-prac-view-id="${boardId}/board"]`);
     const root = host?.shadowRoot;
     return {
@@ -47,7 +49,9 @@ const read = () =>
 const initial = await read();
 
 const selected = await page.evaluate((boardId) => {
-  const board = globalThis.__pracTest?.widgets?.boards().find((candidate) => candidate.id === boardId);
+  const board = globalThis.__pracTest?.widgets
+    ?.boards()
+    .find((candidate) => candidate.id === boardId);
   const next = board.widgetOrder()[1];
   board.selectWidget(next);
   return { expected: next, active: board.content.activeWidget };
@@ -57,7 +61,9 @@ await page.waitForTimeout(300);
 const afterSelect = await read();
 
 const reordered = await page.evaluate((boardId) => {
-  const board = globalThis.__pracTest?.widgets?.boards().find((candidate) => candidate.id === boardId);
+  const board = globalThis.__pracTest?.widgets
+    ?.boards()
+    .find((candidate) => candidate.id === boardId);
   const reversed = [...board.widgetOrder()].reverse();
   board.reorderWidgets(reversed);
   return { expected: reversed, actual: [...board.widgetOrder()] };
@@ -145,7 +151,9 @@ const crossDrag = await page.evaluate(async (targetBoardId) => {
   globalThis.__pracTest?.frame.place(source.windowId, "center");
   globalThis.__pracTest?.frame.setItemBoard(source.windowId, source.boardId);
   await new Promise((resolve) => setTimeout(resolve, 800));
-  const target = globalThis.__pracTest?.widgets?.boards().find((board) => board.id === targetBoardId);
+  const target = globalThis.__pracTest?.widgets
+    ?.boards()
+    .find((board) => board.id === targetBoardId);
   const host =
     target === undefined
       ? null
@@ -226,7 +234,10 @@ const stage = await page.evaluate(
       if (fileId !== undefined) break;
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    const board = globalThis.__pracTest?.widgets?.createBoardWindow("gate:stage-board", "Gate Stage");
+    const board = globalThis.__pracTest?.widgets?.createBoardWindow(
+      "gate:stage-board",
+      "Gate Stage",
+    );
     globalThis.__pracTest?.frame.place(board.windowId, "center");
     globalThis.__pracTest?.frame.setItemBoard(board.windowId, board.boardId);
     await new Promise((resolve) => setTimeout(resolve, 600));
@@ -246,7 +257,9 @@ const stage = await page.evaluate(
 
 await page.evaluate(
   ({ boardId, order, active }) => {
-    const board = globalThis.__pracTest?.widgets?.boards().find((candidate) => candidate.id === boardId);
+    const board = globalThis.__pracTest?.widgets
+      ?.boards()
+      .find((candidate) => candidate.id === boardId);
     board.reorderWidgets(order);
     if (active !== undefined) board.selectWidget(active);
   },

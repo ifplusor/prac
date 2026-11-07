@@ -45,7 +45,8 @@ const state = () =>
       return {
         catalogue:
           globalThis.__pracTest?.vscode?.catalogue().filter((entry) => entry.view === view) ?? [],
-        frames: globalThis.__pracTest?.frame?.listItems().filter((entry) => entry.id === view) ?? [],
+        frames:
+          globalThis.__pracTest?.frame?.listItems().filter((entry) => entry.id === view) ?? [],
         owners: boards.filter((widgets) => widgets.includes(view)).length,
         hosts: deepHosts(),
       };

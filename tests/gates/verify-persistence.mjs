@@ -78,7 +78,9 @@ const initial = await sample();
 await page.evaluate(
   ({ left, view, width, boardId }) => {
     globalThis.__pracTest?.frame.setWidth(left, width);
-    const board = globalThis.__pracTest?.widgets?.boards().find((candidate) => candidate.id === boardId);
+    const board = globalThis.__pracTest?.widgets
+      ?.boards()
+      .find((candidate) => candidate.id === boardId);
     board.content.setWidgetCollapsed(view, true);
   },
   { left: LEFT, view: VIEW, width: WIDTH, boardId: BOARD },

@@ -546,11 +546,7 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
         Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).start(accessor);
         Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).start(accessor);
         Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
-          EditorPaneDescriptor.create(
-            PracWindowPane,
-            PracWindowPane.ID,
-            "Prac Window",
-          ),
+          EditorPaneDescriptor.create(PracWindowPane, PracWindowPane.ID, "Prac Window"),
           [new SyncDescriptor(PracWindowInput)],
         );
 
@@ -1476,11 +1472,15 @@ export class EmbeddedWorkbench extends Disposable implements IWorkbenchLayoutSer
    */
   openPreviewFile(resource: string): void {
     try {
-      const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource) ? URI.parse(resource) : URI.file(resource);
+      const uri = /^[a-z][a-z0-9+.-]*:\/\//i.test(resource)
+        ? URI.parse(resource)
+        : URI.file(resource);
       void this.fileService
         .canHandleResource(uri)
         .then(() => this.editorService.openEditor({ resource: uri, options: { pinned: false } }))
-        .catch((error) => this.logService.error(`vscode-embed: preview open failed for ${resource}`, error));
+        .catch((error) =>
+          this.logService.error(`vscode-embed: preview open failed for ${resource}`, error),
+        );
     } catch (error) {
       this.logService.error(`vscode-embed: preview open failed for ${resource}`, error);
     }
