@@ -241,7 +241,11 @@ export interface PracExtension {
   apps?(): readonly PracAppDef[];
   widgets?(): readonly PracWidgetDef[];
   windows?(appId: string): readonly { readonly id: string; readonly title: string }[];
-  contentFor?(windowId: string): () => ReactNode;
+  contentFor?(
+    windowId: string,
+    render?: ApplicationSlotRenderer,
+    view?: ApplicationViewport,
+  ): () => ReactNode;
   hostFor?(widgetId: string): () => ReactNode;
   wrap?(widgetId: string, host: () => ReactNode): () => ReactNode;
   onDidChange?(listener: () => void): () => void;

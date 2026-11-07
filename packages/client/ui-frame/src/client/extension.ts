@@ -71,7 +71,8 @@ export function createExtensionRegistry(ctx?: Context): PracExtensionsFace {
         instances: app.instances,
         ...(app.defaultRegion === undefined ? {} : { defaultRegion: app.defaultRegion }),
         ...(app.paneHeader === true ? { paneHeader: true } : {}),
-        content: (windowId: string) => extension.contentFor?.(windowId) ?? (() => null),
+        content: (windowId: string, render, view) =>
+          extension.contentFor?.(windowId, render, view) ?? (() => null),
         windows: () => extension.windows?.(app.id) ?? [],
       })),
   });

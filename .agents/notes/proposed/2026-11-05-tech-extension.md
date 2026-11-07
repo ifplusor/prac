@@ -122,7 +122,7 @@ interface PracExtension {
   widgets?(): readonly PracWidgetDef[];
   windows?(appId: string): readonly PracWindowDecl[];
 
-  contentFor?(windowId: string): () => ReactNode;
+  contentFor?(windowId: string, render?: ApplicationSlotRenderer, view?: ApplicationViewport): () => ReactNode;
   hostFor?(widgetId: string): () => ReactNode;
 
   onDidChange?(listener: () => void): () => void;
@@ -155,7 +155,7 @@ export function apply(ctx: Context): void {
 - `ctx.effect` / `ctx.on("dispose")` 负责清理；
 - 没有 `PracExtensionContext` / `activate` / `dispose` 这一层。
 
-- app 内容：`contentFor(windowId)`；
+- app 内容：`contentFor(windowId, render?, view?)`；`render` / `view` 是 app window 的运行时上下文；
 - widget 内容：`hostFor(widgetId)`；
 - app 的窗口声明：`windows(appId)`；由 app layer 做 diff / admit / close；
 - host extension：Cordis plugin，`ctx.provide("prac.vscodeHost", …)`，不贡献 apps / widgets；

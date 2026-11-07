@@ -5,6 +5,7 @@
  */
 
 import type { Context } from "@deepseek-ai/cordis";
+import type { PracAppDef, PracExtension, PracExtensionsFace } from "prac-client-ui-frame/client";
 import type {} from "prac-client-ui-frame/client";
 import {
   DSH_CONVERSATION_VIEW,
@@ -16,74 +17,73 @@ import {
 } from "./dsh.js";
 import type { PracDshFace } from "./contract.js";
 
+const chat: PracAppDef = {
+  id: "chat",
+  version: "1",
+  label: "Chat",
+  instances: "single",
+  defaultRegion: "center",
+};
+
+const sidebar: PracAppDef = {
+  id: "dsh.sidebar",
+  version: "1",
+  label: "Sidebar",
+  instances: "single",
+  defaultRegion: "left",
+};
+
+const rightbar: PracAppDef = {
+  id: "dsh.rightbar",
+  version: "1",
+  label: "Right bar",
+  instances: "single",
+  defaultRegion: "right",
+};
+
 /** Install the DSH adapter service. */
 export function apply(ctx: Context): void {
-  ctx.effect(
-    () =>
-      ctx.pracApplications.register({
-        id: "chat",
-        label: "Chat",
-        instances: "single",
-        defaultRegion: "center",
-        content: (windowId, render) => {
-          if (render === undefined) return () => null;
-          const key = dshMainKey(windowId) ?? "conversation";
-          return () => render("main", {}, { entryKey: key });
-        },
-      }),
-    "prac-client-dsh-host: chat app",
-  );
-  // The sidebar is a host panel too (the arrangement hides it by default; it
-  // still exists as a window so a layout can show it).
-  ctx.effect(
-    () =>
-      ctx.pracApplications.register({
-        id: "dsh.sidebar",
-        label: "Sidebar",
-        instances: "single",
-        defaultRegion: "left",
-        content: (_windowId, render, view) => {
-          if (render === undefined) return () => null;
-          return () =>
-            render("sidebar", {
-              collapsed: (view?.width ?? 0) === 0,
-              width: view?.width ?? 0,
-            });
-        },
-      }),
-    "prac-client-dsh-host: sidebar app",
-  );
-  // The right rail is a host panel: an app window whose body renders the host's
-  // `rightbar` slot with the box the frame hands to the app content.
-  ctx.effect(
-    () =>
-      ctx.pracApplications.register({
-        id: "dsh.rightbar",
-        label: "Right bar",
-        instances: "single",
-        defaultRegion: "right",
-        content: (_windowId, render, view) => {
-          if (render === undefined) return () => null;
-          return () =>
-            render("rightbar", {
-              width: view?.width ?? 0,
-              viewportWidth: view?.viewportWidth ?? 0,
-              canShow: (view?.width ?? 0) > 0,
-            });
-        },
-      }),
-    "prac-client-dsh-host: rightbar app",
-  );
-  ctx.effect(() => {
-    ctx.pracWindows.admit("chat", { windowId: DSH_CONVERSATION_VIEW, title: "Chat" });
-    ctx.pracWindows.admit("dsh.rightbar", { windowId: DSH_RIGHTBAR_VIEW, title: "Right bar" });
-    ctx.pracWindows.admit("dsh.sidebar", { windowId: DSH_SIDEBAR_VIEW, title: "Sidebar" });
-    return () => {
-      ctx.pracWindows.close(DSH_CONVERSATION_VIEW);
-      ctx.pracWindows.close(DSH_RIGHTBAR_VIEW);
-      ctx.pracWindows.close(DSH_SIDEBAR_VIEW);
-    };
-  }, "prac-client-dsh-host: host windows");
+  const extensions: PracExtensionsFace = ctx.pracExtensions;
+  const extension: PracExtension = {
+    manifest: { id: "prac.dsh-host", origin: "dsh", version: "1" },
+    apps: () => [chat, sidebar, rightbar],
+    windows: (appId) => {
+      switch (appId) {
+        case chat.id:
+          return [{ id: DSH_CONVERSATION_VIEW, title: "Chat" }];
+        case sidebar.id:
+          return [{ id: DSH_SIDEBAR_VIEW, title: "Sidebar" }];
+        case rightbar.id:
+          return [{ id: DSH_RIGHTBAR_VIEW, title: "Right bar" }];
+        default:
+          return [];
+      }
+    },
+    contentFor: (windowId, render, view) => {
+      if (render === undefined) return () => null;
+      if (windowId === DSH_CONVERSATION_VIEW) {
+        const key = dshMainKey(windowId) ?? "conversation";
+        return () => render("main", {}, { entryKey: key });
+      }
+      if (windowId === DSH_SIDEBAR_VIEW) {
+        return () =>
+          render("sidebar", {
+            collapsed: (view?.width ?? 0) === 0,
+            width: view?.width ?? 0,
+          });
+      }
+      if (windowId === DSH_RIGHTBAR_VIEW) {
+        return () =>
+          render("rightbar", {
+            width: view?.width ?? 0,
+            viewportWidth: view?.viewportWidth ?? 0,
+            canShow: (view?.width ?? 0) > 0,
+          });
+      }
+      return () => null;
+    },
+  };
+  ctx.effect(() => extensions.register(extension), "prac-client-dsh-host: host extension");
   const face: PracDshFace = {
     sidebar: DSH_SIDEBAR_VIEW,
     rightbar: DSH_RIGHTBAR_VIEW,
@@ -96,4 +96,4 @@ export function apply(ctx: Context): void {
 }
 
 export const name = "prac-client-dsh-host";
-export const inject: readonly string[] = ["pracApplications", "pracWindows"];
+export const inject: readonly string[] = ["pracExtensions"];
