@@ -1,5 +1,5 @@
 ---
-status: resolved:implemented
+status: abandoned:superseded
 ---
 
 # Agent Note: C1 怎么搭 + 验证结果（最小可运行 prac-on-DSH）

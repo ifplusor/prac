@@ -1,5 +1,5 @@
 ---
-status: resolved:settled
+status: abandoned:superseded
 ---
 
 # Agent Note: prac 的定位、`.agents/notes` 形态与开发工作流模型

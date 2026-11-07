@@ -114,6 +114,6 @@ status: abandoned:superseded
 
 - [2026-09-08-decision-space-presentation.md](2026-09-08-decision-space-presentation.md)（立身之本，C2 问题域）
 - [2026-09-08-epistemic-loop-decision-unit.md](2026-09-08-epistemic-loop-decision-unit.md)（决策交付单元 / 六件事）
-- [2026-09-08-c1-build-prac-web-app.md](../resolved/2026-09-08-c1-build-prac-web-app.md)（C1 已验证的工具链 + C2 候选）
+- [2026-09-08-c1-build-prac-web-app.md](2026-09-08-c1-build-prac-web-app.md)（C1 已验证的工具链 + C2 候选）
 - [../../../docs/philosophy.md](../../../docs/philosophy.md)（六件事 / 决策单元 / 审查是主界面）
 - DSH 缝：`../deepseek-harness/dsh-master/docs/capability-seams.md`（`ctx.userQuestions` / `ctx.sessionProjections` / `ctx.tools` / `dsh.client`）
