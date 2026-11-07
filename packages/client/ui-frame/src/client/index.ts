@@ -311,7 +311,7 @@ export function apply(ctx: Context): void {
     const disposePracSurfaces = ctx.provide("pracSurfaces", surfaces);
     const disposePracSpaces = ctx.provide("pracSpaces", pracSpaces);
     const disposeWindowActions = ctx.provide("pracWindowActions", windowActions);
-    const disposeExtensions = ctx.provide("pracExtensions", createExtensionRegistry());
+    const disposeExtensions = ctx.provide("pracExtensions", createExtensionRegistry(ctx));
     // The catalogue's live sources. `listItems()` reads the registry on every
     // call, so a later registration is already visible; these subscriptions
     // only bump `catalogueVersion`, which is how a subscribed UI (and this
@@ -348,6 +348,7 @@ export function apply(ctx: Context): void {
     const disposeProbes = publishPracProbes({
       frame: pracFrame,
       boardLayouts,
+      applications: ctx.pracApplications,
       spaces: pracSpaces,
       windowActions,
     });

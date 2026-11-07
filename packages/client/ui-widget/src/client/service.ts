@@ -79,4 +79,10 @@ export function apply(ctx: Context): void {
 /** Cordis plugin name. */
 export const name = "prac-client-ui-widget";
 /** The widget plugin needs the frame's placement face. */
-export const inject = ["pracFrame", "pracSurfaces", "pracExtensions", "pracWindows"];
+export const inject = [
+  "pracFrame",
+  "pracSurfaces",
+  "pracExtensions",
+  "pracApplications",
+  "pracWindows",
+];
