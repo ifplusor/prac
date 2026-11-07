@@ -11,6 +11,10 @@ const url = requireUrl();
 const { page, own, close } = await openPrac(url);
 
 const BOARD = "left/container:workbench.view.explorer";
+// The extension-lifecycle fixture enters a probe view while the gate runs. It
+// is exercised by the lifecycle/dynamic gates; this gate asserts the Explorer
+// board's own order, so keep the probe out of both the baseline and the restore.
+const IGNORE = new Set(["vscode:view:pracProbeWebviewView"]);
 
 await page.waitForFunction(
   (boardId) => {
@@ -26,48 +30,63 @@ await page.waitForFunction(
 );
 
 const read = () =>
-  page.evaluate((boardId) => {
-    const board = globalThis.__pracTest?.widgets
-      ?.boards()
-      .find((candidate) => candidate.id === boardId);
-    const host = document.querySelector(`[data-prac-view-id="${boardId}/board"]`);
-    const root = host?.shadowRoot;
-    return {
-      window: board === undefined ? null : board.windowId,
-      record: globalThis.__pracTest?.frame.getState().items[`${boardId}/board`] ?? null,
-      order: board === undefined ? [] : [...board.widgetOrder()],
-      active: board === undefined ? undefined : board.content.activeWidget,
-      rows:
-        root === undefined || root === null
-          ? []
-          : [...root.querySelectorAll("[data-prac-stack-entry]")].map((row) =>
-              row.getAttribute("data-prac-stack-entry"),
-            ),
-    };
-  }, BOARD);
+  page.evaluate(
+    ({ boardId, ignore }) => {
+      const ignored = new Set(ignore);
+      const board = globalThis.__pracTest?.widgets
+        ?.boards()
+        .find((candidate) => candidate.id === boardId);
+      const host = document.querySelector(`[data-prac-view-id="${boardId}/board"]`);
+      const root = host?.shadowRoot;
+      return {
+        window: board === undefined ? null : board.windowId,
+        record: globalThis.__pracTest?.frame.getState().items[`${boardId}/board`] ?? null,
+        order: board === undefined ? [] : [...board.widgetOrder()].filter((id) => !ignored.has(id)),
+        active: board === undefined ? undefined : board.content.activeWidget,
+        rows:
+          root === undefined || root === null
+            ? []
+            : [...root.querySelectorAll("[data-prac-stack-entry]")]
+                .map((row) => row.getAttribute("data-prac-stack-entry"))
+                .filter((id) => id !== null && !ignored.has(id)),
+      };
+    },
+    { boardId: BOARD, ignore: [...IGNORE] },
+  );
 
 const initial = await read();
 
-const selected = await page.evaluate((boardId) => {
-  const board = globalThis.__pracTest?.widgets
-    ?.boards()
-    .find((candidate) => candidate.id === boardId);
-  const next = board.widgetOrder()[1];
-  board.selectWidget(next);
-  return { expected: next, active: board.content.activeWidget };
-}, BOARD);
+const selected = await page.evaluate(
+  ({ boardId, ignore }) => {
+    const ignored = new Set(ignore);
+    const board = globalThis.__pracTest?.widgets
+      ?.boards()
+      .find((candidate) => candidate.id === boardId);
+    const next = board.widgetOrder().filter((id) => !ignored.has(id))[1];
+    board.selectWidget(next);
+    return { expected: next, active: board.content.activeWidget };
+  },
+  { boardId: BOARD, ignore: [...IGNORE] },
+);
 
 await page.waitForTimeout(300);
 const afterSelect = await read();
 
-const reordered = await page.evaluate((boardId) => {
-  const board = globalThis.__pracTest?.widgets
-    ?.boards()
-    .find((candidate) => candidate.id === boardId);
-  const reversed = [...board.widgetOrder()].reverse();
-  board.reorderWidgets(reversed);
-  return { expected: reversed, actual: [...board.widgetOrder()] };
-}, BOARD);
+const reordered = await page.evaluate(
+  ({ boardId, ignore }) => {
+    const ignored = new Set(ignore);
+    const board = globalThis.__pracTest?.widgets
+      ?.boards()
+      .find((candidate) => candidate.id === boardId);
+    const reversed = [...board.widgetOrder()].filter((id) => !ignored.has(id)).reverse();
+    board.reorderWidgets(reversed);
+    return {
+      expected: reversed,
+      actual: [...board.widgetOrder()].filter((id) => !ignored.has(id)),
+    };
+  },
+  { boardId: BOARD, ignore: [...IGNORE] },
+);
 
 await page.waitForTimeout(300);
 const afterReorder = await read();
