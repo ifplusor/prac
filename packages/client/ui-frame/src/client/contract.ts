@@ -183,7 +183,7 @@ export interface PracPartner {
  * The base partners. There are exactly two, and each is a **group of plugins**
  * (VS Code: the views and editor plugins; DSH: its host), not one plugin.
  */
-export type PracPartnerName = "vscode" | "dsh";
+export type PracPartnerName = "vscode" | "dsh" | "prac";
 
 /** Origin metadata; not a branch. */
 export type PracExtensionOrigin = "prac" | "vscode" | "dsh" | (string & {});
@@ -215,6 +215,8 @@ export interface PracWidgetDef {
   readonly version: string;
   readonly title: string;
   readonly icon?: string;
+  readonly paneHeader?: boolean;
+  readonly actions?: () => ReactNode;
   readonly defaultBoard?: string;
   readonly defaultRegion?: string;
 }
@@ -240,8 +242,10 @@ export interface PracExtension {
   readonly manifest: PracExtensionManifest;
   apps?(): readonly PracAppDef[];
   widgets?(): readonly PracWidgetDef[];
+  windows?(appId: string): readonly { readonly id: string; readonly title: string }[];
   contentFor?(windowId: string): () => ReactNode;
   hostFor?(widgetId: string): () => ReactNode;
+  wrap?(widgetId: string, host: () => ReactNode): () => ReactNode;
   onDidChange?(listener: () => void): () => void;
 }
 

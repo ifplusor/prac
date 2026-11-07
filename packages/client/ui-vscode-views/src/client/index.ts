@@ -7,8 +7,8 @@
  * package does not distinguish them, nor core from extension.
  *
  * The registration itself belongs to the shared mechanism: this package is a
- * `PracPartner` (`ctx.pracPartners`), and the runner turns its contributions
- * into registrations, re-registering when a view's chrome changes (a pane header
+ * `PracExtension` (`ctx.pracExtensions`), and the registry turns its widgets into
+ * registrations, re-registering when a view's chrome changes (a pane header
  * showing a different title).
  *
  * Placement is not decided here. The arrangement (`prac-web-app`) owns the
@@ -22,39 +22,39 @@ import { createElement, useLayoutEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import type { Context } from "@deepseek-ai/cordis";
 import type { PracVscodeFace } from "prac-client-vscode-host/client";
-import type { PracContribution, PracPartner, PracPartnersFace } from "prac-client-ui-frame/client";
+import type { PracExtension, PracExtensionsFace, PracWidgetDef } from "prac-client-ui-frame/client";
 // Type-only, for the frame plugin's `Context` / `SlotMap` merges.
 import type {} from "prac-client-ui-frame/client";
 
 /**
- * A partner over the app's view registry.
+ * An extension over the app's view registry.
  *
  * @param host - the mechanism face.
  * @param onRetitle - called when a view's own pane header reports a new title.
- * @returns the partner the runner registers.
+ * @returns the extension the registry registers.
  */
-function viewPartner(host: PracVscodeFace, onRetitle: () => void): PracPartner {
+function viewExtension(host: PracVscodeFace, onRetitle: () => void): PracExtension {
   /** The pane header's title per view; survives a catalogue re-read. */
   const paneTitles = new Map<string, string>();
   /** The pane header's icon class per view. */
   const paneIcons = new Map<string, string>();
-  const contributions = (): readonly PracContribution[] =>
+  const widgets = (): readonly PracWidgetDef[] =>
     host
       .catalogue()
       .filter((entry) => entry.source === "view")
       .map((entry) => ({
         id: entry.view,
-        kind: "widget" as const,
-        label: paneTitles.get(entry.view) ?? entry.title,
+        version: "1",
+        title: paneTitles.get(entry.view) ?? entry.title,
         icon: paneIcons.get(entry.view) ?? "",
         paneHeader: true,
       }));
   return {
-    name: "vscode",
-    contributions,
+    manifest: { id: "prac.vscode-views", origin: "vscode", version: "1" },
+    widgets,
     onDidChange: (listener: () => void) => host.onDidChangeCatalogue(listener),
     hostFor: (id) => host.hostFor(id),
-    wrap: (contribution, content) => {
+    wrap: (widgetId, content) => {
       /**
        * The view plus a title observer.
        *
@@ -87,7 +87,7 @@ function viewPartner(host: PracVscodeFace, onRetitle: () => void): PracPartner {
         }, [view]);
         return createElement("div", { ref, style: { display: "contents" } }, createElement(View));
       }
-      const view = contribution.id;
+      const view = widgetId;
       return () => createElement(ViewWithTitle, { view, View: content });
     },
   };
@@ -100,7 +100,7 @@ function viewPartner(host: PracVscodeFace, onRetitle: () => void): PracPartner {
  */
 export function apply(ctx: Context): void {
   const host: PracVscodeFace = ctx.pracVscode;
-  const partners: PracPartnersFace = ctx.pracPartners;
+  const extensions: PracExtensionsFace = ctx.pracExtensions;
   ctx.effect(() => {
     // The retitle listener is the partner's own change source; the runner
     // subscribes to `onDidChange` for both it and the catalogue.
@@ -108,8 +108,8 @@ export function apply(ctx: Context): void {
     const notify = (): void => {
       for (const listener of listeners) listener();
     };
-    const partner: PracPartner = {
-      ...viewPartner(host, notify),
+    const extension: PracExtension = {
+      ...viewExtension(host, notify),
       onDidChange: (listener: () => void) => {
         listeners.add(listener);
         const off = host.onDidChangeCatalogue(listener);
@@ -119,12 +119,12 @@ export function apply(ctx: Context): void {
         };
       },
     };
-    return partners.register(partner);
+    return extensions.register(extension);
   }, "prac-client-ui-vscode-views: one widget per app view");
 }
 
 /** The cordis plugin name used by loader diagnostics. */
 export const name = "prac-client-ui-vscode-views";
 
-/** The DSH services this plugin needs: the partner registry and the mechanism. */
-export const inject = ["pracPartners", "pracVscode"];
+/** The DSH services this plugin needs: the extension registry and the mechanism. */
+export const inject = ["pracExtensions", "pracVscode"];

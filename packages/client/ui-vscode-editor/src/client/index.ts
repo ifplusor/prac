@@ -35,8 +35,10 @@ import type {
   VscodeCatalogueEntry,
 } from "prac-client-vscode-host/client";
 import type {
+  PracAppDef,
+  PracExtension,
+  PracExtensionsFace,
   PracLayoutFace,
-  PracPartnersFace,
   PracWindowActionsFace,
   WindowAction,
   WindowActionModel,
@@ -235,29 +237,27 @@ export function apply(ctx: Context): void {
       stopClose();
     };
   }, "prac-client-ui-vscode-editor: chrome + active editor");
-  // The editor app and its windows go through the partner contract: the adapter
-  // says which instances exist (one per open file placement) and what one renders;
-  // the runner registers the app and opens / closes the windows.
-  const partners: PracPartnersFace = ctx.pracPartners;
+  // The editor app and its windows go through the extension contract: the
+  // adapter says which app / windows exist and what one renders; the registry
+  // registers the app and opens / closes the windows.
+  const extensions: PracExtensionsFace = ctx.pracExtensions;
+  const editorApp: PracAppDef = {
+    id: "editor",
+    version: "1",
+    label: "Editor",
+    instances: "multi",
+    defaultRegion: "center",
+    paneHeader: true,
+  };
+  const extension: PracExtension = {
+    manifest: { id: "prac.vscode-editor", origin: "vscode", version: "1" },
+    apps: () => [editorApp],
+    onDidChange: (listener: () => void) => host.onDidChangeCatalogue(listener),
+    contentFor: (windowId: string) => host.hostFor(windowId) ?? (() => null),
+    windows: () => fileEntries().map(({ view, title }) => ({ id: view, title })),
+  };
   ctx.effect(
-    () =>
-      partners.register({
-        name: "vscode",
-        contributions: () => [],
-        onDidChange: (listener: () => void) => host.onDidChangeCatalogue(listener),
-        hostFor: (id: string) => host.hostFor(id) ?? (() => null),
-        applications: () => [
-          {
-            id: "editor",
-            label: "Editor",
-            instances: "multi",
-            defaultRegion: "center",
-            paneHeader: true,
-            content: (windowId: string) => host.hostFor(windowId) ?? (() => null),
-            windows: () => fileEntries().map(({ view, title }) => ({ id: view, title })),
-          },
-        ],
-      }),
+    () => extensions.register(extension),
     "prac-client-ui-vscode-editor: editor app + windows",
   );
 }
@@ -266,4 +266,4 @@ export function apply(ctx: Context): void {
 export const name = "prac-client-ui-vscode-editor";
 
 /** The DSH services this plugin needs: the app + window faces, the mechanism and the layout. */
-export const inject = ["pracPartners", "pracVscode", "pracFrame", "pracWindowActions"];
+export const inject = ["pracExtensions", "pracVscode", "pracFrame", "pracWindowActions"];

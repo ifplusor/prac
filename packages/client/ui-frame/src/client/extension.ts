@@ -9,11 +9,18 @@
  * @module prac-client-ui-frame/client/extension
  */
 
+import type { Context } from "@deepseek-ai/cordis";
+
 import type {
   PracCatalog,
+  PracContribution,
   PracExtension,
   PracExtensionManifest,
+  PracExtensionOrigin,
   PracExtensionsFace,
+  PracPartner,
+  PracPartnerApplication,
+  PracPartnerName,
 } from "./contract.js";
 
 const emptyCatalog = (): PracCatalog => ({
@@ -29,11 +36,43 @@ const emptyCatalog = (): PracCatalog => ({
  *
  * @returns the registry; `register` returns a disposer for one extension.
  */
-export function createExtensionRegistry(): PracExtensionsFace {
+export function createExtensionRegistry(ctx?: Context): PracExtensionsFace {
   const extensions = new Map<string, PracExtension>();
+  const runtimes = new Map<string, () => void>();
   const listeners = new Set<() => void>();
   let version = 0;
   let catalog = emptyCatalog();
+
+  const partnerName = (origin: PracExtensionOrigin): PracPartnerName =>
+    (origin === "vscode" || origin === "dsh" ? origin : "prac") as PracPartnerName;
+
+  const partnerOf = (extension: PracExtension): PracPartner => ({
+    name: partnerName(extension.manifest.origin),
+    contributions: (): readonly PracContribution[] =>
+      (extension.widgets?.() ?? []).map((widget) => ({
+        id: widget.id,
+        kind: "widget",
+        label: widget.title,
+        ...(widget.icon === undefined ? {} : { icon: widget.icon }),
+        ...(widget.paneHeader === true ? { paneHeader: true } : {}),
+        ...(widget.actions === undefined ? {} : { actions: widget.actions }),
+      })),
+    onDidChange: (listener: () => void) => extension.onDidChange?.(listener) ?? (() => {}),
+    hostFor: (id) => extension.hostFor?.(id) ?? (() => null),
+    ...(extension.wrap === undefined
+      ? {}
+      : { wrap: (contribution, host) => extension.wrap?.(contribution.id, host) ?? host }),
+    applications: (): readonly PracPartnerApplication[] =>
+      (extension.apps?.() ?? []).map((app) => ({
+        id: app.id,
+        label: app.label,
+        instances: app.instances,
+        ...(app.defaultRegion === undefined ? {} : { defaultRegion: app.defaultRegion }),
+        ...(app.paneHeader === true ? { paneHeader: true } : {}),
+        content: (windowId: string) => extension.contentFor?.(windowId) ?? (() => null),
+        windows: () => extension.windows?.(app.id) ?? [],
+      })),
+  });
 
   const rebuild = (): void => {
     const manifests: PracExtensionManifest[] = [];
@@ -88,7 +127,11 @@ export function createExtensionRegistry(): PracExtensionsFace {
       const stop = watch(extension);
       try {
         rebuild();
+        if (ctx !== undefined)
+          runtimes.set(extension.manifest.id, ctx.pracPartners.register(partnerOf(extension)));
       } catch (error) {
+        runtimes.get(extension.manifest.id)?.();
+        runtimes.delete(extension.manifest.id);
         extensions.delete(extension.manifest.id);
         stop();
         rebuild();
@@ -96,6 +139,8 @@ export function createExtensionRegistry(): PracExtensionsFace {
       }
       return () => {
         stop();
+        runtimes.get(extension.manifest.id)?.();
+        runtimes.delete(extension.manifest.id);
         if (extensions.get(extension.manifest.id) !== extension) return;
         extensions.delete(extension.manifest.id);
         rebuild();
