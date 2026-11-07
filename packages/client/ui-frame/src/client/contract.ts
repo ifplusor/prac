@@ -121,68 +121,6 @@ export interface WindowActionModel {
   readonly secondary: readonly WindowAction[];
 }
 
-/** The frame's window-action registry (keyed by view id). */
-/** One thing a base partner contributes to prac. */
-export interface PracContribution {
-  /** Global id (`vscode:view:*`, `dsh:main:*`, `vscode:file:*`). */
-  readonly id: string;
-  /**
-   * `app` — the contribution opens windows through the application layer;
-   * `widget` — it is a composable unit a board renders. A window is prac's
-   * **instance**, never the partner's unit of contribution.
-   */
-  readonly kind: "app" | "widget";
-  readonly label?: string;
-  readonly icon?: string;
-  /** The content brings its own native header; the frame must not draw a second row. */
-  readonly paneHeader?: boolean;
-  /** The contribution's own actions; they ride the registration (not a separate seat). */
-  readonly actions?: () => ReactNode;
-}
-
-/** An app a partner contributes, with the window instances it currently wants open. */
-export interface PracPartnerApplication {
-  readonly id: string;
-  readonly label: string;
-  readonly instances: "single" | "multi";
-  readonly defaultRegion?: string;
-  /** The content brings its own native header (the frame overlays controls only). */
-  readonly paneHeader?: boolean;
-  /** One window's content; resolved per instance id. */
-  content(
-    windowId: string,
-    render?: ApplicationSlotRenderer,
-    view?: ApplicationViewport,
-  ): () => ReactNode;
-  /** The instances the partner wants open right now. */
-  windows(): readonly { readonly id: string; readonly title: string }[];
-}
-
-/** A base partner (VS Code, DSH) and how prac reads what it contributes. */
-export interface PracPartner {
-  /** Which base partner this plugin contributes to. */
-  readonly name: PracPartnerName;
-  contributions(): readonly PracContribution[];
-  onDidChange(listener: () => void): () => void;
-  /**
-   * One contribution's content.
-   *
-   * Resolved once per **registration**, never per render: a fresh component on
-   * every render would remount the whole view and its header.
-   */
-  hostFor(id: string): () => ReactNode;
-  /** The partner's own wrapping of a contribution (e.g. observing its pane title). */
-  wrap?(contribution: PracContribution, host: () => ReactNode): () => ReactNode;
-  /** The apps the partner contributes, with their current window instances. */
-  applications?(): readonly PracPartnerApplication[];
-}
-
-/**
- * The base partners. There are exactly two, and each is a **group of plugins**
- * (VS Code: the views and editor plugins; DSH: its host), not one plugin.
- */
-export type PracPartnerName = "vscode" | "dsh" | "prac";
-
 /** Origin metadata; not a branch. */
 export type PracExtensionOrigin = "prac" | "vscode" | "dsh" | (string & {});
 
@@ -259,13 +197,7 @@ export interface PracExtensionsFace {
   onDidChange(listener: () => void): () => void;
 }
 
-/** The partner registry the frame provides. */
-export interface PracPartnersFace {
-  /** Join a base partner; several plugins may register under the same name. */
-  register(partner: PracPartner): () => void;
-  /** The base partners currently joined, with their provider count. */
-  partners(): readonly { readonly name: PracPartnerName; readonly providers: number }[];
-}
+/** The frame's window-action registry (keyed by view id). */
 
 export interface PracWindowActionsFace {
   /** Set (or replace) the model for one view. */

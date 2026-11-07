@@ -14,15 +14,17 @@ import type { Context } from "@deepseek-ai/cordis";
 import { createPartnerRegistry } from "./partner.js";
 import type {
   PracCatalog,
-  PracContribution,
   PracExtension,
   PracExtensionManifest,
   PracExtensionOrigin,
   PracExtensionsFace,
+} from "./contract.js";
+import type {
+  PracContribution,
   PracPartner,
   PracPartnerApplication,
   PracPartnerName,
-} from "./contract.js";
+} from "./partner.js";
 
 const emptyCatalog = (): PracCatalog => ({
   version: 0,

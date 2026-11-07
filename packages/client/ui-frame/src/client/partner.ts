@@ -11,8 +11,153 @@
  */
 
 import type { Context } from "@deepseek-ai/cordis";
+import type { ReactNode } from "react";
+import type { ApplicationSlotRenderer, ApplicationViewport } from "prac-ui-kit-workbench";
 
-import type { PracContribution, PracPartner, PracPartnersFace } from "./contract.js";
+/** One thing a base partner contributes to prac. */
+export interface PracContribution {
+  /** Global id (`vscode:view:*`, `dsh:main:*`, `vscode:file:*`). */
+  readonly id: string;
+  /**
+   * `app` — the contribution opens windows through the application layer;
+   * `widget` — it is a composable unit a board renders. A window is prac's
+   * **instance**, never the partner's unit of contribution.
+   */
+  readonly kind: "app" | "widget";
+  readonly label?: string;
+  readonly icon?: string;
+  /** The content brings its own native header; the frame must not draw a second row. */
+  readonly paneHeader?: boolean;
+  /** The contribution's own actions; they ride the registration (not a separate seat). */
+  readonly actions?: () => ReactNode;
+}
+
+/** An app a partner contributes, with the window instances it currently wants open. */
+export interface PracPartnerApplication {
+  readonly id: string;
+  readonly label: string;
+  readonly instances: "single" | "multi";
+  readonly defaultRegion?: string;
+  /** The content brings its own native header (the frame overlays controls only). */
+  readonly paneHeader?: boolean;
+  /** One window's content; resolved per instance id. */
+  content(
+    windowId: string,
+    render?: ApplicationSlotRenderer,
+    view?: ApplicationViewport,
+  ): () => ReactNode;
+  /** The instances the partner wants open right now. */
+  windows(): readonly { readonly id: string; readonly title: string }[];
+}
+
+/** A base partner (VS Code, DSH) and how prac reads what it contributes. */
+export interface PracPartner {
+  /** Which base partner this plugin contributes to. */
+  readonly name: PracPartnerName;
+  contributions(): readonly PracContribution[];
+  onDidChange(listener: () => void): () => void;
+  /**
+   * One contribution's content.
+   *
+   * Resolved once per **registration**, never per render: a fresh component on
+   * every render would remount the whole view and its header.
+   */
+  hostFor(id: string): () => ReactNode;
+  /** The partner's own wrapping of a contribution (e.g. observing its pane title). */
+  wrap?(contribution: PracContribution, host: () => ReactNode): () => ReactNode;
+  /** The apps the partner contributes, with their current window instances. */
+  applications?(): readonly PracPartnerApplication[];
+}
+
+/**
+ * The base partners. There are exactly two, and each is a **group of plugins**
+ * (VS Code: the views and editor plugins; DSH: its host), not one plugin.
+ */
+export type PracPartnerName = "vscode" | "dsh" | "prac";
+
+/** Origin metadata; not a branch. */
+export type PracExtensionOrigin = "prac" | "vscode" | "dsh" | (string & {});
+
+/** Declarative extension manifest. */
+export interface PracExtensionManifest {
+  readonly id: string;
+  readonly origin: PracExtensionOrigin;
+  readonly version: string;
+  readonly dependsOn?: readonly string[];
+  readonly capabilities?: readonly string[];
+  readonly provides?: readonly string[];
+}
+
+/** Declarative app definition. */
+export interface PracAppDef {
+  readonly id: string;
+  readonly version: string;
+  readonly label: string;
+  readonly icon?: string;
+  readonly paneHeader?: boolean;
+  readonly instances: "single" | "multi";
+  readonly defaultRegion?: string;
+}
+
+/** Declarative widget definition. */
+export interface PracWidgetDef {
+  readonly id: string;
+  readonly version: string;
+  readonly title: string;
+  readonly icon?: string;
+  readonly paneHeader?: boolean;
+  readonly actions?: () => ReactNode;
+  readonly defaultBoard?: string;
+  readonly defaultRegion?: string;
+}
+
+/** One host capability declaration. */
+export interface PracHostDecl {
+  readonly id: string;
+  readonly version: string;
+  readonly status: "ready" | "starting" | "unavailable";
+}
+
+/** The derived catalog snapshot. */
+export interface PracCatalog {
+  readonly version: number;
+  readonly extensions: readonly PracExtensionManifest[];
+  readonly apps: readonly PracAppDef[];
+  readonly widgets: readonly PracWidgetDef[];
+  readonly hosts: readonly PracHostDecl[];
+}
+
+/** One extension runtime contribution object, registered by a Cordis plugin. */
+export interface PracExtension {
+  readonly manifest: PracExtensionManifest;
+  apps?(): readonly PracAppDef[];
+  widgets?(): readonly PracWidgetDef[];
+  windows?(appId: string): readonly { readonly id: string; readonly title: string }[];
+  contentFor?(
+    windowId: string,
+    render?: ApplicationSlotRenderer,
+    view?: ApplicationViewport,
+  ): () => ReactNode;
+  hostFor?(widgetId: string): () => ReactNode;
+  wrap?(widgetId: string, host: () => ReactNode): () => ReactNode;
+  onDidChange?(listener: () => void): () => void;
+}
+
+/** The extension registry service. */
+export interface PracExtensionsFace {
+  register(extension: PracExtension): () => void;
+  list(): readonly PracExtensionManifest[];
+  catalog(): PracCatalog;
+  onDidChange(listener: () => void): () => void;
+}
+
+/** The partner registry the frame provides. */
+export interface PracPartnersFace {
+  /** Join a base partner; several plugins may register under the same name. */
+  register(partner: PracPartner): () => void;
+  /** The base partners currently joined, with their provider count. */
+  partners(): readonly { readonly name: PracPartnerName; readonly providers: number }[];
+}
 
 /** The content slot a `widget` contribution registers into. */
 const WIDGET_SLOT = "prac.widget" as const;
