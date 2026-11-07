@@ -67,20 +67,20 @@ flowchart LR
 
 ## 4. 对象
 
-| 对象 | 是什么 | 不是什么 |
-|---|---|---|
-| **PracExtension** | Cordis plugin + contribution；`apps()` / `widgets()` / `hostFor` / `contentFor` | 不是新的 plugin runtime |
-| **PracAppDef** | app 的声明：id / version / label / instances / defaultRegion | 不是 window；不含 content |
-| **ApplicationDefinition** | app 的运行时定义：`PracAppDef` + `content(windowId)` | 不是 window 实例 |
-| **PracWindow** | 一个窗口实例：身份 / 生命周期 / appId / appVersion / title | 不是 DOM window；不是 tab |
-| **PracWidgetDef** | widget 的声明：id / version / title / defaultBoard / defaultRegion | 不含 content / hostFor |
-| **PracWidget** | widget 的运行时：`PracWidgetDef` + source + content | 不是 window；不直接进 group |
-| **WindowPlacement** | window 在 space root 的 placement | 不是 window；不属于 `PracWindow` |
-| **WidgetPlacement** | widget 在 board root 的 placement | 不是 widget |
-| **PracCatalog** | 声明 / 定义的派生快照 + 索引 | 不是第二权威；不持久化 |
-| **Window group** | 一组 window；tab strip 的 tab 是 window | 不是 editor group |
-| **Space** | stage 的虚拟桌面；拥有一个 space root | 不是 project folder |
-| **board** | widget 的布局内容 | 不是 window；board window 才是 window |
+| 对象                      | 是什么                                                                          | 不是什么                              |
+| ------------------------- | ------------------------------------------------------------------------------- | ------------------------------------- |
+| **PracExtension**         | Cordis plugin + contribution；`apps()` / `widgets()` / `hostFor` / `contentFor` | 不是新的 plugin runtime               |
+| **PracAppDef**            | app 的声明：id / version / label / instances / defaultRegion                    | 不是 window；不含 content             |
+| **ApplicationDefinition** | app 的运行时定义：`PracAppDef` + `content(windowId)`                            | 不是 window 实例                      |
+| **PracWindow**            | 一个窗口实例：身份 / 生命周期 / appId / appVersion / title                      | 不是 DOM window；不是 tab             |
+| **PracWidgetDef**         | widget 的声明：id / version / title / defaultBoard / defaultRegion              | 不含 content / hostFor                |
+| **PracWidget**            | widget 的运行时：`PracWidgetDef` + source + content                             | 不是 window；不直接进 group           |
+| **WindowPlacement**       | window 在 space root 的 placement                                               | 不是 window；不属于 `PracWindow`      |
+| **WidgetPlacement**       | widget 在 board root 的 placement                                               | 不是 widget                           |
+| **PracCatalog**           | 声明 / 定义的派生快照 + 索引                                                    | 不是第二权威；不持久化                |
+| **Window group**          | 一组 window；tab strip 的 tab 是 window                                         | 不是 editor group                     |
+| **Space**                 | stage 的虚拟桌面；拥有一个 space root                                           | 不是 project folder                   |
+| **board**                 | widget 的布局内容                                                               | 不是 window；board window 才是 window |
 
 ## 5. 关系约束
 
@@ -96,17 +96,17 @@ flowchart LR
 
 ## 6. 来源
 
-| 来源 | prac |
-|---|---|
-| VS Code editor input（文件 / diff / custom editor / webview） | `PracAppDef` + `PracWindow` |
-| VS Code `ViewContainer` | board / board window |
-| VS Code `ViewDescriptor` | `PracWidgetDef` / `PracWidget` |
-| VS Code editor group | window group 的 adapter runtime |
-| VS Code 菜单 / 命令 | action model |
-| DSH `main` keyed entry | app / `PracWindow` |
-| DSH `sidebar` / `rightbar` | app / board（后续） |
-| DSH 内部 slot | widget |
-| DSH `shell.overlay` | frame overlay |
+| 来源                                                          | prac                            |
+| ------------------------------------------------------------- | ------------------------------- |
+| VS Code editor input（文件 / diff / custom editor / webview） | `PracAppDef` + `PracWindow`     |
+| VS Code `ViewContainer`                                       | board / board window            |
+| VS Code `ViewDescriptor`                                      | `PracWidgetDef` / `PracWidget`  |
+| VS Code editor group                                          | window group 的 adapter runtime |
+| VS Code 菜单 / 命令                                           | action model                    |
+| DSH `main` keyed entry                                        | app / `PracWindow`              |
+| DSH `sidebar` / `rightbar`                                    | app / board（后续）             |
+| DSH 内部 slot                                                 | widget                          |
+| DSH `shell.overlay`                                           | frame overlay                   |
 
 - VS Code / DSH 是**内容来源**，不是 prac 的原生对象；
 - `PracExtension` 负责转换；frame 不认识 `vscode:` / `dsh:`；
@@ -137,19 +137,19 @@ Frame shell
 
 ## 8. 术语
 
-| canonical | 不要用 | 说明 |
-|---|---|---|
-| **PracExtension** | partner | Cordis plugin + contribution |
-| **PracCatalog** | catalogue | 派生快照 / 索引 |
-| **PracWindow** | WindowInstance / WindowRecord | 窗口运行时 |
-| **PracWidget** | WidgetInstance / WidgetItem | widget 运行时 |
-| **PracAppDef** | — | app 声明 |
-| **PracWidgetDef** | — | widget 声明 |
-| **WindowPlacement** | WindowItem | window 位置 |
-| **WidgetPlacement** | WidgetItem | widget 位置 |
-| **application window** | editor view / editor group | editor / chat / diff / terminal 的 window |
-| **editor group** | prac window group | VS Code adapter runtime |
-| **source adapter** | — | 把 VS Code / DSH 内容投影成 prac 对象 |
+| canonical              | 不要用                        | 说明                                      |
+| ---------------------- | ----------------------------- | ----------------------------------------- |
+| **PracExtension**      | partner                       | Cordis plugin + contribution              |
+| **PracCatalog**        | catalogue                     | 派生快照 / 索引                           |
+| **PracWindow**         | WindowInstance / WindowRecord | 窗口运行时                                |
+| **PracWidget**         | WidgetInstance / WidgetItem   | widget 运行时                             |
+| **PracAppDef**         | —                             | app 声明                                  |
+| **PracWidgetDef**      | —                             | widget 声明                               |
+| **WindowPlacement**    | WindowItem                    | window 位置                               |
+| **WidgetPlacement**    | WidgetItem                    | widget 位置                               |
+| **application window** | editor view / editor group    | editor / chat / diff / terminal 的 window |
+| **editor group**       | prac window group             | VS Code adapter runtime                   |
+| **source adapter**     | —                             | 把 VS Code / DSH 内容投影成 prac 对象     |
 
 ## 9. 已退役
 
