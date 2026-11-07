@@ -99,13 +99,20 @@
 
 Conventional Commits：`feat:` `fix:` `refactor:` `docs:` `test:` `chore:`
 
+- 提交必须使用当前配置的 SSH 签名；**禁止使用 `--no-gpg-sign`**。
+- 签名不可用（1Password / ssh-agent 未解锁等）时，停下来报告失败；不要绕过签名。
+
 ## 常用命令
+
+prac 仓内的脚本一律通过 `vp` 执行，不直接用 `pnpm` 跑 prac 脚本：
 
 ```bash
 cd /Volumes/Dev/prac
 git status                 # 当前状态
-# prac dev 的 DSH 锚点：一个 worktree（dsh-prac-dev），rig 与类型都从这里来
-cd ../deepseek-harness/dsh-prac-dev && pnpm dsh --profile prac-dev "<task>"
-# 锚点前进：worktree 更新后先 `pnpm run clean && pnpm build`（增量构建会留陈旧 lib/types）
-#            → 改 catalog 的 pin → pnpm check（含 dsh-types 逐字节比较）
+vp check                   # 格式化 + lint/type + dsh-types
+vp run -r test             # 全仓测试
+vp run -r build            # 全仓构建
+vp run verify:stack        # 单条 live gate
 ```
+
+prac dev 的 DSH 锚点是一个独立 worktree（`dsh-prac-dev`），它不是 vite-plus 项目，入口按 DSH 自己的约定执行；不要把它当成 prac 仓的 `vp` 脚本。
