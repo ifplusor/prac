@@ -73,6 +73,7 @@ import { createFrameStore, createSpaceStore } from "./store.js";
 import { WindowGroupAdapter } from "./window-group-adapter.js";
 import { publishPracProbes } from "./probes.js";
 import { createPartnerRegistry } from "./partner.js";
+import { createExtensionRegistry } from "./extension.js";
 import type { BoardDropFace } from "./layout-item.js";
 import { ThemePresenter } from "./theme.js";
 
@@ -311,6 +312,7 @@ export function apply(ctx: Context): void {
     const disposePracSpaces = ctx.provide("pracSpaces", pracSpaces);
     const disposeWindowActions = ctx.provide("pracWindowActions", windowActions);
     const disposePartners = ctx.provide("pracPartners", createPartnerRegistry(ctx));
+    const disposeExtensions = ctx.provide("pracExtensions", createExtensionRegistry());
     // The catalogue's live sources. `listItems()` reads the registry on every
     // call, so a later registration is already visible; these subscriptions
     // only bump `catalogueVersion`, which is how a subscribed UI (and this
@@ -354,6 +356,7 @@ export function apply(ctx: Context): void {
       disposeProbes();
       for (const stop of stopSlots) stop();
       offMain();
+      disposeExtensions();
       disposePartners();
       disposeWindowActions();
       windowActionEntries.clear();
@@ -383,6 +386,8 @@ export function apply(ctx: Context): void {
     };
   }, "prac-client-ui-frame: theme presenter");
 }
+
+export { createExtensionRegistry } from "./extension.js";
 
 /** The cordis plugin name used by loader diagnostics. */
 export const name = "prac-client-ui-frame";

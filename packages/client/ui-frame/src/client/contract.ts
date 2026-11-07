@@ -93,6 +93,8 @@ declare module "@deepseek-ai/cordis" {
     pracWindowActions: PracWindowActionsFace;
     /** The partner registry: a base partner contributes app / widget entries. */
     pracPartners: PracPartnersFace;
+    /** The extension registry: contribution objects -> catalog. */
+    pracExtensions: PracExtensionsFace;
     /** The frame's surface socket registry. */
     pracSurfaces: RegionContentRegistry<WindowGroup>;
   }
@@ -182,6 +184,74 @@ export interface PracPartner {
  * (VS Code: the views and editor plugins; DSH: its host), not one plugin.
  */
 export type PracPartnerName = "vscode" | "dsh";
+
+/** Origin metadata; not a branch. */
+export type PracExtensionOrigin = "prac" | "vscode" | "dsh" | (string & {});
+
+/** Declarative extension manifest. */
+export interface PracExtensionManifest {
+  readonly id: string;
+  readonly origin: PracExtensionOrigin;
+  readonly version: string;
+  readonly dependsOn?: readonly string[];
+  readonly capabilities?: readonly string[];
+  readonly provides?: readonly string[];
+}
+
+/** Declarative app definition. */
+export interface PracAppDef {
+  readonly id: string;
+  readonly version: string;
+  readonly label: string;
+  readonly icon?: string;
+  readonly paneHeader?: boolean;
+  readonly instances: "single" | "multi";
+  readonly defaultRegion?: string;
+}
+
+/** Declarative widget definition. */
+export interface PracWidgetDef {
+  readonly id: string;
+  readonly version: string;
+  readonly title: string;
+  readonly icon?: string;
+  readonly defaultBoard?: string;
+  readonly defaultRegion?: string;
+}
+
+/** One host capability declaration. */
+export interface PracHostDecl {
+  readonly id: string;
+  readonly version: string;
+  readonly status: "ready" | "starting" | "unavailable";
+}
+
+/** The derived catalog snapshot. */
+export interface PracCatalog {
+  readonly version: number;
+  readonly extensions: readonly PracExtensionManifest[];
+  readonly apps: readonly PracAppDef[];
+  readonly widgets: readonly PracWidgetDef[];
+  readonly hosts: readonly PracHostDecl[];
+}
+
+/** One extension runtime contribution object, registered by a Cordis plugin. */
+export interface PracExtension {
+  readonly manifest: PracExtensionManifest;
+  apps?(): readonly PracAppDef[];
+  widgets?(): readonly PracWidgetDef[];
+  contentFor?(windowId: string): () => ReactNode;
+  hostFor?(widgetId: string): () => ReactNode;
+  onDidChange?(listener: () => void): () => void;
+}
+
+/** The extension registry service. */
+export interface PracExtensionsFace {
+  register(extension: PracExtension): () => void;
+  list(): readonly PracExtensionManifest[];
+  catalog(): PracCatalog;
+  onDidChange(listener: () => void): () => void;
+}
 
 /** The partner registry the frame provides. */
 export interface PracPartnersFace {
