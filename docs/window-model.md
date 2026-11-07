@@ -29,9 +29,10 @@ flowchart LR
 - 一个 conversation = 一个 `PracWindow`（当前）；
 - tab strip 的 tab 是 **window group 里的 window**，不是 window 内的 tab；
 - window group 只包含 `PracWindow`；
-- `PracWindow` 的身份 / 生命周期 / appId / title 由 WM 持有；
+- `PracWindow` 的身份 / 生命周期 / appId / appVersion / title 由 WM 持有；
 - `PracWindow` 的内容由 app 提供：editor / chat / terminal / board；
 - `WindowPlacement` 只描述位置 / region / order / hidden / size，不拥有 window；
+- 已有 window / widget pin 它们启动时的 def version；新 runtime 用新 version。
 - window 可以没有 board（application window）；board window 是 content 为 board 的普通 `PracWindow`，不是子类。
 
 ## 3. Board
@@ -46,7 +47,7 @@ flowchart LR
 ## 4. Widget
 
 - `PracWidgetDef`：声明（id / title / icon / defaultBoard / defaultRegion）；
-- `PracWidget`：runtime（def + source + content，content 由 extension 的 `hostFor` 提供）；
+- `PracWidget`：runtime（def + source + content，content 由 extension 的 `hostFor` 提供；`version` 来自 def）；
 - `WidgetPlacement`：board root 里的位置 / order / hidden / collapsed / size / sourceId；
 - 一个 widget 同时只在一个 board root；
 - widget 可以被放在兼容 board 之间；placement 改，source 不变；

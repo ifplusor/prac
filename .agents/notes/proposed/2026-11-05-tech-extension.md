@@ -84,6 +84,7 @@ interface PracExtensionManifest {
 
 interface PracAppDef {
   readonly id: string;                 // global app id
+  readonly version: string;            // runtime pins this
   readonly label: string;
   readonly icon?: string;
   readonly paneHeader?: boolean;
@@ -93,6 +94,7 @@ interface PracAppDef {
 
 interface PracWidgetDef {
   readonly id: string;                 // namespaced by extension
+  readonly version: string;            // runtime pins this
   readonly title: string;
   readonly icon?: string;
   readonly defaultBoard?: string;
@@ -196,13 +198,13 @@ flowchart LR
   A --> B --> C --> D --> E --> F
 ```
 
-- **stable id** 是前提：
+- **stable id** 是前提，统一为 `source:kind:id`：
   - `vscode:view:<container>/<view>`；
   - `vscode:editor:<file>`；
   - `dsh:slot:<id>`；
-  - `prac:<id>`。
+  - `prac:widget:<id>` / `prac:app:<id>`。
 - 新增：注册 def；runtime 懒创建；
-- 更新：更新 metadata；已有 runtime 可以 **pin 旧版本**，新 runtime 用新定义；placement 保留；
+- 更新：更新 metadata；已有 runtime **pin 旧 def version**（`PracWindow.appVersion` / `PracWidget.version`），新 runtime 用新定义；placement 保留；
 - 删除：关闭对应 window / 移除 widget；placement heal；
 - 顺序：remove → update → add → fix active / placement；
 - **restart 只用于** host 崩溃、ABI / manifest 不兼容、registry 损坏；不用于普通贡献变化。
@@ -284,13 +286,19 @@ interface PracExtensionsFace {
 - live：VS Code / DSH 动态贡献；
 - planned：content handler / generation rollback。
 
-## 11. Open
+## 11. 已定
 
-1. **稳定 ID**：VS Code view / editor / DSH slot 的 ID 规则。
-2. **动态 view**：VS Code 静态 `contributes` + `when` 的边界。
-3. **content handler**：是否作为下一等 citizen。
-4. **generation pinning**：已有 runtime 保留旧 def 的粒度。
-5. **公开 API**：仍不发布公共 SDK / marketplace。
+- **稳定 ID**：`source:kind:id`；source = `vscode` / `dsh` / `prac`；kind = `app` / `widget` / `editor` / `view` / `slot`。
+- **一个正在编辑的文件 = 一个 `PracWindow`**；tab 是 window group 的 window。
+- **一个 conversation = 一个 `PracWindow`**。
+- **def version pinning**：`PracAppDef.version` / `PracWidgetDef.version`；已有 runtime pin 旧 version，新 runtime 用新 version。
+- **content handler 不在当前阶段**：作为 future point；现在由 app / widget 直接承接。
+
+## 12. Open
+
+1. **动态 view**：VS Code 静态 `contributes` + `when` 的边界。
+2. **content handler 的引入条件**：什么需求下值得成为独立 point。
+3. **公开 API**：仍不发布公共 SDK / marketplace。
 
 ## Related
 

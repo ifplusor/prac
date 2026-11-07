@@ -37,7 +37,10 @@ flowchart LR
 - **声明**：可序列化、可比较；不放函数 / 句柄 / ReactNode；
 - **catalog**：派生快照 + 索引；不持久化；
 - **运行时**：Cordis plugin、host、window、widget、content root；
-- **状态**：placement / active / Space；持久化，但不是声明。
+- **状态**：placement / active / Space；持久化，但不是声明；
+- **stable id**：`source:kind:id`（`vscode:view:...` / `vscode:editor:...` / `dsh:slot:...` / `prac:widget:...`）；
+- **def version**：`PracAppDef.version` / `PracWidgetDef.version`；已有 runtime pin 旧 version，新 runtime 用新 version；
+- **content handler** 不在当前阶段，作为 future point。
 
 ## 3. 对象图
 
@@ -67,10 +70,10 @@ flowchart LR
 | 对象 | 是什么 | 不是什么 |
 |---|---|---|
 | **PracExtension** | Cordis plugin + contribution；`apps()` / `widgets()` / `hostFor` / `contentFor` | 不是新的 plugin runtime |
-| **PracAppDef** | app 的声明：id / label / instances / defaultRegion | 不是 window；不含 content |
+| **PracAppDef** | app 的声明：id / version / label / instances / defaultRegion | 不是 window；不含 content |
 | **ApplicationDefinition** | app 的运行时定义：`PracAppDef` + `content(windowId)` | 不是 window 实例 |
-| **PracWindow** | 一个窗口实例：身份 / 生命周期 / appId / title | 不是 DOM window；不是 tab |
-| **PracWidgetDef** | widget 的声明：id / title / defaultBoard / defaultRegion | 不含 content / hostFor |
+| **PracWindow** | 一个窗口实例：身份 / 生命周期 / appId / appVersion / title | 不是 DOM window；不是 tab |
+| **PracWidgetDef** | widget 的声明：id / version / title / defaultBoard / defaultRegion | 不含 content / hostFor |
 | **PracWidget** | widget 的运行时：`PracWidgetDef` + source + content | 不是 window；不直接进 group |
 | **WindowPlacement** | window 在 space root 的 placement | 不是 window；不属于 `PracWindow` |
 | **WidgetPlacement** | widget 在 board root 的 placement | 不是 widget |
