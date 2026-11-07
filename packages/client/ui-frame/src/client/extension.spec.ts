@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
+import type { Context } from "@deepseek-ai/cordis";
+import { ApplicationRegistry } from "prac-ui-kit-workbench";
 
 import { createExtensionRegistry } from "./extension.js";
 import type { PracAppDef, PracExtension, PracWidgetDef } from "./contract.js";
@@ -84,5 +86,55 @@ describe("extension registry", () => {
 
     expect(registry.catalog().version).toBeGreaterThan(before);
     expect(registry.catalog().widgets.map((entry) => entry.id)).toEqual(["files", "outline"]);
+  });
+});
+
+describe("extension projection", () => {
+  it("registers widgets and app windows through ctx", () => {
+    const widgets = new Map<string, unknown>();
+    const windows = new Map<string, { appId: string; title?: string }>();
+    const apps = new ApplicationRegistry();
+    const ctx = {
+      slots: {
+        inject: (_slot: string, callback: () => () => void) => callback(),
+        register: (options: { id: string }, content: unknown) => {
+          widgets.set(options.id, content);
+          return () => widgets.delete(options.id);
+        },
+      },
+      pracApplications: apps,
+      pracWindows: {
+        admit: (appId: string, options: { windowId: string; title?: string }) => {
+          windows.set(options.windowId, {
+            appId,
+            ...(options.title === undefined ? {} : { title: options.title }),
+          });
+          return options.windowId;
+        },
+        close: (windowId: string) => {
+          windows.delete(windowId);
+          return true;
+        },
+      },
+    } as unknown as Context;
+
+    const registry = createExtensionRegistry(ctx);
+    const off = registry.register({
+      manifest: { id: "prac.example", origin: "prac", version: "1" },
+      apps: () => [app("editor")],
+      windows: () => [{ id: "file-1", title: "File" }],
+      widgets: () => [widget("files")],
+      contentFor: () => () => null,
+      hostFor: () => () => null,
+    });
+
+    expect(apps.get("editor")?.label).toBe("editor");
+    expect(windows.get("file-1")?.appId).toBe("editor");
+    expect(widgets.has("files")).toBe(true);
+
+    off();
+    expect(apps.get("editor")).toBeUndefined();
+    expect(windows.size).toBe(0);
+    expect(widgets.size).toBe(0);
   });
 });
