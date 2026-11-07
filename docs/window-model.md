@@ -1,6 +1,6 @@
 # Window / Board / Widget model（当前）
 
-> 概念词表见 [concepts.md](concepts.md)；架构见 [architecture.md](architecture.md)；扩展 / catalog 见 [.agents/notes/proposed/2026-11-05-tech-extension.md](../.agents/notes/proposed/2026-11-05-tech-extension.md)。
+> 概念词表见 [concepts.md](concepts.md)；架构见 [architecture.md](architecture.md)；扩展 / catalog 见 [.agents/notes/in-progress/2026-11-05-tech-extension.md](../.agents/notes/in-progress/2026-11-05-tech-extension.md)。
 > 本文只写 window / board / widget 的对象关系与 placement；不写 UI 交互文案。
 
 ## 1. 对象关系

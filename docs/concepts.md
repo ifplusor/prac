@@ -1,7 +1,7 @@
 # prac 的概念
 
 > 这份是**词表与体系**：prac 用哪些词、每个词指什么、哪些**不是**。它是现在时的参考。
-> 架构在 [architecture.md](architecture.md)；扩展模型在 [.agents/notes/proposed/2026-11-05-tech-extension.md](../.agents/notes/proposed/2026-11-05-tech-extension.md)。
+> 架构在 [architecture.md](architecture.md)；扩展模型在 [.agents/notes/in-progress/2026-11-05-tech-extension.md](../.agents/notes/in-progress/2026-11-05-tech-extension.md)。
 
 ## 一句话
 
@@ -167,4 +167,4 @@ Frame shell
 - [window-model.md](window-model.md)：window / group / placement。
 - [ui-surface-map.md](ui-surface-map.md)：来源 → 对象映射。
 - [ui-acceptance.md](ui-acceptance.md)：UI 验收。
-- [.agents/notes/proposed/2026-11-05-tech-extension.md](../.agents/notes/proposed/2026-11-05-tech-extension.md)：extension / catalog / runtime。
+- [.agents/notes/in-progress/2026-11-05-tech-extension.md](../.agents/notes/in-progress/2026-11-05-tech-extension.md)：extension / catalog / runtime。

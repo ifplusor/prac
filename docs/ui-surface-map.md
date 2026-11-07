@@ -101,7 +101,7 @@ PracAppDef / PracWidgetDef        // 声明
 | `prac-client-dsh-host`         | DSH slot / app / internal slot                           |
 | `prac-web-app`                 | composition root only                                    |
 
-完整职责 / 目标新增见 [.agents/notes/proposed/2026-11-05-tech-packages.md](../.agents/notes/proposed/2026-11-05-tech-packages.md)。
+完整职责 / 目标新增见 [.agents/notes/in-progress/2026-11-05-tech-packages.md](../.agents/notes/in-progress/2026-11-05-tech-packages.md)。
 
 ## 7. 相关
 

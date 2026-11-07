@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: abandoned:superseded
 ---
 
 # Agent Note: 认识论循环 + 决策交付单元

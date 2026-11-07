@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 ---
 
 # Technical runtime — extension host, LSP, MCP, webview, extension policy

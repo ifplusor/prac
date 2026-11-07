@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: abandoned:superseded
 ---
 
 # Agent Note: 决策空间如何呈现（立身之本，开放）

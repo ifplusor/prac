@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 ---
 
 # Technical extension — VS Code adaptor

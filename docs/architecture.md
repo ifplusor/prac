@@ -212,4 +212,4 @@ flowchart TB
 - [ui-surface-map.md](ui-surface-map.md)：来源 → 对象映射。
 - [ui-acceptance.md](ui-acceptance.md)：UI 验收。
 - [dsh.md](dsh.md) / [vscode.md](vscode.md)：被依赖系统的内部结构。
-- [.agents/notes/proposed/2026-11-05-tech-extension.md](../.agents/notes/proposed/2026-11-05-tech-extension.md)：扩展模型 / catalog / reconcile。
+- [.agents/notes/in-progress/2026-11-05-tech-extension.md](../.agents/notes/in-progress/2026-11-05-tech-extension.md)：扩展模型 / catalog / reconcile。

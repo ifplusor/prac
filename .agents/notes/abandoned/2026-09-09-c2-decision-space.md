@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: abandoned:superseded
 ---
 
 # C2 决策空间 —「带依据的候选决策」成为模型可见输入 & 审决策为主界面

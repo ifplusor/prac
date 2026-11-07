@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: abandoned:superseded
 ---
 
 # Agent Note: 六件事在 DSH 机制上的落点（提案，未落地）

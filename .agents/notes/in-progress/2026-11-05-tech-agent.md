@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 ---
 
 # Technical agent — chat, session, plan, review, approval, artifacts

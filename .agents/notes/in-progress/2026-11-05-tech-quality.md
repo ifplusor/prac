@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 ---
 
 # Technical quality — security, observability, performance, a11y, i18n, persistence, testing, deployment

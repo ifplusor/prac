@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: in-progress
 ---
 
 # product MVP — 产品模型、stories 与验收

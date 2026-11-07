@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: abandoned:superseded
 ---
 
 # Agent Note: 责任分配 — AI 有界认知 / 人意图·判断·校验 / harness 账本
