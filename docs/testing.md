@@ -121,7 +121,7 @@ single test that runs the whole seam against a real `LayoutStore`:
 - a split's two placements → two admitted windows → two catalogue entries.
 
 These need a fake slot registry and a real `LayoutStore`; they belong in
-`ui-frame` next to `window-manager.spec.ts`. A model change should then fail a
+`prac-client-ui-frame` next to `window-manager.spec.ts`. A model change should then fail a
 two-second test instead of a four-minute gate.
 
 ## Cost profile
