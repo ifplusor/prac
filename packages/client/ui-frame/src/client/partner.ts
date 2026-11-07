@@ -27,7 +27,7 @@ const shapeOf = (contribution: PracContribution): string =>
   });
 
 /**
- * Create the registry the frame publishes as `ctx.pracPartners`.
+ * Create the internal projector behind `ctx.pracExtensions`.
  *
  * @param ctx - the Cordis client context.
  * @returns the registry; `register` returns a disposer for one partner.

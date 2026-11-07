@@ -72,7 +72,6 @@ import { createServices } from "./services.js";
 import { createFrameStore, createSpaceStore } from "./store.js";
 import { WindowGroupAdapter } from "./window-group-adapter.js";
 import { publishPracProbes } from "./probes.js";
-import { createPartnerRegistry } from "./partner.js";
 import { createExtensionRegistry } from "./extension.js";
 import type { BoardDropFace } from "./layout-item.js";
 import { ThemePresenter } from "./theme.js";
@@ -311,7 +310,6 @@ export function apply(ctx: Context): void {
     const disposePracSurfaces = ctx.provide("pracSurfaces", surfaces);
     const disposePracSpaces = ctx.provide("pracSpaces", pracSpaces);
     const disposeWindowActions = ctx.provide("pracWindowActions", windowActions);
-    const disposePartners = ctx.provide("pracPartners", createPartnerRegistry(ctx));
     const disposeExtensions = ctx.provide("pracExtensions", createExtensionRegistry());
     // The catalogue's live sources. `listItems()` reads the registry on every
     // call, so a later registration is already visible; these subscriptions
@@ -357,7 +355,6 @@ export function apply(ctx: Context): void {
       for (const stop of stopSlots) stop();
       offMain();
       disposeExtensions();
-      disposePartners();
       disposeWindowActions();
       windowActionEntries.clear();
       disposePracSpaces();

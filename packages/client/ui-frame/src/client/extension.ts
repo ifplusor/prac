@@ -11,6 +11,7 @@
 
 import type { Context } from "@deepseek-ai/cordis";
 
+import { createPartnerRegistry } from "./partner.js";
 import type {
   PracCatalog,
   PracContribution,
@@ -39,6 +40,7 @@ const emptyCatalog = (): PracCatalog => ({
 export function createExtensionRegistry(ctx?: Context): PracExtensionsFace {
   const extensions = new Map<string, PracExtension>();
   const runtimes = new Map<string, () => void>();
+  const projector = ctx === undefined ? undefined : createPartnerRegistry(ctx);
   const listeners = new Set<() => void>();
   let version = 0;
   let catalog = emptyCatalog();
@@ -127,8 +129,9 @@ export function createExtensionRegistry(ctx?: Context): PracExtensionsFace {
       const stop = watch(extension);
       try {
         rebuild();
-        if (ctx !== undefined)
-          runtimes.set(extension.manifest.id, ctx.pracPartners.register(partnerOf(extension)));
+        if (projector !== undefined) {
+          runtimes.set(extension.manifest.id, projector.register(partnerOf(extension)));
+        }
       } catch (error) {
         runtimes.get(extension.manifest.id)?.();
         runtimes.delete(extension.manifest.id);

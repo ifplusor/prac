@@ -91,8 +91,6 @@ declare module "@deepseek-ai/cordis" {
     pracSpaces: PracSpacesFace;
     /** The active window's resolved actions, rendered in the tab strip. */
     pracWindowActions: PracWindowActionsFace;
-    /** The partner registry: a base partner contributes app / widget entries. */
-    pracPartners: PracPartnersFace;
     /** The extension registry: contribution objects -> catalog. */
     pracExtensions: PracExtensionsFace;
     /** The frame's surface socket registry. */
