@@ -35,6 +35,7 @@ export class WindowGroupAdapter implements KitWindowGroup, RegionContent<KitWind
   constructor(
     readonly id: string,
     readonly label?: string,
+    readonly appVersion?: string,
   ) {
     this.#group = new WindowGroup(id);
   }
@@ -90,6 +91,7 @@ export class WindowGroupAdapter implements KitWindowGroup, RegionContent<KitWind
       this.#group.open({
         id: view.id,
         appId: "editor",
+        ...(this.appVersion === undefined ? {} : { appVersion: this.appVersion }),
         kind: "application",
         title: view.id,
       });

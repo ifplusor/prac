@@ -232,7 +232,8 @@ export function apply(ctx: Context): void {
     stopMembership,
   } = createServices(ctx, store, closeListeners);
   const disposeWindowGroupRegionContent = surfaces.register("window-group", {
-    create: ({ nodeId }) => new WindowGroupAdapter(nodeId),
+    create: ({ nodeId }) =>
+      new WindowGroupAdapter(nodeId, undefined, ctx.pracApplications.get("editor")?.version),
   });
 
   // The active window's resolved actions: the adapter pushes a model, the frame
