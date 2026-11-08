@@ -23,7 +23,7 @@
 - **CSS 不会自动加载**：`clientPack` 把 CSS modules 拆成 `dist/style.css`，而 DSH loader 只读 `client.js`；upstream 用 tsdown 的 lightningcss 插件把样式内联进 bundle。补 `scripts/inject-css.mjs`：`vp pack` 之后把 `style.css` 作为带 `data-plugin-css` 的 `<style>` 插进 factory，client.js 94.8 kB → 109 kB。漏掉这一步的卡会完全无样式。
 - **旧包名残留**：`prac-client-ui-workbench` 的 devDep、`tests/static/packages.ts` 的 boundary 列表都还写着 `prac-client-ui-changed-files`。前者让 `pnpm install` 直接失败，后者让 gate 少查一个包。
 - **格式/命名**：upstream 用 PascalCase 文件、单引号无分号；prac 的 lint 要求 kebab-case。给 `unicorn/filename-case` 加包级 override，给 `fmt` 加 vendored src 的 ignore，保持逐字可 re-copy。
-- **anchor 类型是旧的**：`dsh-types --compare` 现在会比对新装的 `ui-chat` / `ui-primitives` / `client-connection`，而 anchor worktree 的 `lib/types` 是 10-12 的旧构建（`ui-primitives` 的 `PermissionIconAutoReview` 只在 src 里、未重建），所以 gate 红。修法是 anchor 里 `tsc -b tsconfig.client.json`（或 `pnpm build`）；这不在 prac 仓内，未自动执行。另外 anchor 的 `packages/client/connection/src/browser-auth.ts` 有本地改动，重建后 `client-connection` 仍可能与发布版不同。
+- **发布版与 anchor 内容不一致**：加了 `ui-chat` / `ui-primitives` 之后，`dsh-types --compare` 开始比对它们。先在 anchor 里重建（`tsc -b tsconfig.client.json --force`，需要工作区外写权限），旧构建的红消失了；剩下的 2 个差异是**发布包内容**与 anchor tag 的 src 不一致：`ui-primitives` 的 `PermissionIconAutoReview*`、`ui-chat` 的 `transcriptView` / 注释只在 anchor 的 src 里，alpha.2 的 tarball 没有。这正是 anchor note 里记录的「pin 钉得住名字、钉不住内容」；修法是 anchor + pin 一起前进，不是本次 copy 能解决的。
 - **SessionId 漂移**：新装的 `@deepseek-ai/dsh-session@0.2.1-alpha.2` 把 `SessionId` 收成 branded type，`vscode-host` 里 `sessionIds.includes(current)`（`current: string`）因此报错。补 `SessionId` 的 type-only cast 与 devDep，行为不变。
 - **许可证**：复制了 anchor 的 MIT `LICENSE` 到 vendored 包，README 写明来源与 diff。
 
@@ -35,4 +35,4 @@
 - `node tests/static/entries.ts`：8 个 client 包通过。
 - `node tests/static/packages.ts`：通过（更新包名后）。
 - `vp run verify:ui -- smoke`：4 个 gate 全绿（shell 用新插件正常启动、无 console 错误）。
-- `dsh-types --compare`：红，原因见上（anchor 旧构建），不是本次 copy 的类型问题。
+- `dsh-types --compare`：红，2 个包是发布版与 anchor 的内容漂移（见上），不是本次 copy 的类型问题。
