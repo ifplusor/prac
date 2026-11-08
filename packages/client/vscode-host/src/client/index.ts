@@ -33,6 +33,7 @@ import type { Context } from "@deepseek-ai/cordis";
 // Type-only: loads the `ctx.uiSession` augmentation without emitting a runtime import
 // (a value import here would inline DSH's session client into this bundle).
 import type {} from "@deepseek-ai/dsh-client-ui-session/client";
+import type { SessionId } from "@deepseek-ai/dsh-session/types";
 // Type-only, for prac's own Context merge (`ctx.pracFrame`), which is the face that owns
 // the region tree `addGroup` asks about.
 // Type-only, for the frame plugin's `Context` / `SlotMap` merges.
@@ -135,7 +136,7 @@ function activeWorkspace(ctx: Context): WorkspaceLaunch | undefined {
     // session's identity is published by the session adapter.
     const current = ctx.uiSession.adapter.current.getSnapshot().key;
     if (current !== undefined) {
-      const owning = items.find((item) => item.sessionIds.includes(current));
+      const owning = items.find((item) => item.sessionIds.includes(current as SessionId));
       if (owning !== undefined) return { path: owning.path };
     }
     // No session yet: the most recent workspace is the one the shell would show

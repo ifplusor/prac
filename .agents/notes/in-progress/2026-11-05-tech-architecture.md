@@ -162,6 +162,7 @@ flowchart LR
 - 运行期状态按 XDG：config / state / data；构建期 `.build/`。
 - webview 需要通配 DNS + 受信任证书；端点模板由部署提供。
 - 升级 / 回滚走 profile + pin + 比较门；不 fork 上游。
+- **例外（2026-11-08，James 裁决）**：`@deepseek-ai/dsh-client-ui-deliverables` 以 vendored 形式复制为 [prac-client-ui-deliverables](../../../packages/client/ui-deliverables/README.md)，上游行 disable。唯一行为差异是卡片的 `openChangesReview` 改走 prac 的 VS Code diff；其余逐字保留，review tab 留给恢复的 tab。理由是 DSH 没有 open seam，且发布物只带 `lib/`、不含卡片组件源码。范围只此一个叶子；核心仍走 pin + 比较门，升级时整体 re-copy + 重放这一处 diff。
 
 ## 7. 约束
 

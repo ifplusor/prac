@@ -5,7 +5,13 @@ export default defineConfig({
   // memory and the process memory — and must not be reflowed by the formatter (see
   // AGENTS.md). Everything else in the repository — code, scripts, configs, docs —
   // is formatted and checked.
-  fmt: { ignorePatterns: [".agents/notes/**", ".agents/worklog/**"] },
+  fmt: {
+    ignorePatterns: [
+      ".agents/notes/**",
+      ".agents/worklog/**",
+      "packages/client/ui-deliverables/src/**",
+    ],
+  },
   lint: {
     // The vendored VS Code overlay imports VS Code's own internal modules; it is
     // typechecked against that checkout by `vscode:typecheck-overlay`, not by the
@@ -19,6 +25,12 @@ export default defineConfig({
     overrides: [
       {
         files: ["vendor/**"],
+        rules: { "unicorn/filename-case": "off" },
+      },
+      {
+        // Vendored from DSH: upstream file names are PascalCase, and keeping
+        // them verbatim makes a re-copy a directory copy rather than a rename.
+        files: ["packages/client/ui-deliverables/**"],
         rules: { "unicorn/filename-case": "off" },
       },
     ],

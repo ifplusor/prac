@@ -9,6 +9,14 @@
 - id: ui-layout
   disabled: true
 
+# Upstream deliverables is replaced by the vendored copy below. Both halves are
+# vendored (the card, delivery cards, review tab, routes and prompt); the only
+# behavioral diff is that a changed file opens prac's VS Code diff instead of
+# the review tab. Disabling the upstream row also avoids duplicate route and
+# slot registrations.
+- id: ui-deliverables
+  disabled: true
+
 - insert:
     # The frame mechanism: region tree, sashes, collapse, surfaces and the
     # content seats (`prac.window` / `prac.widget`); provides `ctx.pracFrame`, `ctx.layout` and the
@@ -47,9 +55,11 @@
     - id: prac-host-vscode
       name: "prac-host-vscode"
 
-    # The changed-files turn-tail card.
-    - id: prac-client-ui-changed-files
-      name: "prac-client-ui-changed-files"
+    # The vendored deliverables plugin: DSH's changed-files card, delivery
+    # cards, mentions and review tab, with the card's open action routed to
+    # prac's VS Code diff.
+    - id: prac-client-ui-deliverables
+      name: "prac-client-ui-deliverables"
 
     # The arrangement / default workbench policy.
     - id: prac-client-ui-workbench

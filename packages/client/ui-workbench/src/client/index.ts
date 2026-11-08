@@ -500,9 +500,9 @@ export function apply(ctx: Context): void {
   // the title bar itself only renders what this answers when the menu opens.
   let layoutMenu: () => readonly PracLayoutAction[] = () => [];
 
-  // The DSH changed-files card opens the review tab; prac replaces it with the
-  // turn-scoped diff card below. Hide the DSH card by its stable marker, not by
-  // a hashed CSS class.
+  // The changed-files card is DSH's own, vendored as
+  // `prac-client-ui-deliverables`; its open action routes to prac's VS Code
+  // diff. The shell does not hide or re-render it.
   // The shell chrome: title bar, vertical activity rail, hidden DSH sidebar,
   // and bottom panel. The DSH sidebar's rows are shown by the title bar's
   // switchers; the left rail is the VS Code container bar.
