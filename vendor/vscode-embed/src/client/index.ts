@@ -333,6 +333,14 @@ export interface VscodeEmbedHandle {
   /** The files the app currently has open, as URI strings (placement-blind). */
   openFiles(): string[];
   /**
+   * Open one file by the app's URI, focusing it when it is already open.
+   *
+   * The face owns URI construction; the page cannot build a `URI` the app's
+   * commands accept, so this is the one open path a consumer needs.
+   * @param resource - the app's URI for the file.
+   */
+  openFile(resource: string): void;
+  /**
    * Project a frame-owned window into the active group as an empty editor.
    *
    * @param id - the frame window / view id.
@@ -915,6 +923,9 @@ export function createVscodeEmbed(options: VscodeEmbedOptions): VscodeEmbedHandl
       };
     },
     openFiles: () => record.face?.listOpenFiles() ?? [],
+    openFile: (resource: string): void => {
+      record.face?.openFile(resource);
+    },
     mapWindow: (id: string, title: string, region?: string): void => {
       if (record.face !== undefined) {
         record.face.mapWindow(id, title, region);

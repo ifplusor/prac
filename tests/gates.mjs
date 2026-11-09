@@ -26,6 +26,10 @@ export const GATES = [
   ["editor:close", "vendor/vscode/scripts/verify-close.mjs"],
   ["tabs", "vendor/vscode/scripts/verify-tabs.mjs"],
   ["dynamic", "tests/gates/verify-dynamic.mjs"],
+  ["switch-cost", "tests/gates/verify-switch-cost.mjs"],
+  ["multitab", "tests/gates/verify-multitab.mjs"],
+  ["workspace-state", "tests/gates/verify-workspace-state.mjs"],
+  ["folder-switch", "tests/gates/verify-folder-switch.mjs"],
 ];
 
 /**

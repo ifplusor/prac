@@ -42,6 +42,16 @@ export interface PracVscodeActionModel {
 }
 
 /** The shared VS Code client mechanism this package publishes on the registry. */
+/** The embedded workbench's editor state, as the consumer-facing subset. */
+export interface PracEditorState {
+  /** Open files, in the app's URI form. */
+  readonly open: readonly string[];
+  /** The active file, when there is one. */
+  readonly active?: string;
+  /** Files with unsaved changes. */
+  readonly dirty: readonly string[];
+}
+
 export interface PracVscodeFace {
   /**
    * Everything the app currently offers as a prac view, from **both** upstream
@@ -165,6 +175,16 @@ export interface PracVscodeFace {
    * @param args - forwarded arguments.
    */
   runCommand(command: string, ...args: unknown[]): Promise<unknown>;
+  /** Read the embedded workbench's open / active / dirty files. */
+  editorState(): PracEditorState;
+  /** Save every dirty editor through the workbench's Save All. */
+  saveAll(): Promise<void>;
+  /** Open one file by the app's URI, focusing it when it is already open. */
+  openFile(resource: string): void;
+  /** Make one file the active editor. */
+  activate(resource: string): void;
+  /** Resolve once the workbench has published its face and is usable. */
+  whenReady(): Promise<void>;
   /**
    * The app's **placement** behind a view id, or `undefined` when the id is not a
    * file view.

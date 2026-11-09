@@ -20,6 +20,7 @@ status: in-progress
 ## 2. 工作台
 
 - **title bar**：project folder / session / Space 的导航入口。
+- **tab / window**：一个 folder 一个 tab；多显示器 = 多个 tab / 窗口；同一个 folder 已有 tab 时聚焦它，不再开第二个；session / Space 在 tab 内切换。
 - **stage**：主操作台；可 split / grid；中间放什么由人决定。
 - **dock rail**：工具 / board 的入口；点图标切 board，不抢 stage。
 - **sidebar / panel**：frame 级，不随 Space；放 Explorer / SCM / search / problems / output 等。
@@ -38,11 +39,11 @@ status: in-progress
 
 ### 3.2 日常
 
-- 打开 project folder → 恢复上次 session / Space / window。
+- 打开 project folder → 恢复上次 session / Space / window 与 active；scroll 位置 later。
 - chat 与 IDE 并排；文件在 editor window；终端随时能调出。
 - notes 是文件；plan 在 note 里；不新开 plan app。
 - 改完 → changed-files card → diff；checks 在 chat；request changes 是 chat。
-- 离开 → 后台继续；回来看到状态。
+- 离开页面 → 任务在 Host 上继续（与前端是否打开无关）；回来看到状态。
 
 ## 4. IDE 体验
 
@@ -57,15 +58,18 @@ status: in-progress
 
 ## 5. agent 体验
 
-- **chat**：一个 conversation 一个窗口（当前）；可切换 session；chat 是通道。
-- **session**：title bar 切换；离开再回来恢复；后台继续。
-- **plan**：note 文件；人和 agent 共编；plan mode 不是路径。
-- **review**：changed-files card 只显示最新 turn；点文件开 preview diff；binary / oversized 禁用。
+Agent 的循环、turn / session 生命周期、完成与后台执行、approval 都继承 DSH；本节只写 prac 呈现什么、从哪里进入，不重新定义 agent 行为。
+
+- **chat**：呈现 DSH conversation；一个 conversation 一个窗口（prac 的窗口策略）；chat 是通道。
+- **session**：title bar 切换 DSH session；恢复用 DSH 的 session 状态；前端关闭不打断（Host 继续）。
+- **plan**：note 文件；人和 agent 共编；不新增 plan app / plan mode。
+- **note 共编**：MVP 按普通文件；agent 编辑前重读最新；人改过的文件被覆盖时在 chat 可见提示；不做实时协作 / 锁 / 版本向量。
+- **review**：DSH 记录每轮的 changed files；prac 的卡就是 DSH 的卡（hover 预览、四行折叠、逐轮历史）；点文件在 editor group 打开 turn-scoped diff；binary / oversized 禁用。
 - **checks**：shell / tool calls 的结果留在 chat / tool call；card 不列 checks。
 - **request changes**：chat message；approve 不是对象。
-- **approval**：tool call 里 allow / reject；只显示 DSH 支持的 status / cancel。
+- **approval**：DSH ui-approval；tool call 里 allow / reject；只呈现 DSH 支持的 status / cancel。
 - **human edit / git revert**：直接在 editor / git；不新造 checkpoint。
-- **background**：agent 继续；人回来看到状态。
+- **background**：执行归 DSH 的 Host；prac 只呈现 run 状态（title bar / chat / session 列表）并提供回到对应 session 的入口；不做 background 面板。
 
 ## 6. 导航 / 注意力
 
@@ -74,7 +78,7 @@ status: in-progress
 - **MVP 先不自动布局**：不按“交流 / 审方案 / 审工件”切中间；自动跟随是 later，不是永久约束。
 - **返回栈**：MVP 不做；active + recall 足够；以后若需要，再作为 workbench chrome。
 - **Space**：切 Space 只切 stage；sidebar / panel / dock 不随 Space。
-- **project folder**：切换换一整套；切回恢复。
+- **project folder**：一个 folder 一个 tab；切换 = 打开/聚焦那个 folder 的 tab；同一个 folder 不重复开。
 
 ## 7. 状态 / 反馈
 
@@ -99,17 +103,9 @@ status: in-progress
 - **Should**：problems / output / GitLens / Space / 多 session / recall。
 - **Later**：debug / tasks / 返回栈 / 多窗口 / free window / 完整 i18n / 自动注意力跟随 / MCP。
 
-## 10. Open
+### 9.1 体验指标
 
-1. **chat 实例**：single（当前）还是 multi。
-2. **session 切换**：window / scroll / active 恢复范围。
-3. **note 共编**：冲突 / 可见性 / 版本。
-4. **approval**：chat 内 / overlay；队列。
-5. **background service**：状态 surface / 操作。
-6. **return stack**：以后是否做。
-7. **changed-files 历史**：是否显示旧 turn。
-8. **多窗口 / free window**：以后是否进。
-9. **指标**：哪些体验可量化。
+先定性；量化在第一次 dogfood 后补 2–3 个可测数（候选：切 session / 恢复 / review diff 的耗时与成功率）。
 
 ## Related
 

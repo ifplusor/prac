@@ -317,6 +317,37 @@ export function apply(ctx: Context): void {
     },
     runCommand: (command: string, ...args: unknown[]): Promise<unknown> =>
       embed.runCommand(command, ...args),
+    editorState: () => {
+      const editors = embed.capabilities.editors.snapshot();
+      const active = editors.find((entry) => entry.active)?.resource;
+      return {
+        open: embed.openFiles(),
+        ...(active === undefined ? {} : { active }),
+        dirty: editors.filter((entry) => entry.dirty).map((entry) => entry.resource),
+      };
+    },
+    saveAll: async (): Promise<void> => {
+      await embed.runCommand("workbench.action.files.saveAll");
+    },
+    openFile: (resource: string): void => {
+      embed.openFile(resource);
+    },
+    activate: (resource: string): void => {
+      embed.capabilities.editors.actions.activate(resource);
+    },
+    whenReady: (): Promise<void> =>
+      new Promise<void>((resolve) => {
+        if (embed.page.face !== undefined) {
+          resolve();
+          return;
+        }
+        const timer = setInterval(() => {
+          if (embed.page.face !== undefined) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 50);
+      }),
     /**
      * Register the gate-only timeline provider (see the workbench's face doc): a Timeline pane
      * with nothing in it cannot be told apart from a broken one.

@@ -9,11 +9,23 @@
  * @module prac-web-app/client/title-bar
  */
 
-import { createElement, useEffect, useState, useSyncExternalStore } from "react";
+import { createElement, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import type { PracVscodeFace } from "prac-client-vscode-host/client";
 import type { ReactElement } from "react";
 
 /** The selection key DSH's Workspace navigation persists. */
 const SELECTION_KEY = "dsh.sessions.current";
+
+/** Per-folder keys: the last session and the open editor set. */
+const sessionKey = (workspaceId: string): string => `prac-session/v1/${workspaceId}`;
+const openKey = (workspaceId: string): string => `prac-open/v1/${workspaceId}`;
+
+/** The workbench URIs restore can reopen (synthetic diff editors cannot). */
+const restorable = (uri: string): boolean => uri.startsWith("vscode-remote://");
+
+/** Compare folder paths ignoring a trailing separator. */
+const samePath = (left: string, right: string): boolean =>
+  left.replace(/[/\\]+$/, "") === right.replace(/[/\\]+$/, "");
 
 /** A bare observable, matching the DSH controller sources. */
 interface Observable<T> {
@@ -74,18 +86,24 @@ export interface PracSpacesFace {
 
 /** The DSH services the bar drives. */
 export interface PracTitleFace {
-  workspaces: { list: Observable<WorkspaceSnapshot> };
+  workspaces: {
+    list: Observable<WorkspaceSnapshot>;
+    create(input: { path: string }): Promise<WorkspaceView>;
+  };
   sessions: { list: Observable<SessionListState> };
   /** The session adapter's current identity: the same source the IDE boot used. */
   uiSession: { adapter: { current: Observable<{ key?: string }> } };
   openSession(sessionId: string): void;
   openWorkspace(workspaceId: string): Promise<void>;
+  createWorkspace(path: string): Promise<WorkspaceView>;
   openWorkspaceFolder(path: string): void;
   startSession(workspaceId?: string): void;
   /** The dock/layout commands (move a tool window, later presets and reset). */
   layoutActions(): readonly PracLayoutAction[];
   /** The Space registry: named layouts over the same project folder. */
   spaces: PracSpacesFace;
+  /** The embedded workbench: editor state, save, reopen. */
+  pracVscode: PracVscodeFace;
   /** Whether the bottom panel is collapsed. */
   bottomCollapsed(): boolean;
   /** Collapse / expand the bottom panel. */
@@ -156,15 +174,106 @@ export function PracTitleBar({ face }: PracTitleBarProps): ReactElement {
   }, [menu]);
 
   const activeSession = current === undefined ? undefined : sessions.byId[current];
-  // A Session row carries no workspaceId: Workspace membership is the only
-  // relation, so the label follows the Workspace whose sessionIds contains it.
-  const activeWorkspace =
-    current === undefined
-      ? workspaces.items[0]
-      : (workspaces.items.find((workspace) => workspace.sessionIds.includes(current)) ??
-        workspaces.items[0]);
+  // The URL's folder is the authoritative "which world"; the session-derived
+  // membership is only a fallback for a page without the parameter.
+  const urlFolder = new URLSearchParams(window.location.search).get("workspace");
+  const [adoptedWorkspace, setAdoptedWorkspace] = useState<WorkspaceView | undefined>(undefined);
+  const currentWorkspace =
+    urlFolder !== null
+      ? (workspaces.items.find((workspace) => samePath(workspace.path, urlFolder)) ??
+        adoptedWorkspace)
+      : current === undefined
+        ? workspaces.items[0]
+        : (workspaces.items.find((workspace) => workspace.sessionIds.includes(current)) ??
+          workspaces.items[0]);
   const sessionTitle = activeSession?.title ?? "New Session";
-  const workspaceTitle = activeWorkspace?.title ?? "No workspace";
+  const workspaceTitle = currentWorkspace?.title ?? "No workspace";
+
+  // Restore this folder's last session once; then persist its current session.
+  const restoredSessionFor = useRef<string | undefined>(undefined);
+  const waitingFor = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const id = currentWorkspace?.workspaceId;
+    if (id === undefined || restoredSessionFor.current === id) return;
+    restoredSessionFor.current = id;
+    const saved = localStorage.getItem(sessionKey(id)) ?? undefined;
+    waitingFor.current = saved;
+    if (saved !== undefined && saved !== current) {
+      face.openSession(saved);
+      setSelected(saved);
+    }
+  }, [currentWorkspace?.workspaceId, current, face]);
+  useEffect(() => {
+    const id = currentWorkspace?.workspaceId;
+    if (id === undefined || current === undefined) return;
+    if (restoredSessionFor.current !== id) return;
+    if (waitingFor.current !== undefined && waitingFor.current !== current) return;
+    localStorage.setItem(sessionKey(id), current);
+  }, [current, currentWorkspace?.workspaceId]);
+
+  // Reopen this folder's editor set after the workbench is up.
+  const restoredOpenFor = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const id = currentWorkspace?.workspaceId;
+    if (id === undefined || restoredOpenFor.current === id) return;
+    restoredOpenFor.current = id;
+    void face.pracVscode.whenReady().then(() => {
+      const raw = localStorage.getItem(openKey(id));
+      if (raw === null) return;
+      try {
+        const saved = JSON.parse(raw) as { open?: unknown; active?: unknown };
+        if (!Array.isArray(saved.open)) return;
+        for (const file of saved.open) {
+          if (typeof file === "string" && restorable(file)) face.pracVscode.openFile(file);
+        }
+        if (typeof saved.active === "string" && restorable(saved.active)) {
+          face.pracVscode.activate(saved.active);
+        }
+      } catch {
+        // A malformed record is not worth failing the boot for.
+      }
+    });
+  }, [currentWorkspace?.workspaceId, face.pracVscode]);
+
+  // A folder opened by URL may not be in DSH's registry yet (and DSH seeds a
+  // canonical path, which can differ from the URL's). Register and remember the
+  // returned Workspace row, so keys and session restore use its id.
+  const adoptedFolder = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (urlFolder === null) return;
+    const existing = workspaces.items.find((workspace) => samePath(workspace.path, urlFolder));
+    if (existing !== undefined) {
+      setAdoptedWorkspace(existing);
+      return;
+    }
+    if (adoptedFolder.current === urlFolder) return;
+    adoptedFolder.current = urlFolder;
+    void face
+      .createWorkspace(urlFolder)
+      .then((workspace) => {
+        setAdoptedWorkspace(workspace);
+      })
+      .catch(() => undefined);
+  }, [urlFolder, workspaces.items, face]);
+
+  // Persist on leave (tab close / reload), and let the browser ask when dirty.
+  useEffect(() => {
+    const save = (event: BeforeUnloadEvent): void => {
+      const id = currentWorkspace?.workspaceId;
+      if (id === undefined) return;
+      const state = face.pracVscode.editorState();
+      localStorage.setItem(
+        openKey(id),
+        JSON.stringify({ open: state.open.filter(restorable), active: state.active }),
+      );
+      if (state.dirty.length > 0) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", save);
+    return () => window.removeEventListener("beforeunload", save);
+  }, [currentWorkspace?.workspaceId, face.pracVscode]);
   const workspaceSessions = (workspace: WorkspaceView): readonly SessionSummary[] =>
     workspace.sessionIds
       .map((id) => sessions.byId[id])
@@ -175,31 +284,39 @@ export function PracTitleBar({ face }: PracTitleBarProps): ReactElement {
     setSelected(sessionId);
     setMenu(null);
   };
+  const switchTo = (workspace: WorkspaceView): void => {
+    const from = currentWorkspace?.workspaceId;
+    if (from !== undefined && from !== workspace.workspaceId) {
+      const state = face.pracVscode.editorState();
+      localStorage.setItem(
+        openKey(from),
+        JSON.stringify({ open: state.open.filter(restorable), active: state.active }),
+      );
+    }
+    setMenu(null);
+    face.openWorkspaceFolder(workspace.path);
+  };
   const chooseWorkspace = (workspaceId: string): void => {
-    // A Workspace pick means "show this Workspace's conversation": reuse its
-    // first known Session. `openWorkspace` creates a blank and has been
-    // rejecting in this profile; a listed Session is the direct, observable path.
     const workspace = workspaces.items.find((item) => item.workspaceId === workspaceId);
-    const first = workspace?.sessionIds
-      .map((id) => sessions.byId[id])
-      .find((session): session is SessionSummary => session !== undefined);
-    if (first !== undefined) {
-      face.openSession(first.id);
-      setSelected(first.id);
+    if (workspace === undefined) return;
+    if (workspace.workspaceId === currentWorkspace?.workspaceId) {
       setMenu(null);
-      if (workspace !== undefined) face.openWorkspaceFolder(workspace.path);
       return;
     }
-    void face
-      .openWorkspace(workspaceId)
-      .then(() => {
-        setSelected(readSelection());
-        setMenu(null);
-      })
-      .catch(() => setMenu(null));
+    const dirty = face.pracVscode.editorState().dirty;
+    if (dirty.length === 0) {
+      switchTo(workspace);
+      return;
+    }
+    // No silent discard: save, or stay. VS Code asks the same question.
+    if (!window.confirm("有未保存的修改。保存后切换？")) {
+      setMenu(null);
+      return;
+    }
+    void face.pracVscode.saveAll().then(() => switchTo(workspace));
   };
   const newSession = (): void => {
-    face.startSession(activeWorkspace?.workspaceId);
+    face.startSession(currentWorkspace?.workspaceId);
     setMenu(null);
   };
 
@@ -298,7 +415,7 @@ export function PracTitleBar({ face }: PracTitleBarProps): ReactElement {
               createElement(
                 "span",
                 { className: "check" },
-                workspace.workspaceId === activeWorkspace?.workspaceId ? "✓" : "",
+                workspace.workspaceId === currentWorkspace?.workspaceId ? "✓" : "",
               ),
               createElement(
                 "span",
@@ -389,7 +506,7 @@ export function PracTitleBar({ face }: PracTitleBarProps): ReactElement {
             `Sessions in ${workspaceTitle}`,
           ),
           ...workspaceSessions(
-            activeWorkspace ?? {
+            currentWorkspace ?? {
               workspaceId: "",
               path: "",
               title: "",

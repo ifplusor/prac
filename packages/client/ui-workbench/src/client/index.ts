@@ -527,6 +527,7 @@ export function apply(ctx: Context): void {
     sessions: PracTitleFace["sessions"];
     uiSession: PracTitleFace["uiSession"];
     pracSpaces: PracTitleFace["spaces"];
+    pracVscode: PracTitleFace["pracVscode"];
     uiWorkspace: {
       openSession(sessionId: string): void;
       openWorkspace(workspaceId: string): Promise<void>;
@@ -534,52 +535,60 @@ export function apply(ctx: Context): void {
     };
     slots: typeof slots;
   }
-  ctx.inject(["workspaces", "sessions", "uiSession", "uiWorkspace", "pracSpaces"], (titleCtx) => {
-    const titleServices = titleCtx as unknown as TitleServices;
-    const face: PracTitleFace = {
-      workspaces: titleServices.workspaces,
-      sessions: titleServices.sessions,
-      uiSession: titleServices.uiSession,
-      openSession: (sessionId) => titleServices.uiWorkspace.openSession(sessionId),
-      openWorkspace: (workspaceId) => titleServices.uiWorkspace.openWorkspace(workspaceId),
-      openWorkspaceFolder: (path) => {
-        // The code server is long-running; the browser page opens a folder. The
-        // IDE boot reads `workspace` first, so this reload is the actual switch.
-        const params = new URLSearchParams(window.location.search);
-        params.set("workspace", path);
-        window.location.replace(`${window.location.pathname}?${params.toString()}`);
-      },
-      startSession: (workspaceId) => titleServices.uiWorkspace.startSession(workspaceId),
-      layoutActions: () => layoutMenu(),
-      spaces: titleServices.pracSpaces,
-      bottomCollapsed: () => {
-        const node = layout.getState().tree?.children?.find((child) => child.id === "bottom");
-        return node?.type !== "region" || node.collapsed === true;
-      },
-      toggleBottom: () => {
-        const node = layout.getState().tree?.children?.find((child) => child.id === "bottom");
-        layout.setCollapsed("bottom", !(node?.type === "region" && node.collapsed === true));
-      },
-    };
-    const inject = titleServices.slots.inject.bind(titleServices.slots) as unknown as (
-      name: string,
-      callback: () => unknown,
-    ) => void;
-    const register = titleServices.slots.register.bind(titleServices.slots) as unknown as (
-      options: { name: string; id: string; order?: number },
-      component: () => unknown,
-    ) => unknown;
-    inject("shell.overlay", () =>
-      register({ name: "shell.overlay", id: "prac-titlebar", order: -10 }, () =>
-        createElement(PracTitleBar, { face }),
-      ),
-    );
-    inject("shell.overlay", () =>
-      register({ name: "shell.overlay", id: "prac-firstrun", order: -20 }, () =>
-        createElement(PracFirstRun, { face }),
-      ),
-    );
-  });
+  ctx.inject(
+    ["workspaces", "sessions", "uiSession", "uiWorkspace", "pracSpaces", "pracVscode"],
+    (titleCtx) => {
+      const titleServices = titleCtx as unknown as TitleServices;
+      const face: PracTitleFace = {
+        workspaces: titleServices.workspaces,
+        sessions: titleServices.sessions,
+        uiSession: titleServices.uiSession,
+        openSession: (sessionId) => titleServices.uiWorkspace.openSession(sessionId),
+        openWorkspace: (workspaceId) => titleServices.uiWorkspace.openWorkspace(workspaceId),
+        createWorkspace: (path) => titleServices.workspaces.create({ path }),
+        openWorkspaceFolder: (path) => {
+          // Register the folder first so DSH has a Workspace row and Sessions can
+          // attach; then reload into it (the IDE boot reads `workspace` first).
+          const navigate = (): void => {
+            const params = new URLSearchParams(window.location.search);
+            params.set("workspace", path);
+            window.location.replace(`${window.location.pathname}?${params.toString()}`);
+          };
+          void titleServices.workspaces.create({ path }).then(navigate, navigate);
+        },
+        startSession: (workspaceId) => titleServices.uiWorkspace.startSession(workspaceId),
+        layoutActions: () => layoutMenu(),
+        spaces: titleServices.pracSpaces,
+        pracVscode: titleServices.pracVscode,
+        bottomCollapsed: () => {
+          const node = layout.getState().tree?.children?.find((child) => child.id === "bottom");
+          return node?.type !== "region" || node.collapsed === true;
+        },
+        toggleBottom: () => {
+          const node = layout.getState().tree?.children?.find((child) => child.id === "bottom");
+          layout.setCollapsed("bottom", !(node?.type === "region" && node.collapsed === true));
+        },
+      };
+      const inject = titleServices.slots.inject.bind(titleServices.slots) as unknown as (
+        name: string,
+        callback: () => unknown,
+      ) => void;
+      const register = titleServices.slots.register.bind(titleServices.slots) as unknown as (
+        options: { name: string; id: string; order?: number },
+        component: () => unknown,
+      ) => unknown;
+      inject("shell.overlay", () =>
+        register({ name: "shell.overlay", id: "prac-titlebar", order: -10 }, () =>
+          createElement(PracTitleBar, { face }),
+        ),
+      );
+      inject("shell.overlay", () =>
+        register({ name: "shell.overlay", id: "prac-firstrun", order: -20 }, () =>
+          createElement(PracFirstRun, { face }),
+        ),
+      );
+    },
+  );
 
   /** Every file view the app has open, and the file resources behind them. */
   let fileViews = new Set<string>();
