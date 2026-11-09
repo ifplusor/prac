@@ -98,3 +98,9 @@
   - URL 打开的 folder 通过 `workspaces.create({ path })` 注册进 DSH；返回的 workspaceId 用于所有 per-folder key——`/tmp` 与 `/private/tmp` 的路径差异不会再把 key 对错。
 - 验收：opt-in `folder-switch` 通过（菜单列出 A/B、A→B、B→A、dirty 已保存、文件回来）；smoke / `vp check` / 全仓 build 全绿。
 - 未做：folder 菜单的「在新 tab 打开」动作（当前默认 B：替换当前 tab）；per-folder session 的 UI 断言；reload 时 console 仍有 `Long running operations during shutdown are unsupported in the web`（已知 web 限制）。
+
+## P0 入口（2026-11-09）
+
+- title bar 的 folder 菜单加 **Open folder** 输入（Open = 替换当前 tab；↗ = 新 tab），每个 workspace 行加 **↗ 新 tab**。
+- `workspaces.create` 先注册、再 reload；新 tab 走 `window.open(?workspace=…)`，由新页的 adopt 逻辑注册。
+- 新 gate `folder-entry`（opt-in）：Open folder 到达 C；new-tab 在第二个 tab 到达 A。通过。

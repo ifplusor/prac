@@ -30,6 +30,7 @@ export const GATES = [
   ["multitab", "tests/gates/verify-multitab.mjs"],
   ["workspace-state", "tests/gates/verify-workspace-state.mjs"],
   ["folder-switch", "tests/gates/verify-folder-switch.mjs"],
+  ["folder-entry", "tests/gates/verify-folder-entry.mjs"],
 ];
 
 /**

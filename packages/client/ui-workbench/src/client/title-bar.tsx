@@ -143,6 +143,7 @@ export function PracTitleBar({ face }: PracTitleBarProps): ReactElement {
   );
   const current = adapter.key ?? selected;
   const [menu, setMenu] = useState<"workspace" | "session" | "layout" | "space" | null>(null);
+  const [folderDraft, setFolderDraft] = useState("");
   const [bottomOpen, setBottomOpen] = useState(() => !face.bottomCollapsed());
   const [spacesState, setSpacesState] = useState(() => ({
     list: face.spaces.list(),
@@ -315,6 +316,19 @@ export function PracTitleBar({ face }: PracTitleBarProps): ReactElement {
     }
     void face.pracVscode.saveAll().then(() => switchTo(workspace));
   };
+  const openInNewTab = (path: string): void => {
+    const target = new URL(window.location.href);
+    target.searchParams.set("workspace", path);
+    window.open(target.toString(), "_blank", "noopener");
+  };
+  const openFolder = (replace: boolean): void => {
+    const path = folderDraft.trim();
+    if (path === "") return;
+    setFolderDraft("");
+    setMenu(null);
+    if (replace) face.openWorkspaceFolder(path);
+    else openInNewTab(path);
+  };
   const newSession = (): void => {
     face.startSession(currentWorkspace?.workspaceId);
     setMenu(null);
@@ -405,24 +419,74 @@ export function PracTitleBar({ face }: PracTitleBarProps): ReactElement {
           createElement("div", { className: "prac-title-menu-label" }, "Workspaces"),
           ...workspaces.items.map((workspace) =>
             createElement(
+              "div",
+              { key: workspace.workspaceId, className: "prac-title-row" },
+              createElement(
+                "button",
+                {
+                  type: "button",
+                  className: "prac-title-item",
+                  onClick: () => chooseWorkspace(workspace.workspaceId),
+                },
+                createElement(
+                  "span",
+                  { className: "check" },
+                  workspace.workspaceId === currentWorkspace?.workspaceId ? "✓" : "",
+                ),
+                createElement(
+                  "span",
+                  { className: "main" },
+                  createElement("b", null, workspace.title),
+                  createElement("span", null, workspace.path),
+                ),
+              ),
+              createElement(
+                "button",
+                {
+                  type: "button",
+                  className: "prac-title-newtab",
+                  title: "在新 tab 打开",
+                  "aria-label": `在新 tab 打开 ${workspace.title}`,
+                  onClick: () => openInNewTab(workspace.path),
+                },
+                "↗",
+              ),
+            ),
+          ),
+          createElement("div", { className: "prac-title-menu-sep" }),
+          createElement("div", { className: "prac-title-menu-label" }, "Open folder"),
+          createElement(
+            "div",
+            { className: "prac-title-open" },
+            createElement("input", {
+              className: "prac-title-open-input",
+              placeholder: "/path/to/project",
+              value: folderDraft,
+              onChange: (event) => setFolderDraft(event.currentTarget.value),
+              onKeyDown: (event) => {
+                if (event.key === "Enter") openFolder(true);
+              },
+            }),
+            createElement(
               "button",
               {
-                key: workspace.workspaceId,
                 type: "button",
-                className: "prac-title-item",
-                onClick: () => chooseWorkspace(workspace.workspaceId),
+                className: "prac-title-open-button",
+                disabled: folderDraft.trim() === "",
+                onClick: () => openFolder(true),
               },
-              createElement(
-                "span",
-                { className: "check" },
-                workspace.workspaceId === currentWorkspace?.workspaceId ? "✓" : "",
-              ),
-              createElement(
-                "span",
-                { className: "main" },
-                createElement("b", null, workspace.title),
-                createElement("span", null, workspace.path),
-              ),
+              "Open",
+            ),
+            createElement(
+              "button",
+              {
+                type: "button",
+                className: "prac-title-open-button",
+                title: "在新 tab 打开",
+                disabled: folderDraft.trim() === "",
+                onClick: () => openFolder(false),
+              },
+              "↗",
             ),
           ),
         )
@@ -690,6 +754,15 @@ html,body{overscroll-behavior:none}
 .prac-title-menu-group{padding:7px 8px 2px;color:var(--dsw-alias-label-tertiary);font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .prac-title-menu-label{padding:5px 8px 3px;color:var(--dsw-alias-label-tertiary);font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
 .prac-title-item{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:0;border-radius:5px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.prac-title-row{display:flex;align-items:center;gap:2px}
+.prac-title-row .prac-title-item{flex:1 1 auto;min-width:0}
+.prac-title-newtab{flex:0 0 auto;width:24px;height:24px;border:0;border-radius:5px;background:transparent;color:var(--dsw-alias-label-tertiary);font:inherit;font-size:12px;cursor:pointer}
+.prac-title-newtab:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.prac-title-open{display:flex;align-items:center;gap:4px;padding:4px 8px 6px}
+.prac-title-open-input{flex:1 1 auto;min-width:0;padding:4px 6px;border:1px solid var(--dsw-alias-border-l2);border-radius:5px;background:var(--dsw-alias-bg-base);color:inherit;font:inherit;font-size:11px}
+.prac-title-open-button{flex:0 0 auto;padding:4px 8px;border:1px solid var(--dsw-alias-border-l2);border-radius:5px;background:var(--dsw-alias-bg-layer-2);color:inherit;font:inherit;font-size:11px;cursor:pointer}
+.prac-title-open-button:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}
+.prac-title-open-button:disabled{opacity:.5;cursor:default}
 .prac-title-item:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .prac-title-item .check{width:14px;text-align:center;color:var(--dsw-alias-state-business-primary);flex:none}
 .prac-title-item .main{flex:1 1 auto;min-width:0}
