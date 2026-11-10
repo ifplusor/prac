@@ -50,7 +50,7 @@ const placed = await until(
   page,
   (path) => {
     const items = globalThis.__pracTest?.frame?.getState?.()?.items ?? {};
-    const item = items[`prac.document-preview:${path}`];
+    const item = items[`prac.document-preview:${String(path)}`];
     return item !== undefined && item.region === "center" && item.hidden === false;
   },
   fixture.path,
@@ -71,14 +71,28 @@ const rendered = await until(
   .then(() => true)
   .catch(() => false);
 
+await page.screenshot({ path: "/tmp/prac-pdf-gate.png" });
 const facts = await page.evaluate((path) => {
-  const canvas = document.querySelector("[data-prac-pdf-canvas]");
+  const all = (selector) => {
+    const found = [...document.querySelectorAll(selector)];
+    const walk = (root) => {
+      for (const element of root.querySelectorAll("*")) {
+        if (element.shadowRoot) {
+          found.push(...element.shadowRoot.querySelectorAll(selector));
+          walk(element.shadowRoot);
+        }
+      }
+    };
+    walk(document);
+    return found;
+  };
+  const canvas = all("[data-prac-pdf-canvas]")[0];
   return {
     windows: (globalThis.__pracTest?.windows?.ids?.() ?? []).filter((id) => id.includes(path)),
-    views: document.querySelectorAll("[data-prac-pdf-view]").length,
+    views: all("[data-prac-pdf-view]").length,
     canvasWidth: canvas?.width ?? 0,
     canvasHeight: canvas?.height ?? 0,
-    error: document.querySelector("[data-prac-pdf-error]")?.textContent ?? null,
+    error: all("[data-prac-pdf-error]")[0]?.textContent ?? null,
   };
 }, fixture.path);
 
