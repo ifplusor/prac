@@ -263,9 +263,6 @@ export function apply(ctx: Context): void {
   const vscodeViewIdOf = (view: string): string | undefined =>
     view.startsWith(VIEW_VIEW_PREFIX) ? view.slice(VIEW_VIEW_PREFIX.length) : undefined;
 
-  /** The startup Chat editor is closed once; later whenReady calls leave the active editor alone. */
-  let chatEditorClosed = false;
-
   const face: PracVscodeFace = {
     catalogue: (): readonly VscodeCatalogueEntry[] => {
       const files: VscodeCatalogueEntry[] = embed.placements().map((placement) => ({
@@ -361,16 +358,6 @@ export function apply(ctx: Context): void {
             resolve();
           }
         }, 50);
-      }).then(() => {
-        // The VS Code core chat opens a Chat editor just after the workbench
-        // face appears, so closing at face-ready is too early. Close once the
-        // startup sequence has settled; later whenReady calls leave the active
-        // editor alone, so a file opened afterwards is never closed.
-        if (chatEditorClosed) return;
-        chatEditorClosed = true;
-        setTimeout(() => {
-          void embed.runCommand("workbench.action.closeActiveEditor").catch(() => {});
-        }, 1500);
       }),
     /**
      * Register the gate-only timeline provider (see the workbench's face doc): a Timeline pane
