@@ -201,3 +201,10 @@
 
 - `vendor/vscode/overlay/chatParticipant.contribution.ts`：不注册 core chat 的 AuxiliaryBar view container/view；`build.mjs` 增加 overlay 映射；`vscode:build` 通过；`vp run verify:ui` all gates passed。
 - 第一屏仍显示 Open Editors “Chat” 和右栏 Chat 图标：它们来自 **built-in GitHub.copilot-chat 扩展**（`.build/vscode/extensions/copilot`，build 会重新 copy）以及被 profile 恢复的 chat editor，不是刚移除的 core container。下一步是 build 层过滤 built-in 扩展/`extensions.json`，并清掉恢复的 chat editor。
+
+## Chat editor 是 core 的，不是扩展（2026-11-10）
+
+- `.build/vscode/extensions/copilot` 实际已不存在（build 不会恢复它）；移除它之后第一屏的 Chat 仍在。
+- 因此 Open Editors 的 “Chat” 是 **VS Code core chat editor**（`chat.shared.contribution.ts` 里的 editor pane / resolver / serializer 注册），不是 Copilot 扩展，也不是我们已移除的 AuxiliaryBar container。
+- 右栏的 “Chat” 很可能是 **prac 自己的 DSH chat**（产品主 chat），不是 Copilot。
+- 下一步只有两条：给 `chat.shared.contribution.ts` 做第二个 vendor overlay，去掉 core chat editor 的注册；或重置 VS Code workbench 的 restored editor state（后者有 dirty buffer 风险）。前者干净但文件大（3403 行）。
