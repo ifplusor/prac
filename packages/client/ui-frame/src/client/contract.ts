@@ -145,6 +145,8 @@ export interface PracAppDef {
   readonly defaultRegion?: string;
   /** Whether this app handles a resource; the open pipeline uses the first match. */
   readonly match?: (resource: string) => boolean;
+  /** Open one resource inside this app; the app owns the window it creates. */
+  readonly open?: (resource: string) => boolean;
 }
 
 /** Declarative widget definition. */

@@ -74,16 +74,13 @@ export function apply(ctx: ClientContext): void {
         loadChangesSummary: (sessionId, seq) => summaries.load(sessionId, seq),
         openPresented: (sessionId, seq, index, action, application) => opener.open(sessionId, seq, index, action, application),
         openViaRouter: (path: string) => {
-          // The presented card used to call the DSH editor, which prac never
-          // shows. The app registry picks the app (LaunchServices role); the
-          // window manager opens its window.
+          // Opening is the whole contract: the app registry picks the app and the
+          // app opens itself (its window, its content). Placement is the window
+          // manager's and the arrangement's, not this card's.
           const apps = (ctx as unknown as {
             pracApplications?: { open(resource: string): { id: string } | undefined };
-            pracWindows?: { admit(appId: string, options: { windowId: string }): string };
           });
-          const app = apps.pracApplications?.open(path);
-          if (app === undefined) return;
-          apps.pracWindows?.admit(app.id, { windowId: `${app.id}:${path}` });
+          apps.pracApplications?.open(path);
         },
         openChanged: (sessionId, seq, index, action, application) => opener.openChanged(sessionId, seq, index, action, application),
         openChangesReview: (coordinates, index) => {

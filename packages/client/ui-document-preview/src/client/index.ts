@@ -32,16 +32,16 @@ export interface DocumentWindow {
   readonly kind: "office" | "pdf" | "image" | "text";
 }
 
-/** The app declaration: one app, many windows. */
-const app: PracAppDef = {
-  id: "prac.document-preview",
-  version: "1",
-  label: "Document",
-  instances: "multi",
-  paneHeader: true,
-  match: (resource: string): boolean =>
-    /\.(docx?|xlsx?|pptx?|pdf|png|jpe?g|gif|webp|svg)$/iu.test(resource),
-};
+/** The preview kind the resource implies. */
+function kindOf(path: string): DocumentWindow["kind"] {
+  if (/\.pdf$/iu.test(path)) return "pdf";
+  if (/\.(png|jpe?g|gif|webp|svg)$/iu.test(path)) return "image";
+  if (/\.(docx?|xlsx?|pptx?)$/iu.test(path)) return "office";
+  return "text";
+}
+
+/** The window id the open uses; the path is encoded in it. */
+const WINDOW_PREFIX = "prac.document-preview:";
 
 /**
  * Register the document-preview app.
@@ -49,13 +49,43 @@ const app: PracAppDef = {
  */
 export function apply(ctx: Context): void {
   const extensions: PracExtensionsFace = ctx.pracExtensions;
-  const documents: DocumentWindow[] = [];
+  const windows = ctx.pracWindows;
+  const frame = ctx.pracFrame;
+  // The window manager owns the windows; the app derives its documents from them
+  // instead of keeping a second list. The window id encodes the path.
+  const documents = (): DocumentWindow[] =>
+    windows
+      .ids()
+      .filter((windowId) => windows.appOf(windowId) === app.id)
+      .map((windowId) => {
+        const path = windowId.slice(WINDOW_PREFIX.length);
+        return { id: windowId, path, title: windows.titleOf(windowId) ?? path, kind: kindOf(path) };
+      });
+  const app: PracAppDef = {
+    id: "prac.document-preview",
+    version: "1",
+    label: "Document",
+    instances: "multi",
+    paneHeader: true,
+    defaultRegion: "center",
+    match: (resource: string): boolean =>
+      /\.(docx?|xlsx?|pptx?|pdf|png|jpe?g|gif|webp|svg)$/iu.test(resource),
+    // Opening is complete when the window exists: the app keeps no document list,
+    // and the frame derives the item from the window manager.
+    open: (resource: string): boolean => {
+      const name = resource.split("/").at(-1) ?? resource;
+      const windowId = `${WINDOW_PREFIX}${resource}`;
+      windows.admit(app.id, { windowId, title: name, region: app.defaultRegion });
+      if (app.defaultRegion !== undefined) frame.place(windowId, app.defaultRegion);
+      return true;
+    },
+  };
   const extension: PracExtension = {
     manifest: { id: "prac.document-preview", origin: "prac", version: "1" },
     apps: () => [app],
-    windows: () => documents.map((document) => ({ id: document.id, title: document.title })),
+    windows: () => documents().map((document) => ({ id: document.id, title: document.title })),
     contentFor: (windowId: string): (() => ReactNode) => {
-      const document = documents.find((candidate) => candidate.id === windowId);
+      const document = documents().find((candidate) => candidate.id === windowId);
       if (document === undefined) return () => null;
       if (document.kind === "pdf") return () => createElement(PdfView, { path: document.path });
       return () => DocumentPlaceholder(document);
@@ -83,4 +113,4 @@ function DocumentPlaceholder(document: DocumentWindow): ReactNode {
 export const name = "prac-client-ui-document-preview";
 
 /** The DSH services this plugin needs: the app + window faces. */
-export const inject = ["pracExtensions"];
+export const inject = ["pracExtensions", "pracWindows", "pracFrame"];

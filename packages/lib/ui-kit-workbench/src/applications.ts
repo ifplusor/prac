@@ -48,6 +48,8 @@ export interface ApplicationDefinition {
    * app must not claim a document its document app owns.
    */
   match?(resource: string): boolean;
+  /** Open one resource inside this app; the app owns the window it creates. */
+  open?(resource: string): boolean;
   /**
    * The content of one window instance.
    *
@@ -135,7 +137,9 @@ export class ApplicationRegistry {
    */
   open(resource: string): ApplicationDefinition | undefined {
     for (const app of this.#apps.values()) {
-      if (app.match?.(resource) === true) return app;
+      if (app.match?.(resource) !== true) continue;
+      app.open?.(resource);
+      return app;
     }
     return undefined;
   }
