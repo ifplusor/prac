@@ -89,6 +89,30 @@ prac 是**单人、自用的 agent 工程工作台**：把对话、代码、变�
 - **依赖**：DSH 发布版漂移（`dsh-types` 红）、turn-diff 依赖 DSH 私有 snapshot、vendored ui-deliverables 需要维护、VS Code embed 的 in-place 切换不可用。
 - **维护**：15 份 in-progress notes、无签字 MVP、solo。
 
+## MVP decisions（PM 的裁决，随提案一起签）
+
+这些是当前 notes 里还挂着的产品问题；我按 PM 的判断给出结论，客户可以逐条推翻。
+
+- **默认屏幕**：左侧 Explorer；中间 conversation；打开文件时在中间 group 增加 editor window 并成为 active；右侧保留、默认隐藏；bottom panel 默认收起；title bar 显示 folder / session / Space / layout。
+- **首次运行**：没有 folder → 路径输入 + 最近 folder；打开后进入默认屏幕；错误就地显示，不进入死胡同。首次之后，入口是 title bar 的 **Open folder** / **新 tab**。
+- **审阅约定**：changed-files 卡只做入口——点文件开 turn-scoped diff；checks 留在 chat / tool calls；request changes 走 chat；human edit / git revert 兜底；**卡上不加 review 动作**。
+- **chat**：单 chat；可收起 / 恢复；每个 folder 记住收起状态；不做多 chat 面板。
+- **notes / plan**：notes 是文件；agent 通过文件读写；冲突时提示，不静默合并；不做实时协同。
+- **扩展**：MVP 只验证 **GitLens**；不承诺任意 VSIX / 市场 / 自动安装。
+- **Space**：默认一个；可创建 / 切换；按 folder 存储；panel / sidebar 是 frame 级，不随 Space。
+- **多显示器**：一个 folder 一个 tab；新 tab 是显式动作；同 folder 不做第二个 tab / aux。
+- **MVP 不承诺**：boards / widgets 的产品化（能力保留，不进验收）、多窗口 / free window、MCP、自动布局、完整 i18n / a11y、application pin / launcher。
+
+## MVP acceptance checklist
+
+| 旅程 | 通过条件 | 证据 |
+| --- | --- | --- |
+| J1 第一次 | 打开 folder → 默认屏幕 → 第一句 prompt 或第一次编辑；无 console error | 手工 dogfood + first-run 场景 |
+| J2 审阅 | 一个 turn 的卡 → diff → request changes → 接受/人工改/git revert；不切工具 | 手工 dogfood + changed-files 场景 |
+| J3 切换 | A/B 两个 tab；dirty 保存/取消；回 A 恢复 session / 文件 / layout；running 可见 | `folder-switch` / `folder-entry` gate |
+
+- M1–M3 在 dogfood 中手工记录；两周后按 M3 做证伪判断。
+
 ## 需要客户（James）确认
 
 1. 接受「审阅 + 切换」作为 MVP 的楔子，以及 M3 的证伪条件？
