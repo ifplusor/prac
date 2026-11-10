@@ -250,3 +250,9 @@
 - `SignatureVerificationInternal`：VS Code 扩展管理在安装/更新时验签；web 侧 `node_modules/vsda/rust/web/vsda.js|wasm` **404**，所以 `verification was not executed`；`extensions.verifySignature: false` 的 default 不会覆盖用户已有设置，pageerror 仍在。产品侧要 serve vsda 或强制该设置。
 - `/api/changes.summary` **404**：vendored alpha.2 deliverables client 调用该路由，rc.2 的 host 路由没有被服务/组合——**changed-files card / J2 review 是坏的**，这是 MVP 楔子的核心，下一轮优先。
 - 另：GitHub auth 超时（GitLens）与本次无关。
+
+## J2 changed-files 验证（2026-11-10）
+
+- 新 session / 新 turn 创建 `prac-j2-check.txt`：`/api/changes.summary?sessionId=session-1ca07c9e…&seq=28` 返回 **200**，页面出现 “Edited prac-j2-check.txt  +1 -0”。
+- 所以 J2 card 在新 session 上正常；旧 session 的 404 是 `@deepseek-ai/dsh-workspace-changes` 的 host-memory summary 在重启后丢失（`types.ts` 契约），不是路由 bug。
+- 测试文件与测试 session 已清理。
