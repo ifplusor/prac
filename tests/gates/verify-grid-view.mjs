@@ -5,7 +5,11 @@
 import { clearLayoutState, openPrac, report, requireUrl } from "./harness.mjs";
 
 const CONVERSATION = "dsh:main:conversation";
-const VIEW = "dsh:sidebar";
+// A VS Code view is a board item at runtime (`<container>/<view>/board`), so it
+// has a product definition, a recall row, and no default stage placement. The
+// DSH sidebar was the wrong fixture: prac has no definition for when it shows,
+// and its boot-hide races the drop.
+const VIEW = "left/container:workbench.view.explorer/board";
 const url = requireUrl();
 const { page, close } = await openPrac(url);
 await clearLayoutState(page);

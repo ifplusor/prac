@@ -69,6 +69,10 @@ if ((await page.locator("[data-prac-firstrun]").count()) > 0) {
     }
   }
 }
+// The first-run flow reloads the page after the folder is chosen; installing
+// the deep-DOM helper during that navigation destroys the execution context.
+await page.waitForLoadState("load");
+await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
 await installDeepDom(page);
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face && !!globalThis.__deep, null, {
   timeout: 60_000,
