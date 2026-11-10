@@ -26,6 +26,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@types/react": "catalog:",
+    "pdfjs-dist": "6.3.289",
     "prac-client-ui-frame": "workspace:*",
     "react": "catalog:"
   },

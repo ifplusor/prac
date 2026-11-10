@@ -15,6 +15,7 @@
 
 import type { Context } from "@deepseek-ai/cordis";
 import { createElement, type ReactNode } from "react";
+import { PdfView } from "./pdf-view.tsx";
 // Type-only, for the frame plugin's `Context` / `SlotMap` merges.
 import type {} from "prac-client-ui-frame/client";
 import type { PracAppDef, PracExtension, PracExtensionsFace } from "prac-client-ui-frame/client";
@@ -55,7 +56,9 @@ export function apply(ctx: Context): void {
     windows: () => documents.map((document) => ({ id: document.id, title: document.title })),
     contentFor: (windowId: string): (() => ReactNode) => {
       const document = documents.find((candidate) => candidate.id === windowId);
-      return () => (document === undefined ? null : DocumentPlaceholder(document));
+      if (document === undefined) return () => null;
+      if (document.kind === "pdf") return () => createElement(PdfView, { path: document.path });
+      return () => DocumentPlaceholder(document);
     },
   };
   ctx.effect(

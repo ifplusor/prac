@@ -66,6 +66,12 @@ export interface ClientPackOptions {
    * than at page load.
    */
   readonly external?: readonly string[];
+  /**
+   * Build-time replacements for this bundle only (for example a Node global a
+   * dependency still references). Top-level `define` in `vite.config.ts` does
+   * not reach the client half, because it is a separate `pack` entry.
+   */
+  readonly define?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -96,6 +102,7 @@ export function clientPack(id: string, options: ClientPackOptions = {}) {
     // dts would wrap the banner/footer into a .d.ts the type system must parse.
     dts: false,
     deps: { neverBundle: [...BASELINE_EXTERNALS, ...extra] },
+    ...(options.define === undefined ? {} : { define: options.define }),
     outExtensions: () => ({ js: ".js" }),
     banner: {
       // The Envelope must be declared *inside* the factory before any bundled

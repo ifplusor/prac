@@ -19,6 +19,8 @@ import { PLATFORM_MODULES, clientPack } from "../../../scripts/pack-client.ts";
  * inlined React) instead of a build script asserting them on the side.
  */
 export default defineConfig({
+  // pdfjs-dist references the Node `process` global; the client bundle is browser-only.
+  define: { "process.env": "{}" },
   pack: [
     {
       entry: { index: "src/index.ts" },
@@ -26,7 +28,10 @@ export default defineConfig({
       platform: "node",
       outExtensions: () => ({ js: ".mjs", dts: ".d.mts" }),
     },
-    clientPack("prac-client-ui-document-preview", { entry: "src/client/index.ts" }),
+    clientPack("prac-client-ui-document-preview", {
+      entry: "src/client/index.ts",
+      define: { "process.env": "{}" },
+    }),
   ],
   run: {
     tasks: {
