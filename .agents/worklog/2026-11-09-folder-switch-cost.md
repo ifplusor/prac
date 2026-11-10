@@ -110,3 +110,11 @@
 - `verify-file` 的第 10 段从「reload 忘记文件」改为「reload 恢复该 folder 的 open set」：这是本产品的新行为；同时修了 first-run 点击后导航与 `installDeepDom` 的竞态（先等 navigation 再注入）。
 - `folder-switch` / `folder-entry` 从 opt-in 升为正式 gate；全量 `vp run verify:ui` 全绿（约 232s），folder-switch 14.0s、folder-entry 8.1s。
 - 三个诊断探针（switch-cost / multitab / workspace-state）仍是 opt-in。
+
+## 默认屏幕审计（2026-11-09，rig）
+
+- 证据：`.build/audit/default-screen-collapsed.png`、`.build/audit/default-screen-session.png`（1600×1000）。
+- 事实：打开 folder 后，中心的 tab strip 是 `Chat × Sidebar`，body 空白；左侧是 Explorer；右侧是竖排 `Chat`；bottom 240px 展开（Debug Console / Problems / Output / Terminal）；标题栏 `New Session / Space 1`。
+- 结论：**J1 默认屏幕不达标**——中心 conversation 不可用；bottom 未收起；`dsh:sidebar` 的 state region 是 center，Explorer 是 left。
+- 尝试：把 kit `defaultTree()` 的 bottom 改成 collapsed 0 / cached 240 → `ui-kit-workbench` 的单测（断言 240）失败；已回退。bottom 默认收起应在 **prac frame 层** 做，不改 kit 的默认契约。
+- 未决：中心 chat 空白是产品缺陷，还是 rig 没有 session / model 的假象？需要在真实 DSH 环境复核。下一轮优先修 frame 默认 bottom + conversation 的默认可见 / active。
