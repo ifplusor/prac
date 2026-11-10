@@ -28,7 +28,7 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type { WebServer } from "@deepseek-ai/dsh-host-webserver";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, rename } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -362,6 +362,40 @@ export function apply(ctx: Context): void {
         }),
       `${name}: GET ${VSCODE_ROUTE}`,
     );
+    // The PDF window reads its bytes through this route: the document-preview
+    // app is client-side, and has no other workspace file source.
+    webCtx.effect(
+      () =>
+        server.register({
+          kind: "prefix",
+          path: "/api/prac-file",
+          handler: async (rawReq: { url?: string } | undefined, res: unknown) => {
+            const response = res as {
+              statusCode: number;
+              setHeader(name: string, value: string): void;
+              end(body?: Uint8Array | string): void;
+            };
+            const requestUrl = rawReq?.url ?? "";
+            const path = new URL(requestUrl, "http://localhost").searchParams.get("path");
+            if (path === null || path === "") {
+              response.statusCode = 400;
+              response.end("missing path");
+              return;
+            }
+            try {
+              const bytes = await readFile(path);
+              response.statusCode = 200;
+              response.setHeader("content-type", "application/octet-stream");
+              response.end(bytes);
+            } catch {
+              response.statusCode = 404;
+              response.end("not found");
+            }
+          },
+        }),
+      `${name}: GET /api/prac-file`,
+    );
+
     // Hand the page the webview endpoint, when the deployment configured one.
     // An index injection is the existing channel for a server-side value the
     // page needs at boot — no new mechanism, and no assumption about which

@@ -9,7 +9,12 @@
  * @module prac-client-ui-document-preview/pdf
  */
 
-import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
+import {
+  getDocument,
+  GlobalWorkerOptions,
+  type PDFDocumentProxy,
+  type PDFPageProxy,
+} from "pdfjs-dist";
 /** The worker source, inlined by the build (a Blob URL keeps it off the network). */
 declare const __PRAC_PDF_WORKER__: string;
 
@@ -19,11 +24,7 @@ const workerUrl =
     ? URL.createObjectURL(new Blob([__PRAC_PDF_WORKER__], { type: "text/javascript" }))
     : undefined;
 
-if (workerUrl !== undefined) {
-  void import("pdfjs-dist").then((pdfjs) => {
-    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-  });
-}
+if (workerUrl !== undefined) GlobalWorkerOptions.workerSrc = workerUrl;
 
 /** One loaded PDF and its cleanup. */
 export interface PdfSession {
@@ -38,19 +39,19 @@ export interface PdfSession {
  * @returns the pending document and its cleanup.
  */
 export function openPdf(data: Uint8Array<ArrayBuffer>, signal: AbortSignal): PdfSession {
-  // Loaded lazily: the document-preview bundle must not pay pdfjs on boot.
-  const taskPromise = import("pdfjs-dist").then((pdfjs) => pdfjs.getDocument({ data }));
+  // Static import: a dynamic one would emit a separate chunk the DSH module
+  // table does not know, which fails at the require.
+  const task = getDocument({ data });
   signal.addEventListener(
     "abort",
     () => {
-      void taskPromise.then((task) => task.destroy());
+      void task.destroy();
     },
     { once: true },
   );
   return {
-    document: taskPromise.then((task) => task.promise),
+    document: task.promise,
     async dispose(): Promise<void> {
-      const task = await taskPromise;
       await task.destroy();
     },
   };
