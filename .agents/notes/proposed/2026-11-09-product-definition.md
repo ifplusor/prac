@@ -123,11 +123,13 @@ prac 是**单人、自用的 agent 工程工作台**：把对话、代码、变�
 | 旅程 | 状态 | 证据 |
 | --- | --- | --- |
 | J1 第一次 | **rig 通过；真实环境 dogfood 待做** | `default-screen` gate；`.build/audit/default-screen-fixed.png` |
-| J2 审阅 | **未跑**：需要真实 DSH 模型跑一个 turn | changed-files 卡 / diff / request changes |
+| J2 审阅 | **新 session 验证通过**：`changes.summary` 200，card 显示 `Edited … +1 -0`；旧 session 的 404 是 host-memory summary 丢失（预期） | changed-files 卡 / diff / request changes |
 | J3 切换 | **gate 通过** | `folder-switch` / `folder-entry` |
 | M1–M3 | **待 dogfood 记录** | 手工计时 / 工具切换次数 |
-| 历史 session | **已修，等待重启验证** | rc.2 升级（`job/registered`）；`8c81ed6757` anchor + catalog |
-| Copilot chat | **客户裁决：不要**；live chat UI 已移除；剩的 Open Editors “Chat” 是 **浏览器 IndexedDB 里的旧 editor state**（死 tab），右栏是 DSH chat | 一次性清 VS Code web state（dirty 风险）或接受死 tab |
+| 历史 session | **验证通过**：失败 session 正常打开，无 `Failed to load history` | rc.2 升级（`job/registered`）；`8c81ed6757` anchor + catalog |
+| lsp / tool-lsp | **已修**：link anchor 本地 0.2.1-rc.2，2 个 activation warning 消失 | `scripts/link-profile.mjs` |
+| Copilot chat | live UI 已移除；Open Editors Chat 是 **core VS Code 启动行为**（非扩展/设置/fixture）；右栏是 DSH chat；**接受为已知噪声** | 接受 / 以后 editor 层排除 |
+| vsda / signature | npm `vsda` 不含 `rust/web`；**接受 console 噪声**，不阻塞 | 接受 / 以后从 web 构建取资产 |
 
 - `vp run verify:ui` **all gates passed**；`vp check` 绿；工作区干净。
 - 在客户 dogfood 之前不再改产品代码；下一步是客户的体验与签字，不是继续加功能。
