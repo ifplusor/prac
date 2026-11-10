@@ -208,3 +208,10 @@
 - 因此 Open Editors 的 “Chat” 是 **VS Code core chat editor**（`chat.shared.contribution.ts` 里的 editor pane / resolver / serializer 注册），不是 Copilot 扩展，也不是我们已移除的 AuxiliaryBar container。
 - 右栏的 “Chat” 很可能是 **prac 自己的 DSH chat**（产品主 chat），不是 Copilot。
 - 下一步只有两条：给 `chat.shared.contribution.ts` 做第二个 vendor overlay，去掉 core chat editor 的注册；或重置 VS Code workbench 的 restored editor state（后者有 dirty buffer 风险）。前者干净但文件大（3403 行）。
+
+## Core chat editor overlay（2026-11-10）
+
+- `vendor/vscode/overlay/chat.shared.contribution.ts`：移除 `ChatEditor` pane 注册、`ChatResolverContribution` 注册、`ChatEditorInput` serializer；debug/agent-plugin editor 保留。
+- `vscode:build` 通过；`vp check` 306 文件绿；`vp run verify:ui` all gates passed。
+- Open Editors 的 “Chat” 仍在：它是 **persisted restored editor state**（workbench 恢复旧 editor；注册被移除后变成不可解析的 tab/placeholder），不是活的 Copilot chat。右栏 “Chat” 是 prac 自己的 DSH chat，保留。
+- 下一步：清掉 VS Code 的 restored editor state（prac 自己的 per-folder open restore 是来源；有 dirty buffer 风险），或接受这个 placeholder。

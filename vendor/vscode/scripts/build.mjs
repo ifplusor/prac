@@ -182,6 +182,10 @@ const OVERLAY = [
     from: "overlay/chatParticipant.contribution.ts",
     to: "src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts",
   },
+  {
+    from: "overlay/chat.shared.contribution.ts",
+    to: "src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts",
+  },
   { from: "overlay/embeddedWorkbench.ts", to: "src/vs/workbench/browser/embeddedWorkbench.ts" },
   { from: "overlay/pracEditorPaneHost.ts", to: "src/vs/workbench/browser/pracEditorPaneHost.ts" },
   { from: "overlay/pracWindowInput.ts", to: "src/vs/workbench/browser/pracWindowInput.ts" },
