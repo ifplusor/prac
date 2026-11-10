@@ -275,3 +275,9 @@
 - 第一轮：`Create a file named prac-review.txt containing the word hello` → card `Edited prac-review.txt +1 -0`。
 - 第二轮（request changes）：`Change the word … from hello to world` → `Completed in 2s`，文件改为 world。
 - 即 J2 的 card → diff → request changes → 再改 全链路可用。
+
+## 客户裁决：Open Editors “Chat” 行是预期的（2026-11-10）
+
+- 客户明确说 “Open Editors 的 Chat 行是预期的”。
+- 因此不再尝试关闭/排除该行；`closeActiveEditor` 方案已回退，保持现状。
+- vsda 的 console 噪声仍待客户决定。
