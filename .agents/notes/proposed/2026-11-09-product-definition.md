@@ -118,6 +118,18 @@ prac 是**单人、自用的 agent 工程工作台**：把对话、代码、变�
 - **J1 默认屏幕**：已在 rig 修复。根因是 DSH host window 经 app-window content/isolation 路径渲染时丢失 slot renderer 的 React context；修法是 DSH host window 在 frame 树内用每窗口组件渲染它的 host slot。`default-screen` gate 通过，中心显示 conversation、bottom 收起。真实 DSH 环境的 dogfood 仍待做。
 - **bottom**：stale frame state 会展开 240px；干净状态是 0。不是默认缺陷，不需要改 kit 的 240 契约。
 
+## MVP acceptance status（2026-11-10）
+
+| 旅程 | 状态 | 证据 |
+| --- | --- | --- |
+| J1 第一次 | **rig 通过；真实环境 dogfood 待做** | `default-screen` gate；`.build/audit/default-screen-fixed.png` |
+| J2 审阅 | **未跑**：需要真实 DSH 模型跑一个 turn | changed-files 卡 / diff / request changes |
+| J3 切换 | **gate 通过** | `folder-switch` / `folder-entry` |
+| M1–M3 | **待 dogfood 记录** | 手工计时 / 工具切换次数 |
+
+- `vp run verify:ui` **all gates passed**；`vp check` 绿；工作区干净。
+- 在客户 dogfood 之前不再改产品代码；下一步是客户的体验与签字，不是继续加功能。
+
 ## Dogfood script（客户验收用）
 
 1. **首次**：在没有 workspace 的状态打开 prac，选择/输入一个 folder。预期：中心 conversation 可见（hero / composer），bottom 空，DSH sidebar 不抢位；记录 M1（打开 → 第一次有用动作）。
