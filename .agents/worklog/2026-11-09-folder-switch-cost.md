@@ -104,3 +104,9 @@
 - title bar 的 folder 菜单加 **Open folder** 输入（Open = 替换当前 tab；↗ = 新 tab），每个 workspace 行加 **↗ 新 tab**。
 - `workspaces.create` 先注册、再 reload；新 tab 走 `window.open(?workspace=…)`，由新页的 adopt 逻辑注册。
 - 新 gate `folder-entry`（opt-in）：Open folder 到达 C；new-tab 在第二个 tab 到达 A。通过。
+
+## 全量验收与 file gate 更新（2026-11-09）
+
+- `verify-file` 的第 10 段从「reload 忘记文件」改为「reload 恢复该 folder 的 open set」：这是本产品的新行为；同时修了 first-run 点击后导航与 `installDeepDom` 的竞态（先等 navigation 再注入）。
+- `folder-switch` / `folder-entry` 从 opt-in 升为正式 gate；全量 `vp run verify:ui` 全绿（约 232s），folder-switch 14.0s、folder-entry 8.1s。
+- 三个诊断探针（switch-cost / multitab / workspace-state）仍是 opt-in。

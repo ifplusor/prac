@@ -1,5 +1,5 @@
 /**
- * Opt-in: the real folder-switch flow.
+ * Gate: the real folder-switch flow.
  *
  * Opens A, opens/edits a file, switches to B through the title bar (accepting the
  * save prompt), comes back through the title bar, and checks the file is saved
@@ -10,15 +10,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openPrac, report, requireUrl } from "./harness.mjs";
 import { installDeepDom } from "../../vendor/vscode/scripts/deep-dom.mjs";
-
-const selected = (process.env.PRAC_GATES ?? "")
-  .split(",")
-  .map((name) => name.trim())
-  .includes("folder-switch");
-if (!selected) {
-  console.log("SKIPPED: select it explicitly (PRAC_GATES=folder-switch)");
-  process.exit(0);
-}
 
 const url = requireUrl();
 const root = await mkdtemp(join(tmpdir(), "prac-switch-flow-"));

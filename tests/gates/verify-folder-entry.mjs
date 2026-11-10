@@ -1,5 +1,5 @@
 /**
- * Opt-in: the two product entry points for folders.
+ * Gate: the two product entry points for folders.
  *
  * Opens A, then uses the title bar's Open folder input to enter C, and the
  * per-row new-tab action to reopen A in a second tab. Checks the workspace the
@@ -11,15 +11,6 @@ import { join } from "node:path";
 import { openPrac, report, requireUrl } from "./harness.mjs";
 import { installDeepDom } from "../../vendor/vscode/scripts/deep-dom.mjs";
 import { installShellModalAccommodation } from "../../scripts/shell-modal.mjs";
-
-const selected = (process.env.PRAC_GATES ?? "")
-  .split(",")
-  .map((name) => name.trim())
-  .includes("folder-entry");
-if (!selected) {
-  console.log("SKIPPED: select it explicitly (PRAC_GATES=folder-entry)");
-  process.exit(0);
-}
 
 const url = requireUrl();
 const root = await mkdtemp(join(tmpdir(), "prac-folder-entry-"));

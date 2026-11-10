@@ -144,6 +144,11 @@ page.on("pageerror", (error) => consoleErrors.push(String(error)));
 step("boot");
 await page.goto(url, { waitUntil: "load", timeout: 60_000 });
 if ((await page.locator("[data-prac-firstrun]").count()) > 0) {
+  // The first-run action registers the workspace and then reloads; install the
+  // deep-DOM shim only after that navigation settles, or the evaluate races it.
+  const navigation = page
+    .waitForNavigation({ waitUntil: "load", timeout: 60_000 })
+    .catch(() => undefined);
   const rows = page.locator(".prac-firstrun-row");
   if ((await rows.count()) > 0) {
     await rows.first().click();
@@ -154,7 +159,9 @@ if ((await page.locator("[data-prac-firstrun]").count()) > 0) {
       await page.locator(".prac-firstrun-button").click();
     }
   }
+  await navigation;
 }
+await page.waitForLoadState("load").catch(() => undefined);
 await installDeepDom(page);
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 // The face is published from inside the workbench, once its service graph has
@@ -572,6 +579,9 @@ const diagnosticsProbe = await page.evaluate(async () => {
 // them: a persisted placement record outlives the file, and left alone it renders
 // a tab for a file nobody has open and holds the centre with an empty view.
 step("reload");
+const preReload = await page.evaluate(() => ({
+  open: globalThis.__vscodeEmbed.face.listOpenFiles(),
+}));
 await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
@@ -596,7 +606,6 @@ const reloaded = await page.evaluate(() => ({
   conversationRegion:
     globalThis.__pracTest?.frame.getState().items["dsh:main:conversation"]?.region ?? null,
 }));
-
 // The unit of a view is the **placement** — a file in one of the app's editor groups
 // — not the file. VS Code's own split copies the editor into a second group, and prac
 // has to answer with two placements, two views and two surfaces; one view torn between
@@ -926,9 +935,13 @@ const checks = {
     capabilityClosed.snapshot.every((entry) => entry.resource !== surfaceResource) &&
     capabilityClosed.open.every((resource) => resource !== surfaceResource) &&
     capabilityClosed.version > capabilityHidden.version,
-  // 10. A reload takes the files with it — and takes their views with them.
-  reloadForgetsTheFiles: reloaded.open.length === 0 && reloaded.fileHosts === 0,
-  noTabForAClosedFile: reloaded.fileTabs.length === 0,
+  // 10. A reload restores the folder's open files and their views: the product
+  // keeps the set, and the frame rebuilds one view per restored file.
+  reloadRestoresTheFiles:
+    reloaded.open.length === preReload.open.length &&
+    reloaded.open.every((resource) => preReload.open.includes(resource)) &&
+    reloaded.fileHosts > 0,
+  fileTabsMatchTheRestoredFiles: reloaded.fileTabs.length === reloaded.open.length,
   conversationTakesTheCentreBack: reloaded.conversationRegion === "center",
   // 11. The diagnostics capability's contract.
   diagnosticsSummaryIsTheSameSet: (() => {
