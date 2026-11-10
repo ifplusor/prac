@@ -156,3 +156,9 @@
 - 已回退；重建与 `vp check` 绿。
 - 现状：`main` slot 注册了 `conversation`、`uiSession` adapter 与 current session 都存在，但中心 content host 为空；frame 的 `renderSlot` 对 DSH conversation 返回空的原因仍未定。
 - 决策：给 frame 的 conversation re-host **2 轮 spike 时间盒**；若仍不能渲染，再评估 hybrid（DSH shell 做主区域 + prac 外层 chrome）这一架构级改造。
+
+## 直接 renderSlot spike（2026-11-09）
+
+- 在 frame 根部直接 `renderSlot("main", {}, { entryKey: "conversation" })`：中心渲染出 conversation 的 hero / composer（"Into the Unknown"、"Describe what you want to build…"、"Select model"）。
+- 结论：**slot、session、conversation panel 都正常**；问题在 app-window 的 content host / isolation 路径（`windowContentFor` → `LayoutIsolation` → `LayoutItem`）——DSH slot 在那里渲染为空。
+- 下一轮：让 app content 在 frame 的 React 树内渲染，或桥接 DSH slot 的 React 上下文（content host 单独 root 的问题），而不是继续查 slot/session。

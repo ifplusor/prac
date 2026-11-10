@@ -115,7 +115,7 @@ prac 是**单人、自用的 agent 工程工作台**：把对话、代码、变�
 
 ## Known blockers
 
-- **J1 默认屏幕**：清掉所有 `prac-*` localStorage 后 reload，中心仍只有 `Chat × Sidebar` tab strip、body 空白；`dsh:sidebar` 的 region 仍是 center。这不是 stale state。根因**未定**：`main` slot 注册了 `conversation`，`uiSession` adapter 和 current session 都存在；但中心 content host 为空。上一轮把 "Bring the conversation forward" 当成 session-area 空分支是误读——它是 prac 的 window action label，foreground 假设不成立。临时启用 `ui-layout` 会 boot 失败（8 entries 未激活，root/service 冲突），fallback 不是配置切换。给 frame 的 conversation re-host **2 轮 spike 时间盒**；否则评估 hybrid（DSH shell 做主区域 + prac 外层 chrome）。修好前 J1 不签。
+- **J1 默认屏幕**：清掉所有 `prac-*` localStorage 后 reload，中心仍只有 `Chat × Sidebar` tab strip、body 空白；`dsh:sidebar` 的 region 仍是 center。这不是 stale state。根因已定位：frame 根部直接 `renderSlot("main", {}, { entryKey: "conversation" })` 能渲染出 conversation hero/composer；slot、session、panel 都正常。空的是 **app-window 的 content host / isolation 路径**（`windowContentFor` → `LayoutIsolation` → `LayoutItem`）。修法在 content host 的 React 上下文/宿主，不在 slot/session。修好前 J1 不签。
 - **bottom**：stale frame state 会展开 240px；干净状态是 0。不是默认缺陷，不需要改 kit 的 240 契约。
 
 ## 需要客户（James）确认
