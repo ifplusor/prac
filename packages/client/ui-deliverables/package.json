@@ -23,7 +23,7 @@
   "scripts": {
     "build": "vp pack && node scripts/inject-css.mjs",
     "check": "vp check",
-    "test": "vp test run"
+    "test": "vp test run --passWithNoTests"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

@@ -345,16 +345,16 @@ describe("placeCatalogue", () => {
     ]);
   });
 
-  it("maps each app location to its region", () => {
+  it("maps the app locations it still places", () => {
     const { face, calls } = recordingFace();
     placeCatalogue(face, DSH, [
       entry({ view: "vscode:view:a", appId: "a", location: "sidebar", containerId: "c.a" }),
       entry({ view: "vscode:view:b", appId: "b", location: "panel", containerId: "c.b" }),
       entry({ view: "vscode:view:c", appId: "c", location: "auxiliarybar", containerId: "c.c" }),
     ]);
+    // Panel items open on demand; the bottom track starts empty.
     expect(shapes(calls).filter(([method]) => method === "setRegionChildren")).toEqual([
       ["setRegionChildren", LEFT, [{ id: "left/container:c.a", label: "Explorer" }]],
-      ["setRegionChildren", BOTTOM, [{ id: "bottom/container:c.b", label: "Explorer" }]],
       ["setRegionChildren", RIGHT, [{ id: "right/container:c.c", label: "Explorer" }]],
     ]);
   });
@@ -478,13 +478,10 @@ describe("placeCatalogue", () => {
     ]);
   });
 
-  it("places the app's panel items in the bottom track", () => {
-    // `panel` maps to `bottom`, which is a visible track again: placing the view there is enough.
+  it("leaves the app's panel items for the dock", () => {
+    // The bottom starts empty; terminal / output / problems open on demand.
     const { face, calls } = recordingFace();
     placeCatalogue(face, DSH, [entry({ location: "panel", containerId: "c.panel" })]);
-    expect(shapes(calls)).toEqual([
-      ["setRegionChildren", BOTTOM, [{ id: "bottom/container:c.panel", label: "Explorer" }]],
-      ["placeQuietly", "vscode:view:workbench.explorer.fileView", "bottom/container:c.panel"],
-    ]);
+    expect(shapes(calls)).toEqual([]);
   });
 });
