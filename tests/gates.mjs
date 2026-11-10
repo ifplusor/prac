@@ -31,6 +31,7 @@ export const GATES = [
   ["workspace-state", "tests/gates/verify-workspace-state.mjs"],
   ["folder-switch", "tests/gates/verify-folder-switch.mjs"],
   ["folder-entry", "tests/gates/verify-folder-entry.mjs"],
+  ["default-screen", "tests/gates/verify-default-screen.mjs"],
 ];
 
 /**

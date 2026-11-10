@@ -130,6 +130,10 @@ export function containerBoardTargets(
   for (const entry of entries) {
     if (entry.source !== "view") continue;
     if (EXCLUDED_VIEWS.has(entry.appId)) continue;
+    // The bottom starts collapsed: terminal / problems / output open on demand
+    // rather than occupying the first screen. They stay in the catalogue, so
+    // the dock and recall can bring them back.
+    if (entry.location === "panel") continue;
     const region = childRegionId(LOCATION_REGION[entry.location], entryKey(entry));
     const bucket = groups.get(region) ?? { label: containerLabel(entry), items: [] };
     bucket.items.push(entry.view);
@@ -196,6 +200,10 @@ export function placeCatalogue(
   for (const entry of entries) {
     if (entry.source !== "view") continue;
     if (EXCLUDED_VIEWS.has(entry.appId)) continue;
+    // The bottom starts collapsed: terminal / problems / output open on demand
+    // rather than occupying the first screen. They stay in the catalogue, so
+    // the dock and recall can bring them back.
+    if (entry.location === "panel") continue;
     const region = LOCATION_REGION[entry.location];
     const byKey = groups.get(region) ?? new Map<string, { label: string; items: string[] }>();
     const key = entryKey(entry);

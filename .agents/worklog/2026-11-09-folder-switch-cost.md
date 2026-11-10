@@ -162,3 +162,11 @@
 - 在 frame 根部直接 `renderSlot("main", {}, { entryKey: "conversation" })`：中心渲染出 conversation 的 hero / composer（"Into the Unknown"、"Describe what you want to build…"、"Select model"）。
 - 结论：**slot、session、conversation panel 都正常**；问题在 app-window 的 content host / isolation 路径（`windowContentFor` → `LayoutIsolation` → `LayoutItem`）——DSH slot 在那里渲染为空。
 - 下一轮：让 app content 在 frame 的 React 树内渲染，或桥接 DSH slot 的 React 上下文（content host 单独 root 的问题），而不是继续查 slot/session。
+
+## J1 修复（2026-11-09）
+
+- 根因：DSH host window 经 app-window 的 `windowContentFor` → `LayoutIsolation` portal → `LayoutItem` 渲染时，DSH slot renderer 的 React context 丢失；而直接在 frame 树里 `renderSlot("main")` 正常。
+- 修法：DSH host window 在 frame 树内用每窗口组件 `DshHostWindowBody` 渲染它的 host slot（`main` / `sidebar` / `rightbar`）；hooks 按窗口稳定，不触发 hook-order。其它 host 仍走 isolation。
+- 默认屏幕：DSH sidebar 在 boot 时隐藏一次（之后用户 recall 仍可打开）；不再自动打开 terminal；panel 容器不再默认放进 bottom（需要时从 dock/recall 打开）。bottom 默认空/收起。
+- gate：`default-screen` 升为正式 gate；`bottom` 的 premise 改为「默认空」；`file` 等 restore 而不是等 no-tabs；`editor:group` 在方向 focus 前先聚焦 editor。
+- 验证：`vp run verify:ui` **all gates passed**（224.4s）；`vp check` 绿。

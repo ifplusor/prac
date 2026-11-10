@@ -5,9 +5,8 @@
  *
  *  1. **absent while empty** — nothing visible there means the region is not
  *     rendered, so the frame is exactly the row (this is what keeps the bottom
- *     bar a capability instead of a redesign). The catalogue now **fills** the bar
- *     with the app's panel containers by default, so the gate empties it first:
- *     "empty" is a state to reach, not the factory arrangement;
+ *     bar a capability instead of a redesign). The factory arrangement leaves the
+ *     bar empty: panel containers open on demand, not by default;
  *  2. **appears when filled** — a view placed there renders at the bar's size,
  *     spans the frame, sits at the bottom, and paints;
  *  3. **the row gives room** — the row above shrinks by the bar's height, and
@@ -26,53 +25,15 @@ const url = requireUrl();
 const { page, own, consoleErrors, close } = await openPrac(url);
 await page.waitForTimeout(1500);
 
-// Make the bar empty: the arrangement put the app's panel containers there, so
-// wait for that to have happened (the app boots after the frame) and then hide
-// everything it placed — the region and its container children.
-await page.waitForFunction(
-  (bottom) =>
-    Object.values(globalThis.__pracTest?.frame.getState().items).some((record) =>
-      (record.region ?? "").startsWith(`${bottom}/`),
-    ),
+// The product starts with an empty bottom: the panel containers open on demand,
+// not by default. Wait for the frame, then confirm the bar is absent.
+await page.waitForFunction(() => globalThis.__pracTest?.frame !== undefined, null, {
+  timeout: 60_000,
+});
+const emptied = await page.evaluate(
+  (bottom) => document.querySelector(`[data-prac-region="${bottom}"]`) === null,
   BOTTOM,
-  { timeout: 90_000 },
 );
-
-/**
- * Hide every view the arrangement put in the bottom track, and wait for the bar to
- * actually be gone.
- *
- * Looped rather than done once: the view catalogue keeps growing after the page
- * settles (extensions activate late — more so since the workbench reaches its
- * `Eventually` phase), and a view arriving between the hiding and the sampling
- * puts the bar back. What the gate asserts is "an empty bar is absent", so it
- * waits for that state instead of assuming the first hide was final.
- *
- * @returns whether the bar went away.
- */
-async function emptyTheBar() {
-  for (let attempt = 0; attempt < 20; attempt++) {
-    await page.evaluate((bottom) => {
-      // A container's surface is a board window record; the widget views live on the
-      // board, so emptying the bar means hiding the records the frame actually has.
-      for (const [id, record] of Object.entries(globalThis.__pracTest?.frame.getState().items)) {
-        const region = record.region ?? "";
-        if (region === bottom || region.startsWith(`${bottom}/`)) {
-          globalThis.__pracTest?.frame.hide(id);
-        }
-      }
-    }, BOTTOM);
-    await page.waitForTimeout(500);
-    const present = await page.evaluate(
-      (bottom) => document.querySelector(`[data-prac-region="${bottom}"]`) !== null,
-      BOTTOM,
-    );
-    if (!present) return true;
-  }
-  return false;
-}
-
-const emptied = await emptyTheBar();
 
 async function sample() {
   const facts = await page.evaluate(

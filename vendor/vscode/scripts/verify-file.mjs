@@ -585,14 +585,13 @@ const preReload = await page.evaluate(() => ({
 await page.reload({ waitUntil: "load" });
 await page.waitForSelector("[data-prac-frame]", { timeout: 60_000 });
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 60_000 });
+// The product restores this folder's open set after the reload; wait for that
+// restore rather than for the old "reload forgets" state.
 await until(
   page,
-  () =>
-    (globalThis.__deep.all("[data-prac-tab]") ?? []).every(
-      (tab) => !(tab.getAttribute("data-prac-tab") ?? "").startsWith("vscode:file:"),
-    ),
-  null,
-  { timeout: 10_000 },
+  (expected) => (globalThis.__vscodeEmbed?.face?.listOpenFiles().length ?? 0) === expected,
+  preReload.open.length,
+  { timeout: 20_000 },
 );
 await page.evaluate(
   () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),

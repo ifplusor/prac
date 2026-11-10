@@ -579,6 +579,20 @@ interface FrameProps {
   usePanelInfo: UsePanelInfo;
 }
 
+/** One DSH host window's body: render its host slot in the frame's tree. */
+function DshHostWindowBody({
+  renderSlot,
+  viewId,
+}: {
+  renderSlot: RenderSlot;
+  viewId: string;
+}): ReactNode {
+  if (viewId.startsWith("dsh:main:")) {
+    return renderSlot("main", {}, { entryKey: viewId.slice("dsh:main:".length) });
+  }
+  return renderSlot(viewId === "dsh:sidebar" ? "sidebar" : "rightbar", {});
+}
+
 /**
  * The frame: the region tree, plus the frame-wide overlay layer.
  *
@@ -742,6 +756,27 @@ export function createFrame(
         renderSlot as unknown as ApplicationSlotRenderer,
         { width: box.width, viewportWidth: state.viewportWidth },
       );
+      // DSH host windows render in the frame's own tree, not behind the
+      // isolation portal: the host slot renderer needs the frame's React
+      // context. The body is a component, so its hooks stay per-window.
+      if (viewId.startsWith("dsh:")) {
+        return createElement(
+          "div",
+          {
+            key: viewId,
+            "data-prac-view-host": "",
+            "data-prac-view-id": viewId,
+            style: {
+              display: "flex",
+              flexDirection: "column",
+              flex: "1 1 auto",
+              minWidth: 0,
+              minHeight: 0,
+            },
+          },
+          createElement(DshHostWindowBody, { renderSlot, viewId }),
+        );
+      }
       return createElement(
         LayoutIsolation,
         { key: viewId, itemId: viewId, ...(chrome === undefined ? {} : { chrome }) },

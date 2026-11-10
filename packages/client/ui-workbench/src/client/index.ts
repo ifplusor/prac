@@ -518,6 +518,27 @@ export function apply(ctx: Context): void {
   document.head.append(firstRunStyle);
   ctx.effect(() => () => firstRunStyle.remove(), "prac-web-app: first-run styles");
   arrange(layout, dsh.pracDsh);
+  // The product's first screen is the conversation, not DSH's own sidebar: the
+  // title bar owns Workspace/Session selection. The app can open its sidebar
+  // during boot, so hide it once after that settles; a later recall is the
+  // person's choice and is left alone.
+  ctx.effect(() => {
+    let off: (() => void) | undefined;
+    const stop = (): void => {
+      off?.();
+      off = undefined;
+    };
+    const hideOnce = (): void => {
+      const item = layout.getState().items[dsh.pracDsh.sidebar];
+      if (item !== undefined && item.hidden !== true) {
+        layout.hide(dsh.pracDsh.sidebar);
+        stop();
+      }
+    };
+    off = layout.subscribe(hideOnce);
+    hideOnce();
+    return stop;
+  }, "prac-web-app: hide the DSH sidebar on boot");
 
   // The title bar reads the same Workspace/Session controllers the hidden DSH
   // sidebar used and delegates selection to `uiWorkspace`. The services are not
@@ -830,12 +851,6 @@ export function apply(ctx: Context): void {
       for (const id of Object.keys(layout.getState().items)) {
         if (id.startsWith("vscode:file:")) layout.setItemKind(id, "window");
         else if (id.startsWith("vscode:view:")) layout.setItemKind(id, "widget");
-      }
-      if (layout.activeContainer("bottom") === null) {
-        const terminal = layout
-          .regionChildren("bottom")
-          .find((child) => child.id.endsWith("container:terminal"));
-        if (terminal !== undefined) layout.selectContainer("bottom", terminal.id);
       }
       // Files the app no longer has open are **forgotten**: their record is what the
       // frame persists, a placement is named by the host (so the next open mints a fresh

@@ -107,7 +107,7 @@ prac 是**单人、自用的 agent 工程工作台**：把对话、代码、变�
 
 | 旅程 | 通过条件 | 证据 |
 | --- | --- | --- |
-| J1 第一次 | **阻塞**：干净状态下中心 conversation 仍空白（证据 `.build/audit/default-fresh-session.png`），`dsh:sidebar` 在 center。修好后再验「默认屏幕 → 第一句 prompt」 | 手工 dogfood + first-run 场景 |
+| J1 第一次 | **通过（rig）**：中心显示 conversation（Into the Unknown / Describe… / Select model），bottom 收起；`default-screen` gate 通过。真实 DSH dogfood 待做 | `default-screen` gate + 手工 dogfood |
 | J2 审阅 | 一个 turn 的卡 → diff → request changes → 接受/人工改/git revert；不切工具 | 手工 dogfood + changed-files 场景 |
 | J3 切换 | A/B 两个 tab；dirty 保存/取消；回 A 恢复 session / 文件 / layout；running 可见 | `folder-switch` / `folder-entry` gate |
 
@@ -115,7 +115,7 @@ prac 是**单人、自用的 agent 工程工作台**：把对话、代码、变�
 
 ## Known blockers
 
-- **J1 默认屏幕**：清掉所有 `prac-*` localStorage 后 reload，中心仍只有 `Chat × Sidebar` tab strip、body 空白；`dsh:sidebar` 的 region 仍是 center。这不是 stale state。根因已定位：frame 根部直接 `renderSlot("main", {}, { entryKey: "conversation" })` 能渲染出 conversation hero/composer；slot、session、panel 都正常。空的是 **app-window 的 content host / isolation 路径**（`windowContentFor` → `LayoutIsolation` → `LayoutItem`）。修法在 content host 的 React 上下文/宿主，不在 slot/session。修好前 J1 不签。
+- **J1 默认屏幕**：已在 rig 修复。根因是 DSH host window 经 app-window content/isolation 路径渲染时丢失 slot renderer 的 React context；修法是 DSH host window 在 frame 树内用每窗口组件渲染它的 host slot。`default-screen` gate 通过，中心显示 conversation、bottom 收起。真实 DSH 环境的 dogfood 仍待做。
 - **bottom**：stale frame state 会展开 240px；干净状态是 0。不是默认缺陷，不需要改 kit 的 240 契约。
 
 ## 需要客户（James）确认

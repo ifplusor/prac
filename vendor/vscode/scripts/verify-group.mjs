@@ -161,6 +161,12 @@ await until(
 const after = await state();
 
 // The focus commands are geometry too: LEFT/RIGHT have to land in the region that sits there.
+// prac's conversation is a real window now, so the editor group must own the focus
+// before directional group commands are meaningful.
+await page.evaluate(() =>
+  globalThis.__vscodeEmbed.commands.executeCommand("workbench.action.focusActiveEditorGroup"),
+);
+await page.waitForTimeout(300);
 const focused = {};
 for (const [side, command] of [
   ["left", "workbench.action.focusLeftGroup"],
