@@ -118,6 +118,14 @@ prac 是**单人、自用的 agent 工程工作台**：把对话、代码、变�
 - **J1 默认屏幕**：已在 rig 修复。根因是 DSH host window 经 app-window content/isolation 路径渲染时丢失 slot renderer 的 React context；修法是 DSH host window 在 frame 树内用每窗口组件渲染它的 host slot。`default-screen` gate 通过，中心显示 conversation、bottom 收起。真实 DSH 环境的 dogfood 仍待做。
 - **bottom**：stale frame state 会展开 240px；干净状态是 0。不是默认缺陷，不需要改 kit 的 240 契约。
 
+## Dogfood script（客户验收用）
+
+1. **首次**：在没有 workspace 的状态打开 prac，选择/输入一个 folder。预期：中心 conversation 可见（hero / composer），bottom 空，DSH sidebar 不抢位；记录 M1（打开 → 第一次有用动作）。
+2. **日常**：发第一句 prompt；让 agent 改一个文件；等 turn 结束。预期：changed-files 卡出现；点文件开 prac 的 diff；checks 留在 chat/tool calls；request changes 走 chat。
+3. **审阅**：接受 / 人工改 / git revert；记录 M3（turn 结束 → 决定的时间、工具切换次数）。
+4. **切换**：用 title bar 的 Open folder / 新 tab 打开第二个 folder；A ↔ B 往返；改 dirty 后切换。预期：保存/取消提示；回来 session / 文件 / 布局恢复；记录 M2。
+5. **签收**：把 M1–M3 和主观摩擦写回本 note 的 checklist；对下面三件事签字或提出修改。
+
 ## 需要客户（James）确认
 
 1. 接受「审阅 + 切换」作为 MVP 的楔子，以及 M3 的证伪条件？
