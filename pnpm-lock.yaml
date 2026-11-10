@@ -249,6 +249,10 @@ importers:
         version: 1.0.0(@types/node@24.13.3)(@vitest/ui@5.0.1)(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@5.0.10)
 
   packages/bundle/web-app:
+    dependencies:
+      prac-client-ui-document-preview:
+        specifier: workspace:*
+        version: link:../../client/ui-document-preview
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 'catalog:'
@@ -415,6 +419,21 @@ importers:
       vite-plus:
         specifier: 'catalog:'
         version: 1.0.0(@types/node@24.13.3)(@vitest/ui@5.0.1)(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@5.0.10)
+
+  packages/client/ui-document-preview:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: 'catalog:'
+        version: 4.0.5-alpha.1
+      '@types/react':
+        specifier: 'catalog:'
+        version: 18.3.31
+      prac-client-ui-frame:
+        specifier: workspace:*
+        version: link:../ui-frame
+      react:
+        specifier: 'catalog:'
+        version: 18.3.1
 
   packages/client/ui-frame:
     devDependencies:

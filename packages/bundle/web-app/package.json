@@ -23,7 +23,9 @@
     "test": "vp test --passWithNoTests",
     "check": "vp check"
   },
-  "dependencies": {},
+  "dependencies": {
+    "prac-client-ui-document-preview": "workspace:*"
+  },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh-client-ui-layout": "catalog:",
