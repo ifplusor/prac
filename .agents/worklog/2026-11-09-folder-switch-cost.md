@@ -221,3 +221,10 @@
 - 服务端 `workspaceStorage` 只有 `vscode.lock`，没有 `state.vscdb`；workbench 的 editor state 在**浏览器 IndexedDB**（`vscode-web-state-db-<workspace>`，早先探针见过）。
 - 所以 Open Editors 的 “Chat” 是 **client-state migration artifact**：live chat UI 已从 vendored build 移除，旧 profile 的 editor state 仍被恢复成死 tab。
 - 两条：一次性清掉这些 VS Code web state DB（prac 自己的 per-folder open restore 会重开文件；dirty buffer 风险），或接受死 tab。live Copilot chat 已经没有。
+
+## Fresh-context Chat 反证（2026-11-10）
+
+- 全新 Playwright context（无旧 IndexedDB）第一屏仍有 Open Editors “Chat” 行，且该行 `focused selected`。
+- `face.listOpenFiles()` / `editors.snapshot()` 都为空，说明它不是 file placement，而是 VS Code 的 Chat **webview/editor**（不在 editors capability）。
+- 右栏 “Chat” 是 `dsh:rightbar`（prac 自己的 DSH chat），保留。
+- 结论：**一次性清 IndexedDB 不会移除它**——它是启动时实际打开的 VS Code Chat editor，不是纯持久化状态。下一步要么接受，要么在 VS Code editor/startup 层做排除；不做盲清。
