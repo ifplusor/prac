@@ -118,3 +118,9 @@
 - 结论：**J1 默认屏幕不达标**——中心 conversation 不可用；bottom 未收起；`dsh:sidebar` 的 state region 是 center，Explorer 是 left。
 - 尝试：把 kit `defaultTree()` 的 bottom 改成 collapsed 0 / cached 240 → `ui-kit-workbench` 的单测（断言 240）失败；已回退。bottom 默认收起应在 **prac frame 层** 做，不改 kit 的默认契约。
 - 未决：中心 chat 空白是产品缺陷，还是 rig 没有 session / model 的假象？需要在真实 DSH 环境复核。下一轮优先修 frame 默认 bottom + conversation 的默认可见 / active。
+
+## 干净状态复核（2026-11-09）
+
+- 清掉所有 `prac-*` localStorage 后 reload：bottom 高度回到 0（bottom 展开是 **stale frame state**，不是默认）；但中心仍只有 `Chat × Sidebar` tab strip、body 空白，`dsh:sidebar` region 仍是 center。
+- 点 `+ New Session` 后仍空白，`Bring the conversation...` notice 仍在。
+- 结论：**J1 默认屏幕缺陷不是 stale state**（至少在 rig 上）；bottom 收起无需改 kit（已回退），真正的问题是 conversation 默认不可见 / inactive。下一轮应在 frame / DSH adapter 层定位，并到真实 DSH 环境复核是否 rig-only。
