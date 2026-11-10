@@ -131,3 +131,12 @@
 - `prac-client-dsh-host` 的 `contentFor` 只做 `render("main", {}, { entryKey: "conversation" })`；它没有给这个 session-scoped slot 提供 DSH 的 session provider / scope。
 - 实验：title bar 在 URL folder boot 时 `openWorkspace(workspaceId)` 连接一个 blank session 并 reveal。结果中心仍然空白（`Chat × Sidebar`，body 空），说明问题不是「没有 session」，而是 slot 渲染时缺少 session scope/provider。实验已回退。
 - 下一轮：在 dsh-host / extension 层给 conversation slot 包上 DSH session provider（或复用 DSH layout 的 conversation panel），再复验干净状态与真实 DSH。
+
+## 中心 content host 是空的（2026-11-09）
+
+- 直接 dump 中心 region 的 DOM：tab strip 下面是 `1272×700` 的 content div，**children 为空**。
+- 这排除了「内容被压成 0 高 / CSS 尺寸」的解释；`render("main", {}, { entryKey: "conversation" })` 返回了空。
+- 两种可能：
+  1. `ui-conversation` 的 `main` slot entry 没有注册（composition 里没装该 UI 插件）；
+  2. entry 在，但 `session-maybe` scope adapter 缺失 / current session 为空，panel 渲染空。
+- 下一轮：在 `prac-client-dsh-host` 加只读诊断（`slots.entries('main')`、`slots.scope('session')`、current session），先判断是哪一种，再修 composition 或 session scope。
