@@ -107,11 +107,16 @@ prac 是**单人、自用的 agent 工程工作台**：把对话、代码、变�
 
 | 旅程 | 通过条件 | 证据 |
 | --- | --- | --- |
-| J1 第一次 | 打开 folder → 默认屏幕 → 第一句 prompt 或第一次编辑；无 console error | 手工 dogfood + first-run 场景 |
+| J1 第一次 | **阻塞**：干净状态下中心 conversation 仍空白（证据 `.build/audit/default-fresh-session.png`），`dsh:sidebar` 在 center。修好后再验「默认屏幕 → 第一句 prompt」 | 手工 dogfood + first-run 场景 |
 | J2 审阅 | 一个 turn 的卡 → diff → request changes → 接受/人工改/git revert；不切工具 | 手工 dogfood + changed-files 场景 |
 | J3 切换 | A/B 两个 tab；dirty 保存/取消；回 A 恢复 session / 文件 / layout；running 可见 | `folder-switch` / `folder-entry` gate |
 
 - M1–M3 在 dogfood 中手工记录；两周后按 M3 做证伪判断。
+
+## Known blockers
+
+- **J1 默认屏幕**：清掉所有 `prac-*` localStorage 后 reload，中心仍只有 `Chat × Sidebar` tab strip、body 空白；`dsh:sidebar` 的 region 仍是 center。这不是 stale state。需要在 frame / DSH adapter 层定位 conversation 的默认可见 / active，并在真实 DSH 环境复核是否 rig-only。修好前 J1 不签。
+- **bottom**：stale frame state 会展开 240px；干净状态是 0。不是默认缺陷，不需要改 kit 的 240 契约。
 
 ## 需要客户（James）确认
 
