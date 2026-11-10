@@ -281,3 +281,8 @@
 - 客户明确说 “Open Editors 的 Chat 行是预期的”。
 - 因此不再尝试关闭/排除该行；`closeActiveEditor` 方案已回退，保持现状。
 - vsda 的 console 噪声仍待客户决定。
+
+## 客户裁决：两个已知边界都接受（2026-11-10）
+
+- Open Editors 的 “Chat” 行：客户确认是预期行为，保持现状。
+- vsda / signature 的 console 噪声：客户“先接受”，保持现状；不再改 vendor。

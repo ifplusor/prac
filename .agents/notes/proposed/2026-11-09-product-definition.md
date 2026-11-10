@@ -129,7 +129,7 @@ prac 是**单人、自用的 agent 工程工作台**：把对话、代码、变�
 | 历史 session | **验证通过**：失败 session 正常打开，无 `Failed to load history` | rc.2 升级（`job/registered`）；`8c81ed6757` anchor + catalog |
 | lsp / tool-lsp | **已修**：link anchor 本地 0.2.1-rc.2，2 个 activation warning 消失 | `scripts/link-profile.mjs` |
 | Copilot chat | **客户确认：Open Editors 的 “Chat” 行是预期的**；live chat UI 已移除；右栏是 DSH chat | 保持现状 |
-| vsda / signature | vendored web 构建**不含 vsda 资产**；npm `vsda` 是占位包、`@vscode/vsda` 不存在；**接受 console 噪声** | 接受 / 以后取官方资产或改 web 源码 |
+| vsda / signature | **客户接受**：Code OSS 不带 vsda，官方发行版才带；vendored 构建的 404/验签噪声保持现状 | 保持现状 |
 | containers | gate 已对齐 **board 模型**（container = board window，不是 WindowGroup）；full acceptance 绿 | `verify-containers` |
 
 - `vp run verify:ui` **all gates passed**；`vp check` 绿；工作区干净。
