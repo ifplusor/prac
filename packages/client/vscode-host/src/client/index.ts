@@ -204,6 +204,12 @@ export function apply(ctx: Context): void {
         // The product has one agent: hide VS Code's built-in/Copilot chat and
         // inline AI features instead of showing a second agent beside prac's chat.
         "chat.disableAIFeatures": true,
+        // The vendored build has no extension signature service; the default
+        // `true` makes extension install/update throw SignatureVerificationInternal
+        // ("verification was not executed") into the workbench. The MVP does not
+        // promise an extension ecosystem, so keep signature verification off
+        // instead of letting a signed-install path fail in the console.
+        "extensions.verifySignature": false,
       },
     });
   };

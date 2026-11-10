@@ -244,3 +244,9 @@
   - **没有** `Failed to load history`；日志里 536 个 `job/registered`，rc.2 能读。
 - 控制台仍有 `SignatureVerificationInternal: Signature verification was not executed.` 的 pageerror、几个 404、以及 GitHub auth 超时，但都不是历史加载；下一轮查 signature 那个。
 - 第一屏仍有 VS Code Chat editor；右栏是 dsh:rightbar。
+
+## Session 控制台根因（2026-11-10）
+
+- `SignatureVerificationInternal`：VS Code 扩展管理在安装/更新时验签；web 侧 `node_modules/vsda/rust/web/vsda.js|wasm` **404**，所以 `verification was not executed`；`extensions.verifySignature: false` 的 default 不会覆盖用户已有设置，pageerror 仍在。产品侧要 serve vsda 或强制该设置。
+- `/api/changes.summary` **404**：vendored alpha.2 deliverables client 调用该路由，rc.2 的 host 路由没有被服务/组合——**changed-files card / J2 review 是坏的**，这是 MVP 楔子的核心，下一轮优先。
+- 另：GitHub auth 超时（GitLens）与本次无关。
