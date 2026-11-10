@@ -32,6 +32,7 @@ export const GATES = [
   ["folder-switch", "tests/gates/verify-folder-switch.mjs"],
   ["folder-entry", "tests/gates/verify-folder-entry.mjs"],
   ["default-screen", "tests/gates/verify-default-screen.mjs"],
+  ["pdf", "tests/gates/verify-pdf.mjs"],
 ];
 
 /**
@@ -48,4 +49,6 @@ export const GROUPS = {
   editor: ["file", "editor:group", "editor:close"],
   /** Grid placement and resize. */
   grid: ["grid", "grid:resize", "grid:merge", "grid:view", "grid:tab", "grid:free"],
+  /** The document app: the registry open → the app's open → a rendered page. */
+  document: ["pdf"],
 };

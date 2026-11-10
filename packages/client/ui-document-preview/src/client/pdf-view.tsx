@@ -27,7 +27,12 @@ export function PdfView({ path }: PdfViewProps): ReactNode {
     setError(null);
     void (async () => {
       try {
-        const response = await fetch(`/api/prac-file?path=${encodeURIComponent(path)}`, {
+        // The page's token is the same credential the API routes check; a
+        // relative fetch does not carry it in the query by itself.
+        const query = new URLSearchParams({ path });
+        const token = new URLSearchParams(window.location.search).get("token");
+        if (token !== null && token !== "") query.set("token", token);
+        const response = await fetch(`/api/prac-file?${query.toString()}`, {
           signal: controller.signal,
         });
         if (!response.ok) throw new Error(`HTTP ${String(response.status)}`);
