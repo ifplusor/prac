@@ -21,7 +21,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const args = process.argv.slice(2);
 const get = (name, fallback) => {
@@ -50,6 +50,18 @@ for (const root of roots) {
     if (json.private !== true && json.dsh?.bundle === undefined) continue;
     packages.push({ dir: join(dir, name), json });
   }
+}
+
+// The dev anchor carries the DSH lsp packages the published ones trail: npm
+// ships @deepseek-ai/dsh-lsp@0.0.1-rc.1, whose dsh-llm/dsh-brand peer range the
+// 0.2.1-rc.2 runtime rejects, so the base bundle's lsp rows fail to import.
+// Link the anchor's local 0.2.1-rc.2 copies instead of accepting that version.
+const anchor = resolve(get("anchor", join(repo, "../../deepseek-harness/dsh-prac-dev")));
+for (const rel of ["packages/lsp/lsp", "packages/lsp/tool-lsp"]) {
+  const dir = join(anchor, rel);
+  const file = join(dir, "package.json");
+  if (!existsSync(file)) continue;
+  packages.push({ dir, json: JSON.parse(readFileSync(file, "utf8")) });
 }
 
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
@@ -86,6 +98,7 @@ for (const pkg of packages) {
   } catch {
     // absent or directory; pnpm's node_modules layout is symlinks
   }
+  mkdirSync(dirname(target), { recursive: true });
   symlinkSync(pkg.dir, target, "dir");
 }
 const bundles = new Set(manifest.dsh?.profile?.bundles ?? []);
