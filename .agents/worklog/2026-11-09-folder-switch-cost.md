@@ -236,3 +236,11 @@
 - 31 entries 是 re-link 前的旧 profile；重启即恢复。
 - 顺手清掉 code-server extensions 里上次 gate 留下的 `prac.probe-appears-1.0.0`。
 - 仍需客户打开那个 rc.2 session 验证历史；Chat（VS Code editor + dsh:rightbar）仍在。
+
+## rc.2 session 历史验证（2026-11-10）
+
+- 重启后的 3084，在 `rc_ifplusor` 工作区打开失败 session（`session-a577f9f1-…`，标题「查看 AI 编程作业 PDF」）：
+  - 会话内容、Trajectory、「Load earlier」都出现；
+  - **没有** `Failed to load history`；日志里 536 个 `job/registered`，rc.2 能读。
+- 控制台仍有 `SignatureVerificationInternal: Signature verification was not executed.` 的 pageerror、几个 404、以及 GitHub auth 超时，但都不是历史加载；下一轮查 signature 那个。
+- 第一屏仍有 VS Code Chat editor；右栏是 dsh:rightbar。
