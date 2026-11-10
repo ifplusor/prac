@@ -35,6 +35,8 @@ export interface DeliverablesInjected {
   openChanged: PresentedOpenController['openChanged']
   /** Open one turn's review in the right Sidebar on the file at an index. */
   openChangesReview: (coordinates: ChangesReviewCoordinates, index: number) => void
+  /** Open a presented file through prac's app registry, never the hidden DSH editor. */
+  openViaRouter: (path: string) => void
 }
 
 /**
@@ -66,7 +68,7 @@ export function DeliverablesTail(props: PropsRuntime<'conversation.chat.turnTail
  * @returns the closing turn's file rows.
  */
 export function Deliverables({
-  matched, openFile, t, sessionId, useSessions, openPresented, openChangesReview, usePresentedOpen, usePresentedHost,
+  matched, openViaRouter, t, sessionId, useSessions, openPresented, openChangesReview, usePresentedOpen, usePresentedHost,
   useChangesDiff, loadChangesDiff, useChangesSummary, reloadPresentedHost, loadChangesSummary, useShowCodeDiff, renderSlot,
 }: Pick<TurnTailOwnerProps, 'openFile'> & {
   matched: DeliverablesMatch
@@ -108,7 +110,7 @@ export function Deliverables({
         {presented.map(file => <PresentedFileCard key={`${file.seq}:${file.index}`} file={file} cwd={cwd}
           phase={states[presentedFileUrl(sessionId, file.seq, file.index)]}
           host={host === 'error' ? null : host} t={t}
-          onPreview={() => { openFile(file.path) }}
+          onPreview={() => { openViaRouter(file.path) }}
           actions={renderSlot('deliverables.file.actions', {
             actionUrl: presentedFileUrl(sessionId, file.seq, file.index),
             available: host !== null && host !== 'error' && host.available,

@@ -102,6 +102,7 @@ function project(ctx: Context, extension: PracExtension): Projection | undefined
             instances: app.instances,
             ...(app.defaultRegion === undefined ? {} : { defaultRegion: app.defaultRegion }),
             ...(app.paneHeader === true ? { paneHeader: true } : {}),
+            ...(app.match === undefined ? {} : { match: app.match }),
             content: (windowId, render, view) =>
               extension.contentFor?.(windowId, render, view) ?? (() => null),
           }),

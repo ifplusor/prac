@@ -41,6 +41,14 @@ export interface ApplicationDefinition {
    */
   readonly paneHeader?: boolean;
   /**
+   * Whether this app handles a resource.
+   *
+   * The open pipeline asks every app in registration order and uses the first
+   * match; the application registry plays the LaunchServices role, so a code
+   * app must not claim a document its document app owns.
+   */
+  match?(resource: string): boolean;
+  /**
    * The content of one window instance.
    *
    * Called by the frame when it renders that window, never by this registry:
@@ -117,6 +125,19 @@ export class ApplicationRegistry {
   /** Every registered application, in registration order. */
   list(): readonly ApplicationDefinition[] {
     return [...this.#apps.values()];
+  }
+
+  /**
+   * Find the app that handles a resource — the LaunchServices role.
+   *
+   * @param resource - the workspace path or URI to open.
+   * @returns the first app whose `match` accepts it, or `undefined`.
+   */
+  open(resource: string): ApplicationDefinition | undefined {
+    for (const app of this.#apps.values()) {
+      if (app.match?.(resource) === true) return app;
+    }
+    return undefined;
   }
 
   /**

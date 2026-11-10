@@ -143,6 +143,8 @@ export interface PracAppDef {
   readonly paneHeader?: boolean;
   readonly instances: "single" | "multi";
   readonly defaultRegion?: string;
+  /** Whether this app handles a resource; the open pipeline uses the first match. */
+  readonly match?: (resource: string) => boolean;
 }
 
 /** Declarative widget definition. */

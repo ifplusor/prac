@@ -248,6 +248,10 @@ export function apply(ctx: Context): void {
     instances: "multi",
     defaultRegion: "center",
     paneHeader: true,
+    // The editor is the fallback app: it claims everything the document app
+    // does not, so it must be asked last (or match the complement).
+    match: (resource: string): boolean =>
+      !/\.(docx?|xlsx?|pptx?|pdf|png|jpe?g|gif|webp|svg)$/iu.test(resource),
   };
   const extension: PracExtension = {
     manifest: { id: "prac.vscode-editor", origin: "vscode", version: "1" },

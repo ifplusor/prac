@@ -73,6 +73,18 @@ export function apply(ctx: ClientContext): void {
         reloadPresentedHost: () => opener.loadHost(),
         loadChangesSummary: (sessionId, seq) => summaries.load(sessionId, seq),
         openPresented: (sessionId, seq, index, action, application) => opener.open(sessionId, seq, index, action, application),
+        openViaRouter: (path: string) => {
+          // The presented card used to call the DSH editor, which prac never
+          // shows. The app registry picks the app (LaunchServices role); the
+          // window manager opens its window.
+          const apps = (ctx as unknown as {
+            pracApplications?: { open(resource: string): { id: string } | undefined };
+            pracWindows?: { admit(appId: string, options: { windowId: string }): string };
+          });
+          const app = apps.pracApplications?.open(path);
+          if (app === undefined) return;
+          apps.pracWindows?.admit(app.id, { windowId: `${app.id}:${path}` });
+        },
         openChanged: (sessionId, seq, index, action, application) => opener.openChanged(sessionId, seq, index, action, application),
         openChangesReview: (coordinates, index) => {
           // The one behavioral diff from upstream: open prac's editor diff

@@ -38,6 +38,8 @@ const app: PracAppDef = {
   label: "Document",
   instances: "multi",
   paneHeader: true,
+  match: (resource: string): boolean =>
+    /\.(docx?|xlsx?|pptx?|pdf|png|jpe?g|gif|webp|svg)$/iu.test(resource),
 };
 
 /**
