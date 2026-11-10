@@ -148,3 +148,11 @@
 - 中心 content 仍空；hide/show 之后中心显示 **"Bring the conversation forward"**。
 - 结论：不是 slot 缺失、不是 session 缺失；conversation panel 渲染的是 **session-area 的 "bring forward" 空分支**——prac frame 没有向 DSH session area 提供 visibility / foreground 状态（`ui-layout` 被 disable，prac 用 `pracFrame` 替代）。
 - 下一步：在 frame 层实现 session-area visibility 契约（或保留最小 `ui-layout` 状态并桥接），让 conversation 认为自己在主区域前景；再复验。
+
+## 更正 + ui-layout 实验（2026-11-09）
+
+- **更正**：`"Bring the conversation forward"` 是 **prac 自己的 window action label**（`packages/client/ui-workbench/src/client/index.ts:1120`），不是 DSH session-area 的空分支。上一轮把“hide/show 后出现这句话”当成 foreground 缺失的证据，是误读；foreground 假设不成立。
+- 临时启用 `ui-layout`：web boot **8 entries did not activate**，`prac-client-ui-frame: failed`，页面 `Failed to load plugins`。两套 layout 在 root/service 层冲突，**不能简单 re-enable** 作为 fallback。
+- 已回退；重建与 `vp check` 绿。
+- 现状：`main` slot 注册了 `conversation`、`uiSession` adapter 与 current session 都存在，但中心 content host 为空；frame 的 `renderSlot` 对 DSH conversation 返回空的原因仍未定。
+- 决策：给 frame 的 conversation re-host **2 轮 spike 时间盒**；若仍不能渲染，再评估 hybrid（DSH shell 做主区域 + prac 外层 chrome）这一架构级改造。
