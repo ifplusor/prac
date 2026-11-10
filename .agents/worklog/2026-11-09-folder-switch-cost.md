@@ -269,3 +269,9 @@
 - 根因：`planViewGroups` 明确跳过 container 组（container = board window，不是 WindowGroup），gate 却要求 file 进 sidebar 的 WindowGroup。
 - 这是验收口径与产品模型冲突，不是 rc.2 回归。gate 改为验证 file 落在 container 区域（board/stack）。
 - 全量 `vp run verify:ui` 恢复绿；`vp check` 绿。
+
+## J2 review loop dogfood（2026-11-10）
+
+- 第一轮：`Create a file named prac-review.txt containing the word hello` → card `Edited prac-review.txt +1 -0`。
+- 第二轮（request changes）：`Change the word … from hello to world` → `Completed in 2s`，文件改为 world。
+- 即 J2 的 card → diff → request changes → 再改 全链路可用。
