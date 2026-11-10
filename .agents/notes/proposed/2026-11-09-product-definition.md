@@ -127,7 +127,7 @@ prac 是**单人、自用的 agent 工程工作台**：把对话、代码、变�
 | J3 切换 | **gate 通过** | `folder-switch` / `folder-entry` |
 | M1–M3 | **待 dogfood 记录** | 手工计时 / 工具切换次数 |
 | 历史 session | **已修，等待重启验证** | rc.2 升级（`job/registered`）；`8c81ed6757` anchor + catalog |
-| Copilot chat | **客户裁决：不要**；core chat container + editor 注册已移除；剩下的 Open Editors “Chat” 是 **persisted editor state**（placeholder），右栏是 DSH chat | 清 VS Code restored editor state（dirty 风险）或接受 placeholder |
+| Copilot chat | **客户裁决：不要**；live chat UI 已移除；剩的 Open Editors “Chat” 是 **浏览器 IndexedDB 里的旧 editor state**（死 tab），右栏是 DSH chat | 一次性清 VS Code web state（dirty 风险）或接受死 tab |
 
 - `vp run verify:ui` **all gates passed**；`vp check` 绿；工作区干净。
 - 在客户 dogfood 之前不再改产品代码；下一步是客户的体验与签字，不是继续加功能。

@@ -215,3 +215,9 @@
 - `vscode:build` 通过；`vp check` 306 文件绿；`vp run verify:ui` all gates passed。
 - Open Editors 的 “Chat” 仍在：它是 **persisted restored editor state**（workbench 恢复旧 editor；注册被移除后变成不可解析的 tab/placeholder），不是活的 Copilot chat。右栏 “Chat” 是 prac 自己的 DSH chat，保留。
 - 下一步：清掉 VS Code 的 restored editor state（prac 自己的 per-folder open restore 是来源；有 dirty buffer 风险），或接受这个 placeholder。
+
+## Dead Chat tab 在 client IndexedDB（2026-11-10）
+
+- 服务端 `workspaceStorage` 只有 `vscode.lock`，没有 `state.vscdb`；workbench 的 editor state 在**浏览器 IndexedDB**（`vscode-web-state-db-<workspace>`，早先探针见过）。
+- 所以 Open Editors 的 “Chat” 是 **client-state migration artifact**：live chat UI 已从 vendored build 移除，旧 profile 的 editor state 仍被恢复成死 tab。
+- 两条：一次性清掉这些 VS Code web state DB（prac 自己的 per-folder open restore 会重开文件；dirty buffer 风险），或接受死 tab。live Copilot chat 已经没有。
