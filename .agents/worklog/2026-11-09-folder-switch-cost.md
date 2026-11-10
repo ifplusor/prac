@@ -256,3 +256,9 @@
 - 新 session / 新 turn 创建 `prac-j2-check.txt`：`/api/changes.summary?sessionId=session-1ca07c9e…&seq=28` 返回 **200**，页面出现 “Edited prac-j2-check.txt  +1 -0”。
 - 所以 J2 card 在新 session 上正常；旧 session 的 404 是 `@deepseek-ai/dsh-workspace-changes` 的 host-memory summary 在重启后丢失（`types.ts` 契约），不是路由 bug。
 - 测试文件与测试 session 已清理。
+
+## J2 card → diff 验证（2026-11-10）
+
+- 新 turn 创建 `prac-j2-diff.txt`：card 出现，`/api/changes.summary` 200；点 card 打开 `Turn 1 · prac-j2-diff.txt`，diff 可见。
+- 即 J2 的 card → diff 链路打通；request changes / 人工改是交互动作，不需要再验核心。
+- 测试文件已清理；测试 session 清理中。
