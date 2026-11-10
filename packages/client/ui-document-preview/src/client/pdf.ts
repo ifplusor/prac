@@ -10,9 +10,20 @@
  */
 
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
-// No worker is configured yet: the pack pipeline cannot carry the pdfjs worker
-// asset and the app has no static root shared by the dev server and the gate rig.
-// The PDF view reports the resulting load error instead of pretending to render.
+/** The worker source, inlined by the build (a Blob URL keeps it off the network). */
+declare const __PRAC_PDF_WORKER__: string;
+
+/** One Blob URL shared by every PDF window in the page. */
+const workerUrl =
+  typeof __PRAC_PDF_WORKER__ === "string"
+    ? URL.createObjectURL(new Blob([__PRAC_PDF_WORKER__], { type: "text/javascript" }))
+    : undefined;
+
+if (workerUrl !== undefined) {
+  void import("pdfjs-dist").then((pdfjs) => {
+    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+  });
+}
 
 /** One loaded PDF and its cleanup. */
 export interface PdfSession {

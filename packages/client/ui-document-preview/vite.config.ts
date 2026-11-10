@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { defineConfig } from "vite-plus";
 
 import { PLATFORM_MODULES, clientPack } from "../../../scripts/pack-client.ts";
@@ -18,6 +20,12 @@ import { PLATFORM_MODULES, clientPack } from "../../../scripts/pack-client.ts";
  * task asserts the emitted bytes (loader closure, answerable requires, no
  * inlined React) instead of a build script asserting them on the side.
  */
+// The pdfjs worker is inlined as a string: the dev server and the gate rig have
+// no shared static root, and the pack pipeline cannot resolve `?url`/`?raw` for
+// this dependency. A Blob URL keeps the worker out of the network entirely.
+const require = createRequire(import.meta.url);
+const pdfWorkerSource = readFileSync(require.resolve("pdfjs-dist/build/pdf.worker.mjs"), "utf8");
+
 export default defineConfig({
   // pdfjs-dist references the Node `process` global; the client bundle is browser-only.
   define: { "process.env": "{}" },
@@ -30,7 +38,10 @@ export default defineConfig({
     },
     clientPack("prac-client-ui-document-preview", {
       entry: "src/client/index.ts",
-      define: { "process.env": "{}" },
+      define: {
+        "process.env": "{}",
+        __PRAC_PDF_WORKER__: JSON.stringify(pdfWorkerSource),
+      },
     }),
   ],
   run: {
