@@ -228,3 +228,11 @@
 - `face.listOpenFiles()` / `editors.snapshot()` 都为空，说明它不是 file placement，而是 VS Code 的 Chat **webview/editor**（不在 editors capability）。
 - 右栏 “Chat” 是 `dsh:rightbar`（prac 自己的 DSH chat），保留。
 - 结论：**一次性清 IndexedDB 不会移除它**——它是启动时实际打开的 VS Code Chat editor，不是纯持久化状态。下一步要么接受，要么在 VS Code editor/startup 层做排除；不做盲清。
+
+## 3084 重启 + boot 验证（2026-11-10）
+
+- `node scripts/link-profile.mjs --profile prac-dev` 后，`dsh --profile prac-dev --dump-config` 组合正确（remote-access 在、ui-layout disabled、旧包消失）。
+- 停掉旧 3084（PID 40749），用 `node apps/cli/lib/bin.js --profile prac-dev --port 3084` 重启；Playwright 打开页面：无 “did not activate”，`__vscodeEmbed.face` 就绪，第一屏是 “Into the Unknown / New Session” 对话。
+- 31 entries 是 re-link 前的旧 profile；重启即恢复。
+- 顺手清掉 code-server extensions 里上次 gate 留下的 `prac.probe-appears-1.0.0`。
+- 仍需客户打开那个 rc.2 session 验证历史；Chat（VS Code editor + dsh:rightbar）仍在。
