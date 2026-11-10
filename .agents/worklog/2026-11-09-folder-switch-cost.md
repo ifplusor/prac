@@ -170,3 +170,15 @@
 - 默认屏幕：DSH sidebar 在 boot 时隐藏一次（之后用户 recall 仍可打开）；不再自动打开 terminal；panel 容器不再默认放进 bottom（需要时从 dock/recall 打开）。bottom 默认空/收起。
 - gate：`default-screen` 升为正式 gate；`bottom` 的 premise 改为「默认空」；`file` 等 restore 而不是等 no-tabs；`editor:group` 在方向 focus 前先聚焦 editor。
 - 验证：`vp run verify:ui` **all gates passed**（224.4s）；`vp check` 绿。
+
+## DSH rc.2 升级：修复 rc.2 session 历史加载（2026-11-10）
+
+- 客户 dogfood 反馈：历史 session 加载失败，`job/registered` 对当前 harness 未知，session 由更新的 harness 写入（raw log 在 `~/.dsh/sessions/...`）。
+- 证据：`dsh-master`（2026-10-17，release 0.2.1-rc.2）的 `known-event-types.ts` 包含 `job/registered`；prac anchor `dsh-prac-dev`（2026-10-09，0.2.1-alpha.2）没有。
+- 动作：
+  - `pnpm-workspace.yaml` 的 32 个 DSH catalog 条目 alpha.2 → **0.2.1-rc.2**；`pnpm install`。
+  - `dsh-prac-dev` anchor 从 alpha.2 rebase 到 rc.2（687f282e86），保留 prac 的 auth redirect patch（`?workspace=` 穿过 303），anchor commit `8c81ed6757`。
+  - anchor `pnpm install` + client types rebuild。
+- 验证：`vp check` 绿；全仓 build；`vp run verify:ui` **all gates passed**（rc.2 客户端）。
+- `dsh-types --compare`：32 包比较，**4 个 published-vs-checkout 漂移**（api-workspace-controller / client-connection / ui-chat / ui-conversation），不是产品的 session 问题。
+- 生效条件：**重启 prac dev server / DSH anchor**，然后客户重试历史 session。

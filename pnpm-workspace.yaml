@@ -5,7 +5,7 @@ packages:
 # The DSH *runtime* still comes from the installation (`ctx`, the loader's
 # module table, the served bundles) — these entries are for TYPES and for the
 # build-time resolution of the platform words. They are published on npm, pinned
-# exactly to the release **prac dev's anchor worktree runs** (`0.2.1-alpha.2`;
+# exactly to the release **prac dev's anchor worktree runs** (`0.2.1-rc.2`;
 # `latest` points at an old release and `alpha` at the anchor's line, so a range
 # would resolve the wrong thing). `scripts/dsh-types.mjs --compare` reports on
 # the same worktree.
@@ -24,41 +24,41 @@ catalog:
   # (see `scripts/pack-client.ts`'s PLATFORM_MODULES) — so no implementation of
   # it is inlined here either.
   "@deepseek-ai/cordis": 4.0.5-alpha.1
-  "@deepseek-ai/dsh-api-remotes": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-api-session-controller": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-api-workspace-controller": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-api-workspace-files": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-client-connection": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-client-locale": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-client-ui-chat": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-client-ui-conversation": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-client-ui-dockkit": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-client-ui-primitives": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-client-ui-settings": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-client-ui-sidebar-right": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-client-ui-tool": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-fs": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-llm": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-sandbox-policy": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-session": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-session-query": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-system-prompt": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-tool-present": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-typert-protocol": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-util-workspace-path": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-workspace-changes": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-client-ui-layout": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-client-ui-renderer": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-client-ui-session": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-client-store": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-client-ui-slots": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-client-ui-theme": 0.2.1-alpha.2
-  "@deepseek-ai/dsh-host-webserver": 0.2.1-alpha.2
+  "@deepseek-ai/dsh-api-remotes": 0.2.1-rc.2
+  "@deepseek-ai/dsh-api-session-controller": 0.2.1-rc.2
+  "@deepseek-ai/dsh-api-workspace-controller": 0.2.1-rc.2
+  "@deepseek-ai/dsh-api-workspace-files": 0.2.1-rc.2
+  "@deepseek-ai/dsh-client-connection": 0.2.1-rc.2
+  "@deepseek-ai/dsh-client-locale": 0.2.1-rc.2
+  "@deepseek-ai/dsh-client-ui-chat": 0.2.1-rc.2
+  "@deepseek-ai/dsh-client-ui-conversation": 0.2.1-rc.2
+  "@deepseek-ai/dsh-client-ui-dockkit": 0.2.1-rc.2
+  "@deepseek-ai/dsh-client-ui-primitives": 0.2.1-rc.2
+  "@deepseek-ai/dsh-client-ui-settings": 0.2.1-rc.2
+  "@deepseek-ai/dsh-client-ui-sidebar-right": 0.2.1-rc.2
+  "@deepseek-ai/dsh-client-ui-tool": 0.2.1-rc.2
+  "@deepseek-ai/dsh-fs": 0.2.1-rc.2
+  "@deepseek-ai/dsh-llm": 0.2.1-rc.2
+  "@deepseek-ai/dsh-sandbox-policy": 0.2.1-rc.2
+  "@deepseek-ai/dsh-session": 0.2.1-rc.2
+  "@deepseek-ai/dsh-session-query": 0.2.1-rc.2
+  "@deepseek-ai/dsh-system-prompt": 0.2.1-rc.2
+  "@deepseek-ai/dsh-tool-present": 0.2.1-rc.2
+  "@deepseek-ai/dsh-typert-protocol": 0.2.1-rc.2
+  "@deepseek-ai/dsh-util-workspace-path": 0.2.1-rc.2
+  "@deepseek-ai/dsh-workspace-changes": 0.2.1-rc.2
+  "@deepseek-ai/dsh-client-ui-layout": 0.2.1-rc.2
+  "@deepseek-ai/dsh-client-ui-renderer": 0.2.1-rc.2
+  "@deepseek-ai/dsh-client-ui-session": 0.2.1-rc.2
+  "@deepseek-ai/dsh-client-store": 0.2.1-rc.2
+  "@deepseek-ai/dsh-client-ui-slots": 0.2.1-rc.2
+  "@deepseek-ai/dsh-client-ui-theme": 0.2.1-rc.2
+  "@deepseek-ai/dsh-host-webserver": 0.2.1-rc.2
   # The language-service seam the VS Code extension host is registered into
   # (`ctx.lsp`). Types only, like the rest: the runtime comes from the DSH
   # installation, and the seam has to be inserted into the composition by hand
   # because no bundle ships it.
-  "@deepseek-ai/dsh-lsp": 0.2.1-alpha.2
+  "@deepseek-ai/dsh-lsp": 0.2.1-rc.2
   "@types/node": ^24
   "@types/react": ~18.3.1
   "@types/react-dom": ~18.3.0
