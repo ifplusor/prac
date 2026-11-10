@@ -98,8 +98,11 @@ if ((await page.locator("[data-prac-firstrun]").count()) > 0) {
     }
   }
 }
-await installDeepDom(page);
+// The first-run flow reloads the page after the folder is chosen; installing
+// the deep-DOM helper during that navigation destroys the execution context.
+await page.waitForLoadState("load");
 await page.waitForFunction(() => !!globalThis.__vscodeEmbed?.face, null, { timeout: 90_000 });
+await installDeepDom(page);
 await page.evaluate((uri) => globalThis.__vscodeEmbed.face.openFile(uri), FILE.uri);
 await waitDeep(page, "[data-vscode-embed-file] .monaco-editor");
 // The starting case is one group with one painted surface; wait for the model
