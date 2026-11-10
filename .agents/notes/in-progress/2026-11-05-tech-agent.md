@@ -94,7 +94,7 @@ interface PracChangedFilesFace {
 - 数据来源：DSH `workspaceChanges.summary()` + Host turn-diff reader；`api/changes.summary` / `api/prac-turn-diff.text`。
 - card 是 **DSH `conversation.chat.turnTail` 内部 slot 的 widget**；不是 board widget。
 - `openDiff` → editor group preview diff；不复用 review window。
-- 只显示最新 turn；非最新不渲染。
+- 逐轮一张（DSH 卡保留 hover / 折叠 / 历史）；非最新也保留。
 
 ### 2.4 approval
 
@@ -118,9 +118,11 @@ type ArtifactRef =
 
 ### 2.6 现有事实（absorbed）
 
+以下是 DSH 已经提供、prac 直接吸收的面；prac 只加窗口、呈现与打开动作，不新造 agent 状态对象。
+
 - **chat**：`prac-client-dsh-host` 注册 `chat` app，`instances: "single"`，`defaultRegion: "center"`；content 渲染 DSH `main` slot，`entryKey` 取 main key；当前 admit `dsh:conversation`。`dsh.sidebar` / `dsh.rightbar` 也注册为 app，但当前只接 chat。
 - **session**：title bar 读 DSH Workspace / Session controllers；`dsh.sessions.current` 是持久化选择；prac 不另存 session store。
-- **changed-files**：card 注册在 `conversation.chat.turnTail`；读 turn 的 `deliverables.changes.seq`；summary 走 `api/changes.summary`，diff 走 `api/prac-turn-diff.text`；打开走 `prac.openTurnDiff`；只显示最新 turn；binary / oversized 禁用。
+- **changed-files**：card 注册在 `conversation.chat.turnTail`；读 turn 的 `deliverables.changes.seq`；summary 走 `api/changes.summary`，diff 走 `api/prac-turn-diff.text`；打开走 `prac.openTurnDiff`；逐轮一张；binary / oversized 禁用。
 - **plan**：note 文件 + editor input；没有 plan app / plan mode。
 - **approval**：ui-approval 内置；allow / reject；status / cancel 只呈现 DSH 支持的；没有 checkpoint / takeover 对象。
 - **artifacts**：file / diff / note / job；打开复用 editor / diff / note / 状态；没有 artifact 对象。

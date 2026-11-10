@@ -1,6 +1,10 @@
 # 2026-11-07 新设计签收清单
 
 > 过程材料，不是 note；用于 James 逐份 review。14 份 notes 当前均为 `in-progress`，不自我 promote。
+>
+> **签收语义（James，2026-11-07）**：签收 = 认可设计方向，不改 `status:`；这些设计 notes 在 MVP 开发交付前**长期保持 `in-progress`**。`resolved` 留到交付时再定。
+>
+> **范围（James，2026-11-08）**：只覆盖 11-05 设计集这 14 份；[dsh-anchor](../notes/in-progress/2026-10-12-dsh-anchor.md) 不纳入——它是独立工作，另行跟踪。
 
 ## 先签什么
 
@@ -45,3 +49,7 @@
 - **核心 4 份**：签 window / widget / extension 的对象模型；extension 的 3 个 Open 现在关掉。
 - **其余 7 份**：先签“MVP 范围 + later 列表”；terminal 归格单独裁决。
 - **不签**：`proposed` 已经没有；这份清单不改变任何 note 的状态。
+
+## 签收记录
+
+- **2026-11-07 product-design**：方向认可（`status:` 仍 `in-progress`）。裁决：场景优先级从 P1–P4 的 4 个 job 起步；指标先定性、量化待第一次 dogfood；non-goals 原样。Open 2 指向 product-mvp，Open 5 由 §5 的「分界」句承接；§9 已删。

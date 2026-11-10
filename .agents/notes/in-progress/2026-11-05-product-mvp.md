@@ -25,6 +25,8 @@ status: in-progress
 
 ## 2. 产品模型
 
+Agent 的循环 / turn / session / 完成 / 后台执行继承 DSH；本 note 只写 prac 的窗口、呈现与验收。
+
 - **project folder 是根**：文件、notes、git、conversation、后台服务、Space 都挂在它上面。
 - **Space**：stage 的虚拟桌面；默认一个，按需创建；同一 project folder / conversation / 文件可以出现在不同 Space；Space 按 project folder 存储。
 - **panel / dock**：frame 级，不随 Space 切换；只有 stage 跟 Space。
@@ -33,7 +35,7 @@ status: in-progress
 - **chat / IDE**：chat 是 DSH 会话；IDE 是编辑器 / 资源 / SCM / 搜索 / 终端等；两者都在 prac 的 UI 里，但不互相替换。
 - **plan 是 note**：人和 agent 共编；不新增 plan application。
 - **review 是 diff / chat**：changed-files card → diff；checks 是 shell / tool calls；request changes 是 chat；approve 不是新对象；human edit / git revert。
-- **changed-files card（S4）**：DSH `conversation.chat.turnTail` 内部 slot 的 widget；读 turn 的 `workspace/changes` summary；点文件在 editor group 打开 turn-scoped **preview** diff；只显示最新 turn；binary / oversized 禁用；checks 留在 chat / tool calls，card 不加 review 动作。
+- **changed-files card（S4）**：DSH `conversation.chat.turnTail` 内部 slot 的 widget；读 turn 的 `workspace/changes` summary；点文件在 editor group 打开 turn-scoped **preview** diff；逐轮一张（DSH 卡）；binary / oversized 禁用；checks 留在 chat / tool calls，card 不加 review 动作。
   - 数据来源：DSH `workspaceChanges.summary()` + Host 的 turn-diff reader；reader 依赖 DSH 私有 snapshot 布局，布局变时回退 recorder。
 - **tool approval**：ui-approval 内置在 chat / tool call；cancel / status 只呈现 DSH 支持的；不做第二套审批状态。
 - **a11y / keyboard**：至少 Tab 能进 widget root、focus 可见、快捷键可执行；细节见 [product experience](./2026-11-05-product-experience.md) §8。
@@ -93,7 +95,7 @@ status: in-progress
 - S0：没有 project folder 时只有选择入口；选完才有工作台。
 - S1 / S9：project folder 切换后文件 / conversation / 后台服务 / Space 跟着换；切回恢复。
 - S2 / S3：first prompt、plan note、文件 active window、chat is inactive（或同一 group 的另一 window）。
-- S4 / S7：diff / checks / note 机制 / ui-approval / human edit / git revert；只呈现 DSH 支持的 status / cancel；changed-files card 出现 / 点文件开 preview diff / 非最新不显示 / binary 禁用；approval 只在 tool call 出现。
+- S4 / S7：diff / checks / note 机制 / ui-approval / human edit / git revert；只呈现 DSH 支持的 status / cancel；changed-files card 出现 / 点文件开 prac diff / 逐轮保留 / binary 禁用；approval 只在 tool call 出现。
 - S6：默认一个 + 按需创建 / 切换；同一 conversation / 文件跨 Space；每个 Space 的 window group / active window 状态保留；panel / dock 是 frame 级，不随 Space；后台服务后台继续。
 - S5：默认 window group；chat 收起；后台服务状态。
 - S8：GitLens 在 sidebar / panel；widget 可在 board 之间移动；widget 不成为 tab。

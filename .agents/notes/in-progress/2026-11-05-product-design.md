@@ -43,9 +43,11 @@ prac 的回应：
 | 审阅 | changed-files → diff；checks；request changes；human edit |
 | 自己干活 | 编辑、终端、SCM、搜索、问题、输出、设置 |
 | 切换 | session / Space / project folder / window；回来恢复 |
-| 长会话 | 后台继续；离开再回来不丢上下文 |
+| 长会话 | 任务在 Host 继续；离开再回来不丢上下文 |
 | 扩展 | GitLens / 语言包 / 视图进入 prac；不成为第二套布局 |
 | 离开 / 回来 | 不要求人一直盯；状态可见 |
+
+MVP 第一天承诺 P1–P4 覆盖的 4 个 job（开始 / 一起做 / 审阅 / 自己干活）；切换 / 长会话 / 扩展 / 回来按 P5–P9 的验收推进。
 
 ## 5. 产品需求
 
@@ -63,11 +65,13 @@ prac 的回应：
 | P8 | 本地 / 可信 | XDG；无 telemetry；secret 不暴露 |
 | P9 | 扩展生态：GitLens / language packs / views | 扩展内容进 prac；不成为第二套布局 |
 
+**分界**：产品需求 = 用户可见的结果；实现方式 / 技术约束归 tech-*。
+
 ## 6. 能力地图
 
 - **UI**：app / window / widget board / widget；Space；dock / sidebar / panel；tab strip；overlay。
 - **IDE**：editor / diff、terminal、SCM、search、problems、output、settings；debug / tasks 以后。
-- **agent**：conversation / session、plan、review、approval、artifacts、background。
+- **agent（继承 DSH）**：conversation / session、plan、review、approval、artifacts、background；prac 只做呈现与入口。
 - **扩展**：GitLens、语言包、视图、命令、状态、webview。
 - **质量**：安全、日志、性能、a11y、i18n、测试、部署——用户可见的部分。
 
@@ -109,15 +113,7 @@ prac 的回应：
 - 人是否能在“全自动”和“每步确认”之间自在切换；
 - 主观摩擦：是否要照顾机器。
 
-> 具体数值待 James 讨论；先定性，再定测量。
-
-## 9. Open
-
-1. **首要用户 / 场景**：是否只服务 James 的个人工作流；哪些场景优先。
-2. **MVP 边界**：哪些能力必须第一天有；哪些可以 later。
-3. **指标**：哪些可量化；怎么测量。
-4. **non-goals**：是否还有遗漏。
-5. **产品 vs 技术**：哪些决定属于产品，哪些交给技术设计。
+> **验收**：先按上面 7 条定性；量化在第一次 dogfood 后补 2–3 个可测数。
 
 ## Related
 
