@@ -124,3 +124,10 @@
 - 清掉所有 `prac-*` localStorage 后 reload：bottom 高度回到 0（bottom 展开是 **stale frame state**，不是默认）；但中心仍只有 `Chat × Sidebar` tab strip、body 空白，`dsh:sidebar` region 仍是 center。
 - 点 `+ New Session` 后仍空白，`Bring the conversation...` notice 仍在。
 - 结论：**J1 默认屏幕缺陷不是 stale state**（至少在 rig 上）；bottom 收起无需改 kit（已回退），真正的问题是 conversation 默认不可见 / inactive。下一轮应在 frame / DSH adapter 层定位，并到真实 DSH 环境复核是否 rig-only。
+
+## conversation 空白的根因假设（2026-11-09）
+
+- `ui-conversation` 注册 `main` slot：`key: "conversation"`、`scope: "session-maybe"`。
+- `prac-client-dsh-host` 的 `contentFor` 只做 `render("main", {}, { entryKey: "conversation" })`；它没有给这个 session-scoped slot 提供 DSH 的 session provider / scope。
+- 实验：title bar 在 URL folder boot 时 `openWorkspace(workspaceId)` 连接一个 blank session 并 reveal。结果中心仍然空白（`Chat × Sidebar`，body 空），说明问题不是「没有 session」，而是 slot 渲染时缺少 session scope/provider。实验已回退。
+- 下一轮：在 dsh-host / extension 层给 conversation slot 包上 DSH session provider（或复用 DSH layout 的 conversation panel），再复验干净状态与真实 DSH。

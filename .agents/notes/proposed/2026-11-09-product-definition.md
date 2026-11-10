@@ -115,7 +115,7 @@ prac 是**单人、自用的 agent 工程工作台**：把对话、代码、变�
 
 ## Known blockers
 
-- **J1 默认屏幕**：清掉所有 `prac-*` localStorage 后 reload，中心仍只有 `Chat × Sidebar` tab strip、body 空白；`dsh:sidebar` 的 region 仍是 center。这不是 stale state。需要在 frame / DSH adapter 层定位 conversation 的默认可见 / active，并在真实 DSH 环境复核是否 rig-only。修好前 J1 不签。
+- **J1 默认屏幕**：清掉所有 `prac-*` localStorage 后 reload，中心仍只有 `Chat × Sidebar` tab strip、body 空白；`dsh:sidebar` 的 region 仍是 center。这不是 stale state。根因假设：`ui-conversation` 把 `main` 注册成 `scope: "session-maybe"`，而 `prac-client-dsh-host` 只做 `render("main", {}, { entryKey: "conversation" })`，没有给这个 slot 提供 DSH 的 session provider / scope；连接 blank session 的实验没有修好它，已回退。修法在 dsh-host / extension 层，不在 title bar。修好前 J1 不签。
 - **bottom**：stale frame state 会展开 240px；干净状态是 0。不是默认缺陷，不需要改 kit 的 240 契约。
 
 ## 需要客户（James）确认
