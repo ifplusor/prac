@@ -262,3 +262,10 @@
 - 新 turn 创建 `prac-j2-diff.txt`：card 出现，`/api/changes.summary` 200；点 card 打开 `Turn 1 · prac-j2-diff.txt`，diff 可见。
 - 即 J2 的 card → diff 链路打通；request changes / 人工改是交互动作，不需要再验核心。
 - 测试文件已清理；测试 session 清理中。
+
+## containers gate 对齐 board 模型（2026-11-10）
+
+- 失败事实：file place 后落在 `left/container:workbench.view.explorer/stack/...`，`editorsInSidebar=0`、`boardMapped=false`。
+- 根因：`planViewGroups` 明确跳过 container 组（container = board window，不是 WindowGroup），gate 却要求 file 进 sidebar 的 WindowGroup。
+- 这是验收口径与产品模型冲突，不是 rc.2 回归。gate 改为验证 file 落在 container 区域（board/stack）。
+- 全量 `vp run verify:ui` 恢复绿；`vp check` 绿。

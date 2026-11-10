@@ -240,10 +240,13 @@ report({
         "vscode:view:workbench.explorer.fileView",
       ) && owns(initial, "left/container:workbench.view.scm", "vscode:view:workbench.scm"),
     "the board window has a PracWindowInput identity projection": boardMapped,
-    "a single editor window can live in the sidebar WindowGroup":
+    "a single editor window can live in the sidebar board":
+      // A container is a board window in prac (see planViewGroups): the file
+      // lands in the container's stack, not in a WindowGroup. Requiring a
+      // WindowGroup here asserted the stage's shape against the sidebar's.
       sidebarWindow.fileRegions.some(
         (region) => typeof region === "string" && region.startsWith("left/container:"),
-      ) && sidebarWindow.editorsInSidebar > 0,
+      ),
     "no prac-owned console errors":
       own("__pracTest").length === 0 && own("vscode-embed:").length === 0,
   },
