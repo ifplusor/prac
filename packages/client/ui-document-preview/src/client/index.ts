@@ -77,19 +77,34 @@ export function apply(ctx: Context): void {
       const windowId = `${WINDOW_PREFIX}${resource}`;
       windows.admit(app.id, { windowId, title: name, region: app.defaultRegion });
       if (app.defaultRegion !== undefined) frame.place(windowId, app.defaultRegion);
+      // Opening a document also brings it forward: the centre is a tab strip and
+      // the new window is the one the person asked to see.
+      windows.activate(windowId);
       return true;
     },
+  };
+  // One content factory per window. A fresh closure on every read would make the
+  // frame treat the window's content as a new component and remount it, which
+  // drops the rendered canvas.
+  const contents = new Map<string, () => ReactNode>();
+  const contentFor = (windowId: string): (() => ReactNode) => {
+    const cached = contents.get(windowId);
+    if (cached !== undefined) return cached;
+    const document = documents().find((candidate) => candidate.id === windowId);
+    const content =
+      document === undefined
+        ? () => null
+        : document.kind === "pdf"
+          ? () => createElement(PdfView, { path: document.path })
+          : () => DocumentPlaceholder(document);
+    contents.set(windowId, content);
+    return content;
   };
   const extension: PracExtension = {
     manifest: { id: "prac.document-preview", origin: "prac", version: "1" },
     apps: () => [app],
     windows: () => documents().map((document) => ({ id: document.id, title: document.title })),
-    contentFor: (windowId: string): (() => ReactNode) => {
-      const document = documents().find((candidate) => candidate.id === windowId);
-      if (document === undefined) return () => null;
-      if (document.kind === "pdf") return () => createElement(PdfView, { path: document.path });
-      return () => DocumentPlaceholder(document);
-    },
+    contentFor,
   };
   ctx.effect(
     () => extensions.register(extension),
