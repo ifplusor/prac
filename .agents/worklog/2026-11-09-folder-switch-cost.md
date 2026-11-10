@@ -196,3 +196,8 @@
 - 结论：它不是 Copilot 扩展，而是 **VS Code core chat**（`src/vs/workbench/contrib/chat`）。`chat.disableAIFeatures` 和扩展 quarantine 都不会移除 core chat 的 view/editor。
 - 正确的移除需要在 **vendored VS Code build 层**去掉 chat contribution（`vendor/vscode/overlay` 对 workbench contribution 的 patch），或接受 IDE 自带 chat；不是 `EXCLUDED_VIEWS` / CSS 能解决的。
 - 当前 product code：`chat.disableAIFeatures` + `copilot-chat` quarantine（`e9bdf73`）；core chat 仍在。
+
+## Core chat container 移除（2026-11-10）
+
+- `vendor/vscode/overlay/chatParticipant.contribution.ts`：不注册 core chat 的 AuxiliaryBar view container/view；`build.mjs` 增加 overlay 映射；`vscode:build` 通过；`vp run verify:ui` all gates passed。
+- 第一屏仍显示 Open Editors “Chat” 和右栏 Chat 图标：它们来自 **built-in GitHub.copilot-chat 扩展**（`.build/vscode/extensions/copilot`，build 会重新 copy）以及被 profile 恢复的 chat editor，不是刚移除的 core container。下一步是 build 层过滤 built-in 扩展/`extensions.json`，并清掉恢复的 chat editor。
