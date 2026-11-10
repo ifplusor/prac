@@ -28,6 +28,7 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type { WebServer } from "@deepseek-ai/dsh-host-webserver";
 import { existsSync } from "node:fs";
+import { mkdir, readdir, rename } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -151,6 +152,37 @@ function codeServerDirs(): { serverDataDir: string; extensionsDir: string; userD
   };
 }
 
+/**
+ * The product has one agent: Copilot's chat is another agent's UI, and the
+ * customer does not want it. The server rejects `--disable-extension` ("not
+ * supported for server"), so move the extension out of the profile's extensions
+ * directory before the server scans it. The move is reversible: the directory
+ * stays under `extensions-disabled/`, and Copilot completions are untouched.
+ *
+ * @param extensionsDir - the profile's `--extensions-dir`.
+ */
+async function quarantineCopilotChat(extensionsDir: string): Promise<void> {
+  let entries;
+  try {
+    entries = await readdir(extensionsDir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  const disabled = join(dirname(extensionsDir), "extensions-disabled");
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !/^github\.copilot-chat-/i.test(entry.name)) continue;
+    const from = join(extensionsDir, entry.name);
+    const to = join(disabled, entry.name);
+    try {
+      await mkdir(disabled, { recursive: true });
+      await rename(from, to);
+      console.log(`${name}: quarantined ${entry.name} (Copilot chat is not part of prac)`);
+    } catch (error: unknown) {
+      console.warn(`${name}: could not quarantine ${entry.name}: ${String(error)}`);
+    }
+  }
+}
+
 /** Where the proxy should forward: an outside server, or one we started. */
 interface CodeServerTarget {
   readonly host: string;
@@ -206,11 +238,13 @@ async function launchCodeServer(): Promise<CodeServerTarget | undefined> {
     return undefined;
   }
 
+  const dirs = codeServerDirs();
+  await quarantineCopilotChat(dirs.extensionsDir);
   const handle = await startCodeServer({
     entry,
     cwd,
     port: Number(process.env[PORT_ENV] ?? "") || (await freePort()),
-    ...codeServerDirs(),
+    ...dirs,
     // The prac dev rig is local and single-user; a token would have to travel to
     // the page, which is the transport design's business, not this step's.
     extraArgs: ["--without-connection-token"],

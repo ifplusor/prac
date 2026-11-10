@@ -199,7 +199,12 @@ export function apply(ctx: Context): void {
       // A **web** workbench defaults `files.autoSave` to `afterDelay`
       // (`files.contribution.ts:270`), while the documented behaviour is `off`.
       // prac wants the documented one: the person decides when a file is written.
-      configurationDefaults: { "files.autoSave": "off" },
+      configurationDefaults: {
+        "files.autoSave": "off",
+        // The product has one agent: hide VS Code's built-in/Copilot chat and
+        // inline AI features instead of showing a second agent beside prac's chat.
+        "chat.disableAIFeatures": true,
+      },
     });
   };
 

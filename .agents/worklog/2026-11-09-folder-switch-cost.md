@@ -182,3 +182,10 @@
 - 验证：`vp check` 绿；全仓 build；`vp run verify:ui` **all gates passed**（rc.2 客户端）。
 - `dsh-types --compare`：32 包比较，**4 个 published-vs-checkout 漂移**（api-workspace-controller / client-connection / ui-chat / ui-conversation），不是产品的 session 问题。
 - 生效条件：**重启 prac dev server / DSH anchor**，然后客户重试历史 session。
+
+## Copilot / VS Code Chat（2026-11-10）
+
+- 客户裁决：不要 Copilot 的 chat。
+- 动作：`chat.disableAIFeatures: true` 默认（隐藏内建 AI/chat）；在 code server 启动前把 `github.copilot-chat-*` 扩展目录移到 `extensions-disabled/`（`--disable-extension` 对 server 不支持，日志已证）。
+- **仍未解决**：第一屏仍显示 Open Editors 的 “Chat” 行和右栏 Chat 图标；`face.listOpenFiles()`/`editors.snapshot()` 为空，说明它不是普通的 VS Code 文件编辑器，可能是被 profile 恢复的内建 Chat 视图/编辑器。需要关闭/清除持久化的 Chat UI，或对 built-in chat 的 view container 做排除；不是 CSS 隐藏。
+- 全量 `vp run verify:ui` 仍 all gates passed。
