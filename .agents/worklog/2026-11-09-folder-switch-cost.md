@@ -140,3 +140,11 @@
   1. `ui-conversation` 的 `main` slot entry 没有注册（composition 里没装该 UI 插件）；
   2. entry 在，但 `session-maybe` scope adapter 缺失 / current session 为空，panel 渲染空。
 - 下一轮：在 `prac-client-dsh-host` 加只读诊断（`slots.entries('main')`、`slots.scope('session')`、current session），先判断是哪一种，再修 composition 或 session scope。
+
+## DSH slot / session 诊断（2026-11-09）
+
+- `main` slot：`kind: "keyed"`、`scope: "root"`；entries 里有 `plugins` / `conversation` / `schedules`，**conversation 已注册**。
+- `uiSession` 存在、adapter 存在、current session 是 `session-cc4e…`；**session 也不缺**。
+- 中心 content 仍空；hide/show 之后中心显示 **"Bring the conversation forward"**。
+- 结论：不是 slot 缺失、不是 session 缺失；conversation panel 渲染的是 **session-area 的 "bring forward" 空分支**——prac frame 没有向 DSH session area 提供 visibility / foreground 状态（`ui-layout` 被 disable，prac 用 `pracFrame` 替代）。
+- 下一步：在 frame 层实现 session-area visibility 契约（或保留最小 `ui-layout` 状态并桥接），让 conversation 认为自己在主区域前景；再复验。

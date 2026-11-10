@@ -115,7 +115,7 @@ prac 是**单人、自用的 agent 工程工作台**：把对话、代码、变�
 
 ## Known blockers
 
-- **J1 默认屏幕**：清掉所有 `prac-*` localStorage 后 reload，中心仍只有 `Chat × Sidebar` tab strip、body 空白；`dsh:sidebar` 的 region 仍是 center。这不是 stale state。根因已缩小：中心 content host 的 DOM **children 为空**（不是 CSS 压成 0 高），`render("main", {}, { entryKey: "conversation" })` 返回空。两种可能：`ui-conversation` 的 `main` slot 没注册，或 `session-maybe` scope adapter / current session 为空。连接 blank session 的实验没有修好它，已回退。修法在 dsh-host / composition 层，不在 title bar。修好前 J1 不签。
+- **J1 默认屏幕**：清掉所有 `prac-*` localStorage 后 reload，中心仍只有 `Chat × Sidebar` tab strip、body 空白；`dsh:sidebar` 的 region 仍是 center。这不是 stale state。根因已定：`main` slot 注册了 `conversation`，`uiSession` adapter 和 current session 都存在；但中心 content host 为空，hide/show 后显示 **"Bring the conversation forward"**。conversation panel 渲染的是 session-area 的「未在前景」空分支——prac frame 没有向 DSH session area 提供 visibility / foreground 状态（`ui-layout` 被 disable）。修法在 frame / session-area 契约层，不在 title bar。修好前 J1 不签。
 - **bottom**：stale frame state 会展开 240px；干净状态是 0。不是默认缺陷，不需要改 kit 的 240 契约。
 
 ## 需要客户（James）确认
