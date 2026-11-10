@@ -189,3 +189,10 @@
 - 动作：`chat.disableAIFeatures: true` 默认（隐藏内建 AI/chat）；在 code server 启动前把 `github.copilot-chat-*` 扩展目录移到 `extensions-disabled/`（`--disable-extension` 对 server 不支持，日志已证）。
 - **仍未解决**：第一屏仍显示 Open Editors 的 “Chat” 行和右栏 Chat 图标；`face.listOpenFiles()`/`editors.snapshot()` 为空，说明它不是普通的 VS Code 文件编辑器，可能是被 profile 恢复的内建 Chat 视图/编辑器。需要关闭/清除持久化的 Chat UI，或对 built-in chat 的 view container 做排除；不是 CSS 隐藏。
 - 全量 `vp run verify:ui` 仍 all gates passed。
+
+## VS Code Chat 的真实身份（2026-11-10）
+
+- 移除 `.build/vscode/extensions/copilot`（built-in 的 `GitHub.copilot-chat` 扩展）后，第一屏的 Open Editors “Chat” 行和右栏 Chat 图标**仍然存在**。
+- 结论：它不是 Copilot 扩展，而是 **VS Code core chat**（`src/vs/workbench/contrib/chat`）。`chat.disableAIFeatures` 和扩展 quarantine 都不会移除 core chat 的 view/editor。
+- 正确的移除需要在 **vendored VS Code build 层**去掉 chat contribution（`vendor/vscode/overlay` 对 workbench contribution 的 patch），或接受 IDE 自带 chat；不是 `EXCLUDED_VIEWS` / CSS 能解决的。
+- 当前 product code：`chat.disableAIFeatures` + `copilot-chat` quarantine（`e9bdf73`）；core chat 仍在。
