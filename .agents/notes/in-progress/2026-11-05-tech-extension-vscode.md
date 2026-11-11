@@ -15,8 +15,8 @@ status: in-progress
 - `prac.vscode-host` / `prac.vscode-editor` / `prac.vscode-views` 三个 extension；
 - client 侧 VS Code host（embed / face / catalog / boot）；
 - `package.json` `contributes` + 实时 catalog / when 的自动转换；
-- `ViewContainer` / `View` → `PracWidgetDef`；
-- editor input → `PracAppDef` + windows；
+- `ViewContainer` / `View` → `PracWidgetDef` + `PracWidgetImpl`；
+- editor input → editor app 的 `open`（每个 input 一个窗口）；
 - 动态贡献的 reconcile；
 - 错误 / 测试。
 
@@ -43,8 +43,8 @@ flowchart LR
 ```
 
 - **host extension**：`manifest.id = "prac.vscode-host"`，`provides: ["prac.vscodeHost"]`；只 boot / embed / face，不贡献 app / widget。
-- **editor extension**：`dependsOn: ["prac.vscodeHost"]`；`apps()` 返回 editor `PracAppDef`；`windows()` 来自当前 editor input——**一个正在编辑的文件 = 一个 `PracWindow`；tab strip 的 tab 是 window group 的 window，不是 window 内的 tab**；`contentFor(windowId)` 返回 editor pane host —— VS Code 渲染的 `TextEditorPane`（不是 `PracWindowPane` 空 pane；见 [tech-ui](./2026-11-05-tech-ui.md) §2.6）。
-- **views extension**：`dependsOn: ["prac.vscodeHost"]`；`widgets()` 返回 `PracWidgetDef`；`hostFor(widgetId)` 返回 view 宿主。
+- **editor extension**：`dependsOn: ["prac.vscodeHost"]`；`apps()` 返回 editor `PracAppDef`；`appRuntime(def)` 返回 `{ content, match }`；`open(resource)` 声明窗口（一个正在编辑的文件 = 一个 `PracWindow`；tab strip 的 tab 是 window group 的 window，不是 window 内的 tab）；`content(windowId)` 返回 VS Code 渲染的宿主（`TextEditorPane`，不是 `PracWindowPane` 空 pane；见 [tech-ui](./2026-11-05-tech-ui.md) §2.6）。**不**声明 `windows`。
+- **views extension**：`dependsOn: ["prac.vscodeHost"]`；`widgets()` 返回 `PracWidgetDef`；`widgetRuntime(def)` 返回 `{ hostFor, wrap }`；不声明宿主、不声明窗口。
 - 三者都用 `origin: "vscode"`；host 未 ready → editor / views disabled / degraded。
 
 **Cordis 接法**：
@@ -104,7 +104,7 @@ stateDiagram-v2
 
 边界：
 
-- `PracVscodeFace.hostFor(view)` 是 view 宿主；`PracExtension.hostFor(widgetId)` 是 widget 宿主；两者同名但不同层。
+- `PracVscodeFace.hostFor(view)` 是 view 宿主；`PracWidgetImpl.hostFor(widgetId)` 是 widget 宿主；同名但不同层。
 - face 不拥有 window / group / placement。
 - editor host 的 pane / editor group 细节在 [tech-ide](./2026-11-05-tech-ide.md) §2.1。
 
@@ -120,7 +120,7 @@ WM / frame（决策）
 | 层 | 职责 | 不做 |
 | --- | --- | --- |
 | **WM / frame** | 窗口存在性、region、group、placement；渲染 `prac.window` 槽 | VS Code 概念（input / group / pane） |
-| **vscode-host** | boot / embed；face；文件 → editor input；把 WM 的窗口镜像给 embed；提供 vscode origin app 的内容 | 决定窗口存在性、region、打开管线 |
+| **vscode-host** | boot / embed；face；文件 → editor input；把 WM 的窗口镜像给 embed；提供宿主渲染 app 的内容 | 决定窗口存在性、region、打开管线 |
 | **embed overlay** | 实现 `IEditorGroupView` / `IEditorGroupsService` / `IEditorService`；group / pane / projection | 决定窗口集合、知道业务 app |
 | **vendored VS Code** | 上游行为 | — |
 
@@ -164,7 +164,7 @@ flowchart LR
 ```
 
 - `ViewContainer` → board hint；`View` → `PracWidgetDef`；
-- `EditorInput` → `PracAppDef` + `windows()`；
+- `EditorInput` → editor app 的 `open` 声明窗口（每个 input 一个窗口，不再是 `windows()` 列表）；
 - commands / menus → resolved action model（不是 app / widget def）；
 - 只注册 **active** view；`when` 变化就进出；
 - 不搬 `visible`：VS Code 显隐不能成为第二个“在屏上”的真相源；
@@ -173,8 +173,8 @@ flowchart LR
 ## 5. 映射
 
 - **ViewContainer** → widget board；由 widget board app 打开 board window。container 只是默认 board hint，不是所有权。
-- **View** → `PracWidgetDef` + `hostFor`；默认 board hint 来自 container；frame / workbench 决定最终 placement。
-- **EditorInput** → `PracAppDef` + `windows()`；每个 input 一个 `PracWindow` 投影；editor host 见 tech-ide §2.1。
+- **View** → `PracWidgetDef` + `PracWidgetImpl.hostFor`；默认 board hint 来自 container；frame / workbench 决定最终 placement。
+- **EditorInput** → editor app 的 `open` 声明窗口；每个 input 一个 `PracWindow` 投影；editor host 见 tech-ide §2.1。
 - **editor group** → window group 的 adaptor runtime；一个 stage region 一个 editor group；不拥有 chrome / window 记录。
 - **actions / commands**：`containerActions` / `editorActions` / `runAction` / `runEditorAction` → resolved action model；frame 渲染。
 - **webview / custom editor**：`EditorPane`；secure context 由 runtime 管。
