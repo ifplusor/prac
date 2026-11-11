@@ -181,12 +181,12 @@ flowchart LR
 
 ## 5.1 投影：prac window → VS Code
 
-**两条路，按 app 的 origin 分，不按“是不是 editor”分**：
+**判据是“窗口内容由谁渲染”，不是一个叫 origin 的枚举。** host extension 有 vscode、dsh，以后可能更多；extension 机制不假设只有这两种。
 
-- **`origin: other`**（board / document）：`PracWindowInput`（身份投影）+ `PracWindowPane`（空 pane），内容在 prac frame；`mapWindow` 走这条路。
-- **`origin: vscode`**（editor，以及**所有** vscode 贡献的 app，不只 editor）：走 VS Code 的真实渲染——editor 用 `TextEditorInput` + `TextEditorPane`，其它 vscode app 用各自的 VS Code 宿主；它们**不是** `PracWindowInput`，也不经 `windowProjection.map`。
+- **prac 渲染**（frame 渲染的窗口）：`PracWindowInput`（身份投影）+ `PracWindowPane`（空 pane），内容在 prac frame；`mapWindow` 走这条路。
+- **宿主渲染**（由 VS Code 这类机制渲染的窗口）：由宿主自己的机制渲染——editor 用 `TextEditorInput` + `TextEditorPane`，其它宿主内容用各自宿主；它们**不是** `PracWindowInput`，也不经 `windowProjection.map`。
 
-分流依据：`appOf(windowId)` 给出 app，再由 app 的 `origin` 决定渲染方式。
+分流依据是 app 的 `content` 来自哪个层（frame 还是宿主），不是 `origin` 字符串。
 
 **镜像，不是权威**：`PracWindowInput` 由 WM 的窗口驱动，embed 不决定窗口是否存在。
 
