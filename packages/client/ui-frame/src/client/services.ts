@@ -301,7 +301,17 @@ export function createServices(
   const boardLayouts = new BoardLayoutRegistry();
   const pracFrame: PracLayoutFace = {
     getState: () => store.get(),
-    subscribe: (listener) => store.subscribe(listener),
+    // The render must re-read on a manager change too: the manager owns the
+    // placements, so a placement-only change (a group move) would otherwise be
+    // invisible to a subscriber of the layout alone.
+    subscribe: (listener) => {
+      const offLayout = store.subscribe(listener);
+      const offWindows = windows.subscribe(listener);
+      return () => {
+        offLayout();
+        offWindows();
+      };
+    },
     /** The union of the slot registry's items and each one's placement. */
     listItems(): ItemInfo[] {
       return listCatalogueItems(
