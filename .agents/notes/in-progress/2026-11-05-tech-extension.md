@@ -125,10 +125,34 @@ interface PracWindowDecl {
 interface PracExtension {
   readonly manifest: PracExtensionManifest;
 
-  apps?(): readonly PracAppDef[];
+  apps?(): readonly PracAppDef[];      // 声明：catalog / reconcile 用
   widgets?(): readonly PracWidgetDef[];
 
+  runtime?(def: PracAppDef): PracAppImpl | undefined;          // 代码：lazy
+  widgetRuntime?(def: PracWidgetDef): PracWidgetImpl | undefined;
+
   onDidChange?(listener: () => void): () => void;
+}
+
+interface PracAppImpl {
+  content(windowId: string): () => ReactNode;
+  match?(resource: string): boolean;
+  open?(resource: string): boolean;
+}
+
+interface PracWidgetImpl {
+  hostFor(widgetId: string): () => ReactNode;
+}
+
+// 运行时由声明 + 实现组合；声明永远可序列化，代码永远在运行时。
+interface PracApp {
+  readonly def: PracAppDef;
+  readonly impl: PracAppImpl;
+}
+
+interface PracWidget {
+  readonly def: PracWidgetDef;
+  readonly impl: PracWidgetImpl;
 }
 ```
 
