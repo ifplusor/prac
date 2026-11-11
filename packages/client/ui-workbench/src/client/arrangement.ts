@@ -14,6 +14,7 @@ import type { ItemRecord } from "prac-ui-kit-workbench";
 
 import type { PracDshFace } from "prac-client-dsh-host/client";
 import type { PracLayoutFace } from "prac-client-ui-frame/client";
+import type { PracDock } from "prac-ui-kit-workbench";
 import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 
 /** The mechanism's placement face, named once for this module's signatures. */
@@ -405,7 +406,7 @@ export function restoreCentre(layout: PracLayout, dsh: PracDshFace): boolean {
  * @param layout - the mechanism's placement face.
  * @param dsh - the DSH adapter's face (view ids).
  */
-export function arrange(layout: PracLayout, dsh: PracDshFace): void {
+export function arrange(layout: PracLayout, dsh: PracDshFace, dock?: PracDock): void {
   layout.bindRoles(roles(dsh));
   // The left rail is the dock's activity bar, drawn **outside** the region: the region itself has no
   // in-region selector strip, so the allocation must not reserve one. The bottom dock is hidden, so
@@ -418,6 +419,18 @@ export function arrange(layout: PracLayout, dsh: PracDshFace): void {
     if (known[entry.view] !== undefined) continue;
     layout.place(entry.view, entry.region);
     if (entry.hidden === true) layout.hide(entry.view);
+  }
+  // Pin the catalogue's containers as dock shortcuts: the dock shows the app, not the view.
+  if (dock !== undefined) {
+    for (const entry of defaultPlacements(dsh)) {
+      if (entry.region !== LEFT && entry.region !== RIGHT) continue;
+      dock.pin({
+        id: entry.view,
+        appId: "prac.board",
+        label: entry.view.split(":").at(-1) ?? entry.view,
+        side: entry.region === LEFT ? "left" : "right",
+      });
+    }
   }
   // The title bar owns session/workspace selection; the DSH sidebar remains
   // registered (the recall surface can still reach it) but starts hidden.
