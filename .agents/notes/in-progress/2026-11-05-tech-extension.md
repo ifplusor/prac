@@ -64,7 +64,7 @@ flowchart LR
 > **一个 Cordis plugin + 一组 contribution 对象。**
 
 - **Cordis plugin**：`apply(ctx)` / `inject` / `ctx.provide` / `ctx.effect` / dispose；
-- **PracExtension**：manifest + `apps()` / `widgets()` / `hostFor` / `contentFor`，由 Cordis plugin 在 `apply(ctx)` 里注册；
+- **PracExtension**：manifest + `apps()` / `widgets()` / `onDidChange`，由 Cordis plugin 在 `apply(ctx)` 里注册；只贡献声明，不渲染、不持有窗口；
 - **DSH plugin**：一个 Cordis plugin 包（DSH conventions），不是另一套 runtime；
 - **VS Code extension**：VS Code 自己的插件包；prac 的 VS Code adaptor 是 Cordis plugin，不是 VS Code extension。
 
@@ -127,10 +127,6 @@ interface PracExtension {
 
   apps?(): readonly PracAppDef[];
   widgets?(): readonly PracWidgetDef[];
-  windows?(appId: string): readonly PracWindowDecl[];
-
-  contentFor?(windowId: string, render?: ApplicationSlotRenderer, view?: ApplicationViewport): () => ReactNode;
-  hostFor?(widgetId: string): () => ReactNode;
 
   onDidChange?(listener: () => void): () => void;
 }
@@ -150,7 +146,6 @@ export function apply(ctx: Context): void {
       dependsOn: ["prac.vscodeHost"],
     },
     widgets: () => vscodeViewDefs(),
-    hostFor: (id) => vscodeViewHost(id),
   });
 
   ctx.effect(() => () => off.dispose());
@@ -162,9 +157,9 @@ export function apply(ctx: Context): void {
 - `ctx.effect` / `ctx.on("dispose")` 负责清理；
 - 没有 `PracExtensionContext` / `activate` / `dispose` 这一层。
 
-- app 内容：`contentFor(windowId, render?, view?)`；`render` / `view` 是 app window 的运行时上下文；
-- widget 内容：`hostFor(widgetId)`；
-- app 的窗口声明：`windows(appId)`；由 app layer 做 diff / admit / close；
+- app 内容：app 运行时的 `content(windowId)`；extension 不提供内容；
+- widget 宿主：widget 运行时的宿主；extension 不提供宿主；
+- app 的窗口：app 的 `open` 声明、实例持有；extension 不持有窗口；
 - host extension：Cordis plugin，`ctx.provide("prac.vscodeHost", …)`，不贡献 apps / widgets；
 - feature extension：Cordis plugin，`inject: ["prac.vscodeHost"]`，贡献 apps / widgets。
 
@@ -251,8 +246,8 @@ interface PracExtensionsFace {
 - duplicate extension id → reject；duplicate app / widget id → reject。
 - `dependsOn` 映射到 Cordis `inject` / service 可用性；缺依赖 → disabled。
 - `origin` 用于诊断 / 策略 / 分组，不做分支。
-- app sync：`apps()` + `windows()` diff → `admit` / `close`；app layer 负责。
-- widget：`widgets()` + `hostFor` → `PracWidgets`；board root 负责 placement。
+- app sync：`apps()` diff → 注册 / 移除 app；窗口由 app 的 `open` 走 WM，不由 extension 声明。
+- widget：`widgets()` diff → `PracWidgets` 注册；宿主由 widget 运行时提供；board root 负责 placement。
 - 失败：per-extension 回滚；不影响其他 extension。
 
 ## 8. VS Code / DSH 两侧
