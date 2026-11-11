@@ -44,19 +44,47 @@ interface StoreCell<T> {
   update: (updater: (state: T) => T) => void;
 }
 
-/** A persisted state cell whose hydrated value passes through `heal` once. */
+/**
+ * Read a persistence snapshot.
+ *
+ * The snapshot is the recovery artifact, not the runtime: the layout lives in
+ * the window manager, and this channel only carries a copy across a reload.
+ */
+export function readSnapshot<T>(key: string): T | undefined {
+  try {
+    const raw = globalThis.localStorage?.getItem(key);
+    if (raw === null || raw === undefined) return undefined;
+    return JSON.parse(raw) as T;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Write a persistence snapshot; a blocked/full storage never breaks the runtime. */
+export function writeSnapshot<T>(key: string, value: T): void {
+  try {
+    globalThis.localStorage?.setItem(key, JSON.stringify(value));
+  } catch {
+    // The runtime keeps working; the next write may succeed.
+  }
+}
+
+/**
+ * A runtime cell whose persisted snapshot passes through `heal` once at boot.
+ *
+ * The snapshot channel is this cell's only persistence: the cell subscribes and
+ * writes, and reads only at construction. It is not a store the render reads
+ * from — the render reads the window manager — but the frame's layout cells are
+ * still the runtime state they are today.
+ */
 function createCell<T>(initial: T, key: string, heal: (state: T) => T): StoreCell<T> {
-  // `flush: "raf"` batches a burst of updates into one frame; persistence writes
-  // on every committed state. The caller supplies the key: the frame scopes it
-  // by workspace (`?workspace=`, the same identity the page boots from), so two
-  // folders on one origin do not share a layout.
-  const snapshot = createSnapshotStore<T>(initial, {
-    flush: "raf",
-    persist: { name: key },
-  });
-  const hydrated = snapshot.getSnapshot();
-  const healed = heal(hydrated);
-  if (healed !== hydrated) snapshot.set(healed);
+  // `flush: "raf"` batches a burst of updates into one frame. The caller supplies
+  // the key: the frame scopes it by workspace (`?workspace=`), so two folders on
+  // one origin do not share a layout.
+  const hydrated = readSnapshot<T>(key);
+  const healed = heal(hydrated ?? initial);
+  const snapshot = createSnapshotStore<T>(healed, { flush: "raf" });
+  snapshot.subscribe(() => writeSnapshot(key, snapshot.getSnapshot()));
   return {
     get: () => snapshot.getSnapshot(),
     subscribe: (listener) => snapshot.subscribe(listener),
