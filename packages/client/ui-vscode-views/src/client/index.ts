@@ -125,49 +125,10 @@ export function apply(ctx: Context): void {
     };
     return extensions.register(extension);
   }, "prac-client-ui-vscode-views: one widget per app view");
-
-  // The stage's non-native windows need an identity input: their content is
-  // rendered by prac's frame, so the app's editor model holds a placeholder.
-  // The manager is the authority; this adaptor only mirrors it.
-  ctx.effect(() => {
-    const mapped = new Set<string>();
-    const sync = (): void => {
-      const snapshot = ctx.pracWindows?.getSnapshot();
-      if (snapshot === undefined) return;
-      // Every window belongs to a window group, and every window group maps to an
-      // editor group: the region a window sits in is its group's region. Only the
-      // windows prac renders need an input of ours — a vscode-native editor is
-      // already in the editor service.
-      const placed = new Map(
-        snapshot.placements.map((placement) => [placement.windowId, placement.region]),
-      );
-      const wanted = new Set(
-        snapshot.windows
-          .filter((window) => window.tags?.includes("vscode") !== true)
-          .filter((window) => placed.has(window.id))
-          .map((window) => window.id),
-      );
-      for (const id of mapped) {
-        if (wanted.has(id)) continue;
-        ctx.pracVscode.unmapWindow(id);
-        mapped.delete(id);
-      }
-      for (const windowId of wanted) {
-        if (mapped.has(windowId)) continue;
-        const window = snapshot.windows.find((candidate) => candidate.id === windowId);
-        ctx.pracVscode.mapWindow(windowId, window?.title ?? windowId, placed.get(windowId));
-        mapped.add(windowId);
-      }
-    };
-    // Mapping before the workbench is up is safe: the embed queues the id and
-    // applies it once the app boots (the queue is part of `mappedWindows`).
-    sync();
-    return ctx.pracWindows?.subscribe(sync) ?? (() => {});
-  }, "prac-client-ui-vscode-views: stage placeholders");
 }
 
 /** The cordis plugin name used by loader diagnostics. */
 export const name = "prac-client-ui-vscode-views";
 
 /** The DSH services this plugin needs: the extension registry and the mechanism. */
-export const inject = ["pracExtensions", "pracVscode", "pracWindows"];
+export const inject = ["pracExtensions", "pracVscode"];

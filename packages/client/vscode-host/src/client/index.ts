@@ -498,6 +498,51 @@ export function apply(ctx: Context): void {
   }, `${name}: active editor group`);
 
   ctx.effect(() => ctx.provide("pracVscode", face), `${name}: pracVscode service`);
+
+  // The stage is prac's; vscode's editor model is the projection. The embed keeps
+  // imperative primitives (map / unmap / mapped), so the reconciliation lives
+  // here: derive the desired set from the manager, diff against the embed, apply.
+  ctx.effect(() => {
+    let off: (() => void) | undefined;
+    let disposed = false;
+    const reconcile = (): void => {
+      const snapshot = ctx.pracWindows?.getSnapshot();
+      if (snapshot === undefined) return;
+      const inStage = new Map(
+        snapshot.placements
+          .filter((placement) => placement.region === "center")
+          .map((placement) => [placement.windowId, placement.region]),
+      );
+      // A window whose app vscode contributed is already an editor; every other
+      // stage window needs our placeholder input.
+      const desired = new Map(
+        snapshot.windows
+          .filter((window) => inStage.has(window.id))
+          .filter((window) => window.tags?.includes("vscode") !== true)
+          .map((window) => [window.id, window.title ?? window.id]),
+      );
+      const actual = new Set(face.mappedWindows());
+      for (const id of actual) {
+        if (desired.has(id)) continue;
+        face.unmapWindow(id);
+      }
+      for (const [id, title] of desired) {
+        if (actual.has(id)) continue;
+        face.mapWindow(id, title, "center");
+      }
+    };
+    // Map only once the workbench published its face; before that the embed
+    // would queue the id and nothing would reconcile it.
+    void face.whenReady().then(() => {
+      if (disposed) return;
+      reconcile();
+      off = ctx.pracWindows?.subscribe(reconcile);
+    });
+    return () => {
+      disposed = true;
+      off?.();
+    };
+  }, `${name}: stage window reconciliation`);
   // The page probe: lets a live gate exercise the command path directly, without
   // pretending a DOM click reached the workbench. Published through the shared
   // registry, so removal is scoped to this instance (the old assignment leaked).
@@ -551,4 +596,5 @@ export const inject = [
   "layout",
   "pracFrame",
   "pracSurfaces",
+  "pracWindows",
 ];
