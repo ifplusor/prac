@@ -43,12 +43,13 @@ export const BOTTOM = "bottom";
 export function defaultPlacements(dsh: PracDshFace): readonly {
   readonly view: string;
   readonly region: string;
+  readonly appId: string;
   readonly hidden?: boolean;
 }[] {
   return [
-    { view: dsh.sidebar, region: LEFT },
-    { view: dsh.conversation, region: CENTER },
-    { view: dsh.rightbar, region: RIGHT, hidden: true },
+    { view: dsh.sidebar, region: LEFT, appId: "dsh.sidebar" },
+    { view: dsh.conversation, region: CENTER, appId: "chat" },
+    { view: dsh.rightbar, region: RIGHT, hidden: true, appId: "dsh.rightbar" },
   ];
 }
 // No default for the centre's editor: since decision 17 a file is a view that
@@ -411,6 +412,7 @@ export function arrange(
   dsh: PracDshFace,
   dock?: PracDock,
   widgets?: readonly { readonly id: string; readonly defaultBoard?: string }[],
+  windows?: { admit(appId: string, options: { windowId: string; region?: string }): string },
 ): void {
   layout.bindRoles(roles(dsh));
   // The left rail is the dock's activity bar, drawn **outside** the region: the region itself has no
@@ -422,6 +424,14 @@ export function arrange(
   const known = layout.getState().items;
   for (const entry of defaultPlacements(dsh)) {
     if (known[entry.view] !== undefined) continue;
+    // A window only exists once the manager admitted it; the arrangement states
+    // where each default window goes, not whether it exists.
+    try {
+      windows?.admit(entry.appId, { windowId: entry.view, region: entry.region });
+    } catch {
+      // The app may not be in the catalogue yet; the next pass admits it. The
+      // placement below still runs so the region shape is right.
+    }
     layout.place(entry.view, entry.region);
     if (entry.hidden === true) layout.hide(entry.view);
   }

@@ -516,7 +516,7 @@ export function apply(ctx: Context): void {
   firstRunStyle.textContent = PRAC_FIRST_RUN_CSS;
   document.head.append(firstRunStyle);
   ctx.effect(() => () => firstRunStyle.remove(), "prac-web-app: first-run styles");
-  arrange(layout, dsh.pracDsh);
+  arrange(layout, dsh.pracDsh, undefined, undefined, ctx.pracWindows);
   // The product's first screen is the conversation, not DSH's own sidebar: the
   // title bar owns Workspace/Session selection. The app can open its sidebar
   // during boot, so hide it once after that settles; a later recall is the

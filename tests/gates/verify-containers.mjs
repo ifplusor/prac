@@ -82,6 +82,16 @@ const read = () =>
         window: board.windowId,
         widgets: typeof board.widgetOrder === "function" ? [...board.widgetOrder()] : [],
       })),
+      // A window may only be placed if the manager admitted it: the runtime
+      // snapshot's placements must be a subset of its windows.
+      orphanPlacements: (() => {
+        const snapshot = globalThis.__pracTest?.windows?.getSnapshot?.();
+        if (snapshot === undefined) return ["no-snapshot"];
+        const known = new Set(snapshot.windows.map((window) => window.id));
+        return snapshot.placements
+          .map((placement) => placement.windowId)
+          .filter((id) => !known.has(id));
+      })(),
       surfaces: [...document.querySelectorAll("[data-prac-region-content]")].map((element) => ({
         region: element.getAttribute("data-prac-region"),
         split: element.getAttribute("data-prac-split"),
@@ -210,6 +220,7 @@ report({
       "workbench.view.extension.gitlens",
     ].every((id) => leftIds.includes(id)),
     "the right rail lists the agent": initial.right.items.some((item) => item.id === "chat"),
+    "every placed window was admitted": initial.orphanPlacements.length === 0,
     "each rail has at most one active item":
       initial.left.items.filter((item) => item.active).length <= 1,
     "the left rail starts on Explorer": activeLeft[0]?.id === "workbench.view.explorer",
