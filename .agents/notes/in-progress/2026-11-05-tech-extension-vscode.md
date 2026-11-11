@@ -108,6 +108,44 @@ stateDiagram-v2
 - face 不拥有 window / group / placement。
 - editor host 的 pane / editor group 细节在 [tech-ide](./2026-11-05-tech-ide.md) §2.1。
 
+### 3.4 四层与边界
+
+```
+WM / frame（决策）
+  → vscode-host（镜像 + 映射 + 内容）
+  → embed overlay（VS Code 契约实现）
+  → vendored VS Code（不变）
+```
+
+| 层 | 职责 | 不做 |
+| --- | --- | --- |
+| **WM / frame** | 窗口存在性、region、group、placement；渲染 `prac.window` 槽 | VS Code 概念（input / group / pane） |
+| **vscode-host** | boot / embed；face；文件 → editor input；把 WM 的窗口镜像给 embed；提供 vscode origin app 的内容 | 决定窗口存在性、region、打开管线 |
+| **embed overlay** | 实现 `IEditorGroupView` / `IEditorGroupsService` / `IEditorService`；group / pane / projection | 决定窗口集合、知道业务 app |
+| **vendored VS Code** | 上游行为 | — |
+
+**接口**
+
+- WM → host：`pracWindows.getSnapshot()` / `subscribe`（单向）；
+- host → embed：`mapWindow` / `mountViewInto` / `mountFileInto` / `openFile`（单向）；
+- embed → host：`embedBridge` face（回调）；
+- embed → vendored：`IEditorService` / `IEditorGroupsService` 契约（实现）。
+
+**两条流**
+
+窗口流：`admit → getSnapshot → mapWindow → ensureGroup(region) → PracWindowInput + PracWindowPane → mapped()`。
+
+打开流：`prac.open → registry → app.open / pracVscode.open → editorService.openEditor({ resource }) → TextEditorInput + TextEditorPane`。
+
+**不变量**
+
+- 窗口存在性 / region / group 的写者只有 WM；
+- embed 不自行创建窗口，只镜像；
+- `mapped()` 是 WM 窗口的投影，不是 editor group 的；
+- `groupForRegion` / `ensureGroup` 是 region → group 映射，按需创建；
+- 内容是 app 的，frame 渲染，editor pane 是 VS Code 的；
+- embed 不调 `prac.open`。
+
 ## 4. 自动转换
 
 VS Code 侧要合并两类输入：
@@ -143,11 +181,16 @@ flowchart LR
 
 ## 5.1 投影：prac window → VS Code
 
+**镜像，不是权威**：`PracWindowInput` 由 WM 的窗口驱动，embed 不决定窗口是否存在。
+
 - `PracWindowInput`：prac 窗口的身份投影（editor input 形状）；
 - `PracWindowGroup`：prac 的 window group，实现 `IEditorGroupView`，借用 `EditorGroupModel` / `PracEditorPaneHost` / pane 类；
 - `PracWindowPane`：frame 渲染窗口的空 pane（内容在 prac frame）；
 - **editor 窗口例外**：`TextEditorInput` + `TextEditorPane`，由 VS Code 真实渲染；prac frame 挂 `activeEditorPane.getContainer()`；
-- 分流依据是 `appOf(windowId)`，不是 windowId 前缀。
+- 分流依据是 `appOf(windowId)`，不是 windowId 前缀；
+- `mapped()` 返回 WM 投影过的窗口（`inputs.keys()`），不问 editor group；
+- `map(region)` 在 region 没有 group 时先 `ensureGroup(region)`，不丢弃窗口；
+- 窗口的 region 来自 WM 的 placement（`pracFrame.getState().items[id].region`），不从“有没有文件窗口”推导。
 
 ## 6. 动态 / 错误 / 测试
 

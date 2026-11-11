@@ -52,11 +52,15 @@ export class PracWindowProjection {
     private readonly groups: IEditorGroupsService,
   ) {}
 
-  /** The windows that actually made it into an editor group. */
+  /**
+   * The windows the frame has projected.
+   *
+   * This mirrors the WM, not the editor groups: the WM owns which windows exist,
+   * and a window need not have an editor group (a board has its own layout).
+   * Asking the editor groups would let such a window vanish from the projection.
+   */
   mapped(): readonly string[] {
-    return [...this.inputs]
-      .filter(([, input]) => this.editorService.findEditors(input.resource).length > 0)
-      .map(([id]) => id);
+    return [...this.inputs.keys()];
   }
 
   /** The currently active projected window, if any. */
@@ -79,7 +83,10 @@ export class PracWindowProjection {
     } else {
       input.setTitle(title);
     }
-    const group = this.groupForRegion(region);
+    // The WM owns which windows exist; the projection only mirrors them. A
+    // region without an editor group (a board's own layout) still gets a pane
+    // host, so the window is not dropped just because no file landed there.
+    const group = this.groupForRegion(region) ?? this.ensureGroup(region);
     if (group === undefined) return;
     this.writes.map += 1;
     withProjectionWrite(() => {
@@ -146,5 +153,10 @@ export class PracWindowProjection {
     if (region === undefined) return this.groups.activeGroup ?? undefined;
     const host = this.groups as unknown as PracWindowGroupHost;
     return host.groupForRegion?.(region) ?? undefined;
+  }
+
+  private ensureGroup(region: string): IEditorGroup | undefined {
+    const host = this.groups as unknown as PracWindowGroupHost;
+    return host.ensureGroup?.(region, region) as IEditorGroup | undefined;
   }
 }

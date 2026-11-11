@@ -248,17 +248,21 @@ export function apply(ctx: Context): void {
     instances: "multi",
     defaultRegion: "center",
     paneHeader: true,
-    // The editor is the fallback app: it claims everything the document app
-    // does not, so it must be asked last (or match the complement).
-    match: (resource: string): boolean =>
-      !/\.(docx?|xlsx?|pptx?|pdf|png|jpe?g|gif|webp|svg)$/iu.test(resource),
   };
   const extension: PracExtension = {
     manifest: { id: "prac.vscode-editor", origin: "vscode", version: "1" },
     apps: () => [editorApp],
+    appRuntime: (def) =>
+      def.id === "editor"
+        ? {
+            content: (windowId: string) => host.hostFor(windowId) ?? (() => null),
+            // The editor is the fallback app: it claims everything the document
+            // app does not, so it must be asked last (or match the complement).
+            match: (resource: string): boolean =>
+              !/\.(docx?|xlsx?|pptx?|pdf|png|jpe?g|gif|webp|svg)$/iu.test(resource),
+          }
+        : undefined,
     onDidChange: (listener: () => void) => host.onDidChangeCatalogue(listener),
-    contentFor: (windowId: string) => host.hostFor(windowId) ?? (() => null),
-    windows: () => fileEntries().map(({ view, title }) => ({ id: view, title })),
   };
   ctx.effect(
     () => extensions.register(extension),

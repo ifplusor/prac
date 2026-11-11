@@ -53,43 +53,45 @@ function viewExtension(host: PracVscodeFace, onRetitle: () => void): PracExtensi
     manifest: { id: "prac.vscode-views", origin: "vscode", version: "1" },
     widgets,
     onDidChange: (listener: () => void) => host.onDidChangeCatalogue(listener),
-    hostFor: (id) => host.hostFor(id),
-    wrap: (widgetId, content) => {
-      /**
-       * The view plus a title observer.
-       *
-       * The pane header lives in the frame's isolated shadow, which is also this
-       * component's root; observe that root rather than the global document. It is
-       * deliberately a **pull from the rendered chrome**, not a second view model:
-       * the pane header is the authority for the view's own title.
-       *
-       * @param props - the view id and its content.
-       */
-      function ViewWithTitle({ view, View }: { view: string; View: () => ReactNode }): ReactNode {
-        const ref = useRef<HTMLDivElement | null>(null);
-        useLayoutEffect(() => {
-          const root = ref.current?.getRootNode();
-          if (!(root instanceof ShadowRoot)) return undefined;
-          const read = (): void => {
-            const label = root.querySelector(".pane-header .title")?.textContent?.trim();
-            const icon = root.querySelector(".pane-header .icon")?.className ?? "";
-            if (label === undefined || label === "") return;
-            if (paneTitles.get(view) === label && paneIcons.get(view) === icon) return;
-            paneTitles.set(view, label);
-            paneIcons.set(view, icon);
-            // The runner re-reads `contributions()` and re-registers the changed one.
-            onRetitle();
-          };
-          read();
-          const observer = new MutationObserver(read);
-          observer.observe(root, { childList: true, subtree: true, characterData: true });
-          return () => observer.disconnect();
-        }, [view]);
-        return createElement("div", { ref, style: { display: "contents" } }, createElement(View));
-      }
-      const view = widgetId;
-      return () => createElement(ViewWithTitle, { view, View: content });
-    },
+    widgetRuntime: (def) => ({
+      hostFor: () => host.hostFor(def.id),
+      wrap: (widgetId, content) => {
+        /**
+         * The view plus a title observer.
+         *
+         * The pane header lives in the frame's isolated shadow, which is also this
+         * component's root; observe that root rather than the global document. It is
+         * deliberately a **pull from the rendered chrome**, not a second view model:
+         * the pane header is the authority for the view's own title.
+         *
+         * @param props - the view id and its content.
+         */
+        function ViewWithTitle({ view, View }: { view: string; View: () => ReactNode }): ReactNode {
+          const ref = useRef<HTMLDivElement | null>(null);
+          useLayoutEffect(() => {
+            const root = ref.current?.getRootNode();
+            if (!(root instanceof ShadowRoot)) return undefined;
+            const read = (): void => {
+              const label = root.querySelector(".pane-header .title")?.textContent?.trim();
+              const icon = root.querySelector(".pane-header .icon")?.className ?? "";
+              if (label === undefined || label === "") return;
+              if (paneTitles.get(view) === label && paneIcons.get(view) === icon) return;
+              paneTitles.set(view, label);
+              paneIcons.set(view, icon);
+              // The runner re-reads `contributions()` and re-registers the changed one.
+              onRetitle();
+            };
+            read();
+            const observer = new MutationObserver(read);
+            observer.observe(root, { childList: true, subtree: true, characterData: true });
+            return () => observer.disconnect();
+          }, [view]);
+          return createElement("div", { ref, style: { display: "contents" } }, createElement(View));
+        }
+        const view = widgetId;
+        return () => createElement(ViewWithTitle, { view, View: content });
+      },
+    }),
   };
 }
 

@@ -122,71 +122,17 @@ describe("extension projection", () => {
     const off = registry.register({
       manifest: { id: "prac.example", origin: "prac", version: "1" },
       apps: () => [app("editor")],
-      windows: () => [{ id: "file-1", title: "File" }],
       widgets: () => [widget("files")],
-      contentFor: () => () => null,
-      hostFor: () => () => null,
+      appRuntime: () => ({ content: () => () => null }),
+      widgetRuntime: () => ({ hostFor: () => () => null }),
     });
 
     expect(apps.get("editor")?.label).toBe("editor");
-    expect(windows.get("file-1")?.appId).toBe("editor");
     expect(widgets.has("files")).toBe(true);
 
     off();
     expect(apps.get("editor")).toBeUndefined();
     expect(windows.size).toBe(0);
     expect(widgets.size).toBe(0);
-  });
-});
-
-describe("extension projection reconcile", () => {
-  it("keeps app windows in step with onDidChange", () => {
-    const windows = new Map<string, { appId: string; title?: string }>();
-    const apps = new ApplicationRegistry();
-    let wanted: { id: string; title: string }[] = [{ id: "file-1", title: "One" }];
-    let notify: (() => void) | undefined;
-    const ctx = {
-      slots: {
-        inject: (_slot: string, callback: () => () => void) => callback(),
-        register: () => () => {},
-      },
-      pracApplications: apps,
-      pracWindows: {
-        admit: (appId: string, options: { windowId: string; title?: string }) => {
-          windows.set(options.windowId, {
-            appId,
-            ...(options.title === undefined ? {} : { title: options.title }),
-          });
-          return options.windowId;
-        },
-        close: (windowId: string) => {
-          windows.delete(windowId);
-          return true;
-        },
-      },
-    } as unknown as Context;
-
-    const registry = createExtensionRegistry(ctx);
-    const off = registry.register({
-      manifest: { id: "prac.example", origin: "prac", version: "1" },
-      apps: () => [app("editor")],
-      windows: () => wanted,
-      contentFor: () => () => null,
-      onDidChange: (listener) => {
-        notify = listener;
-        return () => {
-          notify = undefined;
-        };
-      },
-    });
-
-    expect(windows.has("file-1")).toBe(true);
-    wanted = [];
-    notify?.();
-    expect(windows.size).toBe(0);
-    wanted = [{ id: "file-2", title: "Two" }];
-    notify?.();
-    expect(windows.get("file-2")?.appId).toBe("editor");
-    off();
   });
 });

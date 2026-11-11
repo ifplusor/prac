@@ -47,41 +47,31 @@ export function apply(ctx: Context): void {
   const extension: PracExtension = {
     manifest: { id: "prac.dsh-host", origin: "dsh", version: "1" },
     apps: () => [chat, sidebar, rightbar],
-    windows: (appId) => {
-      switch (appId) {
-        case chat.id:
-          return [{ id: DSH_CONVERSATION_VIEW, title: "Chat" }];
-        case sidebar.id:
-          return [{ id: DSH_SIDEBAR_VIEW, title: "Sidebar" }];
-        case rightbar.id:
-          return [{ id: DSH_RIGHTBAR_VIEW, title: "Right bar" }];
-        default:
-          return [];
-      }
-    },
-    contentFor: (windowId, render, view) => {
-      if (render === undefined) return () => null;
-      if (windowId === DSH_CONVERSATION_VIEW) {
-        const key = dshMainKey(windowId) ?? "conversation";
-        return () => render("main", {}, { entryKey: key });
-      }
-      if (windowId === DSH_SIDEBAR_VIEW) {
-        return () =>
-          render("sidebar", {
-            collapsed: (view?.width ?? 0) === 0,
-            width: view?.width ?? 0,
-          });
-      }
-      if (windowId === DSH_RIGHTBAR_VIEW) {
-        return () =>
-          render("rightbar", {
-            width: view?.width ?? 0,
-            viewportWidth: view?.viewportWidth ?? 0,
-            canShow: (view?.width ?? 0) > 0,
-          });
-      }
-      return () => null;
-    },
+    appRuntime: () => ({
+      content: (windowId, render, view) => {
+        if (render === undefined) return () => null;
+        if (windowId === DSH_CONVERSATION_VIEW) {
+          const key = dshMainKey(windowId) ?? "conversation";
+          return () => render("main", {}, { entryKey: key });
+        }
+        if (windowId === DSH_SIDEBAR_VIEW) {
+          return () =>
+            render("sidebar", {
+              collapsed: (view?.width ?? 0) === 0,
+              width: view?.width ?? 0,
+            });
+        }
+        if (windowId === DSH_RIGHTBAR_VIEW) {
+          return () =>
+            render("rightbar", {
+              width: view?.width ?? 0,
+              viewportWidth: view?.viewportWidth ?? 0,
+              canShow: (view?.width ?? 0) > 0,
+            });
+        }
+        return () => null;
+      },
+    }),
   };
   ctx.effect(() => extensions.register(extension), "prac-client-dsh-host: host extension");
   const face: PracDshFace = {

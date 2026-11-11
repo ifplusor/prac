@@ -42,6 +42,9 @@ export function apply(ctx: Context): void {
   const coreExtension: PracExtension = {
     manifest: { id: "prac.core.board", origin: "prac", version: "1" },
     apps: () => [boardApp],
+    // The board's content is rendered by the frame (setItemBoard); the app's
+    // implementation only has to exist so the app registers.
+    appRuntime: () => ({ content: () => () => null }),
   };
   const extensions: PracExtensionsFace = ctx.pracExtensions;
   ctx.effect(() => extensions.register(coreExtension), "prac-client-ui-widget: board app");

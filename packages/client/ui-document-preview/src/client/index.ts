@@ -68,20 +68,20 @@ export function apply(ctx: Context): void {
     instances: "multi",
     paneHeader: true,
     defaultRegion: "center",
-    match: (resource: string): boolean =>
-      /\.(docx?|xlsx?|pptx?|pdf|png|jpe?g|gif|webp|svg)$/iu.test(resource),
-    // Opening is complete when the window exists: the app keeps no document list,
-    // and the frame derives the item from the window manager.
-    open: (resource: string): boolean => {
-      const name = resource.split("/").at(-1) ?? resource;
-      const windowId = `${WINDOW_PREFIX}${resource}`;
-      windows.admit(app.id, { windowId, title: name, region: app.defaultRegion });
-      if (app.defaultRegion !== undefined) frame.place(windowId, app.defaultRegion);
-      // Opening a document also brings it forward: the centre is a tab strip and
-      // the new window is the one the person asked to see.
-      windows.activate(windowId);
-      return true;
-    },
+  };
+  const matches = (resource: string): boolean =>
+    /\.(docx?|xlsx?|pptx?|pdf|png|jpe?g|gif|webp|svg)$/iu.test(resource);
+  // Opening is complete when the window exists: the app keeps no document list,
+  // and the frame derives the item from the window manager.
+  const open = (resource: string): boolean => {
+    const name = resource.split("/").at(-1) ?? resource;
+    const windowId = `${WINDOW_PREFIX}${resource}`;
+    windows.admit(app.id, { windowId, title: name, region: app.defaultRegion });
+    if (app.defaultRegion !== undefined) frame.place(windowId, app.defaultRegion);
+    // Opening a document also brings it forward: the centre is a tab strip and
+    // the new window is the one the person asked to see.
+    windows.activate(windowId);
+    return true;
   };
   // One content factory per window. A fresh closure on every read would make the
   // frame treat the window's content as a new component and remount it, which
@@ -103,8 +103,7 @@ export function apply(ctx: Context): void {
   const extension: PracExtension = {
     manifest: { id: "prac.document-preview", origin: "prac", version: "1" },
     apps: () => [app],
-    windows: () => documents().map((document) => ({ id: document.id, title: document.title })),
-    contentFor,
+    appRuntime: () => ({ content: contentFor, match: matches, open }),
   };
   ctx.effect(
     () => extensions.register(extension),

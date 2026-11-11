@@ -64,64 +64,59 @@ function project(ctx: Context, extension: PracExtension): Projection | undefined
       record.dispose();
       widgets.delete(id);
     }
-    for (const widget of wanted.values()) {
-      if (widgets.has(widget.id)) continue;
-      const host = extension.hostFor?.(widget.id) ?? (() => null);
-      const content = extension.wrap?.(widget.id, host) ?? host;
+    for (const def of wanted.values()) {
+      if (widgets.has(def.id)) continue;
+      const impl = extension.widgetRuntime?.(def);
+      if (impl === undefined) continue;
+      const host = impl.hostFor(def.id);
+      const content = impl.wrap?.(def.id, host) ?? host;
       const options = {
         name: WIDGET_SLOT,
-        id: widget.id,
-        ...(widget.icon === undefined ? {} : { icon: widget.icon }),
-        ...(widget.paneHeader === true ? { paneHeader: true } : {}),
-        ...(widget.actions === undefined ? {} : { actions: widget.actions }),
-        label: widget.title,
+        id: def.id,
+        ...(def.icon === undefined ? {} : { icon: def.icon }),
+        ...(def.paneHeader === true ? { paneHeader: true } : {}),
+        ...(impl.actions === undefined ? {} : { actions: () => impl.actions?.() ?? null }),
+        label: def.title,
       } as const;
-      widgets.set(widget.id, {
-        shape: shapeOf(widget),
+      widgets.set(def.id, {
+        shape: shapeOf(def),
         dispose: ctx.slots.register(options, content),
       });
     }
   };
 
   const syncApps = (): void => {
-    const wanted = new Map((extension.apps?.() ?? []).map((app) => [app.id, app]));
+    const wanted = new Map((extension.apps?.() ?? []).map((def) => [def.id, def]));
     for (const [id, record] of Array.from(apps)) {
       if (wanted.has(id)) continue;
-      for (const windowId of record.windows) ctx.pracWindows.close(windowId);
+      for (const windowId of ctx.pracWindows.ids()) {
+        if (ctx.pracWindows.appOf(windowId) === id) ctx.pracWindows.close(windowId);
+      }
       record.dispose();
       apps.delete(id);
     }
-    for (const app of wanted.values()) {
-      let record = apps.get(app.id);
-      if (record === undefined) {
-        record = {
-          dispose: ctx.pracApplications.register({
-            id: app.id,
-            version: app.version,
-            label: app.label,
-            instances: app.instances,
-            ...(app.defaultRegion === undefined ? {} : { defaultRegion: app.defaultRegion }),
-            ...(app.paneHeader === true ? { paneHeader: true } : {}),
-            ...(app.match === undefined ? {} : { match: app.match }),
-            ...(app.open === undefined ? {} : { open: app.open }),
-            content: (windowId, render, view) =>
-              extension.contentFor?.(windowId, render, view) ?? (() => null),
-          }),
-          windows: new Set(),
-        };
-        apps.set(app.id, record);
-      }
-      const open = new Set((extension.windows?.(app.id) ?? []).map((window) => window.id));
-      for (const windowId of record.windows) {
-        if (open.has(windowId)) continue;
-        ctx.pracWindows.close(windowId);
-        record.windows.delete(windowId);
-      }
-      for (const window of extension.windows?.(app.id) ?? []) {
-        if (record.windows.has(window.id)) continue;
-        ctx.pracWindows.admit(app.id, { windowId: window.id, title: window.title });
-        record.windows.add(window.id);
-      }
+    for (const def of wanted.values()) {
+      if (apps.has(def.id)) continue;
+      const impl = extension.appRuntime?.(def);
+      if (impl === undefined) continue;
+      apps.set(def.id, {
+        dispose: ctx.pracApplications.register({
+          id: def.id,
+          version: def.version,
+          label: def.label,
+          instances: def.instances,
+          ...(def.defaultRegion === undefined ? {} : { defaultRegion: def.defaultRegion }),
+          ...(def.paneHeader === true ? { paneHeader: true } : {}),
+          ...(impl.match === undefined
+            ? {}
+            : { match: (resource: string) => impl.match?.(resource) ?? false }),
+          ...(impl.open === undefined
+            ? {}
+            : { open: (resource: string) => impl.open?.(resource) ?? false }),
+          content: (windowId, render, view) => impl.content(windowId, render, view),
+        }),
+        windows: new Set(),
+      });
     }
   };
 
