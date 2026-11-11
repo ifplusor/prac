@@ -169,20 +169,20 @@ export interface PracCatalog {
 }
 
 /** The code half of an app: what it renders and how it opens. */
-export interface PracAppImpl {
+export interface PracAppImpl<TParams = unknown> {
   content(
     windowId: string,
     render?: ApplicationSlotRenderer,
     view?: ApplicationViewport,
   ): () => ReactNode;
   match?(resource: string): boolean;
-  open?(resource: string): boolean;
+  open?(params: TParams): boolean;
 }
 
 /** The runtime app: a declaration plus its lazily built implementation. */
-export interface PracApp {
+export interface PracApp<TParams = unknown> {
   readonly def: PracAppDef;
-  readonly impl: PracAppImpl;
+  readonly impl: PracAppImpl<TParams>;
 }
 
 /** The code half of a widget: its host and actions. */

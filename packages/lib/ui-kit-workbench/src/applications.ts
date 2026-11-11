@@ -49,7 +49,7 @@ export interface ApplicationDefinition {
    */
   match?(resource: string): boolean;
   /** Open one resource inside this app; the app owns the window it creates. */
-  open?(resource: string): boolean;
+  open?(params: unknown): boolean;
   /**
    * The content of one window instance.
    *
@@ -135,6 +135,13 @@ export class ApplicationRegistry {
    * @param resource - the workspace path or URI to open.
    * @returns the first app whose `match` accepts it, or `undefined`.
    */
+  openApp(appId: string, params?: unknown): ApplicationDefinition | undefined {
+    const app = this.#apps.get(appId);
+    if (app === undefined) return undefined;
+    app.open?.(params);
+    return app;
+  }
+
   open(resource: string): ApplicationDefinition | undefined {
     for (const app of this.#apps.values()) {
       if (app.match?.(resource) !== true) continue;

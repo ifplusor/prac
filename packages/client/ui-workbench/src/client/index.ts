@@ -951,7 +951,7 @@ export function apply(ctx: Context): void {
         // would give it a second home.
         const containerId = `left/container:${id}`;
         layout.selectContainer(LEFT, containerId);
-        ctx.pracApplications?.open(containerId);
+        ctx.pracApplications?.openApp("prac.board", { containerId });
       },
     };
 

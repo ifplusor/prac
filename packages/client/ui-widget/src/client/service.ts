@@ -44,7 +44,15 @@ export function apply(ctx: Context): void {
     apps: () => [boardApp],
     // The board's content is rendered by the frame (setItemBoard); the app's
     // implementation only has to exist so the app registers.
-    appRuntime: () => ({ content: () => () => null }),
+    appRuntime: () => ({
+      content: () => () => null,
+      match: (resource) => resource.startsWith("left/container:"),
+      open: (params) => {
+        const { containerId } = params as { containerId: string };
+        face.createBoardWindow(containerId);
+        return true;
+      },
+    }),
   };
   const extensions: PracExtensionsFace = ctx.pracExtensions;
   ctx.effect(() => extensions.register(coreExtension), "prac-client-ui-widget: board app");
