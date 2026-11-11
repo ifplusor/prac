@@ -183,7 +183,7 @@ flowchart LR
 
 **两条路，按 app 的 origin 分，不按“是不是 editor”分**：
 
-- **`origin: prac`**（board / document）：`PracWindowInput`（身份投影）+ `PracWindowPane`（空 pane），内容在 prac frame；`mapWindow` 走这条路。
+- **`origin: other`**（board / document）：`PracWindowInput`（身份投影）+ `PracWindowPane`（空 pane），内容在 prac frame；`mapWindow` 走这条路。
 - **`origin: vscode`**（editor，以及**所有** vscode 贡献的 app，不只 editor）：走 VS Code 的真实渲染——editor 用 `TextEditorInput` + `TextEditorPane`，其它 vscode app 用各自的 VS Code 宿主；它们**不是** `PracWindowInput`，也不经 `windowProjection.map`。
 
 分流依据：`appOf(windowId)` 给出 app，再由 app 的 `origin` 决定渲染方式。
