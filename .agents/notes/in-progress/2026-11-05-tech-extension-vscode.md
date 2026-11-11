@@ -34,7 +34,7 @@ flowchart LR
   H["prac.vscode-host<br/>provides prac.vscodeHost"]
   E["prac.vscode-editor<br/>dependsOn vscodeHost"]
   V["prac.vscode-views<br/>dependsOn vscodeHost"]
-  W["PracWindow / PracWidget"]
+  W["PracAppDef / PracWidgetDef<br/>声明"]
 
   H -->|capability| E
   H -->|capability| V
@@ -46,6 +46,7 @@ flowchart LR
 - **editor extension**：`dependsOn: ["prac.vscodeHost"]`；`apps()` 返回 editor `PracAppDef`；`appRuntime(def)` 返回 `{ content, match }`；`open(resource)` 声明窗口（一个正在编辑的文件 = 一个 `PracWindow`；tab strip 的 tab 是 window group 的 window，不是 window 内的 tab）；`content(windowId)` 返回 VS Code 渲染的宿主（`TextEditorPane`，不是 `PracWindowPane` 空 pane；见 [tech-ui](./2026-11-05-tech-ui.md) §2.6）。**不**声明 `windows`。
 - **views extension**：`dependsOn: ["prac.vscodeHost"]`；`widgets()` 返回 `PracWidgetDef`；`widgetRuntime(def)` 返回 `{ hostFor, wrap }`；不声明宿主、不声明窗口。
 - 三者都用 `origin: "vscode"`；host 未 ready → editor / views disabled / degraded。
+- 扩展只贡献**声明**：`PracApp` / `PracWidget` 是运行时组合（def + impl），`PracWindow` 是 WM 的实体，三者都不由 extension 直接产出。
 
 **Cordis 接法**：
 
