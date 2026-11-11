@@ -6,6 +6,7 @@ import {
   setEntryHeight,
   place,
   setFront,
+  type LayoutState,
   type LayoutStore,
   type ItemRecord,
 } from "prac-ui-kit-workbench";
@@ -300,6 +301,14 @@ function resetEntryBoundary(
   });
 }
 
+/** The visible order of the items placed in one region. */
+function orderOf(state: LayoutState, regionId: string): readonly string[] {
+  return Object.entries(state.items)
+    .filter(([, item]) => item.region === regionId)
+    .sort(([, a], [, b]) => a.order - b.order)
+    .map(([id]) => id);
+}
+
 /** Accept a tab / view / grid-cell drag over a grid cell while cells can move. */
 function gridCellDragOver(canDrag: boolean, event: ReactDragEvent<HTMLDivElement>): void {
   if (canDrag) event.preventDefault();
@@ -320,6 +329,7 @@ function gridCellDragOver(canDrag: boolean, event: ReactDragEvent<HTMLDivElement
  */
 function dropOnGridCell(
   store: LayoutStore,
+  windows: WindowManager | undefined,
   gridId: string,
   childId: string,
   canDrag: boolean,
@@ -338,6 +348,7 @@ function dropOnGridCell(
     if (target !== null) {
       event.preventDefault();
       store.update((current) => place(current, tab, target.id));
+      windows?.place(tab, target.id);
     }
     return;
   }
@@ -347,6 +358,7 @@ function dropOnGridCell(
     if (target !== null) {
       event.preventDefault();
       store.update((current) => place(current, view, target.id));
+      windows?.place(view, target.id);
     }
     return;
   }
@@ -727,10 +739,18 @@ export function createFrame(
         items,
         active,
         label: viewLabel,
-        onActivate: (viewId: string) => store.update((current) => setFront(current, viewId)),
+        onActivate: (viewId: string) => {
+          store.update((current) => setFront(current, viewId));
+          sources.windows?.activate(viewId);
+        },
         onClose: (viewId: string) => store.requestCloseItem(viewId),
-        onReorder: (id: string, dragged: string, target: string) =>
-          store.update((current) => reorderTab(current, id, dragged, target)),
+        onReorder: (id: string, dragged: string, target: string) => {
+          store.update((current) => {
+            const next = reorderTab(current, id, dragged, target);
+            if (next !== current) sources.windows?.reorder(id, orderOf(next, id));
+            return next;
+          });
+        },
         renderActions: (viewId: string | undefined) =>
           createElement(
             Fragment,
@@ -1126,7 +1146,7 @@ export function createFrame(
         return {
           onDragOver: (event: ReactDragEvent<HTMLDivElement>) => gridCellDragOver(canDrag, event),
           onDrop: (event: ReactDragEvent<HTMLDivElement>) =>
-            dropOnGridCell(store, node.id, ctx.itemId ?? "", canDrag, event),
+            dropOnGridCell(store, sources.windows, node.id, ctx.itemId ?? "", canDrag, event),
         };
       }
       return undefined;

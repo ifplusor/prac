@@ -71,6 +71,8 @@ export interface WindowGroupRuntime {
   add(window: WindowRuntimeHandle): void;
   remove(windowId: string): void;
   select(windowId: string | undefined): void;
+  /** Reorder the whole group; the set must match the open windows. */
+  reorder?(order: readonly string[]): void;
 }
 
 /**
@@ -498,6 +500,19 @@ export class WindowManager {
     runtime.remove(windowId);
     this.#notify();
     return true;
+  }
+
+  /**
+   * Reorder a window's group to an explicit order.
+   *
+   * @param windowId - a window of the group (the same one the tab strip reordered).
+   * @param order - the group's new order.
+   */
+  reorder(windowId: string, order: readonly string[]): void {
+    const runtime = this.groupOf(windowId);
+    if (runtime === undefined) return;
+    runtime.reorder?.(order);
+    this.#notify();
   }
 
   /**
