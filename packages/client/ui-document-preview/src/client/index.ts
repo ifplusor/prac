@@ -76,7 +76,12 @@ export function apply(ctx: Context): void {
   const open = (resource: string): boolean => {
     const name = resource.split("/").at(-1) ?? resource;
     const windowId = `${WINDOW_PREFIX}${resource}`;
-    windows.admit(app.id, { windowId, title: name, region: app.defaultRegion });
+    windows.admit(app.id, {
+      windowId,
+      title: name,
+      region: app.defaultRegion,
+      content: contentFor(windowId),
+    });
     if (app.defaultRegion !== undefined) frame.place(windowId, app.defaultRegion);
     // Opening a document also brings it forward: the centre is a tab strip and
     // the new window is the one the person asked to see.
