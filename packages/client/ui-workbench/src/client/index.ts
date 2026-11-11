@@ -822,6 +822,19 @@ export function apply(ctx: Context): void {
         }
       }),
     );
+    // A board window's region is the manager's **placement**, which is not a
+    // layout change: the projection has to follow the manager too, or a board
+    // admitted after the first pass never gets its identity input.
+    scope.effect(
+      () =>
+        ctx.pracWindows?.subscribe(() => {
+          try {
+            syncBoardWindowProjection(vscode);
+          } catch {
+            // The next manager change retries.
+          }
+        }) ?? (() => {}),
+    );
     scope.effect(() => {
       syncChat();
       const offLayout = layout.subscribe(syncChat);
