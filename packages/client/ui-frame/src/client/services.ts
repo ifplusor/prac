@@ -111,8 +111,6 @@ export interface LayoutServices {
   readonly contentHosts: ContentHostRegistry;
   /** Board layout roots; keyed by `boardId`. */
   readonly boardLayouts: BoardLayoutRegistry;
-  /** Stop reconciling group membership from the item records. */
-  readonly stopMembership: () => void;
 }
 
 /**
@@ -161,7 +159,6 @@ export function createServices(
       return ctx.slots.register(options, content);
     },
   });
-  const stopMembership = store.subscribe(() => windows.syncMembership());
   const surfaces = new RegionContentRegistry<WindowGroup>();
   const originalUpdate = store.update;
   const write = (change: Parameters<typeof store.update>[0]): void => originalUpdate(change);
@@ -318,9 +315,10 @@ export function createServices(
     listRegions(): RegionInfo[] {
       return regionInfos(store.get().tree);
     },
-    /** Move a view into a region and show it. */
+    /** Move a view into a region and show it; the manager writes the group. */
     place(viewId: string, regionId: string): void {
       store.update((state) => place(state, viewId, regionId));
+      windows.place(viewId, regionId);
     },
     /** Move a view into a region without changing which child that region shows. */
     placeQuietly(viewId: string, regionId: string): void {
@@ -647,6 +645,5 @@ export function createServices(
     surfaces,
     contentHosts,
     boardLayouts,
-    stopMembership,
   };
 }

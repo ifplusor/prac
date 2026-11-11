@@ -94,8 +94,6 @@ export interface WindowSeatPort {
 
 /** The frame projection the manager delegates to (satisfied by `WindowGroupBindings`). */
 export interface WindowGroupBindingsPort {
-  /** The region a window's item record sits in (used to reconcile membership). */
-  regionOf?(windowId: string): string | undefined;
   /** Add / remove a window in a group owned by the bindings (a region content). */
   join?(groupId: string, windowId: string): void;
   leave?(groupId: string, windowId: string): void;
@@ -311,39 +309,32 @@ export class WindowManager {
   }
 
   /**
-   * Reconcile group membership from the frame's item records.
+   * Move a window into the group bound in a region.
    *
-   * A window belongs to the group bound in the region it is placed in. The
-   * arrangement places windows (a file into a sidebar row, a board window into a
-   * container region), so membership follows the records, not only the `admit`
-   * that opened the window. A group registered through the bindings (a board's
-   * region content) has no manager runtime; membership still belongs to it, so
-   * the bindings' group is the fallback. Adding is selection-neutral.
+   * This is the group writer a placement change uses (the frame calls it when a
+   * view moves). Membership follows the placement command, not a store scan.
+   *
+   * @param windowId - the window that moved.
+   * @param regionId - the region it moved into.
    */
-  syncMembership(): void {
-    let changed = false;
-    for (const windowId of this.#appOf.keys()) {
-      const region = this.bindings.regionOf?.(windowId);
-      if (region === undefined) continue;
-      const groupId = this.groupIn(region);
-      if (groupId === undefined) continue;
-      if (this.groupOf(windowId)?.id === groupId) continue;
-      const current = this.groupOf(windowId)?.id;
-      if (current !== undefined) {
-        this.#runtimes.get(current)?.remove(windowId);
-        this.bindings.leave?.(current, windowId);
-      }
-      const handle = this.#handles.get(windowId) ?? { id: windowId };
-      const runtime = this.#runtimes.get(groupId);
-      if (runtime !== undefined) {
-        runtime.add(handle);
-        this.#handles.set(windowId, handle);
-      } else {
-        this.bindings.join?.(groupId, windowId);
-      }
-      changed = true;
+  place(windowId: string, regionId: string): void {
+    const groupId = this.groupIn(regionId);
+    if (groupId === undefined) return;
+    const current = this.groupOf(windowId)?.id;
+    if (current === groupId) return;
+    if (current !== undefined) {
+      this.#runtimes.get(current)?.remove(windowId);
+      this.bindings.leave?.(current, windowId);
     }
-    if (changed) this.#notify();
+    const handle = this.#handles.get(windowId) ?? { id: windowId };
+    const runtime = this.#runtimes.get(groupId);
+    if (runtime !== undefined) {
+      runtime.add(handle);
+      this.#handles.set(windowId, handle);
+    } else {
+      this.bindings.join?.(groupId, windowId);
+    }
+    this.#notify();
   }
 
   /** The first group bound in a region (or a sub-region of it). */
