@@ -234,7 +234,17 @@ export function apply(ctx: Context): void {
   } = createServices(ctx, store, closeListeners);
   const disposeWindowGroupRegionContent = surfaces.register("window-group", {
     create: ({ nodeId }) =>
-      new WindowGroupAdapter(nodeId, undefined, ctx.pracApplications.get("editor")?.version),
+      new WindowGroupAdapter(
+        nodeId,
+        undefined,
+        ctx.pracApplications.get("editor")?.version,
+        (windowId) => {
+          // The editor app is multi-instance: every window is its own instance,
+          // so the window carries an `instanceId` like any other app window.
+          const instance = instances.create("prac.vscode-editor", { resource: windowId });
+          windows.track(windowId, "prac.vscode-editor", instance.id);
+        },
+      ),
   });
 
   // The active window's resolved actions: the adapter pushes a model, the frame

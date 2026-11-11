@@ -36,6 +36,8 @@ export class WindowGroupAdapter implements KitWindowGroup, RegionContent<KitWind
     readonly id: string,
     readonly label?: string,
     readonly appVersion?: string,
+    /** Records the window's app / instance; the frame supplies it. */
+    readonly track?: (windowId: string) => void,
   ) {
     this.#group = new WindowGroup(id);
   }
@@ -87,6 +89,7 @@ export class WindowGroupAdapter implements KitWindowGroup, RegionContent<KitWind
 
   add(view: WindowViewHandle): void {
     this.#views.set(view.id, view);
+    this.track?.(view.id);
     try {
       this.#group.open({
         id: view.id,

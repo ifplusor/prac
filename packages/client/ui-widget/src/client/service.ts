@@ -48,8 +48,9 @@ export function apply(ctx: Context): void {
       content: () => () => null,
       match: (resource) => resource.startsWith("left/container:"),
       start: (params: unknown, instance: { id: string }) => {
-        const { boardId } = params as { boardId: string };
-        face.createBoardWindow(boardId, undefined, instance.id);
+        // The board's region is the container child, not the bare container id.
+        const { boardId, side } = params as { boardId: string; side: "left" | "right" };
+        face.createBoardWindow(`${side}/container:${boardId}`, undefined, instance.id);
         return true;
       },
     }),
@@ -142,7 +143,7 @@ export function apply(ctx: Context): void {
         appId: "prac.board",
         label: labels.get(board) ?? board,
         side,
-        params: { boardId: board },
+        params: { boardId: board, side },
       });
     }
   };

@@ -930,10 +930,14 @@ export function apply(ctx: Context): void {
         ?.list()
         .find((candidate) => candidate.id === id && candidate.side === side);
       if (item === undefined) return;
+      const region = side === "left" ? LEFT : RIGHT;
+      const child = `${side}/container:${id}`;
       const instance =
         item.instanceId === undefined ? undefined : ctx.pracAppInstances?.get(item.instanceId);
       const windowId = instance?.windows[0];
       if (windowId !== undefined) {
+        // Reopen: show the tool, then bring its window forward.
+        layout.selectContainer(region, child);
         ctx.pracWindows?.activateWindow(windowId);
         return;
       }
@@ -941,7 +945,7 @@ export function apply(ctx: Context): void {
       if (created !== undefined) ctx.pracDock?.pin({ ...item, instanceId: created.id });
       // Last word: opening the board may re-select another container, so the
       // clicked pin's container is selected after the app has run.
-      layout.selectContainer(side === "left" ? LEFT : RIGHT, `${side}/container:${id}`);
+      layout.selectContainer(region, child);
     };
 
     const leftDock: PracDockFace = {

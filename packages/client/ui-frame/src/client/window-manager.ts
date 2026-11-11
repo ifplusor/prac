@@ -297,6 +297,24 @@ export class WindowManager {
     );
   }
 
+  /**
+   * Record the app and instance a window belongs to.
+   *
+   * The group surface opens its own windows (an editor group adds the app's
+   * panels), so it registers the identity here instead of going through
+   * `admit` — the app/instance relation is the same either way.
+   *
+   * @param windowId - the window the group opened.
+   * @param appId - the app that owns it.
+   * @param instanceId - the instance that owns it.
+   */
+  track(windowId: string, appId: string, instanceId: string): void {
+    this.#appOf.set(windowId, appId);
+    this.#instanceOf.set(windowId, instanceId);
+    this.instances?.addWindow(instanceId, windowId);
+    this.#notify();
+  }
+
   /** The app instance that owns a window, if any. */
   instanceOf(windowId: string): string | undefined {
     return this.#instanceOf.get(windowId);
