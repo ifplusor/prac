@@ -78,33 +78,8 @@ flowchart LR
 ## 3. Manifest / 定义 / extension
 
 ```ts
-interface PracExtensionManifest {
-  readonly id: string;                 // global
-  readonly version: string;
-  readonly dependsOn?: readonly string[]; // "prac.vscodeHost" / ...
-  readonly capabilities?: readonly string[];
-  readonly provides?: readonly string[];  // host capability
-}
-
-interface PracAppDef {
-  readonly id: string;                 // global app id
-  readonly version: string;            // runtime pins this
-  readonly label: string;
-  readonly icon?: string;
-  readonly paneHeader?: boolean;
-  readonly instances: "single" | "multi";
-  readonly defaultRegion?: string;
-}
-
-interface PracWidgetDef {
-  readonly id: string;                 // namespaced by extension
-  readonly version: string;            // runtime pins this
-  readonly title: string;
-  readonly icon?: string;
-  readonly defaultBoard?: string;
-  readonly defaultRegion?: string;
-}
-
+// 字段定义见 [tech-app](./2026-11-05-tech-app.md) §2。
+// extension 只负责返回这些声明；它们没有 content / hostFor / 窗口。
 ```
 
 - `PracAppDef` / `PracWidgetDef` 是纯声明：没有 `content` / `hostFor` / `actions` / 窗口；代码在 `PracAppImpl` / `PracWidgetImpl`；

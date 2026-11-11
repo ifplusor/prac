@@ -273,3 +273,13 @@ interface LogRecord {
 - [tech-extension](./2026-11-05-tech-extension.md)：extension / catalog / host capability。
 - [product design](./2026-11-05-product-design.md)：质量期望。
 - [docs/ui-acceptance.md](../../../docs/ui-acceptance.md)：gate 目录。
+
+## 持久化策略
+
+各域都持久化，但**策略**只有一份：
+
+- key 命名：`<domain>/v<n>/<scope>/<id>`；`scope` 是 workspace 哈希，`v<n>` 允许今后迁移；
+- 写：一次 update 一个 key，原子替换；失败保留旧值；
+- 读：失败 / 版本不符 → 返回 `undefined`，由域自己 heal，不抛错；
+- heal 原则：未知项丢弃、未知位置回默认、无效指针清空；
+- 各域只写自己的 key 与格式：`tech-ui`（window/store）、`tech-widget`（`prac-board/v1/…`）、`tech-dock`（`prac-dock/v1`）、`tech-agent`（session）；本 note 不重复它们的字段。
