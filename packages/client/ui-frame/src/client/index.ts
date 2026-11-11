@@ -248,7 +248,10 @@ export function apply(ctx: Context): void {
             instanceId: instance.id,
             ...(editor?.content === undefined
               ? {}
-              : { content: () => editor.content?.(windowId)() ?? null }),
+              : {
+                  content: (render, view) =>
+                    editor.content?.(windowId, render, view) ?? (() => null),
+                }),
           });
         },
       ),

@@ -48,12 +48,13 @@ export interface AdmitWindowOptions {
   /** Opaque annotation the app sets; the core stores it and never interprets it. */
   readonly tags?: readonly string[];
   /**
-   * The window's own content.
-   *
-   * Rendering belongs to the window, not the app: the app starts and hands the
-   * window its content here.
+   * The window's own content, shaped like an app's `content` but closed over the
+   * window: the app starts, and hands over the factory for *that* window.
    */
-  readonly content?: () => ReactNode;
+  readonly content?: (
+    render?: ApplicationSlotRenderer,
+    view?: ApplicationViewport,
+  ) => () => ReactNode;
   /** The app definition version to pin for this window. */
   readonly appVersion?: string;
   /** Which group takes it; otherwise the manager picks the group bound in `region`. */
@@ -142,12 +143,13 @@ export interface WindowSnapshot {
   /** Opaque annotation the app sets; the core stores it and never interprets it. */
   readonly tags?: readonly string[];
   /**
-   * The window's own content.
-   *
-   * Rendering belongs to the window, not the app: the app starts and hands the
-   * window its content here.
+   * The window's own content, shaped like an app's `content` but closed over the
+   * window: the app starts, and hands over the factory for *that* window.
    */
-  readonly content?: () => ReactNode;
+  readonly content?: (
+    render?: ApplicationSlotRenderer,
+    view?: ApplicationViewport,
+  ) => () => ReactNode;
 }
 
 /** One group in the runtime snapshot. */
@@ -296,7 +298,7 @@ export class WindowManager {
       ...(app.icon === undefined ? {} : { icon: app.icon }),
       ...(app.paneHeader === undefined ? {} : { paneHeader: app.paneHeader }),
       ...(own !== undefined
-        ? { content: () => own }
+        ? { content: (id, render, view) => own(render, view) }
         : app.content === undefined
           ? {}
           : { content: app.content.bind(app) }),

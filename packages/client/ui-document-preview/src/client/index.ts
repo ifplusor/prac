@@ -80,7 +80,7 @@ export function apply(ctx: Context): void {
       windowId,
       title: name,
       region: app.defaultRegion,
-      content: contentFor(windowId),
+      content: () => contentFor(windowId),
     });
     if (app.defaultRegion !== undefined) frame.place(windowId, app.defaultRegion);
     // Opening a document also brings it forward: the centre is a tab strip and
