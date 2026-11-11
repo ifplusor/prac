@@ -785,7 +785,7 @@ export function apply(ctx: Context): void {
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, "prac-workbench: bottom shortcut");
 
-  ctx.inject(["pracVscode"], (scope) => {
+  ctx.inject(["pracVscode", "pracApplications"], (scope) => {
     const vscode = scope.pracVscode;
     // The conversation is frame-rendered; project its identity so the editor
     // model includes the window (order / close-if-empty) without rendering it twice.
@@ -873,9 +873,14 @@ export function apply(ctx: Context): void {
       }
       const opened = files.find((entry) => appeared.includes(entry.appId));
       if (opened === undefined) return;
-      // A file the app opened comes forward in the centre window group; the
-      // window group's tab strip is the switch, so the conversation stays a tab.
-      openFileInto(layout, opened.view);
+      // The app registry is the open pipeline: a document app claims its kinds
+      // (PDF, office, images) and opens its own window; the editor is the
+      // fallback, so the file view still lands in the centre window group.
+      const path = opened.view.startsWith("vscode:file:")
+        ? opened.view.slice("vscode:file:".length)
+        : undefined;
+      const app = path === undefined ? undefined : scope.pracApplications?.open(path);
+      if (app === undefined) openFileInto(layout, opened.view);
     };
     sync();
     scope.effect(() => vscode.onDidChangeCatalogue(sync), "prac-web-app: app catalogue");
