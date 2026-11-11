@@ -43,7 +43,7 @@ flowchart LR
 ```
 
 - **host extension**：`manifest.id = "prac.vscode-host"`，`provides: ["prac.vscodeHost"]`；只 boot / embed / face，不贡献 app / widget。
-- **editor extension**：`dependsOn: ["prac.vscodeHost"]`；`apps()` 返回 editor `PracAppDef`；`windows()` 来自当前 editor input——**一个正在编辑的文件 = 一个 `PracWindow`；tab strip 的 tab 是 window group 的 window，不是 window 内的 tab**；`contentFor(windowId)` 返回 editor pane host。
+- **editor extension**：`dependsOn: ["prac.vscodeHost"]`；`apps()` 返回 editor `PracAppDef`；`windows()` 来自当前 editor input——**一个正在编辑的文件 = 一个 `PracWindow`；tab strip 的 tab 是 window group 的 window，不是 window 内的 tab**；`contentFor(windowId)` 返回 editor pane host —— VS Code 渲染的 `TextEditorPane`（不是 `PracWindowPane` 空 pane；见 [tech-ui](./2026-11-05-tech-ui.md) §2.6）。
 - **views extension**：`dependsOn: ["prac.vscodeHost"]`；`widgets()` 返回 `PracWidgetDef`；`hostFor(widgetId)` 返回 view 宿主。
 - 三者都用 `origin: "vscode"`；host 未 ready → editor / views disabled / degraded。
 
