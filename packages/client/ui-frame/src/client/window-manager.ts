@@ -385,6 +385,11 @@ export class WindowManager {
    * @param regionId - the region it moved into.
    */
   place(windowId: string, regionId: string): void {
+    if (windowId.includes("workbench.view.explorer/board")) {
+      console.error(
+        `[prac-wm] place ${windowId} -> ${regionId} from ${String(new Error().stack).split("\n")[2]}`,
+      );
+    }
     this.#placements.set(windowId, regionId);
     const groupId = this.groupIn(regionId);
     if (groupId === undefined) {
