@@ -181,13 +181,17 @@ flowchart LR
 
 ## 5.1 投影：prac window → VS Code
 
+**两条路，按 app 的 origin 分，不按“是不是 editor”分**：
+
+- **`origin: prac`**（board / document）：`PracWindowInput`（身份投影）+ `PracWindowPane`（空 pane），内容在 prac frame；`mapWindow` 走这条路。
+- **`origin: vscode`**（editor，以及**所有** vscode 贡献的 app，不只 editor）：走 VS Code 的真实渲染——editor 用 `TextEditorInput` + `TextEditorPane`，其它 vscode app 用各自的 VS Code 宿主；它们**不是** `PracWindowInput`，也不经 `windowProjection.map`。
+
+分流依据：`appOf(windowId)` 给出 app，再由 app 的 `origin` 决定渲染方式。
+
 **镜像，不是权威**：`PracWindowInput` 由 WM 的窗口驱动，embed 不决定窗口是否存在。
 
-- `PracWindowInput`：prac 窗口的身份投影（editor input 形状）；
 - `PracWindowGroup`：prac 的 window group，实现 `IEditorGroupView`，借用 `EditorGroupModel` / `PracEditorPaneHost` / pane 类；
 - `PracWindowPane`：frame 渲染窗口的空 pane（内容在 prac frame）；
-- **editor 窗口例外**：`TextEditorInput` + `TextEditorPane`，由 VS Code 真实渲染；prac frame 挂 `activeEditorPane.getContainer()`；
-- 分流依据是 `appOf(windowId)`，不是 windowId 前缀；
 - `mapped()` 返回 WM 投影过的窗口（`inputs.keys()`），不问 editor group；
 - `map(region)` 在 region 没有 group 时先 `ensureGroup(region)`，不丢弃窗口；
 - 窗口的 region 来自 WM 的 placement（`pracFrame.getState().items[id].region`），不从“有没有文件窗口”推导。
