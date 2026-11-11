@@ -300,7 +300,29 @@ export function createServices(
   const contentHosts = new ContentHostRegistry();
   const boardLayouts = new BoardLayoutRegistry();
   const pracFrame: PracLayoutFace = {
-    getState: () => store.get(),
+    // The manager owns the placement; the layout's item table is the persistence
+    // snapshot. The render reads the projection, so a placement the manager took
+    // is what the person sees even before the next snapshot write.
+    getState: () => {
+      const state = store.get();
+      const placements = windows.getSnapshot().placements;
+      if (placements.length === 0) return state;
+      let items = state.items;
+      let changed = false;
+      for (const { windowId, region } of placements) {
+        const item = items[windowId];
+        if (item?.region === region) continue;
+        items = {
+          ...items,
+          [windowId]:
+            item === undefined
+              ? { kind: "window", region, order: 0, hidden: false }
+              : { ...item, region },
+        };
+        changed = true;
+      }
+      return changed ? { ...state, items } : state;
+    },
     // The render must re-read on a manager change too: the manager owns the
     // placements, so a placement-only change (a group move) would otherwise be
     // invisible to a subscriber of the layout alone.
