@@ -58,7 +58,7 @@ import type { PracWidgetsFace } from "prac-client-ui-widget/client";
 import { WindowGroupModel } from "prac-ui-kit-workbench";
 // Types only, for its `Context` merge (`ctx.pracVscode`): the arrangement follows
 // the app's open-file set, and naming the face puts that service in this program.
-import type { PracVscodeFace, VscodeCatalogueEntry } from "prac-client-vscode-host/client";
+import type { VscodeCatalogueEntry } from "prac-client-vscode-host/client";
 import {
   CENTER,
   LEFT,
@@ -691,34 +691,6 @@ export function apply(ctx: Context): void {
    * an editor group has nowhere to project into — `mapWindow` is a no-op there — so a
    * sidebar board gets its identity once an editor window lives in that group.
    */
-  const mappedBoards = new Set<string>();
-  const syncBoardWindowProjection = (vscode: PracVscodeFace): void => {
-    // Every container board is alive: `registered` only tracks the surface
-    // registration, and gating this set on it made the pass unmap the windows it
-    // had just mapped (map → next call sees an empty `alive` → unmap).
-    const alive = new Set([...containerBoards.values()].map((entry) => entry.board.windowId));
-    for (const id of mappedBoards) {
-      if (alive.has(id)) continue;
-      vscode.unmapWindow(id);
-      mappedBoards.delete(id);
-    }
-    const mappedIds = new Set(vscode.mappedWindows());
-    for (const entry of containerBoards.values()) {
-      const id = entry.board.windowId;
-      if (mappedIds.has(id)) continue;
-      // The board window's own region is the placement the WM gave it. A board's
-      // state lives in the board layout registry, not the frame's item table, so
-      // the window's region comes from the manager's placements.
-      const region =
-        ctx.pracWindows
-          ?.getSnapshot()
-          .placements.find((placement) => placement.windowId === entry.board.windowId)?.region ??
-        layout.getState().items[entry.board.windowId]?.region;
-      if (region === undefined || region === null) continue;
-      vscode.mapWindow(entry.board.windowId, entry.board.label ?? "Board", region);
-      mappedBoards.add(id);
-    }
-  };
   const placeContainerView = (
     view: string,
     region: string,
@@ -815,7 +787,6 @@ export function apply(ctx: Context): void {
     scope.effect(() =>
       layout.subscribe(() => {
         try {
-          syncBoardWindowProjection(vscode);
         } catch {
           // The next layout change retries.
         }
@@ -828,7 +799,6 @@ export function apply(ctx: Context): void {
       () =>
         ctx.pracWindows?.subscribe(() => {
           try {
-            syncBoardWindowProjection(vscode);
           } catch {
             // The next manager change retries.
           }
@@ -859,7 +829,6 @@ export function apply(ctx: Context): void {
       // centre, or beside the file's other placement.
       placeCatalogue(layout, dsh.pracDsh, catalogue, placeContainerView);
       syncContainerBoards(catalogue);
-      syncBoardWindowProjection(vscode);
       // Model discriminator: a file view is a window; a contributed view is a
       // widget. Board windows are not classified yet; dsh:* stays the default window.
       for (const id of Object.keys(layout.getState().items)) {
