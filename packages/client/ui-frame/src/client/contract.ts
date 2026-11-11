@@ -42,7 +42,12 @@ import type {} from "@deepseek-ai/dsh-client-ui-slots";
 // merged members (no `ctx.effect` / `ctx.provide`).
 export type { Context } from "@deepseek-ai/cordis";
 export type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
-import type { ApplicationRegistry, PracAppInstances, PracDock } from "prac-ui-kit-workbench";
+import type {
+  ApplicationRegistry,
+  PracAppInstance,
+  PracAppInstances,
+  PracDock,
+} from "prac-ui-kit-workbench";
 
 import type { WindowManager } from "./window-manager.js";
 
@@ -180,6 +185,9 @@ export interface PracAppImpl<TParams = unknown> {
     view?: ApplicationViewport,
   ): () => ReactNode;
   match?(resource: string): boolean;
+  /** The app's entry: runs inside a launch, with the instance the launch created. */
+  start?(params: TParams, instance: PracAppInstance): boolean;
+  /** @deprecated use {@link start}; kept until every app migrates. */
   open?(params: TParams): boolean;
 }
 

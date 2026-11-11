@@ -50,6 +50,8 @@ export interface ApplicationDefinition {
   match?(resource: string): boolean;
   /** Open one resource inside this app; the app owns the window it creates. */
   open?(params: unknown): boolean;
+  /** The app's entry: runs inside a launch, with the instance the launch created. */
+  start?(params: unknown, instance: PracAppInstance): boolean;
   /**
    * The content of one window instance.
    *
@@ -224,7 +226,8 @@ export class ApplicationRegistry {
     const app = this.#apps.get(appId);
     if (app === undefined) return undefined;
     const instance = this.#instances?.create(appId, params);
-    app.open?.(params);
+    if (instance !== undefined) app.start?.(params, instance);
+    else app.open?.(params);
     return instance;
   }
 
