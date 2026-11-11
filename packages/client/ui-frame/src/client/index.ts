@@ -248,10 +248,7 @@ export function apply(ctx: Context): void {
             instanceId: instance.id,
             ...(editor?.content === undefined
               ? {}
-              : {
-                  content: (render, view) =>
-                    editor.content?.(windowId, render, view) ?? (() => null),
-                }),
+              : { content: () => editor.content?.(windowId)() ?? null }),
           });
         },
       ),
