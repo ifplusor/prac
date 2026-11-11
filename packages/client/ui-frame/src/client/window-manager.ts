@@ -112,6 +112,29 @@ export interface WindowGroupBindingsPort {
   dispose(): void;
 }
 
+/** One window in the runtime snapshot the render reads. */
+export interface WindowSnapshot {
+  readonly id: string;
+  readonly appId: string;
+  readonly title?: string;
+  readonly appVersion?: string;
+  /** The group the window currently belongs to, by id. */
+  readonly group?: string;
+}
+
+/** One group in the runtime snapshot. */
+export interface GroupSnapshot {
+  readonly id: string;
+  readonly order: readonly string[];
+  readonly active?: string;
+}
+
+/** The window manager's runtime state: the render's single source. */
+export interface WindowManagerSnapshot {
+  readonly windows: readonly WindowSnapshot[];
+  readonly groups: readonly GroupSnapshot[];
+}
+
 /** The window manager: group registry plus membership decisions. */
 export class WindowManager {
   readonly #runtimes = new Map<string, WindowGroupRuntime>();
@@ -126,6 +149,8 @@ export class WindowManager {
   readonly #listeners = new Set<() => void>();
   /** The seat registration per admitted window. */
   readonly #seats = new Map<string, () => void>();
+  /** Cached runtime snapshot; invalidated by every change. */
+  #snapshot: WindowManagerSnapshot | undefined;
 
   constructor(
     private readonly bindings: WindowGroupBindingsPort,
@@ -356,6 +381,40 @@ export class WindowManager {
   onDidChange(listener: () => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
+  }
+
+  /**
+   * The runtime state the render reads.
+   *
+   * The store holds the recovery snapshot; this is the live state. The cached
+   * value keeps `useSyncExternalStore` stable between changes.
+   */
+  getSnapshot(): WindowManagerSnapshot {
+    if (this.#snapshot !== undefined) return this.#snapshot;
+    const windows: WindowSnapshot[] = [];
+    for (const [id, appId] of this.#appOf) {
+      const title = this.#titles.get(id);
+      const appVersion = this.#appVersions.get(id);
+      const group = this.groupOf(id);
+      windows.push({
+        id,
+        appId,
+        ...(title === undefined ? {} : { title }),
+        ...(appVersion === undefined ? {} : { appVersion }),
+        ...(group === undefined ? {} : { group: group.id }),
+      });
+    }
+    const groups: GroupSnapshot[] = [...this.#runtimes.values()].map((runtime) => ({
+      id: runtime.id,
+      ...runtime.state,
+    }));
+    this.#snapshot = { windows, groups };
+    return this.#snapshot;
+  }
+
+  /** Subscribe to runtime changes; the render's subscription. */
+  subscribe(listener: () => void): () => void {
+    return this.onDidChange(listener);
   }
 
   /** Every window an app opened (admitted), in no particular order. */
