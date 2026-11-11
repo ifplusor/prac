@@ -58,22 +58,56 @@ export function apply(ctx: Context): void {
   };
   const extensions: PracExtensionsFace = ctx.pracExtensions;
   ctx.effect(() => extensions.register(coreExtension), "prac-client-ui-widget: board app");
-  const face: PracWidgetsFace = {
-    registry: new WidgetRegistry(),
-    createBoardWindow: (id, label, instanceId) => {
-      const existing = boards.get(id);
-      if (existing !== undefined) return existing;
-      const board = new BoardWindowAdapter(id, label, windowFace);
-      boards.set(id, board);
+
+  /** Board windows the manager has admitted (a retry must not admit twice). */
+  const admitted = new Set<string>();
+
+  /**
+   * Admit one board's window into the manager.
+   *
+   * The region may not exist on the first catalogue pass (the arrangement
+   * creates it), so a failure is swallowed and retried on the next pass — the
+   * widget mount would otherwise be lost for the life of the page.
+   *
+   * @param board - the board whose window is admitted.
+   * @param region - the container region the board lives in.
+   * @param instanceId - the app instance that owns the window, when there is one.
+   */
+  const admitBoard = (
+    board: BoardWindowAdapter,
+    region: string,
+    instanceId: string | undefined,
+  ): void => {
+    if (admitted.has(board.boardId)) return;
+    try {
       ctx.pracWindows.admit("prac.board", {
         windowId: board.boardId,
-        title: label ?? "Board",
-        region: id,
+        title: board.label ?? "Board",
+        region,
         ...(instanceId === undefined ? {} : { instanceId }),
       });
       // The board names its region; the manager writes the placement, so the
       // projection can map the window to its pane host.
-      ctx.pracWindows.place(board.boardId, id);
+      ctx.pracWindows.place(board.boardId, region);
+      admitted.add(board.boardId);
+    } catch {
+      // Retried by the next catalogue sync once the region exists.
+    }
+  };
+
+  const face: PracWidgetsFace = {
+    registry: new WidgetRegistry(),
+    createBoardWindow: (id, label, instanceId) => {
+      const existing = boards.get(id);
+      if (existing !== undefined) {
+        // The first pass may have run before the region existed; retry the
+        // admission until the manager accepts it.
+        admitBoard(existing, id, instanceId);
+        return existing;
+      }
+      const board = new BoardWindowAdapter(id, label, windowFace);
+      boards.set(id, board);
+      admitBoard(board, id, instanceId);
       return board;
     },
     boards: () => [...boards.values()].filter((board) => !board.disposed),

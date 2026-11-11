@@ -380,9 +380,17 @@ export class WindowManager {
   place(windowId: string, regionId: string): void {
     this.#placements.set(windowId, regionId);
     const groupId = this.groupIn(regionId);
-    if (groupId === undefined) return;
+    if (groupId === undefined) {
+      // The placement is recorded even when no group hosts the window; the
+      // snapshot must see it, or the projection cannot map the window.
+      this.#notify();
+      return;
+    }
     const current = this.groupOf(windowId)?.id;
-    if (current === groupId) return;
+    if (current === groupId) {
+      this.#notify();
+      return;
+    }
     if (current !== undefined) {
       this.#runtimes.get(current)?.remove(windowId);
       this.bindings.leave?.(current, windowId);
@@ -655,6 +663,9 @@ export class WindowManager {
   }
 
   #notify(): void {
+    // The snapshot is memoised; every write has to invalidate it, or readers
+    // (the projection, the dock) keep the state from their first read.
+    this.#snapshot = undefined;
     for (const listener of Array.from(this.#listeners)) listener();
   }
 

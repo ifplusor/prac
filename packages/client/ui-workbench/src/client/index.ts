@@ -648,11 +648,17 @@ export function apply(ctx: Context): void {
     if (entry.registered) return entry.board;
     try {
       layout.registerWindowGroup(entry.group, region);
+    } catch {
+      // The manager already bound a group at this region (it admits the board's
+      // window). Two bindings for one region is the error, not a missing region:
+      // the board keeps the manager's group and only needs its item record.
+      if (layout.regionChildren(region).length === 0) return undefined;
+    }
+    try {
       layout.setItemBoard(entry.board.windowId, entry.board.boardId);
       entry.registered = true;
       return entry.board;
     } catch {
-      // The region may not exist yet. The catalogue sync retries.
       return undefined;
     }
   };
