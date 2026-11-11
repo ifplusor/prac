@@ -125,10 +125,49 @@ export function apply(ctx: Context): void {
     };
     return extensions.register(extension);
   }, "prac-client-ui-vscode-views: one widget per app view");
+
+  // The stage's non-native windows need an identity input: their content is
+  // rendered by prac's frame, so the app's editor model holds a placeholder.
+  // The manager is the authority; this adaptor only mirrors it.
+  ctx.effect(() => {
+    const mapped = new Set<string>();
+    const sync = (): void => {
+      const snapshot = ctx.pracWindows?.getSnapshot();
+      if (snapshot === undefined) return;
+      const stage = snapshot.placements.filter((placement) => STAGE.has(placement.region));
+      const wanted = new Set(
+        snapshot.windows
+          .filter((window) => window.tags?.includes("vscode") !== true)
+          .filter((window) => stage.some((placement) => placement.windowId === window.id))
+          .map((window) => window.id),
+      );
+      for (const id of mapped) {
+        if (wanted.has(id)) continue;
+        ctx.pracVscode.unmapWindow(id);
+        mapped.delete(id);
+      }
+      for (const placement of stage) {
+        if (!wanted.has(placement.windowId)) continue;
+        if (mapped.has(placement.windowId)) continue;
+        const window = snapshot.windows.find((candidate) => candidate.id === placement.windowId);
+        ctx.pracVscode.mapWindow(
+          placement.windowId,
+          window?.title ?? placement.windowId,
+          placement.region,
+        );
+        mapped.add(placement.windowId);
+      }
+    };
+    sync();
+    return ctx.pracWindows?.subscribe(sync) ?? (() => {});
+  }, "prac-client-ui-vscode-views: stage placeholders");
 }
+
+/** The stage's region id. */
+const STAGE = new Set(["center"]);
 
 /** The cordis plugin name used by loader diagnostics. */
 export const name = "prac-client-ui-vscode-views";
 
 /** The DSH services this plugin needs: the extension registry and the mechanism. */
-export const inject = ["pracExtensions", "pracVscode"];
+export const inject = ["pracExtensions", "pracVscode", "pracWindows"];
