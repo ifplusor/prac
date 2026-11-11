@@ -143,10 +143,6 @@ export interface PracAppDef {
   readonly paneHeader?: boolean;
   readonly instances: "single" | "multi";
   readonly defaultRegion?: string;
-  /** Whether this app handles a resource; the open pipeline uses the first match. */
-  readonly match?: (resource: string) => boolean;
-  /** Open one resource inside this app; the app owns the window it creates. */
-  readonly open?: (resource: string) => boolean;
 }
 
 /** Declarative widget definition. */
@@ -156,7 +152,6 @@ export interface PracWidgetDef {
   readonly title: string;
   readonly icon?: string;
   readonly paneHeader?: boolean;
-  readonly actions?: () => ReactNode;
   readonly defaultBoard?: string;
   readonly defaultRegion?: string;
 }
@@ -177,19 +172,43 @@ export interface PracCatalog {
   readonly hosts: readonly PracHostDecl[];
 }
 
+/** The code half of an app: what it renders and how it opens. */
+export interface PracAppImpl {
+  content(
+    windowId: string,
+    render?: ApplicationSlotRenderer,
+    view?: ApplicationViewport,
+  ): () => ReactNode;
+  match?(resource: string): boolean;
+  open?(resource: string): boolean;
+}
+
+/** The runtime app: a declaration plus its lazily built implementation. */
+export interface PracApp {
+  readonly def: PracAppDef;
+  readonly impl: PracAppImpl;
+}
+
+/** The code half of a widget: its host and actions. */
+export interface PracWidgetImpl {
+  hostFor(widgetId: string): () => ReactNode;
+  actions?(): ReactNode;
+  wrap?(widgetId: string, host: () => ReactNode): () => ReactNode;
+}
+
+/** The runtime widget: a declaration plus its lazily built implementation. */
+export interface PracWidget {
+  readonly def: PracWidgetDef;
+  readonly impl: PracWidgetImpl;
+}
+
 /** One extension runtime contribution object, registered by a Cordis plugin. */
 export interface PracExtension {
   readonly manifest: PracExtensionManifest;
   apps?(): readonly PracAppDef[];
   widgets?(): readonly PracWidgetDef[];
-  windows?(appId: string): readonly { readonly id: string; readonly title: string }[];
-  contentFor?(
-    windowId: string,
-    render?: ApplicationSlotRenderer,
-    view?: ApplicationViewport,
-  ): () => ReactNode;
-  hostFor?(widgetId: string): () => ReactNode;
-  wrap?(widgetId: string, host: () => ReactNode): () => ReactNode;
+  appRuntime?(def: PracAppDef): PracAppImpl | undefined;
+  widgetRuntime?(def: PracWidgetDef): PracWidgetImpl | undefined;
   onDidChange?(listener: () => void): () => void;
 }
 

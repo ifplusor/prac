@@ -108,14 +108,9 @@ interface PracWidgetDef {
   readonly defaultRegion?: string;
 }
 
-interface PracWindowDecl {
-  readonly id: string;
-  readonly appId: string;
-  readonly title: string;
-}
 ```
 
-- `PracAppDef` / `PracWidgetDef` **没有** `content` / `hostFor` / `windows`；
+- `PracAppDef` / `PracWidgetDef` 是纯声明：没有 `content` / `hostFor` / `actions` / 窗口；代码在 `PracAppImpl` / `PracWidgetImpl`；
 - 定义可以来自 VS Code `contributes`、DSH plugin 声明、prac manifest；
 - `origin` 只是元数据，不做分支；`prac` / `vscode` / `dsh` 都是同一个 extension 模型。
 
