@@ -134,11 +134,17 @@ export function apply(ctx: Context): void {
     const sync = (): void => {
       const snapshot = ctx.pracWindows?.getSnapshot();
       if (snapshot === undefined) return;
-      const stage = snapshot.placements.filter((placement) => STAGE.has(placement.region));
+      // Every window belongs to a window group, and every window group maps to an
+      // editor group: the region a window sits in is its group's region. Only the
+      // windows prac renders need an input of ours — a vscode-native editor is
+      // already in the editor service.
+      const placed = new Map(
+        snapshot.placements.map((placement) => [placement.windowId, placement.region]),
+      );
       const wanted = new Set(
         snapshot.windows
           .filter((window) => window.tags?.includes("vscode") !== true)
-          .filter((window) => stage.some((placement) => placement.windowId === window.id))
+          .filter((window) => placed.has(window.id))
           .map((window) => window.id),
       );
       for (const id of mapped) {
@@ -146,36 +152,19 @@ export function apply(ctx: Context): void {
         ctx.pracVscode.unmapWindow(id);
         mapped.delete(id);
       }
-      for (const placement of stage) {
-        if (!wanted.has(placement.windowId)) continue;
-        if (mapped.has(placement.windowId)) continue;
-        const window = snapshot.windows.find((candidate) => candidate.id === placement.windowId);
-        ctx.pracVscode.mapWindow(
-          placement.windowId,
-          window?.title ?? placement.windowId,
-          placement.region,
-        );
-        mapped.add(placement.windowId);
+      for (const windowId of wanted) {
+        if (mapped.has(windowId)) continue;
+        const window = snapshot.windows.find((candidate) => candidate.id === windowId);
+        ctx.pracVscode.mapWindow(windowId, window?.title ?? windowId, placed.get(windowId));
+        mapped.add(windowId);
       }
     };
-    let off: (() => void) | undefined;
-    let disposed = false;
-    // The workbench has to be up before a window can be mapped: `mapWindow`
-    // against a booting app queues the id instead of creating its input.
-    void ctx.pracVscode.whenReady().then(() => {
-      if (disposed) return;
-      sync();
-      off = ctx.pracWindows?.subscribe(sync);
-    });
-    return () => {
-      disposed = true;
-      off?.();
-    };
+    // Mapping before the workbench is up is safe: the embed queues the id and
+    // applies it once the app boots (the queue is part of `mappedWindows`).
+    sync();
+    return ctx.pracWindows?.subscribe(sync) ?? (() => {});
   }, "prac-client-ui-vscode-views: stage placeholders");
 }
-
-/** The stage's region id. */
-const STAGE = new Set(["center"]);
 
 /** The cordis plugin name used by loader diagnostics. */
 export const name = "prac-client-ui-vscode-views";
