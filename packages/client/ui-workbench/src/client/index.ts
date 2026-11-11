@@ -66,6 +66,7 @@ import {
   arrange,
   VIEW_DEFAULTS,
   containerBoardTargets,
+  defaultPlacements,
   openFileInto,
   placeCatalogue,
   restoreCentre,
@@ -839,6 +840,11 @@ export function apply(ctx: Context): void {
       // centre, or beside the file's other placement.
       placeCatalogue(layout, dsh.pracDsh, catalogue, placeContainerView);
       syncContainerBoards(catalogue);
+      // The default windows are the apps' own: launching them once the catalogue
+      // is in lets `start` create them with their content.
+      for (const entry of defaultPlacements(dsh.pracDsh)) {
+        ctx.pracApplications?.launch(entry.appId, { windowId: entry.view, region: entry.region });
+      }
       // Model discriminator: a file view is a window; a contributed view is a
       // widget. Board windows are not classified yet; dsh:* stays the default window.
       for (const id of Object.keys(layout.getState().items)) {

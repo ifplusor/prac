@@ -249,7 +249,14 @@ export class PracApplications {
       }
     }
     const instance = this.#instances?.create(appId, params);
-    if (instance !== undefined) app.start?.(params, instance);
+    if (instance === undefined) return undefined;
+    try {
+      app.start?.(params, instance);
+    } catch {
+      // A failed start leaves no instance behind: the launch rolls it back.
+      this.#instances?.dispose(instance.id);
+      return undefined;
+    }
     return instance;
   }
 

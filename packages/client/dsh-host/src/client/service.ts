@@ -25,29 +25,25 @@ const chat: PracAppDef = {
   defaultRegion: "center",
 };
 
-const sidebar: PracAppDef = {
-  id: "dsh.sidebar",
-  version: "1",
-  label: "Sidebar",
-  instances: "single",
-  defaultRegion: "left",
-};
-
-const rightbar: PracAppDef = {
-  id: "dsh.rightbar",
-  version: "1",
-  label: "Right bar",
-  instances: "single",
-  defaultRegion: "right",
-};
-
 /** Install the DSH adapter service. */
 export function apply(ctx: Context): void {
   const extensions: PracExtensionsFace = ctx.pracExtensions;
   const extension: PracExtension = {
     manifest: { id: "prac.dsh-host", version: "1" },
-    apps: () => [chat, sidebar, rightbar],
+    apps: () => [chat],
     appRuntime: () => ({
+      // The launch is what creates the window: the app names it, the manager
+      // records it, the content follows from the window's own factory.
+      start: (params, instance) => {
+        const { windowId, region } = params as { windowId?: string; region?: string };
+        const target = windowId ?? DSH_CONVERSATION_VIEW;
+        ctx.pracWindows.admit("chat", {
+          windowId: target,
+          region,
+          ...(instance === undefined ? {} : { instanceId: instance.id }),
+        });
+        return true;
+      },
       content: (windowId, render, view) => {
         if (render === undefined) return () => null;
         if (windowId === DSH_CONVERSATION_VIEW) {
@@ -86,4 +82,4 @@ export function apply(ctx: Context): void {
 }
 
 export const name = "prac-client-dsh-host";
-export const inject: readonly string[] = ["pracExtensions"];
+export const inject: readonly string[] = ["pracExtensions", "pracWindows"];

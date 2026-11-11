@@ -46,11 +46,9 @@ export function defaultPlacements(dsh: PracDshFace): readonly {
   readonly appId: string;
   readonly hidden?: boolean;
 }[] {
-  return [
-    { view: dsh.sidebar, region: LEFT, appId: "dsh.sidebar" },
-    { view: dsh.conversation, region: CENTER, appId: "chat" },
-    { view: dsh.rightbar, region: RIGHT, hidden: true, appId: "dsh.rightbar" },
-  ];
+  // DSH is a host extension, not a set of apps: `chat` is the one app it hosts.
+  // The sidebar and rightbar windows are gone; the chrome is prac's own.
+  return [{ view: dsh.conversation, region: CENTER, appId: "chat" }];
 }
 // No default for the centre's editor: since decision 17 a file is a view that
 // exists because the *app* opened it, so there is nothing to place until one is
@@ -444,7 +442,6 @@ export function arrange(
   }
   // The title bar owns session/workspace selection; the DSH sidebar remains
   // registered (the recall surface can still reach it) but starts hidden.
-  layout.hide(dsh.sidebar);
   // The left region's content is the container **board window** the catalogue sync creates;
   // placing a bare Explorer view here would be a second, empty home for the same container.
 }
