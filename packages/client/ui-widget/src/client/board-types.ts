@@ -28,6 +28,4 @@ export interface PracBoard {
   readonly root: LayoutState;
   /** Active widget id. */
   readonly active?: string;
-  /** Whether the dock shows this board. */
-  readonly pinned: boolean;
 }
