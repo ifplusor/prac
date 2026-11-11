@@ -50,6 +50,13 @@ flowchart LR
 - **运行时**：激活后的 extension、host、window、widget、content root；有生命周期。
 - **layout / session state**：placement / active / Space；可持久化，但不是声明。
 
+### 2.2 两种 extension
+
+- **host extension**：提供机制（boot / embed / face），不贡献 app / widget；feature extension 依赖它。
+- **feature extension**：贡献 app / widget，`dependsOn` 对应的 host。
+
+本文只规定这两种契约的形态，不定义 app 的语义（app 模型见 [tech-ui](./2026-11-05-tech-ui.md) §2）。
+
 ### 2.1 extension 与 plugin
 
 **prac 和 DSH 都基于 Cordis。** prac extension 不是新的 plugin runtime，而是：

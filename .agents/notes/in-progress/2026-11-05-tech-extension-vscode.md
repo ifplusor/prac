@@ -141,6 +141,14 @@ flowchart LR
 - **actions / commands**：`containerActions` / `editorActions` / `runAction` / `runEditorAction` → resolved action model；frame 渲染。
 - **webview / custom editor**：`EditorPane`；secure context 由 runtime 管。
 
+## 5.1 投影：prac window → VS Code
+
+- `PracWindowInput`：prac 窗口的身份投影（editor input 形状）；
+- `PracWindowGroup`：prac 的 window group，实现 `IEditorGroupView`，借用 `EditorGroupModel` / `PracEditorPaneHost` / pane 类；
+- `PracWindowPane`：frame 渲染窗口的空 pane（内容在 prac frame）；
+- **editor 窗口例外**：`TextEditorInput` + `TextEditorPane`，由 VS Code 真实渲染；prac frame 挂 `activeEditorPane.getContainer()`；
+- 分流依据是 `appOf(windowId)`，不是 windowId 前缀。
+
 ## 6. 动态 / 错误 / 测试
 
 - 贡献变化 → catalog version 更新 → reconcile；不重启。
