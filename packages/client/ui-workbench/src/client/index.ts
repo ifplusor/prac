@@ -33,12 +33,12 @@ import type { Side } from "prac-ui-kit-layout";
 import { createElement, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { PracFirstRun, PRAC_FIRST_RUN_CSS } from "./first-run.js";
 import {
-  PracRail,
+  PracDock,
   PracTitleBar,
   PRAC_SHELL_CSS,
   type PracLayoutAction,
-  type PracRailFace,
-  type PracRailItem,
+  type PracDockFace,
+  type PracDockItem,
   type PracTitleFace,
 } from "./title-bar.js";
 import type { ReactElement } from "react";
@@ -878,7 +878,7 @@ export function apply(ctx: Context): void {
     sync();
     scope.effect(() => vscode.onDidChangeCatalogue(sync), "prac-web-app: app catalogue");
 
-    const railSubscribe = (listener: () => void): (() => void) => {
+    const dockSubscribe = (listener: () => void): (() => void) => {
       const offLayout = layout.subscribe(listener);
       const offCatalogue = vscode.onDidChangeCatalogue(listener);
       return () => {
@@ -905,14 +905,14 @@ export function apply(ctx: Context): void {
     };
 
     /** A dock's tool windows: the children the arrangement put in that region. */
-    const dockItems = (regionId: string): PracRailItem[] =>
+    const dockItems = (regionId: string): PracDockItem[] =>
       layout.regionChildren(regionId).map((child) => ({
         id: child.id,
         label: child.label ?? child.id.split("/").pop() ?? child.id,
         active: layout.activeContainer(regionId) === child.id,
       }));
 
-    const leftRail: PracRailFace = {
+    const leftDock: PracDockFace = {
       // The left rail is the workspace's containers, which the app's catalogue names — that is the
       // same list the dock's children are built from, and it keeps an empty container (Run and
       // Debug) reachable even while its only view is off screen.
@@ -944,18 +944,20 @@ export function apply(ctx: Context): void {
             active: layout.activeContainer(LEFT) === `left/container:${item.id}`,
           }));
       },
-      onDidChange: railSubscribe,
+      onDidChange: dockSubscribe,
       select: (id) => {
-        // The rail names a container, not a view: selecting its child shows the container's
-        // **board window**. Its widgets live on the board — showing one as a frame view would
-        // give it a second home.
-        layout.selectContainer(LEFT, `left/container:${id}`);
+        // The dock is an app shortcut: selecting it opens the app (its board window), which
+        // also shows the container. Its widgets live on the board — showing one as a frame view
+        // would give it a second home.
+        const containerId = `left/container:${id}`;
+        layout.selectContainer(LEFT, containerId);
+        ctx.pracApplications?.open(containerId);
       },
     };
 
-    const rightRail: PracRailFace = {
-      items: (): PracRailItem[] => {
-        const items: PracRailItem[] = [];
+    const rightDock: PracDockFace = {
+      items: (): PracDockItem[] => {
+        const items: PracDockItem[] = [];
         const chatView = layout.getState().items[conversation];
         const region = chatView?.region ?? null;
         const inDock = region === RIGHT || (region !== null && region.startsWith(`${RIGHT}/`));
@@ -976,7 +978,7 @@ export function apply(ctx: Context): void {
         }
         return items;
       },
-      onDidChange: railSubscribe,
+      onDidChange: dockSubscribe,
       select: (id) => {
         if (id === "chat") {
           // Showing it must not drag it out of the editor area: maximize is a placement the app
@@ -1101,12 +1103,12 @@ export function apply(ctx: Context): void {
     ) => unknown;
     registerActivity("shell.overlay", () =>
       addActivity({ name: "shell.overlay", id: "prac-activity", order: -9 }, () =>
-        createElement(PracRail, { face: leftRail, side: "left" }),
+        createElement(PracDock, { face: leftDock, side: "left" }),
       ),
     );
     registerActivity("shell.overlay", () =>
       addActivity({ name: "shell.overlay", id: "prac-activity-right", order: -9 }, () =>
-        createElement(PracRail, { face: rightRail, side: "right" }),
+        createElement(PracDock, { face: rightDock, side: "right" }),
       ),
     );
   });
@@ -1143,4 +1145,11 @@ export const name = "prac-client-ui-workbench";
  * the mechanism's placement face. `pracFrame` is a hard dependency — every
  * placement goes through it.
  */
-export const inject = ["slots", "layout", "pracFrame", "pracDsh", "pracWidgets"];
+export const inject = [
+  "slots",
+  "layout",
+  "pracFrame",
+  "pracDsh",
+  "pracWidgets",
+  "pracApplications",
+];

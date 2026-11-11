@@ -643,7 +643,7 @@ export function PracTitleBar({ face }: PracTitleBarProps): ReactElement {
 }
 
 /** One item a dock rail shows: a container, a view, or the agent. */
-export interface PracRailItem {
+export interface PracDockItem {
   /** Stable id; the face's `select` receives it back. */
   readonly id: string;
   /** The visible name (the glyph is derived from it). */
@@ -655,9 +655,9 @@ export interface PracRailItem {
 }
 
 /** The face a dock rail drives. */
-export interface PracRailFace {
+export interface PracDockFace {
   /** The items to show, in order. */
-  items(): readonly PracRailItem[];
+  items(): readonly PracDockItem[];
   /** Called when the items or their active state may have changed. */
   onDidChange(listener: () => void): () => void;
   /** Bring the item's tool window forward. */
@@ -673,14 +673,14 @@ export interface PracRailFace {
  *
  * @param props - the face and the side the rail belongs to.
  */
-export function PracRail({
+export function PracDock({
   face,
   side,
 }: {
-  face: PracRailFace;
+  face: PracDockFace;
   side: "left" | "right";
 }): ReactElement {
-  const [items, setItems] = useState<readonly PracRailItem[]>(() => face.items());
+  const [items, setItems] = useState<readonly PracDockItem[]>(() => face.items());
   useEffect(() => {
     const update = (): void => setItems(face.items());
     update();

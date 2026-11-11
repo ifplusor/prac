@@ -136,7 +136,6 @@ function recordingFace(items: LayoutState["items"] = {}): {
     setWidth: record("setWidth"),
     splitItem: record("splitItem"),
     bindRoles: record("bindRoles"),
-    bindTrack: record("bindTrack"),
     setItemFlags: record("setItemFlags"),
     activeItem: () => null,
     onDidRequestCloseItem: () => () => {},
