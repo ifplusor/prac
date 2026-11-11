@@ -6,6 +6,7 @@ import type {
   GroupBarItem,
   GroupRegionContent,
   LayoutState,
+  PracAppInstances,
   RegionBinding,
   WindowGroup,
 } from "prac-ui-kit-workbench";
@@ -41,6 +42,8 @@ export interface AdmitWindowOptions {
   readonly windowId: string;
   /** The window title the chrome shows until the app provides one. */
   readonly title?: string;
+  /** The app instance that owns this window. */
+  readonly instanceId?: string;
   /** The app definition version to pin for this window. */
   readonly appVersion?: string;
   /** Which group takes it; otherwise the manager picks the group bound in `region`. */
@@ -124,6 +127,8 @@ export interface WindowSnapshot {
   readonly appVersion?: string;
   /** The group the window currently belongs to, by id. */
   readonly group?: string;
+  /** The app instance that owns this window. */
+  readonly instanceId?: string;
 }
 
 /** One group in the runtime snapshot. */
@@ -155,6 +160,8 @@ export class WindowManager {
   readonly #handles = new Map<string, WindowRuntimeHandle>();
   /** The app that opened each window, for single-instance reuse. */
   readonly #appOf = new Map<string, string>();
+  /** The app instance that owns each window. */
+  readonly #instanceOf = new Map<string, string>();
   /** The title each app gave its window. */
   readonly #titles = new Map<string, string>();
   /** The app definition version pinned by each window. */
@@ -171,6 +178,7 @@ export class WindowManager {
     private readonly bindings: WindowGroupBindingsPort,
     private readonly apps: ApplicationRegistry,
     private readonly seat?: WindowSeatPort,
+    private readonly instances?: PracAppInstances,
   ) {}
 
   /**
@@ -245,6 +253,10 @@ export class WindowManager {
     // A window with no group is still an app window: the arrangement may place it
     // directly in a region (file windows), so the manager only records it.
     this.#appOf.set(windowId, appId);
+    if (options.instanceId !== undefined) {
+      this.#instanceOf.set(windowId, options.instanceId);
+      this.instances?.addWindow(options.instanceId, windowId);
+    }
     const appVersion = options.appVersion ?? app.version;
     if (appVersion !== undefined) this.#appVersions.set(windowId, appVersion);
     if (options.title !== undefined) this.#titles.set(windowId, options.title);
@@ -283,6 +295,11 @@ export class WindowManager {
         content,
       ),
     );
+  }
+
+  /** The app instance that owns a window, if any. */
+  instanceOf(windowId: string): string | undefined {
+    return this.#instanceOf.get(windowId);
   }
 
   /** The app that opened a window, if any. */
@@ -494,6 +511,11 @@ export class WindowManager {
     this.#handles.delete(windowId);
     this.#placements.delete(windowId);
     this.#appOf.delete(windowId);
+    const instanceId = this.#instanceOf.get(windowId);
+    if (instanceId !== undefined) {
+      this.#instanceOf.delete(windowId);
+      this.instances?.removeWindow(instanceId, windowId);
+    }
     this.#titles.delete(windowId);
     this.#appVersions.delete(windowId);
     const runtime = this.groupOf(windowId);

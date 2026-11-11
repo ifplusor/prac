@@ -89,6 +89,85 @@ export interface ApplicationViewport {
 }
 
 /** The application table: who can be launched. */
+/** One running app instance: the launch params and the windows it owns. */
+export interface PracAppInstance {
+  readonly id: string;
+  readonly appId: string;
+  readonly params?: unknown;
+  readonly windows: readonly string[];
+}
+
+/**
+ * The app instance manager: the OS's process table.
+ *
+ * It owns instance identity and the instance → windows relation. It never
+ * touches a window (the window manager does); it records which windows an
+ * instance holds and disposes an instance when its last window closes.
+ */
+export class PracAppInstances {
+  readonly #instances = new Map<string, PracAppInstance>();
+  readonly #listeners = new Set<() => void>();
+  #next = 0;
+
+  /** One instance by id (the only lookup: callers hold the id, not a matcher). */
+  get(instanceId: string): PracAppInstance | undefined {
+    return this.#instances.get(instanceId);
+  }
+
+  /** Every running instance. */
+  list(): readonly PracAppInstance[] {
+    return [...this.#instances.values()];
+  }
+
+  /** Start one instance and return it. */
+  create(appId: string, params?: unknown): PracAppInstance {
+    const id = `${appId}:${++this.#next}`;
+    const instance: PracAppInstance = {
+      id,
+      appId,
+      ...(params === undefined ? {} : { params }),
+      windows: [],
+    };
+    this.#instances.set(id, instance);
+    this.#notify();
+    return instance;
+  }
+
+  /** Record a window the instance owns. */
+  addWindow(instanceId: string, windowId: string): void {
+    const instance = this.#instances.get(instanceId);
+    if (instance === undefined || instance.windows.includes(windowId)) return;
+    this.#instances.set(instanceId, { ...instance, windows: [...instance.windows, windowId] });
+    this.#notify();
+  }
+
+  /** Drop one window; the last one disposes the instance. */
+  removeWindow(instanceId: string, windowId: string): void {
+    const instance = this.#instances.get(instanceId);
+    if (instance === undefined) return;
+    const windows = instance.windows.filter((id) => id !== windowId);
+    if (windows.length === instance.windows.length) return;
+    if (windows.length === 0) this.#instances.delete(instanceId);
+    else this.#instances.set(instanceId, { ...instance, windows });
+    this.#notify();
+  }
+
+  /** Drop one instance. */
+  dispose(instanceId: string): void {
+    if (this.#instances.delete(instanceId)) this.#notify();
+  }
+
+  /** Subscribe to instance creation / removal. */
+  subscribe(listener: () => void): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
+
+  #notify(): void {
+    for (const listener of this.#listeners) listener();
+  }
+}
+
 export class ApplicationRegistry {
   readonly #apps = new Map<string, ApplicationDefinition>();
   readonly #listeners = new Set<() => void>();
