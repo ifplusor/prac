@@ -881,9 +881,11 @@ export function apply(ctx: Context): void {
     const dockSubscribe = (listener: () => void): (() => void) => {
       const offLayout = layout.subscribe(listener);
       const offCatalogue = vscode.onDidChangeCatalogue(listener);
+      const offDock = ctx.pracDock?.subscribe(listener) ?? (() => {});
       return () => {
         offLayout();
         offCatalogue();
+        offDock();
       };
     };
     /** A dock's tool windows: the children the arrangement put in that region. */
@@ -894,23 +896,32 @@ export function apply(ctx: Context): void {
         active: layout.activeContainer(regionId) === child.id,
       }));
 
-    const activeWindowId = (): string | undefined => {
+    /**
+     * The dock items, with the active one derived from the layout.
+     *
+     * A pin names a board; whether it is the tool the region shows is the
+     * layout's answer, not the instance's (a board keeps its instance after its
+     * window closes).
+     */
+    const dockPins = (side: "left" | "right"): PracDockItem[] => {
+      const region: string = side === "left" ? LEFT : RIGHT;
+      const selected = layout.activeContainer(region);
       const snapshot = ctx.pracWindows?.getSnapshot();
-      return snapshot?.groups.find((group) => group.active !== undefined)?.active;
-    };
-
-    const dockPins = (side: "left" | "right"): PracDockItem[] =>
-      (ctx.pracDock?.list() ?? [])
+      const focused = snapshot?.groups.find((group) => group.active !== undefined)?.active;
+      return (ctx.pracDock?.list() ?? [])
         .filter((item) => item.side === side)
         .map((item) => {
-          const instance =
-            item.instanceId === undefined ? undefined : ctx.pracAppInstances?.get(item.instanceId);
+          const child = `${region}/container:${item.id}`;
           return {
             id: item.id,
             label: item.label,
-            active: instance !== undefined && instance.windows.includes(activeWindowId() ?? ""),
+            // The layout says which tool the region shows; the window manager says
+            // which window has focus. Either one marks the pin (they agree once the
+            // click settles; the layout alone would flicker back during the open).
+            active: selected === child || focused === `${child}/board`,
           };
         });
+    };
 
     const selectDock = (side: "left" | "right", id: string): void => {
       const item = ctx.pracDock
@@ -926,6 +937,9 @@ export function apply(ctx: Context): void {
       }
       const created = ctx.pracApplications?.openApp(item.appId, item.params);
       if (created !== undefined) ctx.pracDock?.pin({ ...item, instanceId: created.id });
+      // Last word: opening the board may re-select another container, so the
+      // clicked pin's container is selected after the app has run.
+      layout.selectContainer(side === "left" ? LEFT : RIGHT, `${side}/container:${id}`);
     };
 
     const leftDock: PracDockFace = {

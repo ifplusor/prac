@@ -263,6 +263,44 @@ interface PracExtensionsFace {
 - widget：`widgets()` diff → `PracWidgets` 注册；宿主由 widget 运行时提供；board root 负责 placement。
 - 失败：per-extension 回滚；不影响其他 extension。
 
+### 7.1 App 生命周期与命名
+
+**命名规则**：一个概念一个词（`App`，不用 `Application`）；动词对齐 OS 词汇；`Prac*` 只加在跨边界的核心概念上。
+
+| 概念 | 名字 | 对标 |
+| --- | --- | --- |
+| app 声明 | `PracAppDef` | manifest |
+| app 代码 | `PracAppImpl<TParams>` | code |
+| app 运行时 | `PracApp` | `def` + `impl` |
+| app 注册表 | `PracApplications` | Launch Services + AMS 的入口 |
+| app 实例 | `PracAppInstance` | `ActivityRecord`（**不是** `ProcessRecord`） |
+| 实例表 | `PracAppInstances` | 进程表 |
+| 资源路由 | `match(resource)` | Launch Services 查询 |
+| 路由 + 启动 | `open(resource)` | 双击文件 |
+| 启动 / 复用 | `launch(appId, params)` | `startActivity` |
+| app 入口 | `start(params, instance)` | `onCreate` |
+
+**启动链**：
+
+```
+open(resource)                    // Launch Services
+  → match(resource) → appId
+  → launch(appId, params)         // AMS
+      → single? 复用已有实例 → activateWindow → 返回
+      → 否则 instances.create → impl.start(params, instance) → 返回
+```
+
+**不变量**：
+
+- 实例只由 `launch` 创建；`open` 只是在它前面加一步路由，不另开路径；
+- `match` 无副作用；
+- 实例由**管理器**在 `start` 之前创建（启动事务），app 拿到实例、不创建、不枚举、不销毁；
+- 复用策略是**声明**（`PracAppDef.instances`：`single` ≈ `singleTask`，`multi` ≈ `standard`），由 `launch` 执行，app 不判断；
+- 边界参数一律 `unknown`：`open` / `launch` 的调用方不知道具体 app 的参数类型；`PracAppImpl<TParams>` 保留泛型，`start` 里自行 narrow；
+- 复用时的前台化经 `focus(windowId)` 端口注入，registry 不认识 WM。
+
+`PracAppHost` 不需要：app 既不需要创建也不枚举实例，它只接收自己的实例。
+
 ## 8. VS Code / DSH 两侧
 
 - **VS Code**：把 `package.json` `contributes` + 实时 catalog / when 转成 `PracAppDef` / `PracWidgetDef`；editor / views 依赖 `prac.vscodeHost`。见 [tech-extension-vscode](./2026-11-05-tech-extension-vscode.md)。

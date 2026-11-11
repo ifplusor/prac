@@ -23,6 +23,8 @@ export interface WidgetDefinition {
   readonly icon?: string;
   /** Default board hint; not ownership. */
   readonly defaultBoard?: string;
+  /** The catalogue's location word; the dock derives its side from it. */
+  readonly defaultRegion?: string;
   readonly multiplicity: "single" | "multi";
   readonly actions?: readonly WidgetActionRef[];
 }

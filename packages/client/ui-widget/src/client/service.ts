@@ -48,8 +48,8 @@ export function apply(ctx: Context): void {
       content: () => () => null,
       match: (resource) => resource.startsWith("left/container:"),
       open: (params) => {
-        const { containerId } = params as { containerId: string };
-        face.createBoardWindow(containerId);
+        const { boardId } = params as { boardId: string };
+        face.createBoardWindow(boardId);
         return true;
       },
     }),
@@ -114,6 +114,7 @@ export function apply(ctx: Context): void {
         multiplicity: "single",
         ...(widget.icon === undefined ? {} : { icon: widget.icon }),
         ...(widget.defaultBoard === undefined ? {} : { defaultBoard: widget.defaultBoard }),
+        ...(widget.defaultRegion === undefined ? {} : { defaultRegion: widget.defaultRegion }),
       });
       registered.set(widget.id, () => disposer.dispose());
     }
@@ -124,13 +125,23 @@ export function apply(ctx: Context): void {
   const pinBoards = (): void => {
     const dock = ctx.pracDock;
     if (dock === undefined) return;
+    const sides = new Map<string, "left" | "right">();
+    const labels = new Map<string, string>();
     for (const definition of face.registry.list()) {
-      if (definition.defaultBoard === undefined) continue;
+      const board = definition.defaultBoard;
+      if (board === undefined) continue;
+      const side = sideFor(definition.defaultRegion);
+      if (side === undefined) continue;
+      sides.set(board, side);
+      if (!labels.has(board)) labels.set(board, definition.title);
+    }
+    for (const [board, side] of sides) {
       dock.pin({
-        id: definition.defaultBoard,
+        id: board,
         appId: "prac.board",
-        label: definition.defaultBoard,
-        side: "left",
+        label: labels.get(board) ?? board,
+        side,
+        params: { boardId: board },
       });
     }
   };
@@ -153,3 +164,18 @@ export const inject = [
   "pracWindows",
   "pracDock",
 ];
+
+/**
+ * The dock side for a catalogue location word.
+ *
+ * The app's vocabulary decides where its container lives; the panel is not a
+ * rail, so it has no dock side at all.
+ *
+ * @param location - the catalogue's location word.
+ * @returns the rail side, or undefined for a location with no rail.
+ */
+function sideFor(location: string | undefined): "left" | "right" | undefined {
+  if (location === "sidebar") return "left";
+  if (location === "auxiliarybar") return "right";
+  return undefined;
+}
