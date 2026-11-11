@@ -886,24 +886,6 @@ export function apply(ctx: Context): void {
         offCatalogue();
       };
     };
-    /** One item per container the app offers in a location, in catalogue order. */
-    const containerItems = (
-      location: "sidebar" | "auxiliarybar",
-    ): { id: string; label: string; view: string }[] => {
-      const groups = new Map<string, { label: string; view: string }>();
-      for (const entry of vscode.catalogue()) {
-        if (entry.source !== "view" || entry.containerId === undefined) continue;
-        if (entry.location !== location) continue;
-        if (!groups.has(entry.containerId)) {
-          groups.set(entry.containerId, {
-            label: entry.containerTitle ?? entry.title,
-            view: entry.view,
-          });
-        }
-      }
-      return [...groups.entries()].map(([id, group]) => ({ id, ...group }));
-    };
-
     /** A dock's tool windows: the children the arrangement put in that region. */
     const dockItems = (regionId: string): PracDockItem[] =>
       layout.regionChildren(regionId).map((child) => ({
@@ -912,49 +894,45 @@ export function apply(ctx: Context): void {
         active: layout.activeContainer(regionId) === child.id,
       }));
 
-    const leftDock: PracDockFace = {
-      // The left rail is the workspace's containers, which the app's catalogue names — that is the
-      // same list the dock's children are built from, and it keeps an empty container (Run and
-      // Debug) reachable even while its only view is off screen.
-      items: () => {
-        // A container moved to the right dock is the right rail's item now; listing it on the left
-        // too would be a dead button. (An unplaced container such as Run and Debug stays: it has no
-        // items anywhere, so moving it is not a state the left rail can lose it in.)
-        const placedRight = new Set(
-          layout
-            .listItems()
-            .filter(
-              (view) =>
-                view.region !== null &&
-                (view.region === RIGHT || view.region.startsWith(`${RIGHT}/`)),
-            )
-            .map((view) => view.id),
-        );
-        const moved = new Set(
-          vscode
-            .catalogue()
-            .filter((entry) => entry.containerId !== undefined && placedRight.has(entry.view))
-            .map((entry) => entry.containerId),
-        );
-        return containerItems("sidebar")
-          .filter((item) => !moved.has(item.id))
-          .map((item) => ({
-            id: item.id,
-            label: item.label,
-            active: layout.activeContainer(LEFT) === `left/container:${item.id}`,
-          }));
-      },
-      onDidChange: dockSubscribe,
-      select: (id) => {
-        // The dock is an app shortcut: selecting it opens the app (its board window), which
-        // also shows the container. Its widgets live on the board — showing one as a frame view
-        // would give it a second home.
-        const containerId = `left/container:${id}`;
-        layout.selectContainer(LEFT, containerId);
-        ctx.pracApplications?.openApp("prac.board", { containerId });
-      },
+    const activeWindowId = (): string | undefined => {
+      const snapshot = ctx.pracWindows?.getSnapshot();
+      return snapshot?.groups.find((group) => group.active !== undefined)?.active;
     };
 
+    const dockPins = (side: "left" | "right"): PracDockItem[] =>
+      (ctx.pracDock?.list() ?? [])
+        .filter((item) => item.side === side)
+        .map((item) => {
+          const instance =
+            item.instanceId === undefined ? undefined : ctx.pracAppInstances?.get(item.instanceId);
+          return {
+            id: item.id,
+            label: item.label,
+            active: instance !== undefined && instance.windows.includes(activeWindowId() ?? ""),
+          };
+        });
+
+    const selectDock = (side: "left" | "right", id: string): void => {
+      const item = ctx.pracDock
+        ?.list()
+        .find((candidate) => candidate.id === id && candidate.side === side);
+      if (item === undefined) return;
+      const instance =
+        item.instanceId === undefined ? undefined : ctx.pracAppInstances?.get(item.instanceId);
+      const windowId = instance?.windows[0];
+      if (windowId !== undefined) {
+        ctx.pracWindows?.activateWindow(windowId);
+        return;
+      }
+      const created = ctx.pracApplications?.openApp(item.appId, item.params);
+      if (created !== undefined) ctx.pracDock?.pin({ ...item, instanceId: created.id });
+    };
+
+    const leftDock: PracDockFace = {
+      items: () => dockPins("left"),
+      onDidChange: dockSubscribe,
+      select: (id) => selectDock("left", id),
+    };
     const rightDock: PracDockFace = {
       items: (): PracDockItem[] => {
         const items: PracDockItem[] = [];
@@ -980,6 +958,7 @@ export function apply(ctx: Context): void {
       },
       onDidChange: dockSubscribe,
       select: (id) => {
+        selectDock("right", id);
         if (id === "chat") {
           // Showing it must not drag it out of the editor area: maximize is a placement the app
           // chooses (no file → editor area), not something a rail click undoes. When it is docked,
@@ -1152,4 +1131,7 @@ export const inject = [
   "pracDsh",
   "pracWidgets",
   "pracApplications",
+  "pracWindows",
+  "pracAppInstances",
+  "pracDock",
 ];

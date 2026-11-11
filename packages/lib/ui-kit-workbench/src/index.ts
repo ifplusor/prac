@@ -25,3 +25,5 @@ export * from "./content-host-registry.js";
 export * from "./board-layouts.js";
 export * from "./layout-drop.js";
 export * from "./probes.js";
+
+export * from "./dock.js";

@@ -170,6 +170,12 @@ export class PracAppInstances {
 
 export class ApplicationRegistry {
   readonly #apps = new Map<string, ApplicationDefinition>();
+  readonly #instances: PracAppInstances | undefined;
+
+  constructor(instances?: PracAppInstances) {
+    this.#instances = instances;
+  }
+
   readonly #listeners = new Set<() => void>();
   #disposed = false;
 
@@ -214,11 +220,12 @@ export class ApplicationRegistry {
    * @param resource - the workspace path or URI to open.
    * @returns the first app whose `match` accepts it, or `undefined`.
    */
-  openApp(appId: string, params?: unknown): ApplicationDefinition | undefined {
+  openApp(appId: string, params?: unknown): PracAppInstance | undefined {
     const app = this.#apps.get(appId);
     if (app === undefined) return undefined;
+    const instance = this.#instances?.create(appId, params);
     app.open?.(params);
-    return app;
+    return instance;
   }
 
   open(resource: string): ApplicationDefinition | undefined {

@@ -42,7 +42,7 @@ import type {} from "@deepseek-ai/dsh-client-ui-slots";
 // merged members (no `ctx.effect` / `ctx.provide`).
 export type { Context } from "@deepseek-ai/cordis";
 export type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
-import type { ApplicationRegistry } from "prac-ui-kit-workbench";
+import type { ApplicationRegistry, PracAppInstances, PracDock } from "prac-ui-kit-workbench";
 
 import type { WindowManager } from "./window-manager.js";
 
@@ -93,6 +93,10 @@ declare module "@deepseek-ai/cordis" {
     pracWindowActions: PracWindowActionsFace;
     /** The extension registry: contribution objects -> catalog. */
     pracExtensions: PracExtensionsFace;
+    /** The app instance manager (the OS's process table). */
+    pracAppInstances: PracAppInstances;
+    /** The dock's pins. */
+    pracDock: PracDock;
     /** The frame's surface socket registry. */
     pracSurfaces: RegionContentRegistry<WindowGroup>;
   }

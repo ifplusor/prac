@@ -226,6 +226,8 @@ export function apply(ctx: Context): void {
     panelInfo,
     windows,
     applications,
+    instances,
+    dock,
     surfaces,
     contentHosts,
     boardLayouts,
@@ -307,6 +309,8 @@ export function apply(ctx: Context): void {
     const disposePracFrame = ctx.provide("pracFrame", pracFrame);
     const disposeApplications = ctx.provide("pracApplications", applications);
     const disposeWindows = ctx.provide("pracWindows", windows);
+    const disposeInstances = ctx.provide("pracAppInstances", instances);
+    const disposeDock = ctx.provide("pracDock", dock);
     const disposePracSurfaces = ctx.provide("pracSurfaces", surfaces);
     const disposePracSpaces = ctx.provide("pracSpaces", pracSpaces);
     const disposeWindowActions = ctx.provide("pracWindowActions", windowActions);
@@ -363,6 +367,8 @@ export function apply(ctx: Context): void {
       disposePracSurfaces();
       disposeWindows();
       disposeApplications();
+      disposeInstances();
+      disposeDock();
       disposePracFrame();
       disposeLayout();
       disposePanelInfo();

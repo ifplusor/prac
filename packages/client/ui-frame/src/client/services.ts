@@ -20,6 +20,7 @@ import {
   BoardLayoutRegistry,
   ApplicationRegistry,
   PracAppInstances,
+  PracDock,
   WindowGroupBindings,
   type RegionBinding,
   type WindowGroup,
@@ -106,6 +107,10 @@ export interface LayoutServices {
   readonly windows: WindowManager;
   /** The app definitions partners contribute. */
   readonly applications: ApplicationRegistry;
+  /** The app instance manager (the OS's process table). */
+  readonly instances: PracAppInstances;
+  /** The dock's pins. */
+  readonly dock: PracDock;
   /** Region-content factories registered by window / widget plugins. */
   readonly surfaces: RegionContentRegistry<WindowGroup>;
   /** Runtime content hosts for windows; keyed by `contentId`. */
@@ -135,6 +140,7 @@ export function createServices(
   // runs on the way out of each change rather than only on placements.
   const applications = new ApplicationRegistry();
   const instances = new PracAppInstances();
+  const dock = new PracDock();
   const windows = new WindowManager(
     new WindowGroupBindings(store),
     applications,
@@ -623,6 +629,8 @@ export function createServices(
     panelInfo,
     windows,
     applications,
+    instances,
+    dock,
     surfaces,
     contentHosts,
     boardLayouts,
