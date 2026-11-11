@@ -321,6 +321,24 @@ importers:
         specifier: workspace:*
         version: link:../ui-frame
 
+  packages/client/ui-chat:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: 'catalog:'
+        version: 4.0.5-alpha.1
+      '@types/react':
+        specifier: 'catalog:'
+        version: 18.3.31
+      prac-client-dsh-host:
+        specifier: workspace:*
+        version: link:../dsh-host
+      prac-client-ui-frame:
+        specifier: workspace:*
+        version: link:../ui-frame
+      react:
+        specifier: 'catalog:'
+        version: 18.3.1
+
   packages/client/ui-deliverables:
     devDependencies:
       '@deepseek-ai/cordis':

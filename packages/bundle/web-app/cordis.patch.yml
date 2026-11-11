@@ -51,6 +51,9 @@
     # The document-preview app: one app, one window per open document. It is a
     # prac app, not a VS Code editor adapter: the open router hands it a
     # document, and the app's windows render the preview body.
+    - id: prac-client-ui-chat
+      name: "prac-client-ui-chat"
+
     - id: prac-client-ui-document-preview
       name: "prac-client-ui-document-preview"
 

@@ -5,7 +5,7 @@
  */
 
 import type { Context } from "@deepseek-ai/cordis";
-import type { PracAppDef, PracExtension, PracExtensionsFace } from "prac-client-ui-frame/client";
+import type { PracExtension, PracExtensionsFace } from "prac-client-ui-frame/client";
 import type {} from "prac-client-ui-frame/client";
 import {
   DSH_CONVERSATION_VIEW,
@@ -17,20 +17,11 @@ import {
 } from "./dsh.js";
 import type { PracDshFace } from "./contract.js";
 
-const chat: PracAppDef = {
-  id: "chat",
-  version: "1",
-  label: "Chat",
-  instances: "single",
-  defaultRegion: "center",
-};
-
 /** Install the DSH adapter service. */
 export function apply(ctx: Context): void {
   const extensions: PracExtensionsFace = ctx.pracExtensions;
   const extension: PracExtension = {
     manifest: { id: "prac.dsh-host", version: "1" },
-    apps: () => [chat],
     appRuntime: () => ({
       // The launch is what creates the window: the app names it, the manager
       // records it, the content follows from the window's own factory.
