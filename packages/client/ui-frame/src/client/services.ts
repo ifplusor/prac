@@ -138,8 +138,13 @@ export function createServices(
   // one-view rows. Hiding the last visible view, placing one, folding one — they all change the shape
   // (a stack that falls back to one row melts, an empty leftover holds no space), so the normaliser
   // runs on the way out of each change rather than only on placements.
-  const applications = new PracApplications();
+  // The focus port is filled in once the window manager exists; a launch happens
+  // after the frame is installed, so the indirection is only about construction order.
+  const focusRef: { current?: (windowId: string) => void } = {};
   const instances = new PracAppInstances();
+  const applications = new PracApplications(instances, {
+    focus: (windowId) => focusRef.current?.(windowId),
+  });
   const dock = new PracDock();
   const windows = new WindowManager(
     new WindowGroupBindings(store),
@@ -159,6 +164,7 @@ export function createServices(
     },
     instances,
   );
+  focusRef.current = (windowId) => windows.activateWindow(windowId);
   const surfaces = new RegionContentRegistry<WindowGroup>();
   const originalUpdate = store.update;
   const write = (change: Parameters<typeof store.update>[0]): void => originalUpdate(change);

@@ -168,11 +168,19 @@ export class PracAppInstances {
   }
 }
 
+/** The port a launch uses to bring an existing instance forward. */
+export interface PracApplicationsPorts {
+  /** Focus one window; the window manager supplies it, so this class stays WM-agnostic. */
+  readonly focus?: (windowId: string) => void;
+}
+
 export class PracApplications {
   readonly #apps = new Map<string, PracAppDef>();
   readonly #instances: PracAppInstances | undefined;
+  readonly #ports: PracApplicationsPorts;
 
-  constructor(instances?: PracAppInstances) {
+  constructor(instances?: PracAppInstances, ports: PracApplicationsPorts = {}) {
+    this.#ports = ports;
     this.#instances = instances;
   }
 
@@ -230,6 +238,16 @@ export class PracApplications {
   launch(appId: string, params?: unknown): PracAppInstance | undefined {
     const app = this.#apps.get(appId);
     if (app === undefined) return undefined;
+    // A single-instance app reopens: bring its existing window forward instead of
+    // starting a second instance (the app declared the policy; the launch runs it).
+    if (app.instances === "single") {
+      const existing = this.#instances?.list().find((candidate) => candidate.appId === appId);
+      const windowId = existing?.windows[0];
+      if (existing !== undefined && windowId !== undefined) {
+        this.#ports.focus?.(windowId);
+        return existing;
+      }
+    }
     const instance = this.#instances?.create(appId, params);
     if (instance !== undefined) app.start?.(params, instance);
     return instance;
