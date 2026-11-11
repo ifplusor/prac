@@ -8,17 +8,21 @@ status: in-progress
 
 ## 1. 范围与不变量
 
-**范围**：widget 是什么、board 是什么、board 怎么从 widget 推导、怎么恢复。
+### 1.1 范围
 
-**不变量**
+widget 是什么、board 是什么、board 怎么从 widget 推导、怎么恢复。
 
-1. **widget 是单例**：一个 widget 只在一个 board（`PracWidget.boardId` 唯一）。
-2. **board 属于 prac core**：extension 只贡献 widget，不贡献 board。
-3. `PracBoard.widgets` 与 `root.items` 的 id 集合相等（隐藏的也算成员）。
-4. `hidden` 是视图状态，不是成员关系。
-5. `defaultBoard` 只是“首次落点”，不是当前归属。
-6. board root 同时只有一个 writer；跨 board 只允许 move，split 只在目标 root 内。
-7. 空 board 保留，显式删除才移除。
+### 1.2 不变量
+
+| id | 不变量 | 验证 |
+| --- | --- | --- |
+| **I1** | widget 是单例：一个 widget 只在一个 board（`boardId` 唯一）。 | unit：`boardId` 唯一 |
+| **I2** | board 属于 prac core：extension 只贡献 widget，不贡献 board。 | 类型：`PracExtension` 无 board 贡献 |
+| **I3** | `PracBoard.widgets` 与 `root.items` 的 id 集合相等（隐藏的也算成员）。 | unit：reconcile 后校验 |
+| **I4** | `hidden` 是视图状态，不是成员关系。 | unit：hide 后仍在 `widgets` |
+| **I5** | `defaultBoard` 只是首次落点，不是当前归属。 | unit：移动后 `defaultBoard` 不变 |
+| **I6** | board root 只有一个 writer；跨 board 只允许 move，split 只在目标 root 内。 | unit：`move` / `split` |
+| **I7** | 空 board 保留，显式删除才移除。 | unit：移走最后一个 widget |
 
 ## 2. 数据模型
 

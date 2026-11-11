@@ -47,9 +47,9 @@ export function apply(ctx: Context): void {
     appRuntime: () => ({
       content: () => () => null,
       match: (resource) => resource.startsWith("left/container:"),
-      open: (params) => {
+      start: (params: unknown, instance: { id: string }) => {
         const { boardId } = params as { boardId: string };
-        face.createBoardWindow(boardId);
+        face.createBoardWindow(boardId, undefined, instance.id);
         return true;
       },
     }),
@@ -58,7 +58,7 @@ export function apply(ctx: Context): void {
   ctx.effect(() => extensions.register(coreExtension), "prac-client-ui-widget: board app");
   const face: PracWidgetsFace = {
     registry: new WidgetRegistry(),
-    createBoardWindow: (id, label) => {
+    createBoardWindow: (id, label, instanceId) => {
       const existing = boards.get(id);
       if (existing !== undefined) return existing;
       const board = new BoardWindowAdapter(id, label, windowFace);
@@ -67,6 +67,7 @@ export function apply(ctx: Context): void {
         windowId: board.boardId,
         title: label ?? "Board",
         region: id,
+        ...(instanceId === undefined ? {} : { instanceId }),
       });
       return board;
     },

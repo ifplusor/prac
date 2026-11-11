@@ -882,10 +882,12 @@ export function apply(ctx: Context): void {
       const offLayout = layout.subscribe(listener);
       const offCatalogue = vscode.onDidChangeCatalogue(listener);
       const offDock = ctx.pracDock?.subscribe(listener) ?? (() => {});
+      const offWindows = ctx.pracWindows?.subscribe(listener) ?? (() => {});
       return () => {
         offLayout();
         offCatalogue();
         offDock();
+        offWindows();
       };
     };
     /** A dock's tool windows: the children the arrangement put in that region. */

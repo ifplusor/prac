@@ -25,7 +25,7 @@ import type { WidgetRegistry } from "./widget.js";
 export interface PracWidgetsFace {
   readonly registry: WidgetRegistry;
   /** Create a board window: one window whose content is a board. */
-  createBoardWindow(id: string, label?: string): BoardWindowAdapter;
+  createBoardWindow(id: string, label?: string, instanceId?: string): BoardWindowAdapter;
   /** Board windows currently created by this service, for diagnostics / gates. */
   boards(): readonly BoardWindowAdapter[];
   /**
