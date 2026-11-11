@@ -406,7 +406,12 @@ export function restoreCentre(layout: PracLayout, dsh: PracDshFace): boolean {
  * @param layout - the mechanism's placement face.
  * @param dsh - the DSH adapter's face (view ids).
  */
-export function arrange(layout: PracLayout, dsh: PracDshFace, dock?: PracDock): void {
+export function arrange(
+  layout: PracLayout,
+  dsh: PracDshFace,
+  dock?: PracDock,
+  widgets?: readonly { readonly id: string; readonly defaultBoard?: string }[],
+): void {
   layout.bindRoles(roles(dsh));
   // The left rail is the dock's activity bar, drawn **outside** the region: the region itself has no
   // in-region selector strip, so the allocation must not reserve one. The bottom dock is hidden, so
@@ -420,17 +425,11 @@ export function arrange(layout: PracLayout, dsh: PracDshFace, dock?: PracDock): 
     layout.place(entry.view, entry.region);
     if (entry.hidden === true) layout.hide(entry.view);
   }
-  // Pin the catalogue's containers as dock shortcuts: the dock shows the app, not the view.
-  if (dock !== undefined) {
-    for (const entry of defaultPlacements(dsh)) {
-      if (entry.region !== LEFT && entry.region !== RIGHT) continue;
-      const id = entry.view.split(":").at(-1) ?? entry.view;
-      dock.pin({
-        id,
-        appId: "prac.board",
-        label: id,
-        side: entry.region === LEFT ? "left" : "right",
-      });
+  // The board is prac's: derive the dock pins from the widgets' default boards.
+  if (dock !== undefined && widgets !== undefined) {
+    for (const boardId of new Set(widgets.map((widget) => widget.defaultBoard))) {
+      if (boardId === undefined) continue;
+      dock.pin({ id: boardId, appId: "prac.board", label: boardId, side: "left" });
     }
   }
   // The title bar owns session/workspace selection; the DSH sidebar remains

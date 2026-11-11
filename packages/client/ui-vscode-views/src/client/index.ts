@@ -48,6 +48,7 @@ function viewExtension(host: PracVscodeFace, onRetitle: () => void): PracExtensi
         title: paneTitles.get(entry.view) ?? entry.title,
         icon: paneIcons.get(entry.view) ?? "",
         paneHeader: true,
+        ...(entry.containerId === undefined ? {} : { defaultBoard: entry.containerId }),
       }));
   return {
     manifest: { id: "prac.vscode-views", version: "1" },

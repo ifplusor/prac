@@ -9,3 +9,5 @@
  */
 
 export { apply, inject, name } from "./service.js";
+
+export * from "./board-types.js";
