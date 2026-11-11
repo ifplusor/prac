@@ -45,6 +45,8 @@ export interface AdmitWindowOptions {
   readonly title?: string;
   /** The app instance that owns this window. */
   readonly instanceId?: string;
+  /** Opaque annotation the app sets; the core stores it and never interprets it. */
+  readonly tags?: readonly string[];
   /** The app definition version to pin for this window. */
   readonly appVersion?: string;
   /** Which group takes it; otherwise the manager picks the group bound in `region`. */
@@ -130,6 +132,8 @@ export interface WindowSnapshot {
   readonly group?: string;
   /** The app instance that owns this window. */
   readonly instanceId?: string;
+  /** Opaque annotation the app sets; the core stores it and never interprets it. */
+  readonly tags?: readonly string[];
 }
 
 /** One group in the runtime snapshot. */
@@ -163,6 +167,8 @@ export class WindowManager {
   readonly #appOf = new Map<string, string>();
   /** The app instance that owns each window. */
   readonly #instanceOf = new Map<string, string>();
+  /** The app's opaque annotation per window; never interpreted here. */
+  readonly #tags = new Map<string, readonly string[]>();
   /** The title each app gave its window. */
   readonly #titles = new Map<string, string>();
   /** The app definition version pinned by each window. */
@@ -265,6 +271,7 @@ export class WindowManager {
       this.#instanceOf.set(windowId, options.instanceId);
       this.instances?.addWindow(options.instanceId, windowId);
     }
+    if (options.tags !== undefined) this.#tags.set(windowId, options.tags);
     const appVersion = options.appVersion ?? app.version;
     if (appVersion !== undefined) this.#appVersions.set(windowId, appVersion);
     if (options.title !== undefined) this.#titles.set(windowId, options.title);
@@ -465,12 +472,16 @@ export class WindowManager {
       const title = this.#titles.get(id);
       const appVersion = this.#appVersions.get(id);
       const group = this.groupOf(id);
+      const instanceId = this.#instanceOf.get(id);
+      const tags = this.#tags.get(id);
       windows.push({
         id,
         appId,
         ...(title === undefined ? {} : { title }),
         ...(appVersion === undefined ? {} : { appVersion }),
         ...(group === undefined ? {} : { group: group.id }),
+        ...(instanceId === undefined ? {} : { instanceId }),
+        ...(tags === undefined ? {} : { tags }),
       });
     }
     const groups: GroupSnapshot[] = [...this.#runtimes.values()].map((runtime) => ({
@@ -559,6 +570,7 @@ export class WindowManager {
       this.#instanceOf.delete(windowId);
       this.instances?.removeWindow(instanceId, windowId);
     }
+    this.#tags.delete(windowId);
     this.#titles.delete(windowId);
     this.#appVersions.delete(windowId);
     const runtime = this.groupOf(windowId);
@@ -642,6 +654,7 @@ export class WindowManager {
     for (const windowId of this.#runtimes.get(groupId)?.state.order ?? []) {
       this.#handles.delete(windowId);
       this.#appOf.delete(windowId);
+      this.#tags.delete(windowId);
       this.#titles.delete(windowId);
       this.#seats.get(windowId)?.();
       this.#seats.delete(windowId);
