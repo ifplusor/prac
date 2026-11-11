@@ -51,16 +51,23 @@ interface PracBoardDef {
 interface PracBoard {
   readonly def: PracBoardDef;
   readonly widgets: readonly string[];  // 成员，按 tab 顺序（权威）
-  readonly root: LayoutState;           // 位置 + 几何 + 可见性
+  // 位置 / 几何 / 可见性：WM 持有的 `LayoutState`，键是 `boardId`（见 §2.3）
   readonly active?: string;
 }
 ```
 
-### 2.3 没有 `WidgetPlacement`
+### 2.3 board 的布局归 WM
 
-board root 是 `LayoutState`，它的 `items` 就是 `ItemRecord`（`region` / `order` / `size` / `collapsed` / `hidden`）。widget 没有 `LayoutState` 之外的字段（对照 `WindowPlacement` 的 `contentId` / `boardId` / `max` 是窗口独有的）。
+board 的布局是一棵 `LayoutState`，它的 `items` 就是 `ItemRecord`（`region` / `order` / `size` / `collapsed` / `hidden`）。widget 没有 `LayoutState` 之外的字段（对照 `WindowPlacement` 的 `contentId` / `boardId` / `max` 是窗口独有的）。
 
-所以 board root 的 item id = widget id；成员由 `PracBoard.widgets` 显式给出；**不产生第三个真相源**。
+**这棵树由 WM 持有**（键是 `boardId`），不由 board 内容的组件持有：
+
+- WM 是唯一写者（[tech-ui](./2026-11-05-tech-ui.md) §1.2 I1）；
+- board 内容只渲染它；
+- 于是跨 board 的 widget 移动、以及“拖到 dock 激活另一个 board / 新建 board”，都在同一个权威下完成；
+- item id = widget id；成员由 `PracBoard.widgets` 显式给出；不产生第三个真相源。
+
+**一个 board 只有一个窗口**：窗口的 region 是 WM 的 window placement，与这棵树是两层（外层是窗口放哪，内层是 widget 怎么排）。
 
 ## 3. 接口
 
@@ -188,6 +195,7 @@ sequenceDiagram
 1. board 的 `def` 随 extension 卸载消失时，board 是否保留；
 2. `reset` 的默认顺序（index 语义）；
 3. 一个 widget 的 `defaultBoard` 指向的 board 不存在且未持久化时的创建时机（contribute 时还是 reconcile 时）；
+4. ~~多窗口同一 board 的写冲突~~ 已关闭：一个 board 只有一个窗口；
 4. **从未被打开的 board 是否存在**（能否被 pin、能否出现在 dock 的初始 pins 里）——这决定 dock 的初始数据来源。在它成为阻塞之前不裁决。
 
 ## Related
