@@ -634,6 +634,8 @@ export function apply(ctx: Context): void {
     if (entry === undefined || entry.board.disposed) {
       try {
         // A container region's surface is a window group whose one window is a board.
+        // Re-created on every pass: `createBoardWindow` is idempotent and retries the
+        // admission, which can fail on the first pass (the app may not be registered).
         const board = widgets.pracWidgets.createBoardWindow(region, label);
         entry = {
           board,
@@ -644,6 +646,14 @@ export function apply(ctx: Context): void {
         return undefined;
       }
       containerBoards.set(region, entry);
+    } else {
+      // The admission can fail on the first pass (the app may not be registered
+      // yet), so the idempotent create re-runs it on every pass.
+      try {
+        widgets.pracWidgets.createBoardWindow(region, label);
+      } catch {
+        return undefined;
+      }
     }
     if (entry.registered) return entry.board;
     try {
