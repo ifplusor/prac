@@ -841,6 +841,11 @@ export function apply(ctx: Context): void {
       placeCatalogue(layout, dsh.pracDsh, catalogue, placeContainerView);
       syncContainerBoards(catalogue);
       // The default windows are the apps' own: launching them once the catalogue
+      // is in lets each `start` create its window with its content.
+      for (const entry of defaultPlacements(dsh.pracDsh)) {
+        ctx.pracApplications?.launch(entry.appId, { windowId: entry.view, region: entry.region });
+      }
+      // The default windows are the apps' own: launching them once the catalogue
       // is in lets `start` create them with their content.
       for (const entry of defaultPlacements(dsh.pracDsh)) {
         ctx.pracApplications?.launch(entry.appId, { windowId: entry.view, region: entry.region });

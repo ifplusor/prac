@@ -38,12 +38,17 @@ export function apply(ctx: Context): void {
       content: () => () => null,
       start: (params: unknown, instance: { id: string }) => {
         const { windowId, region } = params as { windowId?: string; region?: string };
-        ctx.pracWindows.admit(CHAT_APP_ID, {
-          windowId: windowId ?? CHAT_WINDOW_ID,
-          region,
-          content: () => null,
-          instanceId: instance.id,
-        });
+        try {
+          ctx.pracWindows.admit(CHAT_APP_ID, {
+            windowId: windowId ?? CHAT_WINDOW_ID,
+            region,
+            content: () => null,
+            instanceId: instance.id,
+          });
+        } catch {
+          // The region may not exist yet; the next launch retries.
+          return false;
+        }
         return true;
       },
     }),
