@@ -705,7 +705,6 @@ export function apply(ctx: Context): void {
     }
     const mappedIds = new Set(vscode.mappedWindows());
     for (const entry of containerBoards.values()) {
-      if (!entry.registered) continue;
       const id = entry.board.windowId;
       if (mappedIds.has(id)) continue;
       // The board window's own region is the placement the WM gave it. A board's
