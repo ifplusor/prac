@@ -23,6 +23,12 @@ export interface PracProbes {
   readonly boardLayouts: BoardLayoutRegistry;
   /** The application table, so a gate can prove who is launchable. */
   readonly applications: PracApplications;
+  /**
+   * The window manager's snapshot: which windows exist, which group each sits
+   * in, and the region the manager placed it in. A board's state lives in
+   * `boardLayouts`, so a board window's region is only readable here.
+   */
+  readonly windows: { getSnapshot(): unknown };
   /** The Space registry. */
   readonly spaces: PracSpacesFace;
   /**

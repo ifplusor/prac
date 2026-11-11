@@ -362,6 +362,7 @@ export function apply(ctx: Context): void {
       frame: pracFrame,
       boardLayouts,
       applications: ctx.pracApplications,
+      windows: ctx.pracWindows,
       spaces: pracSpaces,
       windowActions,
     });
