@@ -78,6 +78,20 @@ export class WindowGroup {
     this.#emit();
   }
 
+  /**
+   * Open a window by id.
+   *
+   * The bindings' `join` speaks ids (a window placed into a region by the
+   * manager carries no record yet), so the product group accepts one and fills
+   * the minimal record the chrome needs.
+   *
+   * @param id - the window to append.
+   */
+  openWindow(id: string): void {
+    if (this.#windows.has(id)) return;
+    this.open({ id, appId: "prac.board", kind: "application", title: id });
+  }
+
   /** Close a window; active falls back to the next window, then the previous. */
   close(windowId: string): void {
     this.#assertLive();
