@@ -63,6 +63,7 @@ const fakeBindings = (regions: Readonly<Record<string, string>> = {}): WindowGro
       catalogueVersion: 0,
       activePanelId: null,
     }),
+    show: () => {},
     contentFor: () => undefined,
     get: () => undefined,
     unregister: () => {},
@@ -145,9 +146,9 @@ describe("WindowManager", () => {
     manager.register(group, "left");
     manager.open("left", handle("a"));
     manager.open("left", handle("b"));
-    expect(manager.activate("a")).toBe(true);
+    expect(manager.activateWindow("a")).toBe(true);
     expect(group.state.active).toBe("a");
-    expect(manager.activate("missing")).toBe(false);
+    expect(manager.activateWindow("missing")).toBe(false);
   });
 
   it("rejects a duplicate group and an unknown group", () => {

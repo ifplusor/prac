@@ -107,6 +107,8 @@ export interface WindowGroupBindingsPort {
   ): RegionBinding;
   registerContent(content: GroupRegionContent<WindowGroup>, regionId: string): RegionBinding;
   snapshot(): LayoutState;
+  /** Show a region (expand a collapsed sidebar / panel). */
+  show(regionId: string): void;
   barItems(regionId: string): readonly GroupBarItem[];
   contentFor(regionId: string): GroupRegionContent<WindowGroup> | undefined;
   get(groupId: string): RegionBinding | undefined;
@@ -231,7 +233,7 @@ export class WindowManager {
     if (app.instances === "single") {
       for (const [openId, openApp] of this.#appOf) {
         if (openApp !== appId) continue;
-        this.activate(openId);
+        this.activateWindow(openId);
         return openId;
       }
     }
@@ -525,7 +527,9 @@ export class WindowManager {
    * @param windowId - the window to activate.
    * @returns whether a group held it.
    */
-  activate(windowId: string): boolean {
+  activateWindow(windowId: string): boolean {
+    const region = this.#placements.get(windowId);
+    if (region !== undefined) this.bindings.show(region);
     const runtime = this.groupOf(windowId);
     if (runtime === undefined) return false;
     runtime.select(windowId);

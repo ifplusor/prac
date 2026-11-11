@@ -741,7 +741,7 @@ export function createFrame(
         label: viewLabel,
         onActivate: (viewId: string) => {
           store.update((current) => setFront(current, viewId));
-          sources.windows?.activate(viewId);
+          sources.windows?.activateWindow(viewId);
         },
         onClose: (viewId: string) => store.requestCloseItem(viewId),
         onReorder: (id: string, dragged: string, target: string) => {

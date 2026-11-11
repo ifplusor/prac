@@ -80,7 +80,7 @@ export function apply(ctx: Context): void {
     if (app.defaultRegion !== undefined) frame.place(windowId, app.defaultRegion);
     // Opening a document also brings it forward: the centre is a tab strip and
     // the new window is the one the person asked to see.
-    windows.activate(windowId);
+    windows.activateWindow(windowId);
     return true;
   };
   // One content factory per window. A fresh closure on every read would make the

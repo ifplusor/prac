@@ -10,6 +10,7 @@
  */
 
 import { findNode } from "prac-ui-kit-layout";
+import type { LayoutNode } from "prac-ui-kit-layout";
 import type {
   WindowGroup,
   WindowGroupAction as GroupAction,
@@ -40,6 +41,13 @@ export interface RegionBinding {
   readonly bridge: WindowGroupLayoutBridge;
 }
 
+/** Rebuild the tree with one node replaced. */
+function replaceNode(node: LayoutNode, id: string, next: LayoutNode): LayoutNode {
+  if (node.id === id) return next;
+  if (node.type !== "split") return node;
+  return { ...node, children: node.children.map((child) => replaceNode(child, id, next)) };
+}
+
 /** Owns the group → region bindings for one frame store. */
 export class WindowGroupBindings {
   readonly #groups = new Map<string, RegionBinding>();
@@ -53,6 +61,15 @@ export class WindowGroupBindings {
   /** The layout state the bindings read (the frame's store). */
   snapshot(): LayoutState {
     return this.store.get();
+  }
+
+  /** Show a region (expand a collapsed sidebar / panel). */
+  show(regionId: string): void {
+    this.store.update((state) => {
+      const node = findNode(state.tree, regionId);
+      if (node === null || node.type !== "region" || !node.collapsed) return state;
+      return { ...state, tree: replaceNode(state.tree, regionId, { ...node, collapsed: false }) };
+    });
   }
 
   /** Register a group in an existing region. */
