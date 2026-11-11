@@ -53,7 +53,6 @@ interface PracBoard {
   readonly widgets: readonly string[];  // 成员，按 tab 顺序（权威）
   readonly root: LayoutState;           // 位置 + 几何 + 可见性
   readonly active?: string;
-  readonly pinned: boolean;             // 由 dock 读（tech-dock）
 }
 ```
 
@@ -85,13 +84,12 @@ interface PracBoards {
   update(id: string, updater: (board: PracBoard) => PracBoard): void;
   subscribe(listener: () => void): () => void;
   reconcile(widgets: readonly PracWidget[]): void;  // 幂等
-  pin(id: string): void;
-  unpin(id: string): void;
 }
 ```
 
 - registry 只认身份与操作；board 的布局写入只经 `PracBoards.update`；
-- `PracBoards` 不做 window——board window 由 `prac.board` app 的 `start` 打开。
+- `PracBoards` 不做 window——board window 由 `prac.board` app 的 `start` 打开；
+- **pin 不归 board**：谁被固定在 dock 上是 [tech-dock](./2026-11-05-tech-dock.md) 的数据（I1），board 不持 `pinned`。
 
 ## 4. 生命周期
 
@@ -189,7 +187,8 @@ sequenceDiagram
 
 1. board 的 `def` 随 extension 卸载消失时，board 是否保留；
 2. `reset` 的默认顺序（index 语义）；
-3. 一个 widget 的 `defaultBoard` 指向的 board 不存在且未持久化时的创建时机（contribute 时还是 reconcile 时）。
+3. 一个 widget 的 `defaultBoard` 指向的 board 不存在且未持久化时的创建时机（contribute 时还是 reconcile 时）；
+4. **从未被打开的 board 是否存在**（能否被 pin、能否出现在 dock 的初始 pins 里）——这决定 dock 的初始数据来源。在它成为阻塞之前不裁决。
 
 ## Related
 

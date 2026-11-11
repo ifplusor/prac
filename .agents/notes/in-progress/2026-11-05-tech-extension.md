@@ -175,7 +175,9 @@ interface PracHostDecl {
 - `catalogVersion` 进入 `LayoutState` / UI store，用于判断是否需要重读；
 - 不持久化 catalog；重启后重建。
 
-## 5. 动态贡献：reconcile，不重启
+## 5. 动态贡献：catalog diff，不重启
+
+> 注意：这里是 **catalog 的 diff**（贡献增删 → 重建 catalog），与 [tech-widget](./2026-11-05-tech-widget.md) §4.2 的 **board reconcile**（widget → board 的推导）不是同一件事。
 
 ```mermaid
 flowchart LR
