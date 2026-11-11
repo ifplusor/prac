@@ -55,7 +55,11 @@ export function apply(ctx: Context): void {
       if (existing !== undefined) return existing;
       const board = new BoardWindowAdapter(id, label, windowFace);
       boards.set(id, board);
-      ctx.pracWindows.admit("prac.board", { windowId: board.boardId, title: label ?? "Board" });
+      ctx.pracWindows.admit("prac.board", {
+        windowId: board.boardId,
+        title: label ?? "Board",
+        region: id,
+      });
       return board;
     },
     boards: () => [...boards.values()].filter((board) => !board.disposed),
