@@ -702,9 +702,14 @@ export function apply(ctx: Context): void {
       if (!entry.registered) continue;
       const id = entry.board.windowId;
       if (mappedIds.has(id)) continue;
-      // The board window's own region is the placement the WM gave it: no file
-      // window has to land there first. The projection then ensures a pane host.
-      const region = layout.getState().items[entry.board.windowId]?.region;
+      // The board window's own region is the placement the WM gave it. A board's
+      // state lives in the board layout registry, not the frame's item table, so
+      // the window's region comes from the manager's placements.
+      const region =
+        ctx.pracWindows
+          ?.getSnapshot()
+          .placements.find((placement) => placement.windowId === entry.board.windowId)?.region ??
+        layout.getState().items[entry.board.windowId]?.region;
       if (region === undefined || region === null) continue;
       vscode.mapWindow(entry.board.windowId, entry.board.label ?? "Board", region);
       mappedBoards.add(id);
