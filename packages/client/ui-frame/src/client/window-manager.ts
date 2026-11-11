@@ -127,10 +127,17 @@ export interface GroupSnapshot {
   readonly active?: string;
 }
 
+/** One placement in the runtime snapshot: where the window sits. */
+export interface PlacementSnapshot {
+  readonly windowId: string;
+  readonly region: string;
+}
+
 /** The window manager's runtime state: the render's single source. */
 export interface WindowManagerSnapshot {
   readonly windows: readonly WindowSnapshot[];
   readonly groups: readonly GroupSnapshot[];
+  readonly placements: readonly PlacementSnapshot[];
 }
 
 /** The window manager: group registry plus membership decisions. */
@@ -147,6 +154,8 @@ export class WindowManager {
   readonly #listeners = new Set<() => void>();
   /** The seat registration per admitted window. */
   readonly #seats = new Map<string, () => void>();
+  /** Where each window sits; the manager owns the placement, the frame renders it. */
+  readonly #placements = new Map<string, string>();
   /** Cached runtime snapshot; invalidated by every change. */
   #snapshot: WindowManagerSnapshot | undefined;
 
@@ -318,6 +327,7 @@ export class WindowManager {
    * @param regionId - the region it moved into.
    */
   place(windowId: string, regionId: string): void {
+    this.#placements.set(windowId, regionId);
     const groupId = this.groupIn(regionId);
     if (groupId === undefined) return;
     const current = this.groupOf(windowId)?.id;
@@ -399,7 +409,11 @@ export class WindowManager {
       id: runtime.id,
       ...runtime.state,
     }));
-    this.#snapshot = { windows, groups };
+    const placements: PlacementSnapshot[] = [...this.#placements].map(([windowId, region]) => ({
+      windowId,
+      region,
+    }));
+    this.#snapshot = { windows, groups, placements };
     return this.#snapshot;
   }
 
@@ -470,6 +484,7 @@ export class WindowManager {
     hadSeat?.();
     this.#seats.delete(windowId);
     this.#handles.delete(windowId);
+    this.#placements.delete(windowId);
     this.#appOf.delete(windowId);
     this.#titles.delete(windowId);
     this.#appVersions.delete(windowId);
