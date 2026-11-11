@@ -1,3 +1,4 @@
+import { WindowGroup as ProductWindowGroup } from "./window.js";
 import type { ReactNode } from "react";
 import type {
   ApplicationSlotRenderer,
@@ -246,7 +247,14 @@ export class WindowManager {
       }
     }
 
-    const groupId = options.groupId ?? this.groupIn(options.region);
+    // An app window names the region it belongs in: use a group bound there (or
+    // bind one now). The ancestor walk is for windows that have no region of
+    // their own (file rows), so it must not adopt the neighbour's group.
+    const groupId =
+      options.groupId ??
+      (options.region === undefined
+        ? undefined
+        : (this.bindings.barItems(options.region)[0]?.groupId ?? this.#bindGroup(options.region)));
     if (groupId !== undefined) {
       this.open(groupId, options.handle ?? { id: windowId });
     }
@@ -388,6 +396,13 @@ export class WindowManager {
       this.bindings.join?.(groupId, windowId);
     }
     this.#notify();
+  }
+
+  /** Bind a fresh group to a region the app named; the window needs a home. */
+  #bindGroup(regionId: string): string {
+    const group = new ProductWindowGroup(`${regionId}/group`);
+    this.bindings.register(group as unknown as WindowGroup, regionId);
+    return group.id;
   }
 
   /** The first group bound in a region (or a sub-region of it). */
