@@ -5,6 +5,7 @@ import type {
   ApplicationRegistry,
   GroupBarItem,
   GroupRegionContent,
+  LayoutState,
   RegionBinding,
   WindowGroup,
 } from "prac-ui-kit-workbench";
@@ -105,6 +106,7 @@ export interface WindowGroupBindingsPort {
     content?: GroupRegionContent<WindowGroup>,
   ): RegionBinding;
   registerContent(content: GroupRegionContent<WindowGroup>, regionId: string): RegionBinding;
+  snapshot(): LayoutState;
   barItems(regionId: string): readonly GroupBarItem[];
   contentFor(regionId: string): GroupRegionContent<WindowGroup> | undefined;
   get(groupId: string): RegionBinding | undefined;
@@ -140,6 +142,8 @@ export interface WindowManagerSnapshot {
   readonly windows: readonly WindowSnapshot[];
   readonly groups: readonly GroupSnapshot[];
   readonly placements: readonly PlacementSnapshot[];
+  /** The layout state the frame renders (the store's value). */
+  readonly layout: LayoutState;
 }
 
 /** The window manager: group registry plus membership decisions. */
@@ -415,7 +419,7 @@ export class WindowManager {
       windowId,
       region,
     }));
-    this.#snapshot = { windows, groups, placements };
+    this.#snapshot = { windows, groups, placements, layout: this.bindings.snapshot() };
     return this.#snapshot;
   }
 

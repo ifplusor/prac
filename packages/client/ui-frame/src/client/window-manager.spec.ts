@@ -47,6 +47,22 @@ const fakeBindings = (regions: Readonly<Record<string, string>> = {}): WindowGro
       const groupId = regions[regionId];
       return groupId === undefined ? [] : [{ groupId, regionId, label: groupId }];
     },
+    snapshot: () => ({
+      viewportWidth: 0,
+      viewportHeight: 0,
+      tree: {
+        type: "region",
+        id: "stage",
+        size: 0,
+        flex: true,
+        collapsed: false,
+        cachedSize: 0,
+        min: 0,
+      },
+      items: {},
+      catalogueVersion: 0,
+      activePanelId: null,
+    }),
     contentFor: () => undefined,
     get: () => undefined,
     unregister: () => {},

@@ -304,7 +304,7 @@ export function createServices(
     // snapshot. The render reads the projection, so a placement the manager took
     // is what the person sees even before the next snapshot write.
     getState: () => {
-      const state = store.get();
+      const state = windows.getSnapshot().layout;
       const placements = windows.getSnapshot().placements;
       if (placements.length === 0) return state;
       let items = state.items;

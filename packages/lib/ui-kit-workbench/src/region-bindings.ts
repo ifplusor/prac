@@ -15,6 +15,7 @@ import type {
   WindowGroupAction as GroupAction,
   WindowGroupActionBinding as GroupActionBinding,
 } from "./workbench-model.js";
+import type { LayoutState } from "./contract.js";
 import type { LayoutStore } from "./store.js";
 import { WindowGroupLayoutBridge } from "./group-bridge.js";
 import type { GroupRegionContent } from "./region-content.js";
@@ -47,6 +48,11 @@ export class WindowGroupBindings {
 
   constructor(private readonly store: LayoutStore) {
     this.#stop = store.subscribe(() => this.#syncOrderFromStore());
+  }
+
+  /** The layout state the bindings read (the frame's store). */
+  snapshot(): LayoutState {
+    return this.store.get();
   }
 
   /** Register a group in an existing region. */
