@@ -47,6 +47,13 @@ export interface AdmitWindowOptions {
   readonly instanceId?: string;
   /** Opaque annotation the app sets; the core stores it and never interprets it. */
   readonly tags?: readonly string[];
+  /**
+   * The window's own content.
+   *
+   * Rendering belongs to the window, not the app: the app starts and hands the
+   * window its content here.
+   */
+  readonly content?: () => ReactNode;
   /** The app definition version to pin for this window. */
   readonly appVersion?: string;
   /** Which group takes it; otherwise the manager picks the group bound in `region`. */
@@ -134,6 +141,13 @@ export interface WindowSnapshot {
   readonly instanceId?: string;
   /** Opaque annotation the app sets; the core stores it and never interprets it. */
   readonly tags?: readonly string[];
+  /**
+   * The window's own content.
+   *
+   * Rendering belongs to the window, not the app: the app starts and hands the
+   * window its content here.
+   */
+  readonly content?: () => ReactNode;
 }
 
 /** One group in the runtime snapshot. */
@@ -275,7 +289,18 @@ export class WindowManager {
     const appVersion = options.appVersion ?? app.version;
     if (appVersion !== undefined) this.#appVersions.set(windowId, appVersion);
     if (options.title !== undefined) this.#titles.set(windowId, options.title);
-    this.#bindSeat(windowId, app);
+    // The window carries its content when the app hands it over at `admit`; an
+    // app that still renders per window id keeps the old path until it migrates.
+    const own = options.content;
+    this.#bindSeat(windowId, {
+      ...(app.icon === undefined ? {} : { icon: app.icon }),
+      ...(app.paneHeader === undefined ? {} : { paneHeader: app.paneHeader }),
+      ...(own !== undefined
+        ? { content: () => own }
+        : app.content === undefined
+          ? {}
+          : { content: app.content.bind(app) }),
+    });
     this.#notify();
     return windowId;
   }
