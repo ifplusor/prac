@@ -78,11 +78,8 @@ flowchart LR
 ## 3. Manifest / 定义 / extension
 
 ```ts
-type PracExtensionOrigin = "prac" | "vscode" | "dsh" | (string & {});
-
 interface PracExtensionManifest {
   readonly id: string;                 // global
-  readonly origin: PracExtensionOrigin;
   readonly version: string;
   readonly dependsOn?: readonly string[]; // "prac.vscodeHost" / ...
   readonly capabilities?: readonly string[];
@@ -112,7 +109,6 @@ interface PracWidgetDef {
 
 - `PracAppDef` / `PracWidgetDef` 是纯声明：没有 `content` / `hostFor` / `actions` / 窗口；代码在 `PracAppImpl` / `PracWidgetImpl`；
 - 定义可以来自 VS Code `contributes`、DSH plugin 声明、prac manifest；
-- `origin` 只是元数据，不做分支；`prac` / `vscode` / `dsh` 都是同一个 extension 模型。
 
 扩展的运行时接口：
 
@@ -160,7 +156,6 @@ export function apply(ctx: Context): void {
   const off = ctx.pracExtensions.register({
     manifest: {
       id: "prac.vscode-views",
-      origin: "vscode",
       version: "1",
       dependsOn: ["prac.vscodeHost"],
     },
@@ -264,7 +259,6 @@ interface PracExtensionsFace {
 - `register` 返回 disposer；dispose 只移除该 extension 的贡献；plugin 的 `ctx.effect` 负责调用。
 - duplicate extension id → reject；duplicate app / widget id → reject。
 - `dependsOn` 映射到 Cordis `inject` / service 可用性；缺依赖 → disabled。
-- `origin` 用于诊断 / 策略 / 分组，不做分支。
 - app sync：`apps()` diff → 注册 / 移除 app；窗口由 app 的 `open` 走 WM，不由 extension 声明。
 - widget：`widgets()` diff → `PracWidgets` 注册；宿主由 widget 运行时提供；board root 负责 placement。
 - 失败：per-extension 回滚；不影响其他 extension。

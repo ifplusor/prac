@@ -121,13 +121,9 @@ export interface WindowActionModel {
   readonly secondary: readonly WindowAction[];
 }
 
-/** Origin metadata; not a branch. */
-export type PracExtensionOrigin = "prac" | "vscode" | "dsh" | (string & {});
-
 /** Declarative extension manifest. */
 export interface PracExtensionManifest {
   readonly id: string;
-  readonly origin: PracExtensionOrigin;
   readonly version: string;
   readonly dependsOn?: readonly string[];
   readonly capabilities?: readonly string[];

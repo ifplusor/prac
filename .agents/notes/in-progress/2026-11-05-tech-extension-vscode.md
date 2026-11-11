@@ -45,7 +45,7 @@ flowchart LR
 - **host extension**：`manifest.id = "prac.vscode-host"`，`provides: ["prac.vscodeHost"]`；只 boot / embed / face，不贡献 app / widget。
 - **editor extension**：`dependsOn: ["prac.vscodeHost"]`；`apps()` 返回 editor `PracAppDef`；`appRuntime(def)` 返回 `{ content, match }`；`open(resource)` 声明窗口（一个正在编辑的文件 = 一个 `PracWindow`；tab strip 的 tab 是 window group 的 window，不是 window 内的 tab）；`content(windowId)` 返回 VS Code 渲染的宿主（`TextEditorPane`，不是 `PracWindowPane` 空 pane；见 [tech-ui](./2026-11-05-tech-ui.md) §2.6）。**不**声明 `windows`。
 - **views extension**：`dependsOn: ["prac.vscodeHost"]`；`widgets()` 返回 `PracWidgetDef`；`widgetRuntime(def)` 返回 `{ hostFor, wrap }`；不声明宿主、不声明窗口。
-- 三者都用 `origin: "vscode"`；host 未 ready → editor / views disabled / degraded。
+- vscode host 私有地记录它贡献的 app / widget（不写进通用 contract）；host 未 ready → editor / views disabled / degraded。
 - 扩展只贡献**声明**：`PracApp` / `PracWidget` 是运行时组合（def + impl），`PracWindow` 是 WM 的实体，三者都不由 extension 直接产出。
 
 **Cordis 接法**：
@@ -196,6 +196,19 @@ flowchart LR
 - `mapped()` 返回 WM 投影过的窗口（`inputs.keys()`），不问 editor group；
 - `map(region)` 在 region 没有 group 时先 `ensureGroup(region)`，不丢弃窗口；
 - 窗口的 region 来自 WM 的 placement（`pracFrame.getState().items[id].region`），不从“有没有文件窗口”推导。
+
+## 5.2 vscode host 的记录表
+
+窗口的 `tags` 标出“来自哪个机制”；但 `IEditorInput` / `IEditorPane` 的具体对象是 VS Code 内部的，core 不表达。vscode host 维护自己的记录表：
+
+```ts
+Map<windowId, { input: IEditorInput; pane?: IEditorPane }>
+```
+
+- 用于 editor 关闭 ↔ 窗口关闭的联动；
+- 用于 `CustomEditorInput` / `WebviewEditor` 的 pane 映射；
+- 用于 `windowProjection.map` 的“该不该映射”判断；
+- 不写进 core，不进 `PracExtension` 契约。
 
 ## 6. 动态 / 错误 / 测试
 

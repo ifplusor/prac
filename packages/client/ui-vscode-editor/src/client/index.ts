@@ -250,7 +250,7 @@ export function apply(ctx: Context): void {
     paneHeader: true,
   };
   const extension: PracExtension = {
-    manifest: { id: "prac.vscode-editor", origin: "vscode", version: "1" },
+    manifest: { id: "prac.vscode-editor", version: "1" },
     apps: () => [editorApp],
     appRuntime: (def) =>
       def.id === "editor"

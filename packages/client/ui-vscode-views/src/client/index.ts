@@ -50,7 +50,7 @@ function viewExtension(host: PracVscodeFace, onRetitle: () => void): PracExtensi
         paneHeader: true,
       }));
   return {
-    manifest: { id: "prac.vscode-views", origin: "vscode", version: "1" },
+    manifest: { id: "prac.vscode-views", version: "1" },
     widgets,
     onDidChange: (listener: () => void) => host.onDidChangeCatalogue(listener),
     widgetRuntime: (def) => ({

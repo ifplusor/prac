@@ -40,7 +40,7 @@ export function apply(ctx: Context): void {
     instances: "multi",
   };
   const coreExtension: PracExtension = {
-    manifest: { id: "prac.core.board", origin: "prac", version: "1" },
+    manifest: { id: "prac.core.board", version: "1" },
     apps: () => [boardApp],
     // The board's content is rendered by the frame (setItemBoard); the app's
     // implementation only has to exist so the app registers.

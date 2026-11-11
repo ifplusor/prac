@@ -101,7 +101,7 @@ export function apply(ctx: Context): void {
     return content;
   };
   const extension: PracExtension = {
-    manifest: { id: "prac.document-preview", origin: "prac", version: "1" },
+    manifest: { id: "prac.document-preview", version: "1" },
     apps: () => [app],
     appRuntime: () => ({ content: contentFor, match: matches, open }),
   };
