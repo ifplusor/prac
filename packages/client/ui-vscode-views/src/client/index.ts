@@ -158,8 +158,19 @@ export function apply(ctx: Context): void {
         mapped.add(placement.windowId);
       }
     };
-    sync();
-    return ctx.pracWindows?.subscribe(sync) ?? (() => {});
+    let off: (() => void) | undefined;
+    let disposed = false;
+    // The workbench has to be up before a window can be mapped: `mapWindow`
+    // against a booting app queues the id instead of creating its input.
+    void ctx.pracVscode.whenReady().then(() => {
+      if (disposed) return;
+      sync();
+      off = ctx.pracWindows?.subscribe(sync);
+    });
+    return () => {
+      disposed = true;
+      off?.();
+    };
   }, "prac-client-ui-vscode-views: stage placeholders");
 }
 
