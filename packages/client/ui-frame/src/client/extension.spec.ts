@@ -22,7 +22,7 @@ const extension = (
   id: string,
   options: { apps?: readonly PracAppDef[]; widgets?: readonly PracWidgetDef[] } = {},
 ): PracExtension => ({
-  manifest: { id, origin: "prac", version: "1", provides: ["prac.example"] },
+  manifest: { id, origin: "other", version: "1", provides: ["prac.example"] },
   apps: () => options.apps ?? [],
   widgets: () => options.widgets ?? [],
 });
@@ -70,7 +70,7 @@ describe("extension registry", () => {
     let widgets: readonly PracWidgetDef[] = [widget("files")];
     let notify: (() => void) | undefined;
     registry.register({
-      manifest: { id: "prac.one", origin: "prac", version: "1" },
+      manifest: { id: "prac.one", origin: "other", version: "1" },
       widgets: () => widgets,
       onDidChange: (listener) => {
         notify = listener;
@@ -120,7 +120,7 @@ describe("extension projection", () => {
 
     const registry = createExtensionRegistry(ctx);
     const off = registry.register({
-      manifest: { id: "prac.example", origin: "prac", version: "1" },
+      manifest: { id: "prac.example", origin: "other", version: "1" },
       apps: () => [app("editor")],
       widgets: () => [widget("files")],
       appRuntime: () => ({ content: () => () => null }),

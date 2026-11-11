@@ -45,7 +45,7 @@ const rightbar: PracAppDef = {
 export function apply(ctx: Context): void {
   const extensions: PracExtensionsFace = ctx.pracExtensions;
   const extension: PracExtension = {
-    manifest: { id: "prac.dsh-host", origin: "dsh", version: "1" },
+    manifest: { id: "prac.dsh-host", origin: "other", version: "1" },
     apps: () => [chat, sidebar, rightbar],
     appRuntime: () => ({
       content: (windowId, render, view) => {

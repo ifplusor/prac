@@ -122,7 +122,8 @@ export interface WindowActionModel {
 }
 
 /** Origin metadata; not a branch. */
-export type PracExtensionOrigin = "prac" | "vscode" | "dsh" | (string & {});
+/** `vscode` renders through VS Code; every other contributor renders through prac. */
+export type PracExtensionOrigin = "vscode" | "other";
 
 /** Declarative extension manifest. */
 export interface PracExtensionManifest {
