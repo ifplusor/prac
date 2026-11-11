@@ -132,19 +132,6 @@ export function createServices(
   // one-view rows. Hiding the last visible view, placing one, folding one — they all change the shape
   // (a stack that falls back to one row melts, an empty leftover holds no space), so the normaliser
   // runs on the way out of each change rather than only on placements.
-  /** The DSH host face, when a host is present (the frame does not require one). */
-  let dshHost: { conversation: string; mainView(key: string): string } | undefined;
-  ctx.inject(["pracDsh"], (scope) => {
-    dshHost = (
-      scope as unknown as {
-        pracDsh: { conversation: string; mainView(key: string): string };
-      }
-    ).pracDsh;
-    return () => {
-      dshHost = undefined;
-    };
-  });
-
   const applications = new ApplicationRegistry();
   const windows = new WindowManager(new WindowGroupBindings(store), applications, {
     register: (windowId, facts, content) => {
@@ -170,7 +157,6 @@ export function createServices(
   const roles: RoleBindings = {};
 
   /** Where a view parks when it gives up the centre (unbound until the arrangement says). */
-  let trackRegion: string | undefined;
 
   /** The region new centre items go to: the frame's centre, or the first region without one. */
   const centreRegion = (state: LayoutState): string =>
@@ -195,9 +181,6 @@ export function createServices(
    *
    * @param id - the main panel key.
    */
-  const hasMainPanel = (id: string): boolean =>
-    ctx.slots.entries("main").some((entry) => entry.options.key === id);
-
   // The `panelInfo` shared source: part of the published face, and the root hook
   // (`usePanelInfo`) that any panel-aware component reads.
   //
@@ -219,44 +202,6 @@ export function createServices(
   let navigation = new AbortController();
   const layout: LayoutFace = {
     panelInfo,
-    selectPanel(panelId: string | null): void {
-      if (panelId !== null && !hasMainPanel(panelId)) {
-        throw new Error(`layout.selectPanel: main panel "${panelId}" is not registered`);
-      }
-      navigation.abort();
-      navigation = new AbortController();
-      store.update((state) => {
-        // The host owns its panel ids (the DSH host provides the face); the
-        // frame only places the window the host names. Captured through a
-        // dynamic inject: a plain property read on a context that does not
-        // declare the service throws in Cordis.
-        if (dshHost === undefined) {
-          throw new Error("layout.selectPanel: the DSH host face is not available");
-        }
-        const viewId = panelId === null ? dshHost.conversation : dshHost.mainView(panelId);
-        // The chosen view goes where the *arrangement* placed it, or to the
-        // centre when it has no home of its own — never to "wherever the panel
-        // on show happened to sit". A view parked in the track counts as having
-        // no home: selecting it brings it back to the centre.
-        const current = state.items[viewId]?.region;
-        const regionId =
-          current !== undefined && current !== trackRegion ? current : centreRegion(state);
-        const outgoing = frontItem(state, regionId);
-        const next = place({ ...state, activePanelId: panelId }, viewId, regionId);
-        // One view holds a region. The one that gave it up parks in the track
-        // the arrangement bound, which is what lets a panel and the
-        // conversation share the screen instead of replacing each other.
-        if (
-          trackRegion === undefined ||
-          trackRegion === regionId ||
-          outgoing === undefined ||
-          outgoing === viewId
-        ) {
-          return next;
-        }
-        return place(next, outgoing, trackRegion);
-      });
-    },
     beginNavigation(): AbortSignal {
       navigation.abort();
       navigation = new AbortController();
@@ -662,9 +607,6 @@ export function createServices(
     bindRoles(next: RoleBindings): void {
       if (next.primarySidebar !== undefined) roles.primarySidebar = next.primarySidebar;
       if (next.secondarySidebar !== undefined) roles.secondarySidebar = next.secondarySidebar;
-    },
-    bindTrack(regionId: string): void {
-      trackRegion = regionId;
     },
   };
 

@@ -407,9 +407,6 @@ export function restoreCentre(layout: PracLayout, dsh: PracDshFace): boolean {
  */
 export function arrange(layout: PracLayout, dsh: PracDshFace): void {
   layout.bindRoles(roles(dsh));
-  // Where a view parks when it gives up the centre: the right track, which is
-  // what the arrangement already uses for the window group it is *not* on.
-  layout.bindTrack(RIGHT);
   // The left rail is the dock's activity bar, drawn **outside** the region: the region itself has no
   // in-region selector strip, so the allocation must not reserve one. The bottom dock is hidden, so
   // it has no selector either. Both are state, not CSS: a hidden strip still costs its height.

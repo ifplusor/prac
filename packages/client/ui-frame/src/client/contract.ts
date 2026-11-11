@@ -273,7 +273,6 @@ export interface LayoutFace {
    * @param panelId - a registered main key, or null for the conversation.
    * @throws when the key is not registered.
    */
-  selectPanel(panelId: string | null): void;
   /** Start an asynchronous navigation, superseding any earlier pending one. */
   beginNavigation(): AbortSignal;
   /**
@@ -649,5 +648,4 @@ export interface PracLayoutFace {
    *
    * @param regionId - the parking ("track") region id.
    */
-  bindTrack(regionId: string): void;
 }
