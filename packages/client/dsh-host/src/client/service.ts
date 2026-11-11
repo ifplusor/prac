@@ -37,11 +37,16 @@ export function apply(ctx: Context): void {
       start: (params, instance) => {
         const { windowId, region } = params as { windowId?: string; region?: string };
         const target = windowId ?? DSH_CONVERSATION_VIEW;
-        ctx.pracWindows.admit("chat", {
-          windowId: target,
-          region,
-          ...(instance === undefined ? {} : { instanceId: instance.id }),
-        });
+        try {
+          ctx.pracWindows.admit("chat", {
+            windowId: target,
+            region,
+            ...(instance === undefined ? {} : { instanceId: instance.id }),
+          });
+        } catch {
+          // The manager may not have the region yet; the next launch retries.
+          return false;
+        }
         return true;
       },
       content: (windowId, render, view) => {
