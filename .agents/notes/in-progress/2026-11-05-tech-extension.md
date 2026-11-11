@@ -128,7 +128,7 @@ interface PracExtension {
   apps?(): readonly PracAppDef[];      // 声明：catalog / reconcile 用
   widgets?(): readonly PracWidgetDef[];
 
-  runtime?(def: PracAppDef): PracAppImpl | undefined;          // 代码：lazy
+  appRuntime?(def: PracAppDef): PracAppImpl | undefined;       // 代码：lazy
   widgetRuntime?(def: PracWidgetDef): PracWidgetImpl | undefined;
 
   onDidChange?(listener: () => void): () => void;
