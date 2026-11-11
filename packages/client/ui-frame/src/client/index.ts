@@ -242,11 +242,13 @@ export function apply(ctx: Context): void {
           // Every window is admitted, and the window carries its own content: the
           // editor app supplies it (it owns the pane host), the manager records it.
           const instance = instances.create("prac.vscode-editor", { resource: windowId });
-          const content = ctx.pracApplications.get("prac.vscode-editor")?.content;
+          const editor = ctx.pracApplications.get("prac.vscode-editor");
           windows.admit("prac.vscode-editor", {
             windowId,
             instanceId: instance.id,
-            ...(content === undefined ? {} : { content: () => content(windowId)() }),
+            ...(editor?.content === undefined
+              ? {}
+              : { content: () => editor.content?.(windowId)() ?? null }),
           });
         },
       ),
