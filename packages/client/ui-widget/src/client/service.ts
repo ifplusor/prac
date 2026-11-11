@@ -93,6 +93,49 @@ export function apply(ctx: Context): void {
     },
   };
   ctx.provide("pracWidgets", face);
+  // The extension's widgets enter the registry here: the catalog owns the
+  // declarations, the registry the runtime records.
+  const registered = new Map<string, () => void>();
+  const syncWidgets = (): void => {
+    const catalog = extensions.catalog().widgets;
+    const wanted = new Set(catalog.map((widget) => widget.id));
+    for (const [id, dispose] of registered) {
+      if (wanted.has(id)) continue;
+      dispose();
+      registered.delete(id);
+    }
+    for (const widget of catalog) {
+      if (registered.has(widget.id)) continue;
+      const disposer = face.registry.register({
+        id: widget.id,
+        source: widget.id.includes(":") ? widget.id.slice(0, widget.id.indexOf(":")) : "prac",
+        hostKind: "vscode",
+        title: widget.title,
+        multiplicity: "single",
+        ...(widget.icon === undefined ? {} : { icon: widget.icon }),
+        ...(widget.defaultBoard === undefined ? {} : { defaultBoard: widget.defaultBoard }),
+      });
+      registered.set(widget.id, () => disposer.dispose());
+    }
+  };
+  syncWidgets();
+  ctx.effect(() => extensions.onDidChange(syncWidgets), "prac-widget: catalog sync");
+  // The dock shows the boards the widgets' defaultBoard implies (prac owns the board).
+  const pinBoards = (): void => {
+    const dock = ctx.pracDock;
+    if (dock === undefined) return;
+    for (const definition of face.registry.list()) {
+      if (definition.defaultBoard === undefined) continue;
+      dock.pin({
+        id: definition.defaultBoard,
+        appId: "prac.board",
+        label: definition.defaultBoard,
+        side: "left",
+      });
+    }
+  };
+  pinBoards();
+  ctx.effect(() => face.registry.onDidChange(pinBoards), "prac-widget: dock pins");
   // The page-level probe: gates read the same face through one registry. The
   // frame reads it from the Cordis service (its board drop decoration), not from
   // this global.
@@ -108,4 +151,5 @@ export const inject = [
   "pracExtensions",
   "pracApplications",
   "pracWindows",
+  "pracDock",
 ];
