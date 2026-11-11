@@ -35,6 +35,10 @@ export interface PracWidgetsFace {
    * an optional split is completed inside the **target** board's root, never across
    * the two boards.
    */
+  /** Show one widget (visibility, not membership). */
+  show(widgetId: string): void;
+  /** Hide one widget (visibility, not membership). */
+  hide(widgetId: string): void;
   moveWidget(
     widgetId: string,
     fromBoardId: string,

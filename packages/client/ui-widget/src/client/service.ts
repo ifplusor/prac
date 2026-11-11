@@ -71,6 +71,14 @@ export function apply(ctx: Context): void {
       return board;
     },
     boards: () => [...boards.values()].filter((board) => !board.disposed),
+    show: (widgetId) => {
+      for (const board of boards.values())
+        if (board.hasWidget(widgetId)) board.setWidgetHidden(widgetId, false);
+    },
+    hide: (widgetId) => {
+      for (const board of boards.values())
+        if (board.hasWidget(widgetId)) board.setWidgetHidden(widgetId, true);
+    },
     moveWidget: (widgetId, fromBoardId, toBoardId, options = {}) => {
       const find = (id: string): BoardWindowAdapter | undefined =>
         boards.get(id) ?? [...boards.values()].find((board) => board.boardId === id);

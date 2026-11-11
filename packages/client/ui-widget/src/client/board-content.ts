@@ -14,6 +14,7 @@ import {
   regionNode,
   structuralRegion,
   workspaceScope,
+  setItemHidden,
 } from "prac-ui-kit-content";
 import { freshNodeId, type Side } from "prac-ui-kit-layout";
 /**
@@ -177,6 +178,11 @@ export class BoardContent implements BoardContentShape {
   /** Register a widget host with the board; placement is explicit. */
   addWidget(host: BoardWidgetHost): void {
     this.#hosts.set(host.id, host);
+  }
+
+  /** Hide or show one widget (visibility, not membership). */
+  setWidgetHidden(widgetId: string, hidden: boolean): void {
+    this.#set(setItemHidden(this.#state, widgetId, hidden) as LayoutState<WidgetRecord>);
   }
 
   removeWidget(id: string): void {

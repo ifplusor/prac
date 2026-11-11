@@ -75,6 +75,10 @@ export class BoardWindowAdapter {
     this.content.placeWidget(widgetId, this.boardId, options);
   }
 
+  setWidgetHidden(widgetId: string, hidden: boolean): void {
+    this.content.setWidgetHidden(widgetId, hidden);
+  }
+
   removeWidget(widgetId: string): void {
     this.content.removeWidget(widgetId);
   }

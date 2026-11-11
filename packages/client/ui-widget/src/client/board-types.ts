@@ -8,6 +8,8 @@
  * @module prac-client-ui-widget/client/board-types
  */
 
+import type { LayoutState } from "prac-ui-kit-content";
+
 /** One board's declaration (prac core). */
 export interface PracBoardDef {
   readonly id: string;
@@ -17,9 +19,13 @@ export interface PracBoardDef {
   readonly defaultRegion?: string;
 }
 
-/** A board's runtime: its widgets, its active one, and whether the dock shows it. */
+/** A board's runtime: its widgets, its layout, its active one, and whether the dock shows it. */
 export interface PracBoard {
   readonly def: PracBoardDef;
+  /** The board's widgets, in tab order; the membership authority. */
+  readonly widgets: readonly string[];
+  /** Position, geometry and visibility of the board's widgets. */
+  readonly root: LayoutState;
   /** Active widget id. */
   readonly active?: string;
   /** Whether the dock shows this board. */

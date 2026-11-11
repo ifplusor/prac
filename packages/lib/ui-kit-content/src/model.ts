@@ -375,6 +375,23 @@ export function setRegionChildren(
  * @param regionId - the selector region.
  * @param childId - the child to show.
  */
+/**
+ * Hide or show one item.
+ *
+ * Visibility is a view state, not membership: a hidden item is still in the
+ * region's children and in the item table, it is just not painted.
+ *
+ * @param state - the layout state to update.
+ * @param itemId - the item to hide or show.
+ * @param hidden - whether the item is hidden.
+ * @returns the new state, or the same one when nothing changes.
+ */
+export function setItemHidden(state: LayoutState, itemId: string, hidden: boolean): LayoutState {
+  const item = state.items[itemId];
+  if (item === undefined || item.hidden === hidden) return state;
+  return { ...state, items: { ...state.items, [itemId]: { ...item, hidden } } };
+}
+
 export function selectChild(tree: LayoutNode, regionId: string, childId: string): LayoutNode {
   return updateRegion(tree, regionId, (node) =>
     node.children?.some((child) => child.id === childId) === true
