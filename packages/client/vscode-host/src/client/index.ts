@@ -508,19 +508,18 @@ export function apply(ctx: Context): void {
     const reconcile = (): void => {
       const snapshot = ctx.pracWindows?.getSnapshot();
       if (snapshot === undefined) return;
-      const inStage = new Map(
-        snapshot.placements
-          .filter((placement) => placement.region === "center")
-          .map((placement) => [placement.windowId, placement.region]),
-      );
-      // A window whose app vscode contributed is already an editor; every other
-      // stage window needs our placeholder input.
-      const desired = new Map(
-        snapshot.windows
-          .filter((window) => inStage.has(window.id))
-          .filter((window) => window.tags?.includes("vscode") !== true)
-          .map((window) => [window.id, window.title ?? window.id]),
-      );
+      // The placements are the authority for "where a window is": a window placed
+      // by an app's own adaptor (the DSH sidebar, the conversation) never went
+      // through `admit`, so the window list does not contain it.
+      const desired = new Map<string, string>();
+      for (const placement of snapshot.placements) {
+        if (placement.region !== "center") continue;
+        const window = snapshot.windows.find((candidate) => candidate.id === placement.windowId);
+        // A window whose app vscode contributed is already an editor; every other
+        // stage window needs our placeholder input.
+        if (window?.tags?.includes("vscode") === true) continue;
+        desired.set(placement.windowId, window?.title ?? placement.windowId);
+      }
       const actual = new Set(face.mappedWindows());
       for (const id of actual) {
         if (desired.has(id)) continue;
