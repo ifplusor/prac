@@ -60,7 +60,9 @@ interface PracBoardDef {
 
 interface PracBoard {
   readonly def: PracBoardDef;
-  readonly root: LayoutState;    // board 的布局树
+  /** board 的 widget，按 tab 顺序；成员权威（隐藏的也算成员） */
+  readonly widgets: readonly string[];
+  readonly root: LayoutState;    // 位置 + 几何 + 可见性
   readonly active?: string;      // active widget id
   readonly pinned: boolean;      // dock 是否显示
 }
@@ -86,13 +88,16 @@ widget 的“在哪个 region、什么顺序、多大、是否折叠 / 隐藏”
 所以：
 
 - **不设 `WidgetPlacement`**；board root 的 item id = widget id；
-- widget 的归属由 `PracWidget.boardId` 唯一决定；
-- 任何时刻只有 `PracWidget`（身份 + 归属）与 `LayoutState`（位置 + 几何）两个真相源，不产生第三个。
+- **成员显式**：`PracBoard.widgets`（不是从树推导）；
+- **位置 / 几何 / 可见性**：`LayoutState` 的 `ItemRecord`（`hidden` 在 `ItemRecord`，不在 `widgets`）；
+- 任何时刻只有三个各司其职的记录：`PracWidget`（身份 + 归属）、`PracBoard.widgets`（成员）、`LayoutState`（位置 + 几何 + 可见性）。
+
+**隐藏 / 显示**：`hidden` 是视图状态，不是成员关系。隐藏的 widget 仍在 `widgets` 里，仍属于该 board；`show` / `hide` 只写 `ItemRecord.hidden`。
 
 ### 2.4 不变量
 
 - widget 单例：一个 widget 只在一个 board（`PracWidget.boardId`）；
-- board root 的每个 item 必须对应一个 `PracWidget`，其 `boardId` 等于该 board；
+- `PracBoard.widgets` 与 `root.items` 的 id 集合相等（隐藏的也算成员）；
 - `PracBoard.active` 必须是该 board 的 widget；否则忽略 / heal；
 - board root 同时只有一个 writer（drag / reset / layout）；
 - board root 的 item id 唯一；
@@ -116,6 +121,8 @@ interface PracWidgets {
   }): void;
   reset(widgetId: string): void;
   resetAll(): void;
+  show(widgetId: string): void;
+  hide(widgetId: string): void;
 }
 ```
 
@@ -165,8 +172,15 @@ interface DragService {
 
 ## 4. 生命周期
 
-```
-contribute → reconcile → place → pin → open → persist → recover
+```mermaid
+flowchart LR
+  C[contribute] --> R[reconcile]
+  R --> P[place]
+  P --> D[pin]
+  D --> O[open]
+  O --> S[persist]
+  S --> V[recover]
+  V --> R
 ```
 
 ### 4.1 contribute
@@ -188,9 +202,23 @@ reconcile 的输入是当前的 widget 集合，输出是 board 集合。它在 
 
 关键：**`defaultBoard` 只在“首次出现”和“heal”时生效**；正常移动后 `boardId` 优先。
 
-### 4.3 place
+```mermaid
+stateDiagram-v2
+  [*] --> absent
+  absent --> placed: widget appears
+  placed --> placed: user move / hide / show
+  placed --> healed: board missing
+  healed --> placed: defaultBoard
+  placed --> absent: widget disappears
+```
 
-board root 的 item 由 `LayoutState` 的 `ItemRecord` 承载；`place(widgetId, region)` / `move` / `split` 都写这一层。
+### 4.3 place / show / hide
+
+board root 的 item 由 `LayoutState` 的 `ItemRecord` 承载；`place(widgetId, region)` / `move` / `split` / `show` / `hide` 都写这一层。
+
+- `place` / `move` / `split`：写 `ItemRecord.region` / `order` / `size`；
+- `show` / `hide`：写 `ItemRecord.hidden`；
+- 三者都不改 `PracBoard.widgets`（成员）。
 
 ### 4.4 pin
 
@@ -242,6 +270,20 @@ board root 的 item 由 `LayoutState` 的 `ItemRecord` 承载；`place(widgetId,
 ### 7.2 recovery 顺序
 
 刷新页面 / open folder 时：
+
+```mermaid
+sequenceDiagram
+  participant E as Extension
+  participant W as WidgetRegistry
+  participant B as PracBoards
+  participant S as Storage
+  E->>W: contribute(widgets)
+  W->>B: reconcile(defaultBoard)
+  B->>S: load(prac-board/v1)
+  S-->>B: persisted boards
+  B->>B: adopt(persisted)
+  B->>B: pin / restore
+```
 
 ```
 1. re-contribute       extension 重新贡献 widget（registry 就绪）
