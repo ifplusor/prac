@@ -50,7 +50,8 @@ export function apply(ctx: Context): void {
       start: (params: unknown, instance: { id: string }) => {
         // The board's region is the container child, not the bare container id.
         const { boardId, side } = params as { boardId: string; side: "left" | "right" };
-        face.createBoardWindow(`${side}/container:${boardId}`, undefined, instance.id);
+        const region = `${side}/container:${boardId}`;
+        face.createBoardWindow(region, undefined, instance.id);
         return true;
       },
     }),
@@ -70,6 +71,9 @@ export function apply(ctx: Context): void {
         region: id,
         ...(instanceId === undefined ? {} : { instanceId }),
       });
+      // The board names its region; the manager writes the placement, so the
+      // projection can map the window to its pane host.
+      ctx.pracWindows.place(board.boardId, id);
       return board;
     },
     boards: () => [...boards.values()].filter((board) => !board.disposed),
