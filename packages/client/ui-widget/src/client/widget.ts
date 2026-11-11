@@ -71,6 +71,17 @@ export interface WidgetPlacement {
 /** Registry of widget definitions, keyed by id. */
 export class WidgetRegistry {
   readonly #definitions = new Map<string, WidgetDefinition>();
+  readonly #listeners = new Set<() => void>();
+
+  /** Subscribe to definitions being added or removed. */
+  onDidChange(listener: () => void): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
+
+  #notify(): void {
+    for (const listener of this.#listeners) listener();
+  }
 
   /** Register a definition; duplicate id is rejected. */
   register(definition: WidgetDefinition): { dispose(): void } {
@@ -78,6 +89,7 @@ export class WidgetRegistry {
       throw new Error(`widget already registered: ${definition.id}`);
     }
     this.#definitions.set(definition.id, definition);
+    this.#notify();
     let disposed = false;
     return {
       dispose: () => {
@@ -85,6 +97,7 @@ export class WidgetRegistry {
         disposed = true;
         if (this.#definitions.get(definition.id) === definition) {
           this.#definitions.delete(definition.id);
+          this.#notify();
         }
       },
     };
