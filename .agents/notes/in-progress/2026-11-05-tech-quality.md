@@ -46,15 +46,12 @@ status: in-progress
 
 ### 2.2 信任边界
 
-```text
-Browser（prac client）
-  │  HTTPS / WS
-DSH server（agent / tools / approval）
-  │  child / IPC
-code server（VS Code server / assets / PTY）
-extension host（server 侧；language servers）
-  │
-webview iframe / MCP servers
+```mermaid
+flowchart TD
+  B["Browser（prac client）"] -->|HTTPS / WS| D["DSH server（agent / tools / approval）"]
+  D -->|child / IPC| C["code server（VS Code server / assets / PTY）"]
+  C --> E["extension host（server 侧；language servers）"]
+  E --> W["webview iframe / MCP servers"]
 ```
 
 - **browser**：不可信输入（文件内容、webview、扩展 view）；XSS / origin 风险。

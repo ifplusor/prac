@@ -25,14 +25,14 @@ status: in-progress
 
 ## 2. 进程 / 生命周期
 
-```text
-DSH server
-  ├─ prac-host-vscode（原语：language feature / policy / webview endpoint）
-  │    ├─ code server（VS Code server / assets）
-  │    └─ extension host（Node IPC；per workspace）
-  │         └─ language server（由 extension 的 LanguageClient 启动 / 连接）
-  ├─ prac-host-vscode-lsp（provider adapter；same process）
-  └─ MCP servers（DSH MCP client）
+```mermaid
+flowchart TD
+  D["DSH server"] --> H["prac-host-vscode<br/>language feature / policy / webview endpoint"]
+  D --> L["prac-host-vscode-lsp<br/>provider adapter（same process）"]
+  D --> M["MCP servers（DSH MCP client）"]
+  H --> C["code server（VS Code server / assets）"]
+  H --> E["extension host（Node IPC；per workspace）"]
+  E --> S["language server<br/>由 extension 的 LanguageClient 启动 / 连接"]
 ```
 
 - **extension host 与 page extension host 分开**；per workspace；页面关着也运行。
