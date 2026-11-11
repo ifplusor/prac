@@ -693,11 +693,16 @@ export function apply(ctx: Context): void {
    */
   const mappedBoards = new Set<string>();
   const syncBoardWindowProjection = (vscode: PracVscodeFace): void => {
-    const alive = new Set(
-      [...containerBoards.values()]
-        .filter((entry) => entry.registered)
-        .map((entry) => entry.board.windowId),
-    );
+    if (false)
+      console.error(
+        `[prac-board-map] call boards=${containerBoards.size} placed=` +
+          `${[...containerBoards.values()].filter((entry) => ctx.pracWindows?.getSnapshot().placements.some((placement) => placement.windowId === entry.board.windowId)).length} ` +
+          `mapped=${vscode.mappedWindows().length}`,
+      );
+    // Every container board is alive: `registered` only tracks the surface
+    // registration, and gating this set on it made the pass unmap the windows it
+    // had just mapped (map → next call sees an empty `alive` → unmap).
+    const alive = new Set([...containerBoards.values()].map((entry) => entry.board.windowId));
     for (const id of mappedBoards) {
       if (alive.has(id)) continue;
       vscode.unmapWindow(id);
