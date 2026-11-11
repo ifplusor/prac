@@ -401,7 +401,9 @@ export class WindowManager {
   /** Bind a fresh group to a region the app named; the window needs a home. */
   #bindGroup(regionId: string): string {
     const group = new ProductWindowGroup(`${regionId}/group`);
-    this.bindings.register(group as unknown as WindowGroup, regionId);
+    // Registering it as a runtime (not just a binding) is what lets `open` add
+    // the handle and the bridge write the window's placement into the store.
+    this.register(group, regionId);
     return group.id;
   }
 

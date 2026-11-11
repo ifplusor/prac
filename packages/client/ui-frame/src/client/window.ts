@@ -79,6 +79,36 @@ export class WindowGroup {
   }
 
   /**
+   * Select the active window (the manager's `select`).
+   *
+   * @param windowId - the member to make active; `undefined` clears it.
+   */
+  select(windowId: string | undefined): void {
+    if (windowId !== undefined && !this.#windows.has(windowId)) return;
+    if (this.#active === windowId) return;
+    this.#active = windowId;
+    this.#emit();
+  }
+
+  /**
+   * The manager's `add`: a handle carries only an id.
+   *
+   * @param window - the handle the manager placed.
+   */
+  add(window: { id: string }): void {
+    this.openWindow(window.id);
+  }
+
+  /**
+   * The manager's `remove`.
+   *
+   * @param windowId - the member to drop.
+   */
+  remove(windowId: string): void {
+    this.close(windowId);
+  }
+
+  /**
    * Open a window by id.
    *
    * The bindings' `join` speaks ids (a window placed into a region by the
