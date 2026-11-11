@@ -29,6 +29,7 @@ status: in-progress
 ```ts
 interface PracWidget extends PracWidgetDef {
   source: string;             // "vscode:view" / "dsh:slot" / "prac:changed-files"
+  boardId: string;            // the unique board the widget lives in
   actions?: () => ReactNode;
   content(): () => ReactNode;
 }
@@ -43,15 +44,22 @@ interface WidgetPlacement {
   sourceId: string;
 }
 
-interface BoardState {
+interface PracBoard {
   id: string;
+  def: PracBoardDef;          // the board's declaration (prac core)
   root: LayoutState<WidgetPlacement>;
   active?: string;            // active widget id
-  defaultRegion?: string;     // optional; placement policy
+  pinned: boolean;            // shown on the dock
 }
 ```
 
 `PracWidget` 是 runtime；声明对应 `PracWidgetDef`（[tech-extension](./2026-11-05-tech-extension.md)）。extension registry 把 `PracWidgetDef` + `hostFor` 变成 `PracWidget`。
+
+**widget 是单例**：一个 widget 只在一个 board 里（`PracWidget.boardId` 唯一）。`PracWidgetDef.defaultBoard` 只是“首次放置”的默认值，不是当前归属。
+
+**board 属于 prac core**：extension 只贡献 widget，不贡献 board。board 由 prac 从 widget 的 `defaultBoard` **推导**（reconcile），因为 widget 会随 `when` / extension 激活动态增删。
+
+**board 的 pin**：`PracBoard.pinned` 决定它是否出现在 dock；unpin 不影响 board 和窗口，只从 dock 移除；restore 把 `pinned` 置回 true。
 
 命名与 tech-ui 对齐：`PracWidget` 是运行时记录，`WidgetPlacement` 是 board layout 的 placement 记录；不再用 `WidgetItem`。
 

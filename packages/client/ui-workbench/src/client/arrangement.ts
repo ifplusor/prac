@@ -424,10 +424,11 @@ export function arrange(layout: PracLayout, dsh: PracDshFace, dock?: PracDock): 
   if (dock !== undefined) {
     for (const entry of defaultPlacements(dsh)) {
       if (entry.region !== LEFT && entry.region !== RIGHT) continue;
+      const id = entry.view.split(":").at(-1) ?? entry.view;
       dock.pin({
-        id: entry.view,
+        id,
         appId: "prac.board",
-        label: entry.view.split(":").at(-1) ?? entry.view,
+        label: id,
         side: entry.region === LEFT ? "left" : "right",
       });
     }
