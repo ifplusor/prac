@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type {
   ApplicationSlotRenderer,
   ApplicationViewport,
-  ApplicationRegistry,
+  PracApplications,
   GroupBarItem,
   GroupRegionContent,
   LayoutState,
@@ -176,7 +176,7 @@ export class WindowManager {
 
   constructor(
     private readonly bindings: WindowGroupBindingsPort,
-    private readonly apps: ApplicationRegistry,
+    private readonly apps: PracApplications,
     private readonly seat?: WindowSeatPort,
     private readonly instances?: PracAppInstances,
   ) {}
@@ -239,8 +239,8 @@ export class WindowManager {
     }
 
     if (app.instances === "single") {
-      for (const [openId, openApp] of this.#appOf) {
-        if (openApp !== appId) continue;
+      for (const [openId, launch] of this.#appOf) {
+        if (launch !== appId) continue;
         this.activateWindow(openId);
         return openId;
       }

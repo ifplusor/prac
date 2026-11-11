@@ -18,7 +18,7 @@ import {
   type LayoutStore,
   ContentHostRegistry,
   BoardLayoutRegistry,
-  ApplicationRegistry,
+  PracApplications,
   PracAppInstances,
   PracDock,
   WindowGroupBindings,
@@ -106,7 +106,7 @@ export interface LayoutServices {
   /** The frame's view-group owner. */
   readonly windows: WindowManager;
   /** The app definitions partners contribute. */
-  readonly applications: ApplicationRegistry;
+  readonly applications: PracApplications;
   /** The app instance manager (the OS's process table). */
   readonly instances: PracAppInstances;
   /** The dock's pins. */
@@ -138,7 +138,7 @@ export function createServices(
   // one-view rows. Hiding the last visible view, placing one, folding one — they all change the shape
   // (a stack that falls back to one row melts, an empty leftover holds no space), so the normaliser
   // runs on the way out of each change rather than only on placements.
-  const applications = new ApplicationRegistry();
+  const applications = new PracApplications();
   const instances = new PracAppInstances();
   const dock = new PracDock();
   const windows = new WindowManager(

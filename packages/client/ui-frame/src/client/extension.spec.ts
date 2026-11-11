@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { Context } from "@deepseek-ai/cordis";
-import { ApplicationRegistry } from "prac-ui-kit-workbench";
+import { PracApplications } from "prac-ui-kit-workbench";
 
 import { createExtensionRegistry } from "./extension.js";
 import type { PracAppDef, PracExtension, PracWidgetDef } from "./contract.js";
@@ -93,7 +93,7 @@ describe("extension projection", () => {
   it("registers widgets and app windows through ctx", () => {
     const widgets = new Map<string, unknown>();
     const windows = new Map<string, { appId: string; title?: string }>();
-    const apps = new ApplicationRegistry();
+    const apps = new PracApplications();
     const ctx = {
       slots: {
         inject: (_slot: string, callback: () => () => void) => callback(),

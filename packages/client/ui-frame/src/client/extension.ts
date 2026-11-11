@@ -12,6 +12,7 @@
 
 import type { Context } from "@deepseek-ai/cordis";
 
+import type { PracAppInstance } from "prac-ui-kit-workbench";
 import type {
   PracCatalog,
   PracExtension,
@@ -110,9 +111,12 @@ function project(ctx: Context, extension: PracExtension): Projection | undefined
           ...(impl.match === undefined
             ? {}
             : { match: (resource: string) => impl.match?.(resource) ?? false }),
-          ...(impl.open === undefined
+          ...(impl.start === undefined
             ? {}
-            : { open: (resource: string) => impl.open?.(resource) ?? false }),
+            : {
+                start: (params: unknown, instance: PracAppInstance) =>
+                  impl.start?.(params, instance) ?? false,
+              }),
           content: (windowId, render, view) => impl.content(windowId, render, view),
         }),
         windows: new Set(),

@@ -13,7 +13,7 @@
 import { publishProbe } from "prac-ui-kit-workbench/probes";
 
 import type { PracLayoutFace, PracSpacesFace, PracWindowActionsFace } from "./contract.js";
-import type { ApplicationRegistry, BoardLayoutRegistry } from "prac-ui-kit-workbench";
+import type { PracApplications, BoardLayoutRegistry } from "prac-ui-kit-workbench";
 
 /** The faces this plugin publishes, by probe name. */
 export interface PracProbes {
@@ -22,7 +22,7 @@ export interface PracProbes {
   /** The board layout registry (a board's state is not in the frame's item table). */
   readonly boardLayouts: BoardLayoutRegistry;
   /** The application table, so a gate can prove who is launchable. */
-  readonly applications: ApplicationRegistry;
+  readonly applications: PracApplications;
   /** The Space registry. */
   readonly spaces: PracSpacesFace;
   /**

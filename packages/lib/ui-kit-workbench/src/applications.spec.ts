@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { ApplicationRegistry, type ApplicationDefinition } from "./applications.js";
+import { PracApplications, type PracAppDef } from "./applications.js";
 
-const app = (
-  id: string,
-  overrides: Partial<ApplicationDefinition> = {},
-): ApplicationDefinition => ({
+const app = (id: string, overrides: Partial<PracAppDef> = {}): PracAppDef => ({
   id,
   label: id,
   instances: "multi",
@@ -13,9 +10,9 @@ const app = (
   ...overrides,
 });
 
-describe("ApplicationRegistry", () => {
+describe("PracApplications", () => {
   it("registers, reads and lists applications in registration order", () => {
-    const registry = new ApplicationRegistry();
+    const registry = new PracApplications();
     registry.register(app("editor"));
     registry.register(app("chat", { instances: "single" }));
     expect(registry.get("editor")?.id).toBe("editor");
@@ -24,13 +21,13 @@ describe("ApplicationRegistry", () => {
   });
 
   it("rejects a duplicate id", () => {
-    const registry = new ApplicationRegistry();
+    const registry = new PracApplications();
     registry.register(app("editor"));
     expect(() => registry.register(app("editor"))).toThrow(/already registered/);
   });
 
   it("removes a definition through its disposer only once", () => {
-    const registry = new ApplicationRegistry();
+    const registry = new PracApplications();
     const dispose = registry.register(app("editor"));
     dispose();
     expect(registry.get("editor")).toBeUndefined();
@@ -38,7 +35,7 @@ describe("ApplicationRegistry", () => {
   });
 
   it("keeps a replacement registration alive when an old disposer runs", () => {
-    const registry = new ApplicationRegistry();
+    const registry = new PracApplications();
     const first = registry.register(app("editor"));
     first();
     registry.register(app("editor"));
@@ -47,7 +44,7 @@ describe("ApplicationRegistry", () => {
   });
 
   it("notifies subscribers on register and removal", () => {
-    const registry = new ApplicationRegistry();
+    const registry = new PracApplications();
     let changes = 0;
     const stop = registry.onDidChange(() => (changes += 1));
     const dispose = registry.register(app("editor"));
@@ -58,7 +55,7 @@ describe("ApplicationRegistry", () => {
   });
 
   it("refuses registration after dispose", () => {
-    const registry = new ApplicationRegistry();
+    const registry = new PracApplications();
     registry.dispose();
     expect(() => registry.register(app("editor"))).toThrow(/dispose/);
   });

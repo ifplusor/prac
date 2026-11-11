@@ -15,7 +15,7 @@ import type { ReactNode } from "react";
  */
 
 /** One launchable application. */
-export interface ApplicationDefinition {
+export interface PracAppDef {
   /** Stable id (`editor`, `chat`, `board`, …). */
   readonly id: string;
   /** Definition version; a window pins the version it was opened with. */
@@ -48,8 +48,6 @@ export interface ApplicationDefinition {
    * app must not claim a document its document app owns.
    */
   match?(resource: string): boolean;
-  /** Open one resource inside this app; the app owns the window it creates. */
-  open?(params: unknown): boolean;
   /** The app's entry: runs inside a launch, with the instance the launch created. */
   start?(params: unknown, instance: PracAppInstance): boolean;
   /**
@@ -170,8 +168,8 @@ export class PracAppInstances {
   }
 }
 
-export class ApplicationRegistry {
-  readonly #apps = new Map<string, ApplicationDefinition>();
+export class PracApplications {
+  readonly #apps = new Map<string, PracAppDef>();
   readonly #instances: PracAppInstances | undefined;
 
   constructor(instances?: PracAppInstances) {
@@ -188,7 +186,7 @@ export class ApplicationRegistry {
    * @returns the disposer that removes it again.
    * @throws when the id is already registered or the registry is disposed.
    */
-  register(app: ApplicationDefinition): () => void {
+  register(app: PracAppDef): () => void {
     if (this.#disposed) throw new Error("application registry: register after dispose");
     if (this.#apps.has(app.id))
       throw new Error(`application registry: ${app.id} already registered`);
@@ -207,12 +205,12 @@ export class ApplicationRegistry {
    * @param id - the application id.
    * @returns the definition, or `undefined`.
    */
-  get(id: string): ApplicationDefinition | undefined {
+  get(id: string): PracAppDef | undefined {
     return this.#apps.get(id);
   }
 
   /** Every registered application, in registration order. */
-  list(): readonly ApplicationDefinition[] {
+  list(): readonly PracAppDef[] {
     return [...this.#apps.values()];
   }
 
@@ -222,22 +220,25 @@ export class ApplicationRegistry {
    * @param resource - the workspace path or URI to open.
    * @returns the first app whose `match` accepts it, or `undefined`.
    */
-  openApp(appId: string, params?: unknown): PracAppInstance | undefined {
+  match(resource: string): PracAppDef | undefined {
+    for (const app of this.#apps.values()) {
+      if (app.match?.(resource) === true) return app;
+    }
+    return undefined;
+  }
+
+  launch(appId: string, params?: unknown): PracAppInstance | undefined {
     const app = this.#apps.get(appId);
     if (app === undefined) return undefined;
     const instance = this.#instances?.create(appId, params);
     if (instance !== undefined) app.start?.(params, instance);
-    else app.open?.(params);
     return instance;
   }
 
-  open(resource: string): ApplicationDefinition | undefined {
-    for (const app of this.#apps.values()) {
-      if (app.match?.(resource) !== true) continue;
-      app.open?.(resource);
-      return app;
-    }
-    return undefined;
+  open(resource: string, params?: unknown): PracAppInstance | undefined {
+    const app = this.match(resource);
+    if (app === undefined) return undefined;
+    return this.launch(app.id, params ?? resource);
   }
 
   /**

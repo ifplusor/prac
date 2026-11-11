@@ -43,7 +43,7 @@ import type {} from "@deepseek-ai/dsh-client-ui-slots";
 export type { Context } from "@deepseek-ai/cordis";
 export type { SlotMap } from "@deepseek-ai/dsh-client-ui-slots";
 import type {
-  ApplicationRegistry,
+  PracApplications,
   PracAppInstance,
   PracAppInstances,
   PracDock,
@@ -89,7 +89,7 @@ declare module "@deepseek-ai/cordis" {
     /** The frame's placement face. */
     pracFrame: PracLayoutFace;
     /** App definitions partners contribute (launch identity + per-window content). */
-    pracApplications: ApplicationRegistry;
+    pracApplications: PracApplications;
     /** Window membership: which group holds a window, and the membership operations. */
     pracWindows: WindowManager;
     /** The Space registry: named layouts over the same project folder. */

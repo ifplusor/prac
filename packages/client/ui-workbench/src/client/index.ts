@@ -937,7 +937,7 @@ export function apply(ctx: Context): void {
         ctx.pracWindows?.activateWindow(windowId);
         return;
       }
-      const created = ctx.pracApplications?.openApp(item.appId, item.params);
+      const created = ctx.pracApplications?.launch(item.appId, item.params);
       if (created !== undefined) ctx.pracDock?.pin({ ...item, instanceId: created.id });
       // Last word: opening the board may re-select another container, so the
       // clicked pin's container is selected after the app has run.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { ApplicationRegistry, type ApplicationDefinition } from "prac-ui-kit-workbench";
+import { PracApplications, type PracAppDef } from "prac-ui-kit-workbench";
 
 import type { WindowGroupBindingsPort } from "./window-manager.js";
 import {
@@ -70,10 +70,7 @@ const fakeBindings = (regions: Readonly<Record<string, string>> = {}): WindowGro
     dispose: () => {},
   }) satisfies WindowGroupBindingsPort;
 
-const app = (
-  id: string,
-  overrides: Partial<ApplicationDefinition> = {},
-): ApplicationDefinition => ({
+const app = (id: string, overrides: Partial<PracAppDef> = {}): PracAppDef => ({
   id,
   label: id,
   instances: "multi",
@@ -85,7 +82,7 @@ const handle = (id: string): WindowRuntimeHandle => ({ id });
 
 describe("WindowManager", () => {
   it("registers groups and reports the group that holds a window", () => {
-    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
+    const manager = new WindowManager(fakeBindings(), new PracApplications());
     const left = new FakeRuntime("left");
     const right = new FakeRuntime("right");
     manager.register(left, "left");
@@ -99,7 +96,7 @@ describe("WindowManager", () => {
   });
 
   it("opens a window as the group's active member", () => {
-    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
+    const manager = new WindowManager(fakeBindings(), new PracApplications());
     const group = new FakeRuntime("left");
     manager.register(group, "left");
     manager.open("left", handle("a"));
@@ -109,7 +106,7 @@ describe("WindowManager", () => {
   });
 
   it("closes a window wherever it is", () => {
-    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
+    const manager = new WindowManager(fakeBindings(), new PracApplications());
     const group = new FakeRuntime("left");
     manager.register(group, "left");
     manager.open("left", handle("a"));
@@ -119,7 +116,7 @@ describe("WindowManager", () => {
   });
 
   it("moves a window between groups without losing its handle", () => {
-    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
+    const manager = new WindowManager(fakeBindings(), new PracApplications());
     const left = new FakeRuntime("left");
     const right = new FakeRuntime("right");
     manager.register(left, "left");
@@ -132,7 +129,7 @@ describe("WindowManager", () => {
   });
 
   it("refuses to move a window that is not held, or into itself", () => {
-    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
+    const manager = new WindowManager(fakeBindings(), new PracApplications());
     const left = new FakeRuntime("left");
     manager.register(left, "left");
     expect(manager.move("missing", "left")).toBe(false);
@@ -141,7 +138,7 @@ describe("WindowManager", () => {
   });
 
   it("activates a held window", () => {
-    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
+    const manager = new WindowManager(fakeBindings(), new PracApplications());
     const group = new FakeRuntime("left");
     manager.register(group, "left");
     manager.open("left", handle("a"));
@@ -152,14 +149,14 @@ describe("WindowManager", () => {
   });
 
   it("rejects a duplicate group and an unknown group", () => {
-    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
+    const manager = new WindowManager(fakeBindings(), new PracApplications());
     manager.register(new FakeRuntime("left"), "left");
     expect(() => manager.register(new FakeRuntime("left"), "left")).toThrow(/already registered/);
     expect(() => manager.open("missing", handle("a"))).toThrow(/unknown group/);
   });
 
   it("forgets the windows of an unregistered group", () => {
-    const manager = new WindowManager(fakeBindings(), new ApplicationRegistry());
+    const manager = new WindowManager(fakeBindings(), new PracApplications());
     manager.register(new FakeRuntime("left"), "left");
     manager.open("left", handle("a"));
     manager.unregister("left");
@@ -170,7 +167,7 @@ describe("WindowManager", () => {
 
 describe("WindowManager.admit", () => {
   const managerWith = (regions: Readonly<Record<string, string>> = {}) => {
-    const apps = new ApplicationRegistry();
+    const apps = new PracApplications();
     const bindings = fakeBindings(regions);
     const manager = new WindowManager(bindings, apps);
     return { apps, bindings, manager };
@@ -208,7 +205,7 @@ describe("WindowManager.admit", () => {
   });
 
   it("reports app windows, their titles and their content", () => {
-    const apps = new ApplicationRegistry();
+    const apps = new PracApplications();
     apps.register(app("editor"));
     const manager = new WindowManager(fakeBindings(), apps);
     manager.register(new FakeRuntime("center"), "center");
@@ -232,7 +229,7 @@ describe("WindowManager.admit", () => {
   });
 
   it("hands the host's renderer to an app whose body is a host panel", () => {
-    const apps = new ApplicationRegistry();
+    const apps = new PracApplications();
     const render = (_slot: string, _props: Record<string, unknown>, _options?: unknown) => "panel";
     apps.register(
       app("host", { content: (_windowId, renderSlot) => () => renderSlot?.("main", {}) ?? null }),
