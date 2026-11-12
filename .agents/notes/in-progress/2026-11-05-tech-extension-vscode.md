@@ -122,7 +122,7 @@ WM / frame（决策）
 | --- | --- | --- |
 | **WM / frame** | 窗口存在性、region、group、placement；渲染 `prac.window` 槽 | VS Code 概念（input / group / pane） |
 | **vscode-host** | boot / embed；face；文件 → editor input；把 WM 的窗口镜像给 embed；提供宿主渲染 app 的内容 | 决定窗口存在性、region、打开管线 |
-| **embed overlay** | 实现 `IEditorGroupView` / `IEditorGroupsService` / `IEditorService`；group / pane / projection | 决定窗口集合、知道业务 app |
+| **embed overlay** | 实现 `IEditorGroupView` / `IEditorGroupsService` / `IEditorService`；**editor group 是模型投影（无 UI）**，editor pane 是 window content；frame 的 `WindowGroup` 由 engine 渲染 | 决定窗口集合、知道业务 app、渲染 tab strip |
 | **vendored VS Code** | 上游行为 | — |
 
 **接口**
@@ -134,7 +134,7 @@ WM / frame（决策）
 
 **两条流**
 
-窗口流：`admit → getSnapshot → mapWindow → ensureGroup(region) → PracWindowInput + PracWindowPane → mapped()`。
+窗口流：`admit → bindContent（window content）→ 投影（snapshot → editor model）；editor window 的 content 是 editor pane，frame window 的 content 是它的 renderer。`
 
 打开流：`prac.open → registry → app.open / pracVscode.open → editorService.openEditor({ resource }) → TextEditorInput + TextEditorPane`。
 
@@ -142,9 +142,10 @@ WM / frame（决策）
 
 - 窗口存在性 / region / group 的写者只有 WM；
 - embed 不自行创建窗口，只镜像；
-- `mapped()` 是 WM 窗口的投影，不是 editor group 的；
-- `groupForRegion` / `ensureGroup` 是 region → group 映射，按需创建；
+- 投影状态由 editor model 派生（`windowId ↔ IEditorInput`，含非 vscode 的 `PracWindowInput` 身份），不单独维护 `mapped()`；
+- editor group 随 prac `WindowGroup` 创建（一个组一个 model group），不做 region → group 的懒建；
 - 内容是 app 的，frame 渲染，editor pane 是 VS Code 的；
+- **editor group 是模型投影（无 UI）**：vscode 的 editor（pane）渲染成 **file window 的 content**；tab strip / items 由 frame 的 `WindowGroup` 渲染（engine 渲染 frame 的整棵树）；投影方向是 **prac → vscode**；
 - embed 不调 `prac.open`。
 
 ## 4. 自动转换
@@ -176,38 +177,39 @@ flowchart LR
 - **ViewContainer** → widget board；由 widget board app 打开 board window。container 只是默认 board hint，不是所有权。
 - **View** → `PracWidgetDef` + `PracWidgetImpl.hostFor`；默认 board hint 来自 container；frame / workbench 决定最终 placement。
 - **EditorInput** → editor app 的 `open` 声明窗口；每个 input 一个 `PracWindow` 投影；editor host 见 tech-ide §2.1。
-- **editor group** → window group 的 adaptor runtime；一个 stage region 一个 editor group；不拥有 chrome / window 记录。
+- **editor group** → 每个 prac `WindowGroup` 一个 **模型** editor group；不按 region 懒建，不拥有 chrome / window 记录，不渲染。
 - **actions / commands**：`containerActions` / `editorActions` / `runAction` / `runEditorAction` → resolved action model；frame 渲染。
 - **webview / custom editor**：`EditorPane`；secure context 由 runtime 管。
 
 ## 5.1 投影：prac window → VS Code
 
-**判据是“窗口内容由谁渲染”，不是一个叫 origin 的枚举。** host extension 有 vscode、dsh，以后可能更多；extension 机制不假设只有这两种。
+**方向：prac → vscode。** frame 的 `WindowGroup` / window 是权威；VS Code 的 editor group 是**模型投影**（不渲染），VS Code 的 editor 渲染成 **window content**。
 
-- **窗口标注为非 vscode 原生**的窗口：`PracWindowInput`（身份投影）+ `PracWindowPane`（空 pane），内容由 prac 的 frame 渲染；adaptor 对 **stage 的所有窗口**做映射，这一路用占位 input。判据来自窗口的标注（`PracWindow.tags`），不是 app 的来源。
-- **宿主渲染**（由 VS Code 这类机制渲染的窗口）：由宿主自己的机制渲染——editor 用 `TextEditorInput` + `TextEditorPane`，其它宿主内容用各自宿主；它们**不是** `PracWindowInput`，也不经 `windowProjection.map`。
+**窗口内容有两条路**（由窗口创建时绑定的 renderer / host 决定，不是 origin）：
 
-分流依据是窗口创建时绑定的 renderer/host（frame 还是宿主），不是 `origin` 字符串。
+- **host 渲染**（editor）：VS Code 的 editor input / pane 就是该 window 的 content；`PracEditorPaneHost` 把 pane 的 DOM 挂到 window body。
+- **frame 渲染**（chat / board / DSH）：window 的 content 是它的 renderer；frame 渲染。
 
-**镜像，不是权威**：`PracWindowInput` 由 WM 的窗口驱动，embed 不决定窗口是否存在。
+**editor group 是模型，不是容器**：
 
-- `PracWindowGroup`：prac 的 window group，实现 `IEditorGroupView`，借用 `EditorGroupModel` / `PracEditorPaneHost` / pane 类；
-- `PracWindowPane`：frame 渲染窗口的空 pane（内容在 prac frame）；
-- `mapped()` 返回 WM 投影过的窗口（`inputs.keys()`），不问 editor group；
-- `map(region)` 在 region 没有 group 时先 `ensureGroup(region)`，不丢弃窗口；
-- 窗口的 region 来自 WM 的 placement（`pracFrame.getState().items[id].region`），不从“有没有文件窗口”推导。
+- 每个 prac `WindowGroup` 对应一个 editor group（`IEditorGroupView` 的**模型**），随组创建，不按 region 懒建；
+- editor group 的 order / active 由 WM 的组镜像（订阅 snapshot），**不渲染**；
+- **每个窗口在 editor 模型里都有一个 input**：vscode window → editor input；非 vscode window → `PracWindowInput`（身份投影，**没有 `PracWindowPane`、不渲染**）。**这不是可选项**：一个组可以只有非 vscode window（例如只开 chat），editor 模型仍需要一个 input 才能保持 group / editor service 一致；
+- frame 的组才是 tab strip / items / window body 的渲染者；
+- host 的私有记录表只需 `windowId ↔ IEditorInput`（pane 是 window content，host 不需要维护 pane 的映射）。
+
+**去掉的中间层**：`mapWindow` / `ensureGroup(region)` / `PracWindowPane` / `mapped()` 不再是一条 per-window 链。投影是**一次** `snapshot → editor model` 的订阅；content 在 `admit` / `bindContent` 时已经确定。`PracWindowInput` **保留**，作为每个窗口在 editor 模型里的身份（含只有非 vscode window 的组）。
 
 ## 5.2 vscode host 的记录表
 
 窗口的 `tags` 标出“来自哪个机制”；但 `IEditorInput` / `IEditorPane` 的具体对象是 VS Code 内部的，core 不表达。vscode host 维护自己的记录表：
 
 ```ts
-Map<windowId, { input: IEditorInput; pane?: IEditorPane }>
+Map<windowId, IEditorInput>
 ```
 
 - 用于 editor 关闭 ↔ 窗口关闭的联动；
-- 用于 `CustomEditorInput` / `WebviewEditor` 的 pane 映射；
-- 用于 `windowProjection.map` 的“该不该映射”判断；
+- 用于 `CustomEditorInput` / `WebviewEditor` 的 input 映射（pane 是 window content，不在这里）；
 - 不写进 core，不进 `PracExtension` 契约。
 
 ## 6. 动态 / 错误 / 测试

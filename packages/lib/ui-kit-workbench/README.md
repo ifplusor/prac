@@ -27,6 +27,14 @@ prac-client-ui-frame (plugin)   prac-client-ui-widget (prac adapter)
 
 The kit exports no `apply` / `inject` / `name` and cannot be composed as a row.
 
+## Design
+
+The normative design (layers, the workbench model, and the L2 refactor under the
+latest UI model) lives in
+[`.agents/notes/in-progress/2026-11-12-tech-ui-kit.md`](../../../.agents/notes/in-progress/2026-11-12-tech-ui-kit.md).
+The `region-bindings` / `group-bridge` / `window-group-model` entries below describe
+the **pre-refactor** L2 and are being replaced by the model in that note.
+
 ## Scope
 
 ```text

@@ -13,7 +13,7 @@ status: in-progress
 |---|---|---|
 | L0 | `prac-ui-kit-layout` | geometry / tree / allocation / grid |
 | L1 | `prac-ui-kit-content` | content root / item / placement / store / renderer |
-| L2 | `prac-ui-kit-workbench` | app / window / group / board / widget / frame shell |
+| L2 | `prac-ui-kit-workbench` | app / window / group / board / widget 的**类型 / 契约** + frame shell 的渲染原语（region content / bindings / bridge 在 L2 refactor 中退役；模型权威见 [tech-ui](./2026-11-05-tech-ui.md)） |
 | L3 | `prac-client-ui-frame` | WM / frame / services / persistence / extension registry |
 | L3 | `prac-client-ui-widget` | board / widget adapters |
 | L3 | `prac-client-ui-workbench` | arrangement / default placement / recall / first-run |
@@ -34,6 +34,8 @@ status: in-progress
 | `prac-host-vscode-mcp` | MCP 定义来源 → DSH MCP client | `prac-host-vscode` + DSH MCP client | future；MVP 不做 |
 
 > 这些是设计需要，不是当前仓库已有；包名可以再定，职责边界先定。
+>
+> L2 的分层、定位与重构见 [tech-ui-kit](./2026-11-12-tech-ui-kit.md)。
 
 ## 3. 依赖规则
 

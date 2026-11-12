@@ -8,9 +8,9 @@ status: in-progress
 
 ## Summary
 
-prac 的渲染引擎是 DSH `ui-renderer` + `ui-slots`，负责**内容组合与运行时**，不负责窗口 / 布局 / chrome：
+prac 的渲染引擎是 DSH `ui-renderer` + `ui-slots`，是**整个 UI 的唯一 React root / renderer**：它渲染 **frame 在内的全部树**，并负责**内容组合与运行时**；它**不拥有 / 不解释**窗口、布局、chrome 的模型与决策（那些归 prac 的 WM / frame，见 [tech-ui](./2026-11-05-tech-ui.md)）。
 
-1. **窗口 / 布局**：`WindowManager` + frame。模型、parent、space、`WindowGroup`、layout、chrome 规则见 [tech-ui](./2026-11-05-tech-ui.md)。
+1. **frame 由引擎渲染**：frame 是 `root` 的 occupant；它的 region / group / window / chrome 都是 engine 渲染的 React 树（frame 的内部组件是 React，不是 slot entry）。frame 的**模型**（region / space / `WindowGroup` / window、两棵树、chrome 规则）以 tech-ui 为准。
 2. **内容组合**：entry 注册与授权、kind 派发（single / keyed / list / chain）、stable factory + occurrence、scope（root / session-maybe / session）、owner props、inject / store、locale、error boundary、`useSyncExternalStore` 绑定。
 
 **所有权边界**：frame、窗口与 chrome 是 prac 的；app content 是 app 的。app 通过 `start` 请求创建窗口并给出该窗口的内容；窗口的身份 / 生命周期 / chrome 由 prac 拥有并渲染；content 注册不参与 chrome。**数据 / 状态归 app 实例**，不归窗口或组件。
@@ -34,11 +34,11 @@ prac 的渲染引擎是 DSH `ui-renderer` + `ui-slots`，负责**内容组合与
 ```mermaid
 flowchart TD
   M["uiRenderer.mount(container)"] --> R["ctx.slots.renderSlot('root')"]
-  R --> F["frame（root occupant）"]
-  F --> CH["chrome：title / tab / pane header / actions（prac）"]
-  F --> L["regions / groups / boards（WM 快照）"]
+  R --> F["frame（root occupant；engine 渲染它的整棵 React 树）"]
+  F --> CH["chrome：title / tab / pane header / actions（prac 模型，engine 渲染）"]
+  F --> L["regions / groups / boards（WM 快照；engine 渲染）"]
   L --> W["window body"]
-  W --> CS["content seat"]
+  W --> CS["content seat（frame 给的座位）"]
   CS --> W1["prac.window entry（keyed=window id，无 children）"]
   CS --> W2["prac.widget entry（keyed=widget id，无 children）"]
   W1 --> O1["renderFactorySlot(host/app factory, {windowId})"]
@@ -48,7 +48,7 @@ flowchart TD
   I["PracAppInstance.state"] -.->|"uSES"| PC
 ```
 
-**frame 的 resolve**：WM snapshot → frame 把 layout 位置解析成 container（region 对象 / space / `WindowGroup` / window）→ 渲染 region / chrome / window body / content seat。engine **从 seat 开始**：它只认 `prac.window` / `prac.widget` entry 与 factory occurrence，不参与 parent / space / group 的解析。
+**frame 的 resolve**：WM snapshot → frame 把 layout 位置解析成 container（region 对象 / space / `WindowGroup` / window）→ 渲染 region / chrome / window body / content seat。**engine 渲染 frame 的整棵树**；在 content seat 上，它用 `prac.window` / `prac.widget` entry 与 factory occurrence 组合内容。frame 的模型/决策（parent / space / group 的解析）归 prac，engine 不参与，但**渲染**它。
 
 **创建 / 释放序列**
 
@@ -81,12 +81,14 @@ sequenceDiagram
 
 | 角色 | 归谁 | 负责 |
 | --- | --- | --- |
-| Instance | app 运行时（prac 记录） | 一次 launch 的实例：身份、参数、**数据 / 状态**、它打开的窗口；窗口是它的视图 |
+| AppInstance | app 运行时（prac 记录） | 一次 launch 的实例：身份、参数、**数据 / 状态**、它打开的窗口；窗口是它的视图 |
 | Window | prac（WM） | id、appId、instanceId、parent、生命周期（模型见 tech-ui） |
 | Chrome | prac（frame） | title bar、tab strip、container bar、pane header、窗口 actions 的渲染与策略；数据来自窗口记录 / app 定义 |
 | Content | 实现方（host / app）/ adaptor | 只填窗口 body；stable factory（children 声明）+ 每窗口 renderer |
 | Frame | prac | 布局、region、space grid、`WindowGroup` tab order、chrome、内容座位与隔离 |
-| App renderer | DSH ui-renderer | 唯一的 React root、React contexts、slot registry 的 React 绑定 |
+| App renderer | DSH ui-renderer | 唯一的 React root、React contexts、slot registry 的 React 绑定；渲染 frame 的整棵树 |
+
+> 这张表是**所有权 / 决定**：frame / WM 决定窗口、布局、chrome；**engine 渲染它们**（frame 的整棵树），不拥有、不解释。
 
 **不变量**
 
@@ -95,7 +97,7 @@ sequenceDiagram
 - **R3 内容 = stable factory + 每窗口 occurrence。** 声明（children）挂在 factory 上、name 不含 window id；`prac.window` entry 无 children、key 是 window id、renderer 渲染 occurrence。共享槽归 host factory，私有槽归 app factory；app 只提供窗口与 view key。
 - **R4 WM 拥有窗口。** slot entry 不是窗口；content entry 不是窗口。窗口身份、parent、placement、生命周期、chrome 的渲染与策略不写在 slot / content 里。
 - **R5 唯一 renderer、唯一 `root`。** prac 用 DSH `ui-renderer` 作为 app 的唯一 React root（`ctx.uiRenderer.mount` → 唯一一次 `renderSlot('root')`）；frame 是 `root` 的 occupant，在自己的 children 里声明内容座位、chrome、overlay 并渲染。frame 本身也是一个 slot entry；分层是职责分层，不是两个 renderer。
-- **R6 chrome 由 prac 决定并渲染。** content entry 的 `label` / `icon` / `paneHeader` / `actions` 不作为 chrome 来源；chrome 数据来自窗口记录 / app 定义，由 frame 决定怎么画。
+- **R6 chrome 由 prac 决定。** content entry 的 `label` / `icon` / `paneHeader` / `actions` 不作为 chrome 来源；chrome 数据来自窗口记录 / app 定义，由 frame 决定怎么画；engine 渲染 frame 的整棵树（含 chrome）。
 - **R7 数据 / 状态归 app 实例。** durable state 由 instance 拥有（observable / store），renderer 通过它绑定（uSES）；DOM 卸载 / 重挂载（region 移动、hide/show、isolation 重挂）不丢状态。组件本地 state 只放临时 UI 状态。
 - **R8 窗口 / 容器 / 布局模型不在本文。** region 对象、space、`WindowGroup`、window 的 parent 与两棵树的接合点见 [tech-ui](./2026-11-05-tech-ui.md) §2；engine 只认 entry / occurrence，不参与 parent / space / group 的解析。
 
@@ -132,10 +134,9 @@ sequenceDiagram
 
 **frame / chrome**
 
-- frame 渲染窗口树与 chrome；chrome 数据来自窗口记录（`admit` 的 title / icon）与 app 定义，不读 content entry options。
-- catalogue / recall 是 WM 窗口与内容 id 的 join；chrome 事实不来自 content entry。
-- frame 只认识内容 id 与座位，不认识生产者 slot；布局 / 容器的解析见 [tech-ui](./2026-11-05-tech-ui.md) §2.6。
-- 空 `WindowGroup` 的 placeholder（watermark）是 **frame 的 chrome**，不注册 content entry；见 [tech-ui](./2026-11-05-tech-ui.md) I10。
+- **engine 渲染 frame 及其 chrome**；frame 的模型/决策归 prac（见 [tech-ui](./2026-11-05-tech-ui.md)），engine 不拥有、不解释。
+- chrome 数据来自窗口记录 / app 定义，不读 content entry options。
+- frame 只认识内容 id 与座位，不认识生产者 slot；窗口 / 组 / 布局 / chrome 的模型见 tech-ui。
 
 **DSH host**
 
