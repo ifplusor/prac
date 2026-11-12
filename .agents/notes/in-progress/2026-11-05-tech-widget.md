@@ -26,17 +26,28 @@ widget 是什么、board 是什么、board 怎么从 widget 推导、怎么恢�
 
 ## 2. 数据模型
 
+> **board 是 window 的 content**（不是容器树的节点）；widget 是 board 的内容。窗口的 parent 是 group（见 [tech-ui](./2026-11-05-tech-ui.md) §2.1）。
+
 ### 2.1 widget
 
 ```ts
+/** 领域数据（持久化）。 */
 interface PracWidget {
   readonly def: PracWidgetDef;   // id / title / icon / defaultBoard / defaultRegion
   readonly source: string;       // "vscode:view" / "dsh:slot" / "prac:…"
   readonly boardId: string;      // 唯一当前归属
-  content(): () => ReactNode;
+}
+
+/** 视图层（不持久化）：content renderer + chrome actions。 */
+interface PracWidgetView {
+  readonly content: PracWidgetRenderer;
   actions?(): ReactNode;
 }
 ```
+
+`PracWidgetRenderer` 的 props 是 `prac.widget` entry 的 props（owner + 标准 kit + 声明 children 时的 `renderSlot`）。声明挂在 stable factory 上（widget id 是动态的，不挂在 `prac.widget` 下），`prac.widget` entry 只带 renderer；见 [rendering-engine](./2026-11-12-tech-rendering-engine.md)。
+
+**数据 vs 视图**：`PracWidget` 只有领域数据；`content` / `actions` 是视图层的 `PracWidgetView`，随 widget 运行时配对，不进持久化。`def` 里的 title / icon 是 catalog 元数据（chrome 数据），不是视图种类。
 
 ### 2.2 board
 
@@ -67,7 +78,7 @@ board 的布局是一棵 `LayoutState`，它的 `items` 就是 `ItemRecord`（`r
 - 于是跨 board 的 widget 移动、以及“拖到 dock 激活另一个 board / 新建 board”，都在同一个权威下完成；
 - item id = widget id；成员由 `PracBoard.widgets` 显式给出；不产生第三个真相源。
 
-**一个 board 只有一个窗口**：窗口的 region 是 WM 的 window placement，与这棵树是两层（外层是窗口放哪，内层是 widget 怎么排）。
+**一个 board 只有一个窗口**：窗口的 parent 是 `WindowGroup`（组的 cell / tab order 是 WM 的布局）；board 的 `LayoutState` 是窗口 **content 内部** 的布局。两者是两层：组的位置是 WM 的，widget 的排布是 board 的。
 
 ## 3. 接口
 
@@ -196,7 +207,8 @@ sequenceDiagram
 2. `reset` 的默认顺序（index 语义）；
 3. 一个 widget 的 `defaultBoard` 指向的 board 不存在且未持久化时的创建时机（contribute 时还是 reconcile 时）；
 4. ~~多窗口同一 board 的写冲突~~ 已关闭：一个 board 只有一个窗口；
-4. **从未被打开的 board 是否存在**（能否被 pin、能否出现在 dock 的初始 pins 里）——这决定 dock 的初始数据来源。在它成为阻塞之前不裁决。
+5. **从未被打开的 board 是否存在**（能否被 pin、能否出现在 dock 的初始 pins 里）——这决定 dock 的初始数据来源。在它成为阻塞之前不裁决；
+6. **`prac.widget` 的 factory**：widget 内容的声明挂 app factory 还是每 widget 类型的 factory？关闭条件：同一 app 多个 widget 共享声明、widget id 只做 occurrence。
 
 ## Related
 

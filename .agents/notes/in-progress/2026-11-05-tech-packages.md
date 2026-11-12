@@ -21,7 +21,7 @@ status: in-progress
 | L3 | `prac-client-vscode-host` | VS Code bridge / catalog / commands |
 | L3 | `prac-client-ui-vscode-views` | ViewContainer → board；View → widget |
 | L3 | `prac-client-ui-vscode-editor` | editor input → window / pane host |
-| L3 | `prac-client-dsh-host` | DSH slot / app / internal slot |
+| L3 | `prac-client-dsh-host` | DSH slot / host / internal slot |
 | Server | `prac-host-vscode` | code server / extension host / policy / webview endpoint |
 | Bundle | `prac-web-app` | composition root |
 

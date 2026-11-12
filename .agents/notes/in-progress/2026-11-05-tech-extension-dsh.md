@@ -40,8 +40,8 @@ flowchart LR
   H -.->|future| R
 ```
 
-- **host extension**：`manifest.id = "prac.dsh-host"`，`provides: ["prac.dshHost"]`；只接 DSH slots / content host，不贡献 app / widget。
-- **chat extension**：`dependsOn: ["prac.dshHost"]`；`apps()` 返回 chat `PracAppDef`；`windows()` 来自 conversation——**一个 conversation 一个 `PracWindow`；tab 是 window group 的 window**；`contentFor(windowId)` 返回 chat 内容。
+- **host extension**：`manifest.id = "prac.dsh-host"`，`provides: ["prac.dshHost"]`；只接 DSH slots / content factory，不贡献 app / widget。它在 `apply` 里注册**一个** stable content factory，声明 `main` / `sidebar` / `rightbar`（一次，随插件释放）；各 feature extension 的窗口只是这个 factory 的 occurrence，不各自声明这些槽。
+- **chat extension**：`dependsOn: ["prac.dshHost"]`；`apps()` 返回 chat `PracAppDef`；`windows()` 来自 conversation——**一个 conversation 一个 `PracWindow`；tab 是 window group 的 window**；chat 的 `start` 创建窗口并注册 renderer（渲染 host factory 的 occurrence；children 声明在 host factory，不在 per-window entry 上）。窗口模型见 [tech-ui](./2026-11-05-tech-ui.md) §2。
 - **sidebar / rightbar**：设计上是 extension，当前不接；接入时各自贡献 app 或 widget。
 - 全部 `origin: "dsh"`；host 未 ready → feature disabled / degraded。
 
@@ -63,7 +63,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  M["main keyed entry"] --> A["PracAppDef + windows"]
+  M["main keyed entry"] --> A["window 的 factory occurrence<br/>（一个 key 一个窗口）"]
   S["sidebar / rightbar"] --> B["PracAppDef / PracWidgetDef<br/>(future)"]
   I["internal slot"] --> W["PracWidgetDef"]
   O["shell.overlay"] --> OV["frame overlay"]
@@ -71,8 +71,8 @@ flowchart LR
   T["shell.bottom"] --> ST["frame status"]
 ```
 
-- `main` keyed entry（conversation / plugin manager / task manager）→ app；
-- `sidebar` / `rightbar` 设计上是 app；**当前不接**；
+- `main` keyed entry（conversation / plugin manager / task manager）→ 窗口内容（host factory 声明一次、每窗口一个 occurrence）；
+- `sidebar` / `rightbar` 设计上是窗口内容（future）；**当前不接**；
 - 内部 slot（conversation.* / sidebar.* / settings.* / plugins.*）→ widget；
 - `shell.overlay` / toast / quota notice → frame overlay；
 - `shell.leading` / `shell.bottom` → frame chrome / status bar，不是 window / widget。
@@ -126,3 +126,4 @@ flowchart LR
 - [tech-ui](./2026-11-05-tech-ui.md)：PracWindow / WindowPlacement。
 - [tech-widget](./2026-11-05-tech-widget.md)：PracWidget / WidgetPlacement。
 - [tech-extension-vscode](./2026-11-05-tech-extension-vscode.md)：VS Code 侧。
+- [rendering-engine](./2026-11-12-tech-rendering-engine.md)：窗口/内容/renderer 的引擎边界与 host 实现。

@@ -23,7 +23,7 @@ prac 的类型检查用 npm 上发布的 DSH 包，而 app 跑的是某个 check
 
 由此得到 prac 的规矩：
 
-- **键由拥有者声明**。prac 现在就是**帧的所有者**（它 publish `ctx.layout`、自己做 `root` 注册），所以 `sidebar` / `main` / `rightbar` / `shell.overlay` 与 `prac.view` 一起写在 prac 的槽声明里（`ui-frame` / `ui-widget`）—— 不再由 `web-app` 去 import DSH 的 `ui-layout` 借那四个键。
+- **键由拥有者声明**。prac 的 frame 拥有 `root` 与 prac 自己的槽（`prac.window` / `prac.widget` / `shell.overlay`）；DSH 的 `main` / `sidebar` / `rightbar` 由 `dsh-host` 声明并渲染（见 [rendering-engine](./2026-11-12-tech-rendering-engine.md)）。不再由 `web-app` import DSH 的 `ui-layout` 借键。
 - **消费者只取拥有者的声明，不做比较**：`import type {} from "@deepseek-ai/dsh-client-ui-renderer/client"` 把 `Context.slots` 带进 program；不再写 `const slots: SlotRegistry = ctx.slots` 或 `ctx.layout satisfies ILayout` 这类**跨 record 断言**（augmented `Context` 成员与直接 import 在 `nodenext` 下是两条 module record，比较不可能成立）。
 - **消费者读的是构建出的 `dist/client.d.mts`**：改了声明必须 `vp run -r build` 才生效 —— 本仓库的 client 半以 DSH 的 loader 契约打包，`./client` 的 `types` 指向 `dist/client.d.mts`。这一点曾让"声明已经写了、消费者却看不见"看起来像打包器丢了 ambient 声明。
 

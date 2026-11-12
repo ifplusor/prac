@@ -53,7 +53,7 @@ flowchart LR
 ### 2.2 两种 extension
 
 - **host extension**：提供机制（boot / embed / face），不贡献 app / widget；feature extension 依赖它。
-- **feature extension**：贡献 app / widget，`dependsOn` 对应的 host。
+- **feature extension**：贡献 app / widget，`dependsOn` 对应的 host。内容的**实现方**（host 或 app 自己）在 `apply` 里注册 **stable content factory**（slots 声明一次，随插件释放，每实现方一个定义，不按窗口拆）；feature extension 为每个窗口注册无 children 的 `prac.window` entry（renderer 渲染 factory occurrence）。window id 只做 key/occurrence，不进 factory name。
 
 本文只规定这两种契约的形态，不定义 app 的语义（app 模型见 [tech-ui](./2026-11-05-tech-ui.md) §2）。
 
@@ -101,9 +101,9 @@ interface PracExtension {
 }
 
 interface PracAppImpl {
-  content(windowId: string): () => ReactNode;
   match?(resource: string): boolean;
-  open?(resource: string): boolean;
+  /** The app's entry: creates the instance's windows and registers their content slots. */
+  start?(params: unknown, instance: PracAppInstance): boolean;
 }
 
 interface PracWidgetImpl {
@@ -146,7 +146,7 @@ export function apply(ctx: Context): void {
 - `ctx.effect` / `ctx.on("dispose")` 负责清理；
 - 没有 `PracExtensionContext` / `activate` / `dispose` 这一层。
 
-- app 内容：app 运行时的 `content(windowId)`；extension 不提供内容；
+- app 内容：`start` 创建窗口时给定的 renderer；extension 不提供内容；
 - widget 宿主：widget 运行时的宿主；extension 不提供宿主；
 - app 的窗口：app 的 `open` 声明、实例持有；extension 不持有窗口；
 - host extension：Cordis plugin，`ctx.provide("prac.vscodeHost", …)`，不贡献 apps / widgets；
